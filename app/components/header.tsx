@@ -26,8 +26,9 @@ export default function Header() {
         </Link>
       </div>
 
-      <button id="menu-toggle" aria-label="Toggle menu" onClick={toggleMenu}>
-        <i className="fas fa-bars"></i>
+      <button 
+        id="menu-toggle"aria-label="Toggle menu"onClick={toggleMenu} className={menuOpen ? "active" : ""}>
+        <i></i>
       </button>
 
       <ul id="navbar-menu" className={menuOpen ? "active" : ""}>

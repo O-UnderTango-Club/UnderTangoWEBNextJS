@@ -38,6 +38,7 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 40px 20px;
+  opacity: 1;
 }
 
 .image-text-row {
@@ -142,6 +143,7 @@ body {
   max-width: 800px;
   text-align: center;
   padding: 0 20px;
+  opacity: 1;
 }
 
 .hero-title {
@@ -179,6 +181,38 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 4rem 1rem;
+  opacity: 1;
+}
+
+.class-info{
+  opacity: 1;
+}
+
+.location{
+  opacity: 1;
+}
+
+.map-container {
+  display: block !important;
+  width: 100%;
+  height: auto;
+}
+
+
+.gallery{
+  opacity: 1;
+}
+
+.contact{
+  opacity: 1;
+}
+
+.location-content{
+  opacity: 1;
+}
+
+.hero-content{
+  opacity: 1;
 }
 
 .section-title {
@@ -402,7 +436,7 @@ footer {
   opacity: 0.8;
 }
 
-/* Media Queries para mejorar la responsividad */
+
 @media (max-width: 1024px) {
   .hero-title {
     font-size: 3.5rem;

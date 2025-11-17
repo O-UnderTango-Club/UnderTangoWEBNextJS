@@ -30,7 +30,6 @@
   background-color: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);
   box-sizing: border-box;
-  /* Eliminamos overflow: hidden para permitir que el menú se expanda fuera del navbar */
 }
 
 #navbar.scrolled {
@@ -55,19 +54,21 @@
   height: 80px;
 }
 
-#navbar ul {
+#navbar-menu {
   display: flex;
   list-style: none;
   margin: 0;
   padding: 0;
+  flex-direction: row;
+  align-items: center;
 }
 
-#navbar ul li {
+#navbar-menu li {
   margin-left: 30px;
   position: relative;
 }
 
-#navbar ul li a {
+#navbar-menu li a {
   font-family: "Bellerose", sans-serif;
   color: var(--white);
   text-decoration: none;
@@ -76,9 +77,10 @@
   transition: all 0.3s ease;
   padding: 5px 0;
   position: relative;
+  display: inline-block;
 }
 
-#navbar ul li a::after {
+#navbar-menu li a::after {
   content: "";
   position: absolute;
   bottom: -5px;
@@ -89,23 +91,25 @@
   transition: width 0.3s ease;
 }
 
-#navbar ul li a:hover {
+#navbar-menu li a:hover {
   color: var(--burgundy);
 }
 
-#navbar ul li a:hover::after {
+#navbar-menu li a:hover::after {
   width: 100%;
 }
 
-/* Menú hamburguesa - Estilos corregidos */
+#navbar-menu li a.active {
+  color: var(--burgundy);
+}
+
+/* Menú hamburguesa */
 #menu-toggle {
   display: none;
   background: rgba(53, 4, 16, 0.5);
   border: none;
-  color: var(--white);
-  font-size: 1.8rem;
   cursor: pointer;
-  z-index: 1002; /* Aumentamos el z-index para asegurar que esté por encima del menú */
+  z-index: 1002;
   transition: all 0.3s ease;
   padding: 8px;
   border-radius: 5px;
@@ -113,6 +117,8 @@
   height: 45px;
   justify-content: center;
   align-items: center;
+  flex-direction: column;
+  gap: 5px;
   position: absolute;
   right: 15px;
   top: 50%;
@@ -120,15 +126,69 @@
 }
 
 #menu-toggle:hover {
-  color: var(--secondary);
   background-color: rgba(53, 4, 16, 0.8);
 }
 
-#menu-toggle.active {
-  color: var(--secondary);
+#menu-toggle::before,
+#menu-toggle::after,
+#menu-toggle i {
+  content: '';
+  display: block;
+  width: 25px;
+  height: 3px;
+  background-color: var(--white);
+  transition: all 0.3s ease;
+  border-radius: 2px;
 }
 
-@media (max-width: 768px) {
+#menu-toggle i {
+  font-style: normal;
+}
+
+#menu-toggle.active::before {
+  transform: translateY(8px) rotate(45deg);
+}
+
+#menu-toggle.active i {
+  opacity: 0;
+}
+
+#menu-toggle.active::after {
+  transform: translateY(-8px) rotate(-45deg);
+}
+
+#menu-toggle.active {
+  background-color: rgba(53, 4, 16, 0.8);
+}
+
+#menu-toggle:hover::before,
+#menu-toggle:hover::after,
+#menu-toggle:hover i {
+  background-color: var(--secondary);
+}
+
+@media screen and (min-width: 769px) {
+  #navbar-menu {
+    display: flex !important;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    background-color: transparent !important;
+    flex-direction: row !important;
+    padding: 0 !important;
+  }
+  
+  #navbar-menu li {
+    display: list-item !important;
+    margin-left: 30px !important;
+  }
+  
+  #menu-toggle {
+    display: none !important;
+  }
+}
+
+@media screen and (max-width: 768px) {
   #navbar {
     padding: 10px 15px;
   }
@@ -138,10 +198,10 @@
   }
 
   #menu-toggle {
-    display: flex;
+    display: flex !important;
   }
 
-  #navbar ul {
+  #navbar-menu {
     position: fixed;
     top: 0;
     right: -100%;
@@ -154,32 +214,28 @@
     transition: right 0.3s ease;
     backdrop-filter: blur(10px);
     padding: 80px 0;
-    z-index: 1001; /* Aseguramos que el menú tenga un z-index adecuado */
+    z-index: 1001;
   }
 
-  #navbar ul.active {
+  #navbar-menu.active {
     right: 0;
-    display: flex; /* Forzamos display flex cuando está activo */
-    visibility: visible; /* Aseguramos que sea visible */
-    opacity: 1; /* Aseguramos que sea completamente opaco */
   }
 
-  #navbar ul li {
+  #navbar-menu li {
     margin: 20px 0;
     margin-left: 0;
-    display: block; /* Aseguramos que los elementos de lista sean visibles */
     width: 100%;
     text-align: center;
   }
 
-  #navbar ul li a {
+  #navbar-menu li a {
     font-size: calc(var(--font-size-body) * 1.2);
-    display: block; /* Aseguramos que los enlaces sean visibles */
-    padding: 10px 20px; /* Aumentamos el área clickeable */
+    display: block;
+    padding: 10px 20px;
   }
 }
 
-@media (max-width: 480px) {
+@media screen and (max-width: 480px) {
   #navbar {
     padding: 8px 10px;
   }
@@ -188,11 +244,11 @@
     height: 50px;
   }
 
-  #navbar ul {
+  #navbar-menu {
     width: 100%;
   }
 
-  #navbar ul li a {
+  #navbar-menu li a {
     font-size: var(--font-size-body);
   }
   
@@ -204,7 +260,7 @@
   }
 }
 
-@media (max-width: 360px) {
+@media screen and (max-width: 360px) {
   #navbar {
     padding: 6px 8px;
   }

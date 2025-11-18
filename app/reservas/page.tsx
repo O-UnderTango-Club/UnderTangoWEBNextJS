@@ -10,7 +10,10 @@ import '../styles/footer.css';
 export default function ReservasPage() {
   const [showType, setShowType] = useState('');
   const [comments, setComments] = useState('');
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | null }>({ text: '', type: null });
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | null }>({
+    text: '',
+    type: null
+  });
 
   const handleSelect = (value: string) => {
     setShowType(value);
@@ -53,124 +56,130 @@ export default function ReservasPage() {
     <>
       <Header />
 
-      <section className="shows-section" id="shows">
-        <div className="container">
-          <h2 className="section-title">Nuestros Espectáculos</h2>
-          <p className="section-text">
-            Ofrecemos una amplia gama de espectáculos que se adaptan a las necesidades de nuestros clientes. Nos
-            desenvolvemos principalmente en la Triple Frontera entre Paraguay, Brasil y Argentina, pero también llevamos
-            nuestro arte más allá de estas fronteras. Nuestra pasión por el tango nos impulsa a crear experiencias
-            únicas e inolvidables para cada ocasión.
-          </p>
+      {/* ⬇ IMPORTANTE: TODO dentro del wrapper ⬇ */}
+      <div className="reservas-wrapper">
 
-          <div className="show-highlights">
-            <div className="highlight-card">
-              <i className="fas fa-music"></i>
-              <h3>Shows de Danza</h3>
-              <p>Espectáculos de tango tradicional y fusión.</p>
-            </div>
-            <div className="highlight-card">
-              <i className="fas fa-guitar"></i>
-              <h3>Shows de Música en Vivo</h3>
-              <p>Bandas y solistas de tango y géneros afines.</p>
-            </div>
-            <div className="highlight-card">
-              <i className="fas fa-star"></i>
-              <h3>Megaeventos</h3>
-              <p>Producciones a gran escala para ocasiones especiales.</p>
-            </div>
-            <div className="highlight-card">
-              <i className="fas fa-globe-americas"></i>
-              <h3>Show Triplefrontera</h3>
-              <p>Una fusión única de las artes y culturas de Argentina, Brasil y Paraguay.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+        <section className="shows-section" id="shows">
+          <div className="reservas-container">
+            <h2 className="section-title">Nuestros Espectáculos</h2>
+            <p className="section-text">
+              Ofrecemos una amplia gama de espectáculos adaptados a las necesidades de nuestros clientes.
+            </p>
 
-
-      <section className="reserva-section" id="reserva">
-        <div className="container">
-          <h2 className="section-title">Reserva un Espectáculo</h2>
-          <form onSubmit={handleSubmit} className="reserva-form">
-            <div className="form-group">
-              <label htmlFor="name">Nombre:</label>
-              <input type="text" id="name" name="name" required />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="email">Email:</label>
-              <input type="email" id="email" name="email" required />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="date">Fecha Deseada:</label>
-              <input type="date" id="date" name="date" required />
-            </div>
-
-            <div className="form-group">
-              <label>Tipo de Espectáculo:</label>
-              <div className="button-select">
-                {[
-                  { label: 'Show de danza', value: 'show-danza' },
-                  { label: 'Show de música', value: 'show-musica' },
-                  { label: 'Show híbrido', value: 'show-hibrido' },
-                  { label: 'Show triplefrontera', value: 'show-triplefrontera' },
-                  { label: 'Megaevento', value: 'megaevento' },
-                  { label: 'Otros', value: 'otros' },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={`select-button ${showType === option.value ? 'active' : ''}`}
-                    onClick={() => handleSelect(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+            <div className="show-highlights">
+              <div className="highlight-card">
+                <i className="fas fa-music"></i>
+                <h3>Shows de Danza</h3>
+                <p>Espectáculos de tango tradicional y fusión.</p>
               </div>
-              <input type="hidden" id="show-type" name="show-type" value={showType} required />
+
+              <div className="highlight-card">
+                <i className="fas fa-guitar"></i>
+                <h3>Shows de Música en Vivo</h3>
+                <p>Bandas y solistas.</p>
+              </div>
+
+              <div className="highlight-card">
+                <i className="fas fa-star"></i>
+                <h3>Megaeventos</h3>
+                <p>Producciones a gran escala.</p>
+              </div>
+
+              <div className="highlight-card">
+                <i className="fas fa-globe-americas"></i>
+                <h3>Show Triplefrontera</h3>
+                <p>Una fusión de culturas.</p>
+              </div>
             </div>
-
-            <div className="form-group">
-              <label htmlFor="comments">Comentarios:</label>
-              <textarea
-                id="comments"
-                name="comments"
-                maxLength={300}
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
-              ></textarea>
-              <p id="char-count">{comments.length}/300 caracteres</p>
-            </div>
-
-            <button type="submit" className="submit-button">
-              Enviar Solicitud
-            </button>
-          </form>
-
-          {message.type && (
-            <div id="message" className={message.type}>
-              {message.text}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="contact" id="contacto">
-        <div className="container">
-          <h2 className="section-title">Contáctanos</h2>
-          <p className="section-text">
-            ¿Tienes preguntas o quieres más información? ¡Escríbenos!
-          </p>
-          <div className="whatsapp-button-container">
-            <a href="https://wa.me/+5493757618270" className="contact-button" target="_blank" rel="noopener noreferrer">
-              <i className="fab fa-whatsapp"></i>
-              <span>WhatsApp</span>
-            </a>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <section className="reserva-section" id="reserva">
+          <div className="reservas-container">
+            <h2 className="section-title">Reserva un Espectáculo</h2>
+
+            <form onSubmit={handleSubmit} className="reserva-form">
+              <div className="form-group">
+                <label htmlFor="name">Nombre:</label>
+                <input type="text" id="name" name="name" required />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="email">Email:</label>
+                <input type="email" id="email" name="email" required />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="date">Fecha Deseada:</label>
+                <input type="date" id="date" name="date" required />
+              </div>
+
+              <div className="form-group">
+                <label>Tipo de Espectáculo:</label>
+                <div className="button-select">
+                  {[
+                    { label: 'Show de danza', value: 'show-danza' },
+                    { label: 'Show de música', value: 'show-musica' },
+                    { label: 'Show híbrido', value: 'show-hibrido' },
+                    { label: 'Show triplefrontera', value: 'show-triplefrontera' },
+                    { label: 'Megaevento', value: 'megaevento' },
+                    { label: 'Otros', value: 'otros' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`select-button ${showType === option.value ? 'active' : ''}`}
+                      onClick={() => handleSelect(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="comments">Comentarios:</label>
+                <textarea
+                  id="comments"
+                  name="comments"
+                  maxLength={300}
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                ></textarea>
+                <p id="char-count">{comments.length}/300 caracteres</p>
+              </div>
+
+              <button type="submit" className="submit-button">Enviar Solicitud</button>
+            </form>
+
+            {message.type && (
+              <div id="message" className={message.type}>
+                {message.text}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="contact" id="contacto">
+          <div className="reservas-container">
+            <h2 className="section-title">Contáctanos</h2>
+            <p className="section-text">¿Tienes preguntas? Escríbenos por WhatsApp</p>
+
+            <div className="whatsapp-button-container">
+              <a
+                href="https://wa.me/+5493757618270"
+                className="contact-button"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i className="fab fa-whatsapp"></i>
+                <span>WhatsApp</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+      </div>
 
       <Footer />
     </>

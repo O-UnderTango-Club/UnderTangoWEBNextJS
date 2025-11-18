@@ -1,153 +1,100 @@
+/* login.css - estilo actualizado: más estirado, moderno y con toggle de ver contraseña */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, rgba(10, 10, 10, 0.85) 0%, rgba(26, 0, 0, 0.85) 50%, rgba(0, 0, 0, 0.85) 100%), 
-                url('../../public/assets/images/underlogoredondo.png');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    min-height: 100vh;
-    padding: 0;
-    margin: 0;
+:root{
+  --bg-dark: #0b0b0b;
+  --panel-dark: rgba(18,18,18,0.96);
+  --accent: #DC143C;
+  --muted: #9b9b9b;
+  --input-bg: #121212;
+  --glass: rgba(255,0,0,0.04);
+  --radius: 14px;
 }
 
+/* fondo */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, rgba(10,10,10,0.85) 0%, rgba(26,0,0,0.85) 50%, rgba(0,0,0,0.85) 100%),
+                url('/assets/images/underlogoredondo.png') no-repeat center / cover;
+    min-height: 100vh;
+    color: #eee;
+}
+
+/* navbar (si lo usás) */
 .navbar {
     background: rgba(10, 10, 10, 0.95);
-    border-bottom: 2px solid rgba(220, 20, 60, 0.3);
-    padding: 20px 40px;
+    border-bottom: 2px solid rgba(220, 20, 60, 0.15);
+    padding: 16px 32px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.6);
 }
 
-.navbar-brand {
-    display: flex;
-    align-items: center;
-    text-decoration: none;
-}
-
-.navbar-brand img {
-    height: 45px;
-    width: auto;
-    object-fit: contain;
-}
-
-.navbar-links {
-    display: flex;
-    gap: 30px;
-    align-items: center;
-}
-
-.navbar-links a {
-    color: #ccc;
-    text-decoration: none;
-    font-size: 15px;
-    transition: color 0.3s ease;
-    font-weight: 500;
-}
-
-.navbar-links a:hover {
-    color: #DC143C;
-}
-
+/* contenedor central */
 .content-wrapper {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: calc(100vh - 80px);
+    min-height: calc(100vh - 100px);
     padding: 40px 20px;
 }
 
-.page-header {
-    text-align: center;
-    margin-bottom: 40px;
-}
-
-.page-header h1 {
-    color: #DC143C;
-    font-size: 36px;
-    font-weight: 700;
-    margin-bottom: 10px;
-    text-shadow: 0 0 20px rgba(220, 20, 60, 0.5);
-}
-
-.page-header p {
-    color: #999;
-    font-size: 16px;
-}
-
+/* panel (más ancho) */
 .container {
-    background: rgba(20, 20, 20, 0.95);
+    background: linear-gradient(180deg, rgba(18,18,18,0.96), rgba(14,14,14,0.95));
     border-radius: 20px;
-    box-shadow: 0 20px 60px rgba(255, 0, 0, 0.3);
-    border: 1px solid rgba(255, 0, 0, 0.2);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    border: 1px solid rgba(220,20,60,0.06);
     width: 100%;
-    max-width: 450px;
+    max-width: 620px;      /* más estirado que antes */
     overflow: hidden;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(8px);
 }
 
+/* tabs */
 .tabs {
     display: flex;
-    background: #0a0a0a;
-    border-bottom: 2px solid rgba(255, 0, 0, 0.3);
+    background: linear-gradient(90deg, rgba(6,6,6,0.9), rgba(18,18,18,0.9));
+    border-bottom: 1px solid rgba(255,255,255,0.03);
 }
 
 .tab {
     flex: 1;
-    padding: 18px;
+    padding: 16px 22px;
     text-align: center;
     cursor: pointer;
-    color: #999;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    border-bottom: 3px solid transparent;
-}
-
-.tab:hover {
-    background: rgba(139, 0, 0, 0.1);
-    color: #DC143C;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    transition: all 0.25s ease;
+    position: relative;
 }
 
 .tab.active {
-    color: #DC143C;
-    border-bottom-color: #DC143C;
-    background: rgba(139, 0, 0, 0.2);
+    color: var(--accent);
+    background: linear-gradient(180deg, rgba(255,0,30,0.02), rgba(255,0,30,0.015));
+    box-shadow: inset 0 -3px 0 rgba(220,20,60,0.06);
 }
 
+/* formulario con más padding */
 .form-container {
-    padding: 40px;
-}
-
-.form-content {
-    display: none;
+    padding: 36px 44px;
 }
 
 .form-content.active {
     display: block;
-    animation: fadeIn 0.4s ease;
+    animation: fadeIn 0.35s ease;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
+/* estilos de inputs más altos */
 .form-group {
-    margin-bottom: 25px;
+    margin-bottom: 20px;
 }
 
 label {
@@ -155,182 +102,124 @@ label {
     color: #ccc;
     font-size: 14px;
     margin-bottom: 8px;
-    font-weight: 500;
+    font-weight: 600;
+}
+
+/* wrapper para inputs con iconos */
+.input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
 }
 
 input {
     width: 100%;
-    padding: 14px 18px;
-    background: #1a1a1a;
-    border: 2px solid rgba(255, 0, 0, 0.3);
-    border-radius: 10px;
+    padding: 14px 46px 14px 16px; /* espacio para icono a la derecha */
+    background: var(--input-bg);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 12px;
     color: #fff;
     font-size: 15px;
-    transition: all 0.3s ease;
+    transition: all 0.18s ease;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.6) inset;
 }
 
 input:focus {
     outline: none;
-    border-color: #DC143C;
+    border-color: rgba(220,20,60,0.9);
+    box-shadow: 0 6px 24px rgba(220,20,60,0.06);
     background: #0f0f0f;
-    box-shadow: 0 0 15px rgba(220, 20, 60, 0.3);
 }
 
 input::placeholder {
-    color: #666;
+    color: #777;
 }
 
-.remember-forgot {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 25px;
-    font-size: 13px;
-}
-
-.remember {
-    display: flex;
-    align-items: center;
-    color: #999;
-}
-
-.remember input[type="checkbox"] {
-    width: auto;
-    margin-right: 8px;
+/* toggle icono dentro del input (ver contraseña) */
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
     cursor: pointer;
+    padding: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #bbb;
+    border-radius: 8px;
 }
 
-.forgot-link {
-    color: #DC143C;
-    text-decoration: none;
-    transition: color 0.3s ease;
+.password-toggle:hover {
+    color: var(--accent);
+    background: rgba(255,255,255,0.02);
 }
 
-.forgot-link:hover {
-    color: #ff3366;
-}
-
+/* boton principal más grande */
 .btn {
     width: 100%;
-    padding: 15px;
+    padding: 14px;
     background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%);
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     color: #fff;
     font-size: 16px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 5px 15px rgba(220, 20, 60, 0.4);
+    transition: all 0.25s ease;
+    box-shadow: 0 10px 30px rgba(220, 20, 60, 0.18);
 }
 
 .btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(220, 20, 60, 0.6);
+    box-shadow: 0 14px 36px rgba(220,20,60,0.26);
 }
 
-.btn:active {
-    transform: translateY(0);
-}
-
-.divider {
-    display: flex;
-    align-items: center;
-    margin: 25px 0;
-    color: #666;
-    font-size: 13px;
-}
-
-.divider::before,
-.divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: rgba(255, 0, 0, 0.2);
-}
-
-.divider span {
-    padding: 0 15px;
-}
-
-.social-login {
-    display: flex;
-    gap: 15px;
-}
-
-.social-btn {
-    flex: 1;
-    padding: 12px;
-    background: #1a1a1a;
-    border: 2px solid rgba(255, 0, 0, 0.3);
-    border-radius: 10px;
-    color: #fff;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 14px;
-}
-
-.social-btn:hover {
-    background: rgba(139, 0, 0, 0.2);
-    border-color: #DC143C;
-}
-
-.footer-text {
-    text-align: center;
-    margin-top: 20px;
-    color: #666;
-    font-size: 13px;
-}
-
+/* barra de fuerza visible */
 .password-strength {
     margin-top: 8px;
-    height: 4px;
-    background: #1a1a1a;
-    border-radius: 2px;
+    height: 8px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
     overflow: hidden;
-    display: none;
 }
 
 .password-strength-bar {
     height: 100%;
     width: 0;
-    transition: all 0.3s ease;
+    transition: width 0.25s ease, background 0.25s ease;
 }
 
-/* Contenedor principal del login */
-.login-page {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
+/* mensajes de error */
+.error-box {
+    margin: 14px 0;
+    padding: 12px 16px;
+    background: rgba(255,0,0,0.06);
+    border-left: 4px solid rgba(220,20,60,0.8);
+    color: #ffd6d6;
+    border-radius: 8px;
+    font-weight: 600;
 }
 
-.navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  background: rgba(10, 10, 10, 0.95);
-  border-bottom: 2px solid rgba(220, 20, 60, 0.3);
-  padding: 20px 40px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+/* helper / small text */
+.footer-text {
+    text-align: center;
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 13px;
 }
 
-.content-wrapper {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 40px 20px;
-  min-height: calc(100vh - 100px);
-  margin-top: 100px;
+/* responsive */
+@media (max-width: 900px) {
+    .container { max-width: 520px; }
+    .form-container { padding: 28px; }
 }
 
-
-.strength-weak { background: #ff4444; width: 33%; }
-.strength-medium { background: #ffaa00; width: 66%; }
-.strength-strong { background: #00ff00; width: 100%; }
+@media (max-width: 480px) {
+    .container { max-width: 92%; border-radius: 12px; }
+    .form-container { padding: 20px; }
+    .tab { padding: 12px; font-size: 14px; }
+    .btn { padding: 12px; font-size: 15px; }
+}

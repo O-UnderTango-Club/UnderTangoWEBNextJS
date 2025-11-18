@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -8,9 +8,23 @@ import "../styles/navbar.css";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Estado de login
   const pathname = usePathname();
 
   const toggleMenu = () => setMenuOpen(!menuOpen);
+
+  // Ejemplo simple: revisa localStorage si hay token
+  useEffect(() => {
+    const token = localStorage.getItem("token"); // o lo que uses para autenticar
+    setIsLoggedIn(!!token);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token"); // limpiar token
+    setIsLoggedIn(false);
+    // Opcional: redirigir a home
+    window.location.href = "/";
+  };
 
   return (
     <nav id="navbar">
@@ -26,8 +40,12 @@ export default function Header() {
         </Link>
       </div>
 
-      <button 
-        id="menu-toggle"aria-label="Toggle menu"onClick={toggleMenu} className={menuOpen ? "active" : ""}>
+      <button
+        id="menu-toggle"
+        aria-label="Toggle menu"
+        onClick={toggleMenu}
+        className={menuOpen ? "active" : ""}
+      >
         <i></i>
       </button>
 
@@ -54,9 +72,15 @@ export default function Header() {
           </Link>
         </li>
         <li>
-          <Link href="/login" className={pathname === "/login" ? "active" : ""}>
-            Iniciá Sesión / Registrarte
-          </Link>
+          {isLoggedIn ? (
+            <button onClick={handleLogout} className="logout-button">
+              Logout
+            </button>
+          ) : (
+            <Link href="/login" className={pathname === "/login" ? "active" : ""}>
+              Iniciá Sesión / Registrarte
+            </Link>
+          )}
         </li>
       </ul>
     </nav>

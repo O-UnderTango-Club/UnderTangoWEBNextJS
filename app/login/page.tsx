@@ -4,35 +4,50 @@ import { useState } from "react";
 import Header from "../components/header";
 import Footer from "../components/footer";
 import "../styles/login.css";
-import { authService } from "../api/auth/authService";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginRegister() {
+  const { login, register } = useAuth();
+
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // toggles para ver/ocultar contraseña
+  // -----------------------------
+  // LOGIN
+  // -----------------------------
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+
+  // -----------------------------
+  // REGISTER
+  // -----------------------------
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+  const [registerConfirm, setRegisterConfirm] = useState("");
+  const [registerPhone, setRegisterPhone] = useState("");
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterConfirm, setShowRegisterConfirm] = useState(false);
 
+  // -----------------------------
+  // LOGIN HANDLER
+  // -----------------------------
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
 
-    const email = (document.getElementById("login-email") as HTMLInputElement)
-      .value;
-    const password = (
-      document.getElementById("login-password") as HTMLInputElement
-    ).value;
-
     try {
-      const data = await authService.login(email, password);
-      console.log("Login OK =>", data);
-
-      alert("Login exitoso!");
+      const res = await login(loginEmail, loginPassword);
+      if (!res.success) {
+        setErrorMsg(res.message || "Credenciales incorrectas");
+      } else {
+        alert("Login exitoso!");
+      }
     } catch (err: any) {
       setErrorMsg(err.message || "Error al iniciar sesión");
     } finally {
@@ -40,53 +55,39 @@ export default function LoginRegister() {
     }
   };
 
+  // -----------------------------
+  // REGISTER HANDLER
+  // -----------------------------
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
 
-    const fullName = (document.getElementById(
-      "register-name"
-    ) as HTMLInputElement).value;
-    const email = (document.getElementById(
-      "register-email"
-    ) as HTMLInputElement).value;
-    const password = (document.getElementById(
-      "register-password"
-    ) as HTMLInputElement).value;
-    const confirm = (document.getElementById(
-      "register-confirm"
-    ) as HTMLInputElement).value;
-    const phone = (document.getElementById(
-      "register-phone"
-    ) as HTMLInputElement | null)?.value;
-
-    if (password !== confirm) {
+    if (registerPassword !== registerConfirm) {
       setErrorMsg("Las contraseñas no coinciden");
       setLoading(false);
       return;
     }
 
-    const [first_name, ...rest] = fullName.split(" ");
-    const last_name = rest.join(" ") || "";
-
-    const username = email.split("@")[0];
+    const username = registerEmail.split("@")[0];
 
     try {
-      const result = await authService.register({
-        first_name,
-        last_name,
-        email,
+      const res = await register({
+        first_name: firstName,
+        last_name: lastName,
+        email: registerEmail,
         username,
-        password,
-        phone: phone || "000000",
+        password: registerPassword,
+        phone: registerPhone || "000000",
         user_type: 1,
       });
 
-      console.log("Registro OK =>", result);
-      alert("Cuenta creada correctamente!");
-      // opcional: cambiar a pestaña login o limpiar form
-      setActiveTab("login");
+      if (!res.success) {
+        setErrorMsg(res.message || "Error al registrar");
+      } else {
+        alert("Cuenta creada correctamente!");
+        setActiveTab("login");
+      }
     } catch (err: any) {
       setErrorMsg(err.message || "Error al registrar");
     } finally {
@@ -94,6 +95,9 @@ export default function LoginRegister() {
     }
   };
 
+  // -----------------------------
+  // PASSWORD STRENGTH
+  // -----------------------------
   const checkPasswordStrength = (value: string) => {
     let strength = 0;
     if (value.length >= 8) strength++;
@@ -106,7 +110,11 @@ export default function LoginRegister() {
   const strengthBarStyle = {
     width: `${(passwordStrength / 4) * 100}%`,
     background:
-      passwordStrength < 2 ? "#ff4444" : passwordStrength < 3 ? "#ffaa00" : "#3bd46a",
+      passwordStrength < 2
+        ? "#ff4444"
+        : passwordStrength < 3
+        ? "#ffaa00"
+        : "#3bd46a",
   };
 
   return (
@@ -140,7 +148,12 @@ export default function LoginRegister() {
                   <div className="form-group">
                     <label>Correo Electrónico</label>
                     <div className="input-wrap">
-                      <input type="email" id="login-email" required />
+                      <input
+                        type="email"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        required
+                      />
                     </div>
                   </div>
 
@@ -149,20 +162,16 @@ export default function LoginRegister() {
                     <div className="input-wrap">
                       <input
                         type={showLoginPassword ? "text" : "password"}
-                        id="login-password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
                         required
                       />
                       <button
                         type="button"
                         className="password-toggle"
-                        aria-label="Mostrar contraseña"
                         onClick={() => setShowLoginPassword((s) => !s)}
                       >
-                        {showLoginPassword ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10 10 0 0 1 12 20c-5 0-9.27-3.11-11-8a20.42 20.42 0 0 1 4.48-6.35"/><path d="M1 1l22 22"/></svg>
-                        ) : (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                        )}
+                        {showLoginPassword ? "🙈" : "👁️"}
                       </button>
                     </div>
                   </div>
@@ -179,16 +188,38 @@ export default function LoginRegister() {
               <div className="form-content active">
                 <form onSubmit={handleRegister}>
                   <div className="form-group">
-                    <label>Nombre Completo</label>
+                    <label>Nombre</label>
                     <div className="input-wrap">
-                      <input type="text" id="register-name" required />
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Apellido</label>
+                    <div className="input-wrap">
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required
+                      />
                     </div>
                   </div>
 
                   <div className="form-group">
                     <label>Correo Electrónico</label>
                     <div className="input-wrap">
-                      <input type="email" id="register-email" required />
+                      <input
+                        type="email"
+                        value={registerEmail}
+                        onChange={(e) => setRegisterEmail(e.target.value)}
+                        required
+                      />
                     </div>
                   </div>
 
@@ -197,26 +228,27 @@ export default function LoginRegister() {
                     <div className="input-wrap">
                       <input
                         type={showRegisterPassword ? "text" : "password"}
-                        id="register-password"
-                        onChange={(e) => checkPasswordStrength(e.target.value)}
+                        value={registerPassword}
+                        onChange={(e) => {
+                          setRegisterPassword(e.target.value);
+                          checkPasswordStrength(e.target.value);
+                        }}
                         required
                       />
                       <button
                         type="button"
                         className="password-toggle"
-                        aria-label="Mostrar contraseña"
                         onClick={() => setShowRegisterPassword((s) => !s)}
                       >
-                        {showRegisterPassword ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10 10 0 0 1 12 20c-5 0-9.27-3.11-11-8a20.42 20.42 0 0 1 4.48-6.35"/><path d="M1 1l22 22"/></svg>
-                        ) : (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                        )}
+                        {showRegisterPassword ? "🙈" : "👁️"}
                       </button>
                     </div>
 
                     <div className="password-strength" style={{ marginTop: 10 }}>
-                      <div className="password-strength-bar" style={strengthBarStyle}></div>
+                      <div
+                        className="password-strength-bar"
+                        style={strengthBarStyle}
+                      ></div>
                     </div>
                   </div>
 
@@ -225,20 +257,16 @@ export default function LoginRegister() {
                     <div className="input-wrap">
                       <input
                         type={showRegisterConfirm ? "text" : "password"}
-                        id="register-confirm"
+                        value={registerConfirm}
+                        onChange={(e) => setRegisterConfirm(e.target.value)}
                         required
                       />
                       <button
                         type="button"
                         className="password-toggle"
-                        aria-label="Mostrar contraseña de confirmación"
                         onClick={() => setShowRegisterConfirm((s) => !s)}
                       >
-                        {showRegisterConfirm ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10 10 0 0 1 12 20c-5 0-9.27-3.11-11-8a20.42 20.42 0 0 1 4.48-6.35"/><path d="M1 1l22 22"/></svg>
-                        ) : (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                        )}
+                        {showRegisterConfirm ? "🙈" : "👁️"}
                       </button>
                     </div>
                   </div>
@@ -246,7 +274,12 @@ export default function LoginRegister() {
                   <div className="form-group">
                     <label>Teléfono (opcional)</label>
                     <div className="input-wrap">
-                      <input type="text" id="register-phone" placeholder="(opcional)" />
+                      <input
+                        type="text"
+                        value={registerPhone}
+                        onChange={(e) => setRegisterPhone(e.target.value)}
+                        placeholder="(opcional)"
+                      />
                     </div>
                   </div>
 

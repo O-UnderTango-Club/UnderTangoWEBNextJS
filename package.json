@@ -3,24 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "start:https": "set NODE_ENV=production && node server/server.js",
     "dev": "next dev",
     "build": "next build",
+    "build-sw": "tsc --project tsconfig.sw.json",
+    "postbuild": "pnpm run build-sw",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "firebase": "^12.6.0",
+    "geist": "^1.5.1",
+    "next": "16.0.2",
     "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "next": "16.0.2"
+    "react-dom": "19.2.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@tailwindcss/postcss": "^4",
+    "@types/next-pwa": "^5.6.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "copy-webpack-plugin": "^13.0.1",
     "eslint": "^9",
-    "eslint-config-next": "16.0.2"
+    "eslint-config-next": "16.0.2",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }

@@ -14,7 +14,7 @@ interface User {
   surname?: string;
   email?: string;
   role?: string;
-  // Agregá más campos si tu backend devuelve otros
+  
 }
 
 interface AuthContextProps {
@@ -34,9 +34,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   // -----------------------
-  // Cargar token desde localStorage al iniciar
+  // Cargar token desde localStorage al iniciar 
   // -----------------------
   useEffect(() => {
+    // 1. Next.js Guard: Si estamos en el servidor (build), salimos.
+    if (typeof window === "undefined") {
+      setLoading(false);
+      return;
+    }
+
     const storedToken = localStorage.getItem("token");
 
     if (!storedToken) {
@@ -55,7 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       setLoading(false);
     });
-  }, []);
+  }, []); 
 
   // -----------------------
   // Login
@@ -64,7 +70,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const res = await loginApi(email, password);
 
     if (res.success) {
-      localStorage.setItem("token", res.token);
+      // Guard para localStorage
+      if (typeof window !== "undefined") {
+        localStorage.setItem("token", res.token);
+      }
       setUser(res.user);
       setToken(res.token);
     }
@@ -83,7 +92,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Logout
   // -----------------------
   const logout = () => {
-    localStorage.removeItem("token");
+    // Guard para localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("token");
+    }
     setUser(null);
     setToken(null);
   };
@@ -92,13 +104,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Auto Refresh Token (cada 14 minutos si el token dura 15)
   // -----------------------
   useEffect(() => {
-    if (!token) return;
+    // Si no hay token o estamos en el servidor, no iniciamos el intervalo
+    if (!token || typeof window === "undefined") return;
 
     const interval = setInterval(async () => {
       const res = await refreshToken(token);
 
       if (res.success) {
-        localStorage.setItem("token", res.newToken);
+        // Guard para localStorage
+        if (typeof window !== "undefined") {
+          localStorage.setItem("token", res.newToken);
+        }
         setToken(res.newToken);
       } else {
         logout();
@@ -108,11 +124,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => clearInterval(interval);
   }, [token]);
 
+  // -----------------------
+  // RETURN FINAL DEL COMPONENTE
+  // -----------------------
   return (
     <AuthContext.Provider
-    value={{ user, token, loading, login, register, logout }}
+      value={{ user, token, loading, login, register, logout }}
     >
-        {children}
+      {children}
     </AuthContext.Provider>
   );
 };

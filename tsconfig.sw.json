@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["esnext", "webworker"],  // webworker en lugar de dom
+    "module": "esnext",
+    "moduleResolution": "node",
+    "outDir": "public",
+    "esModuleInterop": true,
+    "strict": false,
+    "skipLibCheck": true,            // evita errores en node_modules
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "app/Android-module/firebase-messaging-sw.ts"
+  ]
+}

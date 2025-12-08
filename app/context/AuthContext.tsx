@@ -1,124 +1,130 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import {
-  login as loginApi,
-  register as registerApi,
-  refreshToken,
-  verifyToken
-} from "@/app/api/auth";
-
-interface User {
-  id?: number;
-  name?: string;
-  surname?: string;
-  email?: string;
-  role?: string;
-  // Agregá más campos si tu backend devuelve otros
-}
+import { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "../../src/lib/supabase";
 
 interface AuthContextProps {
-  user: User | null;
-  token: string | null;
+  user: any;
   loading: boolean;
   login: (email: string, password: string) => Promise<any>;
-  register: (data: any) => Promise<any>;
-  logout: () => void;
+  register: (data: RegisterPayload) => Promise<any>;
+  logout: () => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<any>; // ← agregado
+}
+
+interface RegisterPayload {
+  email: string;
+  password: string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  phone?: string;
 }
 
 const AuthContext = createContext<AuthContextProps | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // -----------------------
-  // Cargar token desde localStorage al iniciar
-  // -----------------------
+  // Cargar sesión al iniciar
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-
-    if (!storedToken) {
+    const getSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      setUser(data.session?.user ?? null);
       setLoading(false);
-      return;
-    }
+    };
 
-    setToken(storedToken);
+    getSession();
 
-    // Verificar token con backend
-    verifyToken(storedToken).then((res) => {
-      if (res.success) {
-        setUser(res.user);
-      } else {
-        localStorage.removeItem("token");
+    // Escuchar cambios en la sesión
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
       }
-      setLoading(false);
-    });
+    );
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  // -----------------------
-  // Login
-  // -----------------------
+  // LOGIN
   const login = async (email: string, password: string) => {
-    const res = await loginApi(email, password);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (res.success) {
-      localStorage.setItem("token", res.token);
-      setUser(res.user);
-      setToken(res.token);
+    if (error) {
+      return { success: false, message: error.message };
     }
 
-    return res;
+    return { success: true, user: data.user };
   };
 
-  // -----------------------
-  // Register
-  // -----------------------
-  const register = async (data: any) => {
-    return await registerApi(data);
+  // REGISTER
+  const register = async ({
+    email,
+    password,
+    first_name,
+    last_name,
+    username,
+    phone,
+  }: RegisterPayload) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          first_name,
+          last_name,
+          phone: phone || undefined,
+        },
+      },
+    });
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    return { success: true, user: data.user };
   };
 
-  // -----------------------
-  // Logout
-  // -----------------------
-  const logout = () => {
-    localStorage.removeItem("token");
-    setUser(null);
-    setToken(null);
+  // UPDATE PASSWORD
+  const updatePassword = async (newPassword: string) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    return { success: true, user: data.user };
   };
 
-  // -----------------------
-  // Auto Refresh Token (cada 14 minutos si el token dura 15)
-  // -----------------------
-  useEffect(() => {
-    if (!token) return;
-
-    const interval = setInterval(async () => {
-      const res = await refreshToken(token);
-
-      if (res.success) {
-        localStorage.setItem("token", res.newToken);
-        setToken(res.newToken);
-      } else {
-        logout();
-      }
-    }, 14 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [token]);
+  // LOGOUT
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
 
   return (
     <AuthContext.Provider
-    value={{ user, token, loading, login, register, logout }}
+      value={{
+        user,
+        login,
+        register,
+        logout,
+        loading,
+        updatePassword, // ← agregado al contexto
+      }}
     >
-        {children}
+      {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth debe usarse dentro de AuthProvider");
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 };

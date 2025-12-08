@@ -1,29 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { useAuth } from "../context/AuthContext";
 import "../styles/navbar.css";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // Estado de login
   const pathname = usePathname();
+
+  const { user, logout } = useAuth(); // 👈 ahora usamos tu contexto real
 
   const toggleMenu = () => setMenuOpen(!menuOpen);
 
-  // Ejemplo simple: revisa localStorage si hay token
-  useEffect(() => {
-    const token = localStorage.getItem("token"); // o lo que uses para autenticar
-    setIsLoggedIn(!!token);
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token"); // limpiar token
-    setIsLoggedIn(false);
-    // Opcional: redirigir a home
-    window.location.href = "/";
+  const handleLogout = async () => {
+    await logout();        // cierra sesión en supabase
+    window.location.href = "/"; // recarga o redirige
   };
 
   return (
@@ -32,7 +26,7 @@ export default function Header() {
         <Link href="/">
           <Image
             src="/assets/images/Under-logo-transparente.png"
-            alt="Logotipo de UnderTango Club en Iguazú"
+            alt="Logotipo UnderTango"
             width={160}
             height={60}
             priority
@@ -71,17 +65,41 @@ export default function Header() {
             Preguntas Frecuentes
           </Link>
         </li>
-        <li>
-          {isLoggedIn ? (
-            <button onClick={handleLogout} className="logout-button">
-              Logout
-            </button>
-          ) : (
-            <Link href="/login" className={pathname === "/login" ? "active" : ""}>
-              Iniciá Sesión / Registrarte
-            </Link>
-          )}
-        </li>
+
+        {user ? (
+          <>
+            <li>
+              <button
+                onClick={handleLogout}
+                className={pathname === "/logout" ? "active" : ""}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "white",
+                  fontSize: "16px",
+                  cursor: "pointer",
+                  padding: "10px 15px",
+                }}
+              >
+                Cerrar Sesión
+              </button>
+            </li>
+          </>
+        ) : (
+          <>
+            <li style={{ marginRight: "10px" }}>
+              <Link href="/login" className={pathname === "/login" ? "active" : ""}>
+                Iniciar Sesión
+              </Link>
+            </li>
+            <li style={{ marginLeft: "10px" }}>
+              <Link href="/register" className={pathname === "/register" ? "active" : ""}>
+                Registrarse
+              </Link>
+            </li>
+          </>
+        )}
+
       </ul>
     </nav>
   );

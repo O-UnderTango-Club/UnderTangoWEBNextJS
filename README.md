@@ -9,7 +9,6 @@ pnpm dev
 # or
 bun dev
 ```
-
 Abrir [http://localhost:3000](http://localhost:3000) en navegador
 
 APP

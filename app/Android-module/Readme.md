@@ -83,6 +83,12 @@ npm run build
 yarn build
 ```
 
+Luego ejecutamos el comando:
+
+```bash
+npm build-sw
+```
+
 ---
 
 ## 6️⃣ Ejecutar el proyecto en local

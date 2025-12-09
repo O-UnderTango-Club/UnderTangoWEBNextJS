@@ -1,11 +1,20 @@
+/* =========================================================
+   ============  CSS UNIFICADO PARA MODA  =================
+   ========================================================= */
+
 @font-face {
   font-family: 'Bellerose';
-  src: url('/assets/fonts/Bellerose.ttf') format('woff');
+  src: url('/assets/fonts/Bellerose.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
 }
 
-:root {
+/* =========================================================
+   ==================  VARIABLES Y SCOPE  ==================
+   ========================================================= */
+
+.moda-page {
+  
   --primary-color: #8b0000;
   --secondary-color: #f8f4e6;
   --accent-color: #d4af37;
@@ -14,26 +23,58 @@
   --shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   --hover-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
   --transition: all 0.3s ease;
-}
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Bellerose', sans-serif;
-}
-
-body {
   font-family: 'Bellerose', sans-serif;
   background-color: var(--secondary-color);
   color: var(--text-color);
   line-height: 1.6;
   overflow-x: hidden;
+  padding-top: 120px;
 }
 
-.hero {
+.moda-page * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+/* =========================================================
+   ======================  NAVBAR FIXES  ===================
+   ========================================================= */
+
+.moda-page #navbar {
+  max-width: 100vw;
+}
+
+.moda-page .logo {
+  display: flex;
+  align-items: center;
+}
+
+.moda-page #navbar-menu {
+  z-index: 1001;
+}
+
+.moda-page #navbar-menu.active {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.moda-page #navbar-menu.active li a {
+  padding: 10px 20px !important;
+}
+
+/* =========================================================
+   ========================  HERO  =========================
+   ========================================================= */
+
+.moda-page .hero {
   height: 500px;
-  background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/public/assets/grupal2.png');
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+    url('/assets/grupal2.png');
   background-size: cover;
   background-position: center;
   color: white;
@@ -45,29 +86,31 @@ body {
   padding: 0 2rem;
 }
 
-.hero h1 {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .hero h1 {
   font-size: 3.5rem;
   margin-bottom: 1.5rem;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
 }
 
-.hero p {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .hero p {
   font-size: 1.3rem;
   max-width: 700px;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
   line-height: 1.8;
 }
 
-.main-section {
+/* =========================================================
+   =================  SECCIÓN PRINCIPAL  ===================
+   ========================================================= */
+
+.moda-page .main-section {
   padding: 5rem 10%;
   text-align: center;
-  background-color: #ffffff; /* Cambiado a blanco puro */
+  background-color: #ffffff !important;
+  opacity: 1;
 }
 
-.section-title {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .section-title {
   font-size: 2.8rem;
   margin-bottom: 2.5rem;
   color: var(--primary-color);
@@ -75,7 +118,7 @@ body {
   display: inline-block;
 }
 
-.section-title::after {
+.moda-page .section-title::after {
   content: "";
   position: absolute;
   width: 60%;
@@ -85,32 +128,40 @@ body {
   left: 20%;
 }
 
-.taller-description {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .taller-description {
   max-width: 800px;
   margin: 0 auto 3.5rem;
   font-size: 1.2rem;
   line-height: 1.8;
 }
 
-/* Estilos específicos para el logo del taller */
-.logo-container {
+/* =========================================================
+   ==================  LOGO DEL TALLER  ====================
+   ========================================================= */
+
+.moda-page .logo-container {
   display: flex;
   justify-content: center;
   align-items: center;
   margin: 0 auto 2rem;
-  max-width: 100%;
-  padding: 0 20px;
+  max-width: 90%;
+  padding: 15px;
+  background-color: #ffffff;
+  border-radius: 8px;
 }
 
-.taller-logo {
+.moda-page .taller-logo {
   max-width: 100%;
   height: auto;
   max-height: 250px;
   object-fit: contain;
 }
 
-.taller-gallery {
+/* =========================================================
+   ==================  GALERÍA DEL TALLER  =================
+   ========================================================= */
+
+.moda-page .taller-gallery {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -120,7 +171,7 @@ body {
   overflow: hidden;
 }
 
-.gallery-image {
+.moda-page .gallery-image {
   flex: 1;
   max-width: 50%;
   height: 450px;
@@ -129,32 +180,34 @@ body {
   transition: var(--transition);
 }
 
-.gallery-text {
+.moda-page .gallery-text {
   flex: 1;
   padding: 2.5rem;
   background-color: white;
 }
 
-.gallery-text h3 {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .gallery-text h3 {
   font-size: 2rem;
   margin-bottom: 1.5rem;
   color: var(--primary-color);
 }
 
-.gallery-text p {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .gallery-text p {
   font-size: 1.1rem;
   line-height: 1.8;
 }
 
-.productos-section {
+/* =========================================================
+   ====================  PRODUCTOS  ========================
+   ========================================================= */
+
+.moda-page .productos-section {
   padding: 5rem 10% 3rem;
   background-color: white;
+  opacity: 1;
 }
 
-.productos-title {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .productos-title {
   text-align: center;
   font-size: 2.8rem;
   margin-bottom: 3.5rem;
@@ -163,7 +216,7 @@ body {
   display: inline-block;
 }
 
-.productos-title::after {
+.moda-page .productos-title::after {
   content: "";
   position: absolute;
   width: 60%;
@@ -173,14 +226,14 @@ body {
   left: 20%;
 }
 
-.productos-container {
+.moda-page .productos-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 2.5rem;
   margin-top: 3.5rem;
 }
 
-.producto {
+.moda-page .producto {
   background-color: var(--secondary-color);
   border-radius: 10px;
   overflow: hidden;
@@ -188,12 +241,12 @@ body {
   transition: var(--transition);
 }
 
-.producto:hover {
+.moda-page .producto:hover {
   transform: translateY(-10px);
   box-shadow: var(--hover-shadow);
 }
 
-.producto-img {
+.moda-page .producto-img {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -201,38 +254,35 @@ body {
   height: 250px;
 }
 
-.producto-img img {
+.moda-page .producto-img img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: var(--transition);
 }
 
-.producto:hover .producto-img img {
+.moda-page .producto:hover .producto-img img {
   transform: scale(1.1);
 }
 
-.producto-content {
+.moda-page .producto-content {
   padding: 1.8rem;
   text-align: center;
 }
 
-.producto-content h3 {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .producto-content h3 {
   font-size: 1.6rem;
   margin-bottom: 0.8rem;
   color: var(--primary-color);
 }
 
-.producto-content p {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .producto-content p {
   font-size: 1.1rem;
   margin-bottom: 1.5rem;
   color: var(--text-color);
 }
 
-.btn {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .btn {
   display: inline-block;
   background-color: var(--primary-color);
   color: white;
@@ -243,20 +293,23 @@ body {
   transition: var(--transition);
 }
 
-.btn:hover {
+.moda-page .btn:hover {
   background-color: var(--accent-color);
   color: var(--text-color);
   transform: translateY(-3px);
 }
 
-.image-gallery {
+/* =========================================================
+   ==================  GALERÍA DE IMÁGENES  ================
+   ========================================================= */
+
+.moda-page .image-gallery {
   padding: 5rem 10%;
   background-color: var(--secondary-color);
   text-align: center;
 }
 
-.gallery-title {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .gallery-title {
   font-size: 2.8rem;
   margin-bottom: 3.5rem;
   color: var(--primary-color);
@@ -264,7 +317,7 @@ body {
   display: inline-block;
 }
 
-.gallery-title::after {
+.moda-page .gallery-title::after {
   content: "";
   position: absolute;
   width: 60%;
@@ -274,13 +327,13 @@ body {
   left: 20%;
 }
 
-.gallery-container {
+.moda-page .gallery-container {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.5rem;
 }
 
-.gallery-item {
+.moda-page .gallery-item {
   height: 300px;
   overflow: hidden;
   position: relative;
@@ -289,18 +342,18 @@ body {
   box-shadow: var(--shadow);
 }
 
-.gallery-item img {
+.moda-page .gallery-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: var(--transition);
 }
 
-.gallery-item:hover img {
+.moda-page .gallery-item:hover img {
   transform: scale(1.1);
 }
 
-.gallery-overlay {
+.moda-page .gallery-overlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -316,17 +369,20 @@ body {
   transition: var(--transition);
 }
 
-.gallery-item:hover .gallery-overlay {
+.moda-page .gallery-item:hover .gallery-overlay {
   opacity: 1;
 }
 
-.gallery-overlay h4 {
-  font-family: 'Bellerose', sans-serif;
+.moda-page .gallery-overlay h4 {
   font-size: 1.5rem;
   margin-bottom: 0.8rem;
 }
 
-.modal {
+/* =========================================================
+   ========================  MODAL  ========================
+   ========================================================= */
+
+.moda-page .modal {
   display: none;
   position: fixed;
   z-index: 1000;
@@ -336,9 +392,10 @@ body {
   height: 100%;
   background-color: rgba(0, 0, 0, 0.9);
   overflow: auto;
+  opacity: 1;
 }
 
-.modal-content {
+.moda-page .modal-content {
   display: block;
   margin: 5% auto;
   max-width: 80%;
@@ -355,7 +412,7 @@ body {
   }
 }
 
-.close {
+.moda-page .close {
   position: absolute;
   top: 15px;
   right: 35px;
@@ -363,233 +420,299 @@ body {
   font-size: 40px;
   font-weight: bold;
   transition: 0.3s;
+  cursor: pointer;
 }
 
-.close:hover,
-.close:focus {
+.moda-page .close:hover,
+.moda-page .close:focus {
   color: var(--accent-color);
   text-decoration: none;
   cursor: pointer;
 }
 
-/* Media Queries para mejorar la responsividad */
+/* =========================================================
+   ==================  MEDIA QUERIES  ======================
+   ========================================================= */
+
+/* TABLETS (1024px) */
 @media (max-width: 1024px) {
-  .hero h1 {
+  .moda-page .hero h1 {
     font-size: 3rem;
   }
 
-  .hero p {
+  .moda-page .hero p {
     font-size: 1.2rem;
   }
 
-  .section-title, .productos-title, .gallery-title {
+  .moda-page .section-title,
+  .moda-page .productos-title,
+  .moda-page .gallery-title {
     font-size: 2.5rem;
   }
 
-  .taller-description {
+  .moda-page .taller-description {
     font-size: 1.1rem;
   }
 
-  .gallery-image {
+  .moda-page .gallery-image {
     height: 400px;
   }
 
-  .gallery-text h3 {
+  .moda-page .gallery-text h3 {
     font-size: 1.8rem;
   }
 
-  .productos-container {
+  .moda-page .productos-container {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   }
-  
-  .taller-logo {
+
+  .moda-page .taller-logo {
     max-height: 220px;
   }
 }
 
+/* MOBILE (768px) */
 @media (max-width: 768px) {
-  .hero {
+  .moda-page {
+    padding-top: 90px;
+  }
+
+  .moda-page #navbar-menu {
+    width: 100% !important;
+    height: 100vh !important;
+    position: fixed !important;
+    top: 0 !important;
+    right: -100% !important;
+    transition: right 0.3s ease !important;
+    background-color: rgba(0, 0, 0, 0.95) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding-top: 70px !important;
+  }
+
+  .moda-page #navbar-menu.active {
+    right: 0 !important;
+  }
+
+  .moda-page .hero {
     height: 400px;
   }
 
-  .hero h1 {
+  .moda-page .hero h1 {
     font-size: 2.5rem;
   }
 
-  .hero p {
+  .moda-page .hero p {
     font-size: 1.1rem;
   }
 
-  .section-title, .productos-title, .gallery-title {
+  .moda-page .section-title,
+  .moda-page .productos-title,
+  .moda-page .gallery-title {
     font-size: 2.2rem;
   }
 
-  .taller-description {
+  .moda-page .taller-description {
     font-size: 1rem;
   }
 
-  .taller-gallery {
+  .moda-page .logo-container {
+    max-width: 85%;
+    padding: 0 10px;
+  }
+
+  .moda-page .taller-logo {
+    max-height: 180px;
+  }
+
+  .moda-page .taller-gallery {
     flex-direction: column;
   }
 
-  .gallery-image {
+  .moda-page .gallery-image {
     max-width: 100%;
     height: 300px;
   }
 
-  .gallery-text {
+  .moda-page .gallery-text {
     padding: 2rem;
   }
 
-  .gallery-text h3 {
+  .moda-page .gallery-text h3 {
     font-size: 1.6rem;
   }
 
-  .gallery-text p {
+  .moda-page .gallery-text p {
     font-size: 1rem;
   }
 
-  .productos-container {
+  .moda-page .productos-container {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 2rem;
   }
 
-  .producto-img {
+  .moda-page .producto-img {
     height: 220px;
   }
 
-  .producto-content h3 {
+  .moda-page .producto-content h3 {
     font-size: 1.4rem;
   }
 
-  .producto-content p {
+  .moda-page .producto-content p {
     font-size: 1rem;
   }
 
-  .gallery-container {
+  .moda-page .gallery-container {
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   }
 
-  .gallery-item {
+  .moda-page .gallery-item {
     height: 250px;
   }
 
-  .main-section, .productos-section, .image-gallery {
+  .moda-page .main-section,
+  .moda-page .productos-section,
+  .moda-page .image-gallery {
     padding: 4rem 5%;
-  }
-  
-  .taller-logo {
-    max-height: 180px;
-  }
-  
-  .logo-container {
-    padding: 0 10px;
   }
 }
 
+/* MOBILE PEQUEÑO (480px) */
 @media (max-width: 480px) {
-  .hero {
+  .moda-page {
+    padding-top: 70px;
+  }
+
+  .moda-page #menu-toggle {
+    position: fixed;
+    top: 15px;
+    right: 10px;
+    z-index: 1002 !important;
+  }
+
+  .moda-page .hero {
     height: 350px;
   }
 
-  .hero h1 {
+  .moda-page .hero h1 {
     font-size: 2rem;
   }
 
-  .hero p {
+  .moda-page .hero p {
     font-size: 1rem;
   }
 
-  .section-title, .productos-title, .gallery-title {
+  .moda-page .section-title,
+  .moda-page .productos-title,
+  .moda-page .gallery-title {
     font-size: 1.8rem;
   }
 
-  .taller-description {
+  .moda-page .taller-description {
     font-size: 0.95rem;
     margin-bottom: 2.5rem;
   }
 
-  .gallery-image {
+  .moda-page .logo-container {
+    max-width: 80%;
+    padding: 0 5px;
+    margin-bottom: 1.5rem;
+  }
+
+  .moda-page .taller-logo {
+    max-height: 150px;
+  }
+
+  .moda-page .gallery-image {
     height: 250px;
   }
 
-  .gallery-text {
+  .moda-page .gallery-text {
     padding: 1.5rem;
   }
 
-  .gallery-text h3 {
+  .moda-page .gallery-text h3 {
     font-size: 1.4rem;
   }
 
-  .gallery-text p {
+  .moda-page .gallery-text p {
     font-size: 0.95rem;
   }
 
-  .productos-container {
+  .moda-page .productos-container {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
 
-  .producto-content {
+  .moda-page .producto-content {
     padding: 1.5rem;
   }
 
-  .producto-content h3 {
+  .moda-page .producto-content h3 {
     font-size: 1.3rem;
   }
 
-  .btn {
+  .moda-page .btn {
     padding: 0.8rem 1.5rem;
     font-size: 0.95rem;
   }
 
-  .gallery-container {
+  .moda-page .gallery-container {
     grid-template-columns: 1fr;
   }
 
-  .gallery-item {
+  .moda-page .gallery-item {
     height: 220px;
   }
 
-  .gallery-overlay h4 {
+  .moda-page .gallery-overlay h4 {
     font-size: 1.3rem;
   }
 
-  .modal-content {
+  .moda-page .modal-content {
     max-width: 95%;
   }
 
-  .close {
+  .moda-page .close {
     top: 10px;
     right: 20px;
     font-size: 30px;
   }
 
-  .main-section, .productos-section, .image-gallery {
+  .moda-page .main-section,
+  .moda-page .productos-section,
+  .moda-page .image-gallery {
     padding: 3rem 5%;
-  }
-  
-  .taller-logo {
-    max-height: 150px;
-  }
-  
-  .logo-container {
-    padding: 0 5px;
-    margin-bottom: 1.5rem;
   }
 }
 
-/* Ajustes adicionales para pantallas muy pequeñas */
+/* MOBILE MUY PEQUEÑO (360px) */
 @media (max-width: 360px) {
-  .taller-logo {
+  .moda-page {
+    padding-top: 60px;
+  }
+
+  .moda-page #menu-toggle {
+    top: 12px;
+    right: 8px;
+  }
+
+  .moda-page .logo-container {
+    max-width: 75%;
+  }
+
+  .moda-page .taller-logo {
     max-height: 120px;
   }
-  
-  .main-section {
+
+  .moda-page .main-section {
     padding: 2.5rem 4%;
   }
-  
-  .taller-description {
+
+  .moda-page .taller-description {
     font-size: 0.9rem;
     margin-bottom: 2rem;
   }

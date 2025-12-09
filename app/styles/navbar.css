@@ -167,6 +167,38 @@
   background-color: var(--secondary);
 }
 
+.auth-buttons {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.auth-buttons a {
+  font-family: "Bellerose", sans-serif;
+  color: var(--white);
+  text-decoration: none;
+  font-weight: bold;
+  padding: 8px 16px;
+  transition: all 0.3s ease;
+  text-wrap: nowrap;
+}
+/* MOBILE */
+@media screen and (max-width: 768px) {
+  .auth-buttons {
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .auth-buttons a {
+    width: 80%;
+    text-align: center;
+    padding: 12px;
+    font-size: 1.1rem;
+  }
+}
+
+
 @media screen and (min-width: 769px) {
   #navbar-menu {
     display: flex !important;

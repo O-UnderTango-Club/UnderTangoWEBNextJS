@@ -11,7 +11,7 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  const { user, logout } = useAuth(); // 👈 ahora usamos tu contexto real
+  const { user, logout } = useAuth();
 
   const toggleMenu = () => setMenuOpen(!menuOpen);
 
@@ -68,35 +68,23 @@ export default function Header() {
 
         {user ? (
           <>
-            <li>
-              <button
-                onClick={handleLogout}
-                className={pathname === "/logout" ? "active" : ""}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "white",
-                  fontSize: "16px",
-                  cursor: "pointer",
-                  padding: "10px 15px",
-                }}
-              >
-                Cerrar Sesión
-              </button>
-            </li>
-          </>
-        ) : (
-          <>
-            <li style={{ marginRight: "10px" }}>
-              <Link href="/login" className={pathname === "/login" ? "active" : ""}>
-                Iniciar Sesión
-              </Link>
-            </li>
-            <li style={{ marginLeft: "10px" }}>
-              <Link href="/register" className={pathname === "/register" ? "active" : ""}>
-                Registrarse
-              </Link>
-            </li>
+           <li style={{ marginRight: "10px" }}>
+  <a
+    href="https://sprightly-griffin-33f04f.netlify.app/login/login"
+    className="login-link"
+  >
+    Iniciar Sesión
+  </a>
+</li>
+
+<li style={{ marginLeft: "10px" }}>
+  <a
+    href="https://sprightly-griffin-33f04f.netlify.app/"
+    className="register-link"
+  >
+    Registrarse
+  </a>
+</li>
           </>
         )}
 
@@ -104,3 +92,4 @@ export default function Header() {
     </nav>
   );
 }
+

@@ -3,14 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start:https": "set NODE_ENV=production && node server/server.js",
-    "dev": "next dev",
-    "build": "next build",
-    "build-sw": "tsc --project tsconfig.sw.json",
-    "postbuild": "pnpm run build-sw",
-    "start": "next start",
-    "lint": "eslint"
-  },
+  "start:https": "set NODE_ENV=production && node server/server.js",
+  "dev": "next dev",
+  "build": "next build",
+  "start": "next start",
+  "lint": "eslint"
+},
   "dependencies": {
     "@supabase/supabase-js": "^2.43.0",
     "express": "^5.2.1",
@@ -35,4 +33,5 @@
     "typescript": "^5"
   }
 }
+
 

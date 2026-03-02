@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preguntas Frecuentes – Undertango</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#0b0b0b;
+      --card:#121212;
+      --red:#b10600;
+      --red-dark:#5c0300;
+      --gold:#d4a574;
+      --radius:16px;
+    }
+
+    *{
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+    }
+
+    body{
+      font-family:'Poppins', sans-serif;
+      background:
+        radial-gradient(700px 350px at 10% 20%, rgba(177,6,0,0.10), transparent),
+        radial-gradient(700px 350px at 90% 80%, rgba(177,6,0,0.08), transparent),
+        var(--bg);
+      color:white;
+      padding:24px;
+    }
+
+    .faq-wrapper{
+      max-width:900px;
+      margin:0 auto;
+    }
+
+    header{
+      text-align:center;
+      margin-bottom:40px;
+    }
+
+    header h1{
+      font-size:32px;
+      margin-bottom:10px;
+      color:var(--gold);
+    }
+
+    header p{
+      color:rgba(255,255,255,.7);
+    }
+
+    .faq-section{
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+
+    .faq-item{
+      background:linear-gradient(180deg,#151515,#0d0d0d);
+      border-radius:var(--radius);
+      border-left:4px solid var(--red);
+      overflow:hidden;
+      box-shadow:0 12px 30px rgba(0,0,0,.6);
+    }
+
+    .faq-item input{
+      display:none;
+    }
+
+    .faq-question{
+      padding:18px 20px;
+      cursor:pointer;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+
+    .faq-question h3{
+      font-size:16px;
+      font-weight:600;
+      color:white;
+    }
+
+    .faq-question span{
+      color:var(--red);
+      font-size:18px;
+      transition:transform .3s;
+    }
+
+    .faq-answer{
+      max-height:0;
+      overflow:hidden;
+      transition:max-height .4s ease;
+      padding:0 20px;
+      color:rgba(255,255,255,.75);
+      line-height:1.6;
+    }
+
+    .faq-answer p{
+      margin-bottom:10px;
+    }
+
+    .faq-item input:checked ~ .faq-answer{
+      max-height:600px;
+      padding:16px 20px 20px;
+    }
+
+    .faq-item input:checked ~ label span{
+      transform:rotate(180deg);
+    }
+
+    a{
+      color:var(--gold);
+      text-decoration:none;
+      font-weight:600;
+    }
+
+    .map-container{
+      margin-top:12px;
+      border-radius:12px;
+      overflow:hidden;
+      border:1px solid var(--red-dark);
+    }
+
+    .contact-section{
+      margin-top:50px;
+      text-align:center;
+      background:linear-gradient(180deg,#141414,#0d0d0d);
+      border-radius:var(--radius);
+      padding:32px;
+      box-shadow:0 15px 40px rgba(0,0,0,.6);
+    }
+
+    .contact-section h2{
+      color:var(--gold);
+      margin-bottom:10px;
+    }
+
+    .contact-buttons{
+      margin-top:20px;
+      display:flex;
+      justify-content:center;
+      gap:16px;
+      flex-wrap:wrap;
+    }
+
+    .contact-button{
+      padding:12px 22px;
+      border-radius:999px;
+      background:linear-gradient(135deg,var(--red),var(--red-dark));
+      color:white;
+      font-weight:600;
+      transition:transform .2s, box-shadow .2s;
+      box-shadow:0 6px 16px rgba(177,6,0,.5);
+    }
+
+    .contact-button:hover{
+      transform:translateY(-2px);
+      box-shadow:0 10px 24px rgba(177,6,0,.7);
+    }
+
+    @media(max-width:600px){
+      header h1{font-size:26px}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="faq-wrapper">
+
+    <header>
+      <h1>Preguntas Frecuentes</h1>
+      <p>Información sobre clases, shows y actividades de Undertango</p>
+    </header>
+
+    <section class="faq-section">
+
+      <!-- FAQ ITEM -->
+      <div class="faq-item">
+        <input type="checkbox" id="faq1">
+        <label class="faq-question" for="faq1">
+          <h3>¿Dónde están ubicados?</h3>
+          <span>⌄</span>
+        </label>
+        <div class="faq-answer">
+          <p>Estamos en Puerto Iguazú, Misiones.</p>
+          <div class="map-container">
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3560.1023694772166!2d-54.57342492394826!3d-25.600040141962!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94f6932c3aef0c97%3A0xd45b9e44e0110a6d!2sUndertango%20Club!5e0!3m2!1ses!2sar!4v1710805123456"
+              width="100%"
+              height="280"
+              style="border:0"
+              loading="lazy"
+              allowfullscreen>
+            </iframe>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <input type="checkbox" id="faq2">
+        <label class="faq-question" for="faq2">
+          <h3>¿Dan clases grupales?</h3>
+          <span>⌄</span>
+        </label>
+        <div class="faq-answer">
+          <p>
+            Sí. Sábados de 9 a 10 (principiantes), de 10 a 11 (avanzados) y de
+            11 a 11:30 práctica danzante. Presencial en Iguazú y retransmitido
+            por TikTok Live.
+          </p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <input type="checkbox" id="faq3">
+        <label class="faq-question" for="faq3">
+          <h3>¿Dan clases particulares u online?</h3>
+          <span>⌄</span>
+        </label>
+        <div class="faq-answer">
+          <p>
+            Sí, con reserva previa al
+            <a href="https://wa.me/+5493757618270">+54 3757 618270</a>.
+          </p>
+          <p>
+            También contamos con
+            <a href="https://hotmart.com/es/marketplace/productos/20-lecciones-de-tango/F62016758K" target="_blank">
+              curso online
+            </a>.
+          </p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <input type="checkbox" id="faq4">
+        <label class="faq-question" for="faq4">
+          <h3>¿Hay milongas en Iguazú?</h3>
+          <span>⌄</span>
+        </label>
+        <div class="faq-answer">
+          <p>
+            Sí, todos los domingos de 22 a 00 hs realizamos práctica danzante
+            con reserva previa.
+          </p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <input type="checkbox" id="faq5">
+        <label class="faq-question" for="faq5">
+          <h3>¿Dónde ver un show de tango?</h3>
+          <span>⌄</span>
+        </label>
+        <div class="faq-answer">
+          <p>
+            De martes a domingos de 17 a 19 hs en Cruceros Iguazú:
+            tango electrónico + música internacional en vivo.
+          </p>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="contact-section">
+      <h2>¿Tenés otra consulta?</h2>
+      <p>Contactanos directamente</p>
+
+      <div class="contact-buttons">
+        <a class="contact-button" href="https://wa.me/+5493757618270">WhatsApp</a>
+        <a class="contact-button" href="mailto:undertangoclub@gmail.com">Email</a>
+      </div>
+    </section>
+
+  </div>
+</body>
+</html>

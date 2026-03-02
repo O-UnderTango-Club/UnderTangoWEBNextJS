@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { AuthProvider } from "./context/AuthContext";
+
 import "./styles/index.css";
 import "./styles/footer.css";
 import "./styles/navbar.css";
@@ -14,7 +16,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "UnderTango Club | Milonga y Clases de Tango en Iguazú",
   description:
-    "Descubre el auténtico tango en Iguazú con nuestras clases grupales y privadas, espectáculos de milonga y moda exclusiva. ¡Vive la pasión del tango en la triple frontera!",
+    "Descubre el auténtico tango en Iguazú con nuestras clases grupales y privadas, espectáculos de milonga y moda exclusiva.",
   icons: {
     icon: "/assets/images/favicon.ico",
   },
@@ -28,7 +30,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

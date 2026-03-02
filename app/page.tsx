@@ -1,40 +1,15 @@
 'use client';
 
-import Head from 'next/head';
 import Script from 'next/script';
 import Header from './components/header';
 import Footer from './components/footer';
 import { useHomeEffects } from './hooks/useHomeEffects';
-
-import './styles/index.css';
-import './styles/footer.css';
-import './styles/navbar.css';
-import './styles/timeline.css';
-import './styles/pilars.css';
-import './styles/burguer.css';
 
 export default function HomePage() {
   useHomeEffects();
 
   return (
     <>
-      <Head>
-        <title>UnderTango Club | Milonga y Clases de Tango en Iguazú</title>
-        <meta
-          name="description"
-          content="Descubre el auténtico tango en Iguazú con nuestras clases grupales y privadas, espectáculos de milonga y moda exclusiva. ¡Vive la pasión del tango en la triple frontera!"
-        />
-        <meta
-          name="facebook-domain-verification"
-          content="lx79g9tyq6nhj3ef5u8m8vpwp39r6h"
-        />
-        <link rel="icon" href="/assets/images/favicon.ico" />
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
-        />
-      </Head>
-
       <Script async src="https://www.googletagmanager.com/gtag/js?id=G-MDX0M5KKDM" />
       <Script id="google-analytics">
         {`
@@ -60,19 +35,9 @@ export default function HomePage() {
         `}
       </Script>
 
-      <noscript>
-        <img
-          height="1"
-          width="1"
-          style={{ display: 'none' }}
-          src="https://www.facebook.com/tr?id=1353890722495845&ev=PageView&noscript=1"
-          alt="facebook pixel"
-        />
-      </noscript>
-
       <Header />
 
-      <main>
+ <main>
 
         <header id="video-slider">
           <video autoPlay muted loop id="video-background" playsInline>

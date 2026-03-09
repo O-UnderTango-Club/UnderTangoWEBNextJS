@@ -93,7 +93,7 @@ export default function Header() {
           <>
             <li style={{ marginRight: "10px" }}>
               <a
-                href="https://sprightly-griffin-33f04f.netlify.app/login/login"
+                href="https://www.undertangoclub.com/subundertango/login/login.html"
                 className="login-link"
               >
                 Iniciar Sesión
@@ -102,7 +102,7 @@ export default function Header() {
 
             <li style={{ marginLeft: "10px" }}>
               <a
-                href="https://sprightly-griffin-33f04f.netlify.app/"
+                href="https://www.undertangoclub.com/subundertango"
                 className="register-link"
               >
                 Registrarse
@@ -114,3 +114,4 @@ export default function Header() {
     </nav>
   );
 }
+

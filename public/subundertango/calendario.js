@@ -23,6 +23,24 @@ const monthNames = [
 
 let currentMonth = 0;
 
+const today = new Date();
+const currentMonthIndex = today.getMonth(); // 0 = Enero, 11 = Diciembre
+
+setMonth(currentMonthIndex);
+
+// Marcar el mes actual como activo en la lista
+document
+  .querySelectorAll("#months-list li")
+  .forEach((li) => li.classList.remove("active"));
+
+const activeMonth = document.querySelector(
+  `#months-list li[data-month='${currentMonthIndex}']`
+);
+
+if (activeMonth) {
+  activeMonth.classList.add("active");
+}
+
 function createCalendarDays(calendarGrid, year, month) {
   calendarGrid.innerHTML = ""; // Limpia el contenido previo
 
@@ -755,10 +773,24 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  setMonth(1);
-  document
-    .querySelector("#months-list li[data-month='0']")
-    .classList.add("active");
+const today = new Date();
+const currentMonthIndex = today.getMonth(); // 0-11
+
+setMonth(currentMonthIndex);
+
+// limpiar active
+document
+  .querySelectorAll("#months-list li")
+  .forEach((li) => li.classList.remove("active"));
+
+// marcar mes actual
+const activeMonth = document.querySelector(
+  `#months-list li[data-month='${currentMonthIndex}']`
+);
+
+if (activeMonth) {
+  activeMonth.classList.add("active");
+}
 
   const editBtn = document.querySelector("#edit-btn");
   if (editBtn) {

@@ -62,16 +62,10 @@ const deptMap = {
   89: 'Equipo Central'
 };
 
-/* ===============================
-   ESTADO GLOBAL
-================================ */
 let currentUser = null;
 let myCalendar = null;
 let myEvents = [];
 
-/* ===============================
-   PERFIL
-================================ */
 async function loadMyProfile() {
   const { data: { user } } = await supabaseClient.auth.getUser();
 

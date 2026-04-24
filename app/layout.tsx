@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import { AuthProvider } from "./context/AuthContext";
 
 import "./styles/index.css";
@@ -30,9 +31,12 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
+
+        <Script
+          src="https://script2.chat-robot.com/?token=ed1139a97e102e18ec88a20b30f97aa3"
+          strategy="lazyOnload"
+        />
       </body>
     </html>
   );

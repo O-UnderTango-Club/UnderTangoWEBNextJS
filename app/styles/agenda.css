@@ -2,20 +2,45 @@
   min-height: 100vh;
   background: #f2f0eb;
   color: #141414;
+  position: relative;
+  z-index: 0;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
 }
 
 .agenda-page {
-  padding: 112px 18px 48px;
+  display: block !important;
+  position: relative !important;
+  z-index: 1 !important;
+  min-height: calc(100vh - 80px);
+  padding: 112px 18px 48px !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
 }
 
 .agenda-frame {
-  width: min(1480px, 100%);
-  margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid #d8d4cc;
-  border-radius: 24px;
-  padding: 28px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+  display: block !important;
+  position: relative !important;
+  z-index: 2 !important;
+  width: min(1480px, 100%) !important;
+  margin: 0 auto !important;
+  background: #ffffff !important;
+  color: #141414 !important;
+  border: 1px solid #d8d4cc !important;
+  border-radius: 24px !important;
+  padding: 28px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
+.agenda-frame > * {
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .agenda-topline {
@@ -28,6 +53,7 @@
 
 .agenda-kicker {
   margin: 0 0 6px;
+  color: #141414 !important;
   font-size: 0.78rem;
   letter-spacing: 0.16em;
   font-weight: 800;
@@ -35,7 +61,7 @@
 
 .agenda-topline h1 {
   margin: 0;
-  color: #141414;
+  color: #141414 !important;
   font-size: clamp(2rem, 4vw, 3.5rem);
   line-height: 0.95;
   letter-spacing: -0.04em;
@@ -44,7 +70,7 @@
 .agenda-subtitle {
   margin: 10px 0 0;
   max-width: 640px;
-  color: #67625a;
+  color: #67625a !important;
   font-size: 0.98rem;
 }
 
@@ -91,14 +117,14 @@
 .month-navigation h2 {
   min-width: 190px;
   margin: 0;
-  color: #141414;
+  color: #141414 !important;
   text-align: center;
   font-size: 1.05rem;
   letter-spacing: 0.08em;
 }
 
 .month-navigation h2::after {
-  display: none;
+  display: none !important;
 }
 
 .month-navigation button {
@@ -134,14 +160,19 @@
 }
 
 .calendar-wrap {
+  display: block !important;
   overflow: hidden;
   border: 1px solid #d5d0c7;
   border-radius: 16px;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .calendar-grid {
-  display: grid;
+  display: grid !important;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .weekday-row {
@@ -164,6 +195,10 @@
   border-right: 1px solid #ded9d0;
   border-bottom: 1px solid #ded9d0;
   background: #fff;
+  color: #141414 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
 }
 
 .day-cell:nth-child(7n) {
@@ -200,6 +235,7 @@
   border-radius: 7px;
   padding: 8px 8px 8px 9px;
   background: #f1efe9;
+  color: #141414 !important;
 }
 
 .event-card.clases {
@@ -232,21 +268,28 @@
   margin-top: 3px;
   font-size: 0.69rem;
   line-height: 1.22;
-  color: #5f5a52;
+  color: #5f5a52 !important;
 }
 
 .event-artists {
-  color: #282522;
+  color: #282522 !important;
   font-weight: 700;
 }
 
 .agenda-public-footer {
-  display: flex;
+  display: flex !important;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 14px;
-  color: #7b756c;
+  margin-top: 14px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: #7b756c !important;
   font-size: 0.72rem;
+  overflow: visible !important;
+}
+
+.agenda-public-footer::before {
+  display: none !important;
 }
 
 .share-mode {
@@ -256,15 +299,15 @@
 }
 
 .share-mode .agenda-page {
-  padding: 12px;
+  padding: 12px !important;
 }
 
 .share-mode .agenda-frame {
-  width: 100%;
+  width: 100% !important;
   max-width: 1600px;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 .share-mode .agenda-subtitle,
@@ -318,12 +361,12 @@
 
 @media (max-width: 640px) {
   .agenda-page {
-    padding: 96px 8px 30px;
+    padding: 96px 8px 30px !important;
   }
 
   .agenda-frame {
-    padding: 16px 10px;
-    border-radius: 16px;
+    padding: 16px 10px !important;
+    border-radius: 16px !important;
   }
 
   .agenda-public-footer {
@@ -346,13 +389,13 @@
 
   .agenda-page,
   .agenda-frame {
-    padding: 0;
-    margin: 0;
-    width: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
     max-width: none;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
 
   .day-cell {

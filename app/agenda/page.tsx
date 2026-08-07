@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import type { CSSProperties } from "react"
 
 import Header from "../components/header"
 import Footer from "../components/footer"
@@ -115,6 +116,8 @@ export default function AgendaPage() {
     return cells
   }, [month, year])
 
+  const weekCount = monthCells.length / 7
+
   const visibleEvents = useMemo(
     () => PUBLIC_EVENTS.filter((event) => activeCategories.includes(event.category)),
     [activeCategories],
@@ -136,17 +139,24 @@ export default function AgendaPage() {
     setActiveCategories(["shows", "clases", "ensayos", "otros"])
   }
 
+  const agendaStyle = {
+    "--calendar-weeks": weekCount,
+  } as CSSProperties
+
   return (
-    <div className={shareMode ? "agenda-shell share-mode" : "agenda-shell"}>
+    <div
+      className={shareMode ? "agenda-shell share-mode" : "agenda-shell"}
+      style={agendaStyle}
+    >
       {!shareMode && <Header />}
 
       <main className="agenda-page">
         <div className="agenda-frame">
           <div className="agenda-topline">
-            <div>
+            <div className="agenda-heading">
               <p className="agenda-kicker">Ø UNDERTANGO CLUB</p>
               <h1>Agenda pública</h1>
-              <p className="agenda-subtitle">Shows, clases y movimientos compartidos del equipo.</p>
+              <p className="agenda-subtitle">Información operativa compartida del equipo.</p>
             </div>
 
             <button
@@ -233,7 +243,7 @@ export default function AgendaPage() {
 
           <footer className="agenda-public-footer">
             <span>undertangoclub.com</span>
-            <span>Información operativa pública · actualizada por Ø UnderTango Club</span>
+            <span>Ø UnderTango Club · agenda pública</span>
           </footer>
         </div>
       </main>

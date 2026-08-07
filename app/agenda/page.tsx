@@ -25,12 +25,11 @@ const PUBLIC_EVENTS: PublicEvent[] = [
   {
     id: "itaipu-2026-08-08",
     date: "2026-08-08",
-    time: "20:00",
+    time: "A confirmar",
     title: "Show Club Itaipú",
     place: "Club Itaipú",
     category: "shows",
     artists: ["Thays Andrade", "Pablo Cieslik"],
-    approximate: true,
   },
   {
     id: "festa-nacoes-2026-08-15",

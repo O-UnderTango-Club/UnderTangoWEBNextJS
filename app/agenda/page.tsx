@@ -141,7 +141,7 @@ export default function AgendaPage() {
       {!shareMode && <Header />}
 
       <main className="agenda-page">
-        <section className="agenda-frame">
+        <div className="agenda-frame">
           <div className="agenda-topline">
             <div>
               <p className="agenda-kicker">Ø UNDERTANGO CLUB</p>
@@ -235,7 +235,7 @@ export default function AgendaPage() {
             <span>undertangoclub.com</span>
             <span>Información operativa pública · actualizada por Ø UnderTango Club</span>
           </footer>
-        </section>
+        </div>
       </main>
 
       {!shareMode && <Footer />}

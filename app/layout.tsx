@@ -15,9 +15,23 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "UnderTango Club | Milonga y Clases de Tango en Iguazú",
+  metadataBase: new URL("https://www.undertangoclub.com"),
+  title: "Ø UnderTango Club | Shows y Producción en Puerto Iguazú",
   description:
-    "Descubre el auténtico tango en Iguazú con nuestras clases grupales y privadas, espectáculos de milonga y moda exclusiva.",
+    "Productora artística de la Triple Frontera. Shows de tango, música en vivo, Ø Tango Rave y producciones a medida para hoteles, gastronomía y eventos.",
+  applicationName: "Ø UnderTango Club",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Ø UnderTango Club | Shows y Producción en Puerto Iguazú",
+    description:
+      "Espectáculos, música en vivo y producción escénica para hoteles, gastronomía y eventos de la Triple Frontera.",
+    url: "https://www.undertangoclub.com",
+    siteName: "Ø UnderTango Club",
+    locale: "es_AR",
+    type: "website",
+  },
   icons: {
     icon: "/assets/images/favicon.ico",
   },

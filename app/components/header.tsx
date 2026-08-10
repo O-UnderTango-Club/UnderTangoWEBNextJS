@@ -16,8 +16,8 @@ export default function Header() {
   const toggleMenu = () => setMenuOpen(!menuOpen);
 
   const handleLogout = async () => {
-    await logout(); // cierra sesión en supabase
-    window.location.href = "/"; // recarga o redirige
+    await logout();
+    window.location.href = "/";
   };
 
   return (
@@ -49,24 +49,14 @@ export default function Header() {
             Inicio
           </Link>
         </li>
-
         <li>
           <Link href="/#historia">Historia</Link>
         </li>
-
         <li>
-          <Link href="/#news">Noticias</Link>
-        </li>
-
-        <li>
-          <Link
-            href="/reservas"
-            className={pathname === "/reservas" ? "active" : ""}
-          >
+          <Link href="/reservas" className={pathname === "/reservas" ? "active" : ""}>
             Contacto
           </Link>
         </li>
-
         <li>
           <Link href="/faq" className={pathname === "/faq" ? "active" : ""}>
             Preguntas Frecuentes
@@ -93,16 +83,15 @@ export default function Header() {
           <>
             <li style={{ marginRight: "10px" }}>
               <a
-                href="https://www.undertangoclub.com/subundertango/login/login.html"
+                href="https://sprightly-griffin-33f04f.netlify.app/login/login"
                 className="login-link"
               >
                 Iniciar Sesión
               </a>
             </li>
-
             <li style={{ marginLeft: "10px" }}>
               <a
-                href="https://www.undertangoclub.com/subundertango"
+                href="https://sprightly-griffin-33f04f.netlify.app/"
                 className="register-link"
               >
                 Registrarse
@@ -114,4 +103,3 @@ export default function Header() {
     </nav>
   );
 }
-

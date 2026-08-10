@@ -5,8 +5,6 @@ import Header from './components/header';
 import Footer from './components/footer';
 import { useHomeEffects } from './hooks/useHomeEffects';
 
-import './styles/home-current.css';
-
 export default function HomePage() {
   useHomeEffects();
 
@@ -37,16 +35,6 @@ export default function HomePage() {
         `}
       </Script>
 
-      <noscript>
-        <img
-          height="1"
-          width="1"
-          style={{ display: 'none' }}
-          src="https://www.facebook.com/tr?id=1353890722495845&ev=PageView&noscript=1"
-          alt="facebook pixel"
-        />
-      </noscript>
-
       <Header />
 
       <main>
@@ -60,45 +48,18 @@ export default function HomePage() {
         <section id="shows" className="section-animate commercial-intro">
           <div className="content-wrapper">
             <div className="text-content">
-              <p className="commercial-eyebrow">
-                PRODUCTORA ARTÍSTICA · PUERTO IGUAZÚ · TRIPLE FRONTERA
-              </p>
+              <p className="commercial-eyebrow">PRODUCTORA ARTÍSTICA · PUERTO IGUAZÚ · TRIPLE FRONTERA</p>
               <h2>Producimos espectáculos para hoteles, gastronomía y eventos</h2>
-              <p>
-                Tango, música en vivo y experiencias escénicas de la Triple Frontera,
-                diseñadas a medida para cada espacio, público y ocasión.
-              </p>
+              <p>Tango, música en vivo y experiencias escénicas de la Triple Frontera, diseñadas a medida para cada espacio, público y ocasión.</p>
               <div className="button-group">
-                <a
-                  href="https://wa.me/5493757618270?text=Hola%2C%20quisiera%20consultar%20por%20una%20producci%C3%B3n%20art%C3%ADstica%20para%20mi%20establecimiento%20o%20evento."
-                  className="action-button"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Solicitar una propuesta
-                </a>
-                <a href="/reservas#shows" className="catalog-button secondary-button">
-                  Conocer los espectáculos
-                </a>
+                <a href="https://wa.me/5493757618270?text=Hola%2C%20quisiera%20consultar%20por%20una%20producci%C3%B3n%20art%C3%ADstica%20para%20mi%20establecimiento%20o%20evento." className="action-button" target="_blank" rel="noopener noreferrer">Solicitar una propuesta</a>
+                <a href="/reservas#shows" className="catalog-button secondary-button">Conocer los espectáculos</a>
               </div>
-              <p className="commercial-note">
-                Trabajamos por contratación y adaptamos artistas, duración, sonido y
-                despliegue técnico a las necesidades de cada producción.
-              </p>
-              <a
-                href="https://wa.me/5493757618270?text=Hola%2C%20quisiera%20consultar%20el%20cronograma%20de%20actividades%20abiertas%20al%20p%C3%BAblico%20en%20Puerto%20Iguaz%C3%BA."
-                className="agenda-link"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                ¿Buscás actividades abiertas al público? Consultar cronograma
-              </a>
+              <p className="commercial-note">Trabajamos por contratación y adaptamos artistas, duración, sonido y despliegue técnico a las necesidades de cada producción.</p>
+              <a href="https://wa.me/5493757618270?text=Hola%2C%20quisiera%20consultar%20el%20cronograma%20de%20actividades%20abiertas%20al%20p%C3%BAblico%20en%20Puerto%20Iguaz%C3%BA." className="agenda-link" target="_blank" rel="noopener noreferrer">¿Buscás actividades abiertas al público? Consultar cronograma</a>
             </div>
             <div className="image-content">
-              <img
-                src="/assets/images/showsImage1.png"
-                alt="Producción artística de UnderTango Club en Puerto Iguazú"
-              />
+              <img src="/assets/images/showsImage1.png" alt="Producción artística de UnderTango Club en Puerto Iguazú" />
             </div>
           </div>
         </section>
@@ -162,9 +123,7 @@ export default function HomePage() {
         <section id="map" className="section-animate">
           <h2>Encuéntranos</h2>
           <div className="map-container">
-            <a href="https://www.google.com/maps/place/Undertango+Club/" target="_blank" rel="noopener noreferrer" className="map-link">
-              <img src="/assets/images/mapsScreen3.png" alt="Ubicación de UnderTango Club en Puerto Iguazú" />
-            </a>
+            <a href="https://www.google.com/maps/place/Undertango+Club/" target="_blank" rel="noopener noreferrer" className="map-link"><img src="/assets/images/mapsScreen3.png" alt="Ubicación de UnderTango Club en Puerto Iguazú" /></a>
             <div className="info-overlay">
               <div className="info-content">
                 <h3>Información de Contacto</h3>
@@ -195,7 +154,6 @@ export default function HomePage() {
       </main>
 
       <Footer />
-
       <Script src="/assets/js/index.js" />
       <Script src="/assets/js/burguer.js" />
     </>

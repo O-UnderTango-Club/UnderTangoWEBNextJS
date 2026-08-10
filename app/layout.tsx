@@ -9,6 +9,7 @@ import "./styles/navbar.css";
 import "./styles/timeline.css";
 import "./styles/pilars.css";
 import "./styles/burguer.css";
+import "./styles/home-current.css";
 
 const inter = Inter({
   subsets: ["latin"],

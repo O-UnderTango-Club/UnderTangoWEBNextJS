@@ -1,17 +1,42 @@
 /* Overrides for the current UnderTango commercial homepage. */
 
+/* Hero: keep the video inside its own stacking context so it fills the
+   viewport cleanly instead of falling behind the page background. */
+#video-slider {
+  position: relative;
+  height: calc(100vh - 60px);
+  min-height: 520px;
+  overflow: hidden;
+  background: #000000;
+  isolation: isolate;
+}
+
+#video-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center center;
+  z-index: 0;
+}
+
 #video-slider::after {
   content: "";
   position: absolute;
-  inset: 0;
-  z-index: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38%;
+  z-index: 1;
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    transparent 35%,
-    rgba(0, 0, 0, 0.2) 50%,
-    rgba(0, 0, 0, 0.7) 72%,
-    #000000 94%
+    rgba(0, 0, 0, 0),
+    rgba(0, 0, 0, 0.25) 42%,
+    rgba(0, 0, 0, 0.82) 82%,
+    #000000 100%
   );
 }
 
@@ -52,4 +77,15 @@
 .agenda-link:hover {
   color: #ffffff;
   text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  #video-slider {
+    height: calc(100svh - 58px);
+    min-height: 460px;
+  }
+
+  #video-background {
+    object-position: 50% 50%;
+  }
 }

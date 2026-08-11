@@ -55,6 +55,11 @@ export default function Header() {
           </Link>
         </li>
         <li>
+          <Link href="/subundertango/pages/proyectos.html">
+            Proyectos activos
+          </Link>
+        </li>
+        <li>
           <Link href="/#historia">Historia</Link>
         </li>
         <li>

@@ -50,6 +50,11 @@ export default function Header() {
           </Link>
         </li>
         <li>
+          <Link href="/shows" className={pathname === "/shows" ? "active" : ""}>
+            Shows
+          </Link>
+        </li>
+        <li>
           <Link href="/#historia">Historia</Link>
         </li>
         <li>

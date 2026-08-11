@@ -55,7 +55,7 @@ export default function Header() {
           </Link>
         </li>
         <li>
-          <Link href="/subundertango/pages/proyectos.html">
+          <Link href="/proyectos" className={pathname === "/proyectos" ? "active" : ""}>
             Proyectos activos
           </Link>
         </li>

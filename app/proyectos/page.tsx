@@ -74,7 +74,7 @@ function applyManualOrder(projects: Project[], savedOrder: string[]) {
 }
 
 export default function ProjectsPage() {
-  const { user, loading: authLoading, login, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const [payload, setPayload] = useState<ApiPayload | null>(null);
   const [error, setError] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("manual");
@@ -88,7 +88,6 @@ export default function ProjectsPage() {
   const [toast, setToast] = useState("");
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
 
@@ -265,13 +264,17 @@ export default function ProjectsPage() {
     setLoginError("");
 
     try {
-      const result = await login(loginEmail.trim(), loginPassword);
-      if (!result?.success) throw new Error(result?.message || "No se pudo iniciar sesión.");
-      setLoginPassword("");
+      const email = loginEmail.trim().toLowerCase();
+      if (!email) throw new Error("Ingresá tu email.");
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/proyectos`, shouldCreateUser: true },
+      });
+      if (error) throw error;
       setLoginOpen(false);
-      setToast("Sesión iniciada. Verificando permisos de edición…");
+      setToast("Te enviamos un enlace de acceso por email. Abrilo para activar el modo edición.");
     } catch (err) {
-      setLoginError(err instanceof Error ? err.message : "No se pudo iniciar sesión.");
+      setLoginError(err instanceof Error ? err.message : "No se pudo enviar el enlace de acceso.");
     } finally {
       setLoggingIn(false);
     }
@@ -459,12 +462,8 @@ export default function ProjectsPage() {
                 <span>Email</span>
                 <input type="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} required autoComplete="email" />
               </label>
-              <label className={styles.field}>
-                <span>Contraseña</span>
-                <input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} required autoComplete="current-password" />
-              </label>
               {loginError && <p className={styles.formError}>{loginError}</p>}
-              <button type="submit" className={styles.saveButton} disabled={loggingIn}>{loggingIn ? "Ingresando…" : "Entrar al modo edición"}</button>
+              <button type="submit" className={styles.saveButton} disabled={loggingIn}>{loggingIn ? "Enviando…" : "Enviar enlace de acceso"}</button>
             </form>
           </div>
         </div>

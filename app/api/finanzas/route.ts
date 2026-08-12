@@ -27,6 +27,7 @@ const O = {
   currency: "fld1d4ZilO9HE4xfk",
   balance: "fldLK5IhLNJnaupRS",
   status: "fldpVOPqM6JMfpgWh",
+  nextAction: "fldPjh1CwrJYfC7iR",
 };
 
 type Movement = {
@@ -51,9 +52,23 @@ type Obligation = {
   currency: string;
   balance: number;
   status: string;
+  nextAction: string;
 };
 
 const movementSnapshot: Movement[] = [
+  {
+    id: "recMp5z19LoVcsVO3",
+    name: "Saldo inicial — Efectivo PYG 1.200.000 — 12/08/2026",
+    date: "2026-08-12",
+    createdTime: "2026-08-12T13:36:49.000Z",
+    type: "Ingreso",
+    amount: 1200000,
+    currency: "PYG",
+    status: "Confirmado",
+    concept: "Existencia de caja en guaraníes disponible para cambiar y pagar servicios.",
+    medium: "Efectivo",
+    notes: "Reservado para cambiar el 13/08/2026 y pagar servicios antes de pasar de uno a dos meses de atraso.",
+  },
   {
     id: "recYqrb5dfILNAQMg",
     name: "Egreso — Supermercado — ARS 20.000 — 12/08/2026",
@@ -123,6 +138,16 @@ const movementSnapshot: Movement[] = [
 
 const obligationSnapshot: Obligation[] = [
   {
+    id: "rec0X5lBD5d0y4LLU",
+    name: "Pata Negra — cuenta por cobrar — ARS 960.000",
+    type: "Por cobrar",
+    concept: "Saldo pendiente de pago de Pata Negra a Ø UnderTango Club.",
+    currency: "ARS",
+    balance: 960000,
+    status: "Pendiente",
+    nextAction: "Reclamar el pago todos los días hasta que Pata Negra salde la deuda.",
+  },
+  {
     id: "recaWkKsAuvSnLGtC",
     name: "87Ø1 — Carlos Audibert — cuenta por cobrar",
     type: "Por cobrar",
@@ -130,6 +155,7 @@ const obligationSnapshot: Obligation[] = [
     currency: "BRL",
     balance: 890,
     status: "Parcial",
+    nextAction: "",
   },
 ];
 
@@ -160,6 +186,7 @@ function normalizeObligation(record: any): Obligation {
     currency: f[O.currency] || "",
     balance: typeof f[O.balance] === "number" ? f[O.balance] : 0,
     status: f[O.status] || "",
+    nextAction: f[O.nextAction] || "",
   };
 }
 
@@ -198,7 +225,7 @@ function summarize(movements: Movement[], obligations: Obligation[]) {
     balancesMap.set(movement.currency, (balancesMap.get(movement.currency) || 0) + sign * movement.amount);
   }
 
-  const currencyOrder = ["ARS", "BRL", "USD"];
+  const currencyOrder = ["ARS", "BRL", "PYG", "USD"];
   const balances = Array.from(balancesMap.entries())
     .map(([currency, amount]) => ({ currency, amount }))
     .sort((a, b) => {
@@ -236,7 +263,7 @@ function summarize(movements: Movement[], obligations: Obligation[]) {
       if (dateDelta) return dateDelta;
       return (b.createdTime || "").localeCompare(a.createdTime || "");
     })
-    .slice(0, 14);
+    .slice(0, 16);
 
   return {
     balances,

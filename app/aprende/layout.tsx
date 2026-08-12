@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./aprende.css";
+import "./isolation.css";
 
 export const metadata: Metadata = {
   title: "APRENDE | Memoria y aprendizaje acelerado",

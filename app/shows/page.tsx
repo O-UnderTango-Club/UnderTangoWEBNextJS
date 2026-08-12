@@ -7,6 +7,18 @@ function whatsappFor(subject: string) {
   return `https://wa.me/5493757618270?text=${encodeURIComponent(text)}`;
 }
 
+const reviewMedia = [
+  { id: "1vQR_yq2jDhqC5PtGYNItnHYZq7B67qCy", label: "Video 01" },
+  { id: "1dsEAdFaUAGmTdeMJD3ZMhe0b6xlGVM17", label: "Video 02" },
+  { id: "1z1DFJjhvR95sKvF95I6MdR7JkoOB4WLU", label: "Video 03" },
+  { id: "157NYHPCWUTP9kUfw4EG1LQS8p3jst_yo", label: "Video 04" },
+  { id: "15KPcYN6aY4RLmdymX5yH00_NRoovicO3", label: "Video 05" },
+  { id: "1IgwR_VhWZtnmNmRpkl1lLPkFx8KxwKng", label: "Video 06" },
+  { id: "1FFqYZjspGzuKDmy-fBG0BLhDki-O7SU7", label: "Video 07" },
+  { id: "1vj62rxNNTtRJi0EDF-f8nWrfDwX_CFTr", label: "Video 08" },
+  { id: "1wlzbwtVrmYx6kat0TTf5MnfHTpxtQp87", label: "Video 09" },
+];
+
 const artistChoices = [
   {
     title: "Tango con Eva Janberg",
@@ -92,6 +104,31 @@ export default function ShowsPage() {
           <a className={styles.heroCta} href={whatsappFor("un show de Ø UnderTango")} target="_blank" rel="noopener noreferrer">
             Consultar por WhatsApp
           </a>
+        </section>
+
+        <section className={`${styles.section} ${styles.reviewSection}`} aria-label="Material audiovisual para clasificar">
+          <div className={styles.sectionHeading}>
+            <p className={styles.eyebrow}>MATERIAL PARA CLASIFICAR · TEMPORAL</p>
+            <h2>Decime a qué corresponde cada video</h2>
+            <p>
+              Los dejo numerados del 01 al 09 para que podamos asignarlos a Eva, Luján, Thaís, saxofonista, banda o al producto que corresponda. Después cada video pasa a su ficha comercial definitiva.
+            </p>
+          </div>
+
+          <div className={styles.videoGrid}>
+            {reviewMedia.map((item) => (
+              <article key={item.id} className={styles.videoCard}>
+                <div className={styles.videoFrame}>
+                  <iframe
+                    src={`https://drive.google.com/file/d/${item.id}/preview`}
+                    title={item.label}
+                    allow="autoplay"
+                  />
+                </div>
+                <div className={styles.videoLabel}>{item.label}</div>
+              </article>
+            ))}
+          </div>
         </section>
 
         <section className={styles.section} aria-label="Artistas y formaciones">

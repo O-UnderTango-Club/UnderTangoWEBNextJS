@@ -123,6 +123,7 @@ export default function ShowsPage() {
                     src={`https://drive.google.com/file/d/${item.id}/preview`}
                     title={item.label}
                     allow="autoplay"
+                    loading="lazy"
                   />
                 </div>
                 <div className={styles.videoLabel}>{item.label}</div>

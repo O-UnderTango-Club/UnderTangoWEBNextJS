@@ -38,7 +38,7 @@
 }
 
 .subtitle {
-  max-width: 760px;
+  max-width: 820px;
   margin: 14px 0 0;
   color: #bac3d1;
   font-size: 18px;
@@ -73,10 +73,10 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+  align-items: start;
 }
 
 .card {
-  min-height: 255px;
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(160, 178, 205, .18);
@@ -122,7 +122,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
 .skill {
@@ -135,11 +135,72 @@
 }
 
 .description {
-  margin: auto 0 0;
-  padding-top: 24px;
+  margin: 18px 0 0;
   color: #d8dee8;
   font-size: 15px;
   line-height: 1.5;
+}
+
+.operationalBlock {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(160, 178, 205, .12);
+}
+
+.blockLabel {
+  margin: 0 0 8px;
+  color: #8fa1b7;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.availabilityWarning,
+.availabilityOk,
+.noCommitments {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.availabilityWarning {
+  color: #ffd0a3;
+  border-left: 3px solid rgba(255, 184, 108, .65);
+  padding-left: 10px;
+}
+
+.availabilityOk { color: #b9dfcf; }
+.noCommitments { color: #8798ad; }
+
+.commitments {
+  display: grid;
+  gap: 8px;
+}
+
+.commitment {
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px;
+  border: 1px solid rgba(152, 176, 207, .14);
+  border-radius: 12px;
+  background: rgba(7, 13, 21, .42);
+}
+
+.commitment strong {
+  color: #f3f6fb;
+  font-size: 13px;
+}
+
+.commitment span {
+  color: #c3cedb;
+  font-size: 13px;
+}
+
+.commitment small {
+  color: #8798ad;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .loading,
@@ -170,4 +231,5 @@
   .grid { grid-template-columns: 1fr; }
   .title { font-size: 46px; }
   .subtitle { font-size: 16px; }
+  .card { padding: 18px; }
 }

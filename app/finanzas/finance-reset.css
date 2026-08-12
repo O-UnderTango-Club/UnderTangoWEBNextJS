@@ -1,0 +1,31 @@
+.finance-page-scope main {
+  padding-top: 114px !important;
+}
+
+.finance-page-scope main > section {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+  padding: 0 !important;
+}
+
+.finance-page-scope main > section:nth-of-type(4) {
+  padding: 18px !important;
+}
+
+.finance-page-scope main > section h2 {
+  margin-bottom: 0 !important;
+  text-align: left !important;
+  display: block !important;
+  position: static !important;
+}
+
+.finance-page-scope main > section h2::after {
+  display: none !important;
+}
+
+@media (max-width: 680px) {
+  .finance-page-scope main {
+    padding-top: 104px !important;
+  }
+}

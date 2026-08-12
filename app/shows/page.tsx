@@ -2,57 +2,79 @@ import Header from "../components/header";
 import Footer from "../components/footer";
 import styles from "./shows.module.css";
 
-const whatsapp = "https://wa.me/5493757618270?text=Hola%2C%20quisiera%20consultar%20por%20un%20show%20de%20UnderTango.";
+function whatsappFor(subject: string) {
+  const text = `Hola, vi el catálogo de Ø UnderTango y quisiera consultar disponibilidad y precio para: ${subject}.`;
+  return `https://wa.me/5493757618270?text=${encodeURIComponent(text)}`;
+}
 
-const reviewMedia = [
-  { id: "1vQR_yq2jDhqC5PtGYNItnHYZq7B67qCy", label: "Material 01 · pareja de tango" },
-  { id: "1dsEAdFaUAGmTdeMJD3ZMhe0b6xlGVM17", label: "Material 02 · pareja de tango" },
-  { id: "1z1DFJjhvR95sKvF95I6MdR7JkoOB4WLU", label: "Material 03 · escena / baile" },
-  { id: "157NYHPCWUTP9kUfw4EG1LQS8p3jst_yo", label: "Material 04 · producción" },
-  { id: "15KPcYN6aY4RLmdymX5yH00_NRoovicO3", label: "Material 05 · ensayo / baile" },
-  { id: "1IgwR_VhWZtnmNmRpkl1lLPkFx8KxwKng", label: "Material 06 · banda" },
-  { id: "1FFqYZjspGzuKDmy-fBG0BLhDki-O7SU7", label: "Material 07 · escena / baile" },
-  { id: "1vj62rxNNTtRJi0EDF-f8nWrfDwX_CFTr", label: "Material 08 · pareja de tango" },
-  { id: "1wlzbwtVrmYx6kat0TTf5MnfHTpxtQp87", label: "Material 09 · banda / música en vivo" },
+const artistChoices = [
+  {
+    title: "Tango con Eva Janberg",
+    kind: "DANZA",
+    description: "Show de tango adaptable a hoteles, cenas, recepciones y eventos privados.",
+    availability: "No disponible del 22 al 25 de agosto.",
+    warning: true,
+  },
+  {
+    title: "Tango con Luján Rojas",
+    kind: "DANZA",
+    description: "Danza de tango y opción de experiencia con componente didáctico o participativo.",
+    availability: "No disponible del 17 al 31 de agosto.",
+    warning: true,
+  },
+  {
+    title: "Tango con Thays Andrade",
+    kind: "DANZA",
+    description: "Tango escenario para formatos visuales, eventos, hoteles y producciones especiales.",
+    availability: "Consultar disponibilidad para la fecha del evento.",
+  },
+  {
+    title: "Saxofonista en vivo",
+    kind: "MÚSICA",
+    description: "Intervención musical elegante para recepción, cena, ambientación o integración con danza.",
+    availability: "Consultar disponibilidad y repertorio.",
+  },
+  {
+    title: "Banda Ø UnderTango",
+    kind: "BANDA · 5 MÚSICOS",
+    description: "La banda se presenta como una unidad artística de cinco músicos. Puede funcionar sola o integrarse con bailarines.",
+    availability: "Consultar fecha, repertorio y requerimientos técnicos.",
+  },
 ];
 
 const products = [
   {
+    slug: "dupla-tango",
+    title: "Pareja de Tango",
+    status: "FORMATO BASE",
+    description: "Una propuesta compacta, visual y adaptable para eventos que necesitan una intervención argentina clara y elegante.",
+    format: "2 bailarines",
+    duration: "Adaptable al evento",
+  },
+  {
     slug: "tango-saxo",
     title: "Pareja de Tango + Saxo",
-    status: "ACTIVO · EN EXPANSIÓN",
-    description:
-      "Formato íntimo y elegante para hoteles, cenas y eventos: pareja de tango con saxofón en vivo, interludio de saxo solo y nueva entrada de baile.",
-    format: "Pareja de baile + saxofonista",
-    duration: "Formato adaptable · base de 2 entradas",
+    status: "PRODUCTO DESTACADO",
+    description: "Danza y saxofón en vivo combinados como un único producto escénico: entradas de baile, intervención musical y transiciones pensadas para sostener la atención.",
+    format: "2 bailarines + saxofonista",
+    duration: "Base de 2 entradas · adaptable",
     featured: true,
   },
   {
-    slug: "buchanan-rojas",
-    title: "Buchanan Rojas",
-    status: "MATERIAL EN ORGANIZACIÓN",
-    description:
-      "Propuesta escénica de Ø UnderTango en proceso de consolidación audiovisual para el catálogo comercial.",
-    format: "Formato artístico",
-    duration: "Adaptable según evento",
-  },
-  {
-    slug: "bayon-verde",
-    title: "Bayón Verde",
-    status: "EN DESARROLLO ESCÉNICO",
-    description:
-      "Producto escénico con identidad propia, actualmente en desarrollo y documentación de su versión comercial.",
-    format: "Formato artístico",
-    duration: "Adaptable según evento",
-  },
-  {
     slug: "show-banda",
-    title: "Show con Banda",
-    status: "EN PREPARACIÓN",
-    description:
-      "Formato ampliado de música en vivo con identidad Ø UnderTango, adaptable a escenarios, hoteles, festivales y eventos especiales.",
-    format: "Banda en vivo · opción con bailarines",
+    title: "Banda Ø UnderTango",
+    status: "5 MÚSICOS",
+    description: "Música en vivo con identidad Ø UnderTango para escenarios, hoteles, festivales, peñas y eventos especiales.",
+    format: "Banda de cinco músicos",
     duration: "Escalable según producción",
+  },
+  {
+    slug: "banda-danza",
+    title: "Banda + Tango",
+    status: "FORMATO AMPLIADO",
+    description: "La banda de cinco músicos integrada con danza para construir un show de mayor escala y presencia escénica.",
+    format: "5 músicos + bailarines",
+    duration: "A medida",
   },
 ];
 
@@ -62,60 +84,84 @@ export default function ShowsPage() {
       <Header />
       <main className={styles.page}>
         <section className={styles.hero}>
-          <p className={styles.eyebrow}>Ø UNDERTANGO · CATÁLOGO VIVO</p>
-          <h1>Shows</h1>
+          <p className={styles.eyebrow}>Ø UNDERTANGO · CATÁLOGO DE SHOWS</p>
+          <h1>Elegí el formato.</h1>
           <p className={styles.lead}>
-            Formatos reales que ya estamos produciendo en la Triple Frontera. El catálogo se actualiza a medida que cada producto suma repertorio, video y nuevas versiones.
+            Shows y artistas de la Triple Frontera para hoteles, empresas, recepciones y eventos. Elegí una opción y consultanos por WhatsApp para confirmar fecha, formación y presupuesto.
           </p>
+          <a className={styles.heroCta} href={whatsappFor("un show de Ø UnderTango")} target="_blank" rel="noopener noreferrer">
+            Consultar por WhatsApp
+          </a>
         </section>
 
-        <section style={{ maxWidth: 1180, margin: "0 auto 48px", padding: "0 20px" }} aria-label="Material audiovisual recibido">
-          <div style={{ marginBottom: 18 }}>
-            <p className={styles.eyebrow}>MATERIAL AUDIOVISUAL · VERSIÓN DE TRABAJO</p>
-            <h2 style={{ margin: "6px 0 8px" }}>Videos recibidos para revisar</h2>
-            <p style={{ margin: 0, opacity: 0.75 }}>
-              Carga inicial para ordenar el catálogo. Hoy revisamos cuáles quedan como material definitivo de cada producto.
-            </p>
+        <section className={styles.section} aria-label="Artistas y formaciones">
+          <div className={styles.sectionHeading}>
+            <p className={styles.eyebrow}>ARTISTAS Y FORMACIONES</p>
+            <h2>¿Qué querés sumar al evento?</h2>
+            <p>Podés contratar una opción individual o combinarla con otro formato del catálogo.</p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-            {reviewMedia.map((item) => (
-              <article key={item.id} style={{ borderRadius: 14, overflow: "hidden", background: "#111", border: "1px solid rgba(255,255,255,.12)" }}>
-                <div style={{ aspectRatio: "9 / 16", background: "#000" }}>
-                  <iframe
-                    src={`https://drive.google.com/file/d/${item.id}/preview`}
-                    title={item.label}
-                    allow="autoplay"
-                    style={{ width: "100%", height: "100%", border: 0 }}
-                  />
+
+          <div className={styles.choiceGrid}>
+            {artistChoices.map((choice) => (
+              <article key={choice.title} className={styles.choiceCard}>
+                <span className={styles.kind}>{choice.kind}</span>
+                <h3>{choice.title}</h3>
+                <p>{choice.description}</p>
+                <div className={`${styles.availability} ${choice.warning ? styles.availabilityWarning : ""}`}>
+                  {choice.availability}
                 </div>
-                <div style={{ padding: 12, fontSize: 13, opacity: 0.78 }}>{item.label}</div>
+                <a className={styles.smallCta} href={whatsappFor(choice.title)} target="_blank" rel="noopener noreferrer">
+                  Consultar esta opción
+                </a>
               </article>
             ))}
           </div>
         </section>
 
-        <section className={styles.grid} aria-label="Catálogo de shows">
-          {products.map((product) => (
-            <article key={product.slug} className={`${styles.card} ${product.featured ? styles.featured : ""}`}>
-              <div className={styles.mediaPlaceholder}>
-                <span>{product.featured ? "MATERIAL EN REVISIÓN" : "MATERIAL EN CARGA"}</span>
-              </div>
-              <div className={styles.cardBody}>
-                <span className={styles.status}>{product.status}</span>
-                <h2>{product.title}</h2>
-                <p>{product.description}</p>
-                <dl className={styles.details}>
-                  <div><dt>Formato</dt><dd>{product.format}</dd></div>
-                  <div><dt>Duración</dt><dd>{product.duration}</dd></div>
-                </dl>
-                <a className={styles.cta} href={whatsapp} target="_blank" rel="noopener noreferrer">
-                  Consultar disponibilidad
-                </a>
-              </div>
-            </article>
-          ))}
+        <section className={styles.section} aria-label="Catálogo de formatos">
+          <div className={styles.sectionHeading}>
+            <p className={styles.eyebrow}>COMBOS Y PRODUCTOS</p>
+            <h2>Formatos listos para vender</h2>
+            <p>Partimos de estos formatos y ajustamos duración, repertorio, cantidad de artistas y puesta según el evento.</p>
+          </div>
+
+          <div className={styles.grid}>
+            {products.map((product) => (
+              <article key={product.slug} className={`${styles.card} ${product.featured ? styles.featured : ""}`}>
+                <div className={styles.mediaPlaceholder}>
+                  <span>{product.featured ? "TANGO + SAXO" : product.status}</span>
+                </div>
+                <div className={styles.cardBody}>
+                  <span className={styles.status}>{product.status}</span>
+                  <h2>{product.title}</h2>
+                  <p>{product.description}</p>
+                  <dl className={styles.details}>
+                    <div><dt>Formato</dt><dd>{product.format}</dd></div>
+                    <div><dt>Duración</dt><dd>{product.duration}</dd></div>
+                  </dl>
+                  <a className={styles.cta} href={whatsappFor(product.title)} target="_blank" rel="noopener noreferrer">
+                    Consultar disponibilidad
+                  </a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.finalBlock}>
+          <p className={styles.eyebrow}>¿NO SABÉS QUÉ ELEGIR?</p>
+          <h2>Contanos fecha, lugar y tipo de evento.</h2>
+          <p>Te proponemos la formación más conveniente y combinamos danza, música en vivo y banda según el espacio y el presupuesto.</p>
+          <a className={styles.heroCta} href={whatsappFor("una recomendación de formato para mi evento")} target="_blank" rel="noopener noreferrer">
+            Pedir recomendación
+          </a>
         </section>
       </main>
+
+      <a className={styles.mobileWhatsapp} href={whatsappFor("un show de Ø UnderTango")} target="_blank" rel="noopener noreferrer">
+        Consultar por WhatsApp
+      </a>
+
       <Footer />
     </>
   );

@@ -1,3 +1,4 @@
+/* APRENDE intentionally opts out of the legacy home-page section animation system. */
 .aprendePage,
 .aprendePage * {
   font-family: inherit;
@@ -7,6 +8,7 @@
   opacity: 1 !important;
   visibility: visible !important;
   transform: none;
+  transition: none;
 }
 
 .aprendePage section h2 {

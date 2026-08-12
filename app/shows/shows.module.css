@@ -89,6 +89,44 @@
   line-height: 1.55;
 }
 
+.reviewSection {
+  padding: 22px;
+  border: 1px solid rgba(230, 185, 102, .28);
+  border-radius: 24px;
+  background: rgba(230, 185, 102, .035);
+}
+
+.videoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.videoCard {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 16px;
+  background: rgba(255,255,255,.035);
+}
+
+.videoFrame {
+  aspect-ratio: 9 / 16;
+  background: #000;
+}
+
+.videoFrame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.videoLabel {
+  padding: 12px 13px;
+  font-size: .82rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
 .choiceGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -238,6 +276,7 @@
 .mobileWhatsapp { display: none; }
 
 @media (max-width: 900px) {
+  .videoGrid,
   .choiceGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .featured { grid-template-columns: 1fr; }
   .featured .mediaPlaceholder { min-height: 260px; aspect-ratio: 16 / 9; }
@@ -254,10 +293,14 @@
   .heroCta { width: 100%; }
 
   .section { margin-bottom: 46px; }
+  .videoGrid,
   .choiceGrid,
   .grid {
     grid-template-columns: 1fr;
   }
+
+  .reviewSection { padding: 16px; }
+  .videoCard { max-width: 430px; width: 100%; margin: 0 auto; }
 
   .choiceCard { min-height: 0; padding: 18px; }
   .availability { margin-top: 18px; }

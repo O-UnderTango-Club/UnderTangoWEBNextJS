@@ -240,9 +240,9 @@ export default function ProjectsPage() {
       if (!response.ok) throw new Error(result.error || "No se pudo guardar.");
 
       const updated = result.project as Project;
+      const closesProject = ["Completado", "Archivado"].includes(updated.status);
       setPayload((previous) => {
         if (!previous) return previous;
-        const closesProject = ["Completado", "Archivado"].includes(updated.status);
         return {
           ...previous,
           projects: closesProject

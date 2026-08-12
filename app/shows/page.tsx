@@ -9,10 +9,10 @@ function whatsappFor(subject: string) {
 
 const reviewMedia = [
   {
-    id: "instagram-DatX_MjxWMN",
-    label: "Video 01 · Instagram",
-    type: "instagram",
-    src: "https://www.instagram.com/reel/DatX_MjxWMN/embed",
+    id: "youtube-lrqyoXQiv_A",
+    label: "Video 01 · YouTube",
+    type: "youtube",
+    src: "https://www.youtube.com/embed/lrqyoXQiv_A?playsinline=1&rel=0",
   },
   { id: "1dsEAdFaUAGmTdeMJD3ZMhe0b6xlGVM17", label: "Video 02", type: "drive" },
   { id: "1z1DFJjhvR95sKvF95I6MdR7JkoOB4WLU", label: "Video 03", type: "drive" },
@@ -116,13 +116,13 @@ export default function ShowsPage() {
             <p className={styles.eyebrow}>MATERIAL PARA CLASIFICAR · TEMPORAL</p>
             <h2>Decime a qué corresponde cada video</h2>
             <p>
-              Video 01 ahora usa un Reel de Instagram para comparar velocidad y calidad con los previews de Google Drive. Los demás quedan sin cambios por ahora.
+              Video 01 ahora usa un Short de YouTube para comparar velocidad, calidad y reproducción dentro de la página con los previews de Google Drive. Los demás quedan sin cambios por ahora.
             </p>
           </div>
 
           <div className={styles.videoGrid}>
             {reviewMedia.map((item) => {
-              const src = item.type === "instagram"
+              const src = item.type === "youtube"
                 ? item.src
                 : `https://drive.google.com/file/d/${item.id}/preview`;
 
@@ -132,7 +132,8 @@ export default function ShowsPage() {
                     <iframe
                       src={src}
                       title={item.label}
-                      allow="autoplay; encrypted-media; picture-in-picture"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
                       loading="lazy"
                       referrerPolicy="strict-origin-when-cross-origin"
                     />

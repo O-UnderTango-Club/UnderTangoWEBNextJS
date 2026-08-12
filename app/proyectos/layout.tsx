@@ -1,3 +1,5 @@
+import "./desktop.css";
+
 export default function ProjectsLayout({ children }: { children: React.ReactNode }) {
   return (
     <div id="projects-route-scope">

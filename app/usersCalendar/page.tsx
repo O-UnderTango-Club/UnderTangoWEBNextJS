@@ -52,6 +52,16 @@ function monthLabel(date: Date) {
     .toUpperCase();
 }
 
+function eventTimeLabel(event: PublicEvent) {
+  const normalizedTitle = event.title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (normalizedTitle.includes("horario a confirmar")) return "Horario a confirmar";
+  return event.time;
+}
+
 export default function UsersCalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [activeCategories, setActiveCategories] = useState<Category[]>(["shows"]);
@@ -242,7 +252,7 @@ export default function UsersCalendarPage() {
                     <div className="day-events">
                       {eventsForDay.map((event) => (
                         <div className={`event-card ${event.category}`} key={event.id}>
-                          <div className="event-time">{event.time}</div>
+                          <div className="event-time">{eventTimeLabel(event)}</div>
                           <div className="event-title">{event.title}</div>
                           {event.place && <div className="event-place">{event.place}</div>}
                         </div>

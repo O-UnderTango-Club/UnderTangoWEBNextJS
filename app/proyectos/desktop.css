@@ -1,0 +1,59 @@
+@media (min-width: 1100px) {
+  #projects-route-scope main h1 {
+    font-size: 58px !important;
+  }
+
+  #projects-route-scope main section:first-of-type p:last-of-type {
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    max-width: 900px !important;
+  }
+
+  #projects-route-scope main > p {
+    font-size: 15px !important;
+    line-height: 1.55 !important;
+  }
+
+  #projects-route-scope main section:nth-of-type(2) > div > span:first-child {
+    font-size: 32px !important;
+  }
+
+  #projects-route-scope main section:nth-of-type(2) > div > span:last-child {
+    font-size: 14px !important;
+  }
+
+  #projects-route-scope main button {
+    font-size: 14px !important;
+    padding: 10px 13px !important;
+  }
+
+  #projects-route-scope main article {
+    min-height: 330px !important;
+    padding: 20px !important;
+  }
+
+  #projects-route-scope main article h2 {
+    font-size: 19px !important;
+    line-height: 1.28 !important;
+  }
+
+  #projects-route-scope main article > div:nth-of-type(3) p:first-child,
+  #projects-route-scope main article > div:nth-of-type(4) p:first-child {
+    font-size: 12px !important;
+  }
+
+  #projects-route-scope main article > div:nth-of-type(3) p:last-child,
+  #projects-route-scope main article > div:nth-of-type(4) p:last-child {
+    font-size: 15px !important;
+    line-height: 1.5 !important;
+  }
+
+  #projects-route-scope main article > div:last-child {
+    font-size: 12px !important;
+  }
+
+  #projects-route-scope main article > div:first-child div:last-child div span {
+    font-size: 11px !important;
+    padding: 5px 8px !important;
+  }
+}

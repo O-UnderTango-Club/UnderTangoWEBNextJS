@@ -1,0 +1,39 @@
+name: Patch project editor magic link
+on:
+  push:
+    branches: [agent/proyectos-editables]
+    paths: [.github/workflows/patch-project-editor-magic-link.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/proyectos-editables
+      - name: Patch login
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/proyectos/page.tsx')
+          s=p.read_text()
+          pairs=[
+          ('  const { user, loading: authLoading, login, logout } = useAuth();','  const { user, loading: authLoading, logout } = useAuth();'),
+          ('  const [loginPassword, setLoginPassword] = useState("");\n',''),
+          ('''  async function handleEditorLogin(event: FormEvent) {\n    event.preventDefault();\n    setLoggingIn(true);\n    setLoginError("");\n\n    try {\n      const result = await login(loginEmail.trim(), loginPassword);\n      if (!result?.success) throw new Error(result?.message || "No se pudo iniciar sesión.");\n      setLoginPassword("");\n      setLoginOpen(false);\n      setToast("Sesión iniciada. Verificando permisos de edición…");\n    } catch (err) {\n      setLoginError(err instanceof Error ? err.message : "No se pudo iniciar sesión.");\n    } finally {\n      setLoggingIn(false);\n    }\n  }''','''  async function handleEditorLogin(event: FormEvent) {\n    event.preventDefault();\n    setLoggingIn(true);\n    setLoginError("");\n\n    try {\n      const email = loginEmail.trim().toLowerCase();\n      if (!email) throw new Error("Ingresá tu email.");\n      const { error } = await supabase.auth.signInWithOtp({\n        email,\n        options: { emailRedirectTo: `${window.location.origin}/proyectos`, shouldCreateUser: true },\n      });\n      if (error) throw error;\n      setLoginOpen(false);\n      setToast("Te enviamos un enlace de acceso por email. Abrilo para activar el modo edición.");\n    } catch (err) {\n      setLoginError(err instanceof Error ? err.message : "No se pudo enviar el enlace de acceso.");\n    } finally {\n      setLoggingIn(false);\n    }\n  }'''),
+          ('''              <label className={styles.field}>\n                <span>Contraseña</span>\n                <input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} required autoComplete="current-password" />\n              </label>\n''',''),
+          ('<button type="submit" className={styles.saveButton} disabled={loggingIn}>{loggingIn ? "Ingresando…" : "Entrar al modo edición"}</button>','<button type="submit" className={styles.saveButton} disabled={loggingIn}>{loggingIn ? "Enviando…" : "Enviar enlace de acceso"}</button>')]
+          for old,new in pairs:
+              if old not in s: raise SystemExit('missing expected block')
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          Path('.github/workflows/patch-project-editor-magic-link.yml').unlink()
+          PY
+      - name: Commit
+        run: |
+          git config user.name undertangoclub
+          git config user.email 75939161+undertangoclub@users.noreply.github.com
+          git add -A
+          git commit -m "Use passwordless email access for project editor"
+          git push origin HEAD:agent/proyectos-editables

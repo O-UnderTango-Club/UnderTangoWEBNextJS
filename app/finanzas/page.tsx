@@ -31,6 +31,7 @@ type Obligation = {
   currency: string;
   balance: number;
   status: string;
+  nextAction: string;
 };
 
 type FinancePayload = {
@@ -47,6 +48,8 @@ type FinancePayload = {
 };
 
 function money(value: number, currency: string) {
+  if (currency === "PYG") return `₲ ${Math.round(value).toLocaleString("es-PY")}`;
+
   try {
     return new Intl.NumberFormat("es-AR", {
       style: "currency",
@@ -99,6 +102,8 @@ export default function FinanzasPage() {
 
   const ars = payload ? totalFor(payload.balances, "ARS") : 0;
   const brl = payload ? totalFor(payload.balances, "BRL") : 0;
+  const pyg = payload ? totalFor(payload.balances, "PYG") : 0;
+  const receivableArs = payload ? totalFor(payload.receivableTotals, "ARS") : 0;
   const receivableBrl = payload ? totalFor(payload.receivableTotals, "BRL") : 0;
 
   return (
@@ -139,6 +144,12 @@ export default function FinanzasPage() {
             <span className={styles.cardHint}>Efectivo disponible después del cambio a pesos.</span>
           </article>
 
+          <article className={`${styles.balanceCard} ${styles.primaryCard}`}>
+            <span className={styles.cardLabel}>PYG para servicios</span>
+            <strong className={styles.balanceValue}>{payload ? money(pyg, "PYG") : "—"}</strong>
+            <span className={styles.cardHint}>Reservados para cambiar mañana 13 ago y pagar servicios atrasados.</span>
+          </article>
+
           <article className={styles.balanceCard}>
             <span className={styles.cardLabel}>Fondo comida</span>
             <strong className={styles.balanceValue}>{payload ? money(payload.foodFund, "ARS") : "—"}</strong>
@@ -150,7 +161,13 @@ export default function FinanzasPage() {
           </article>
 
           <article className={`${styles.balanceCard} ${styles.receivableCard}`}>
-            <span className={styles.cardLabel}>Por cobrar</span>
+            <span className={styles.cardLabel}>Por cobrar ARS</span>
+            <strong className={styles.balanceValue}>{payload ? money(receivableArs, "ARS") : "—"}</strong>
+            <span className={styles.cardHint}>Incluye Pata Negra. No está dentro de la caja disponible.</span>
+          </article>
+
+          <article className={`${styles.balanceCard} ${styles.receivableCard}`}>
+            <span className={styles.cardLabel}>Por cobrar BRL</span>
             <strong className={styles.balanceValue}>{payload ? money(receivableBrl, "BRL") : "—"}</strong>
             <span className={styles.cardHint}>No está incluido en el dinero disponible.</span>
           </article>
@@ -227,6 +244,7 @@ export default function FinanzasPage() {
                   <div>
                     <strong>{item.name}</strong>
                     <p>{item.concept}</p>
+                    {item.nextAction && <p><strong>Próxima acción:</strong> {item.nextAction}</p>}
                   </div>
                   <div className={styles.receivableAmount}>
                     <strong>{money(item.balance, item.currency)}</strong>

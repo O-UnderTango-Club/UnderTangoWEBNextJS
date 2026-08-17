@@ -45,18 +45,99 @@ export default function HomePage() {
           </video>
         </header>
 
+        <section id="intentions" className="intent-gateway section-animate" aria-labelledby="intentions-title">
+          <div className="intent-shell">
+            <p className="intent-eyebrow">Ø UNDERTANGO CLUB · PUERTO IGUAZÚ · TRIPLE FRONTERA</p>
+            <h1 id="intentions-title">¿Qué estás buscando?</h1>
+            <p className="intent-lede">
+              Elegí el camino que mejor describe lo que necesitás y te llevamos directo a la información útil.
+            </p>
+
+            <div className="intent-grid">
+              <a
+                href="/usersCalendar"
+                className="intent-card"
+                data-undertango-event="intent_click"
+                data-undertango-intent="ver_tango"
+                data-undertango-subintent="agenda_publica"
+                data-undertango-cta="Quiero ver tango"
+              >
+                <span className="intent-number">01</span>
+                <h2>Quiero ver tango</h2>
+                <p>Shows, milongas, clases abiertas y experiencias para disfrutar en la Triple Frontera.</p>
+                <span className="intent-card-cta">Ver agenda pública →</span>
+              </a>
+
+              <a
+                href="#classes"
+                className="intent-card"
+                data-undertango-event="intent_click"
+                data-undertango-intent="aprender_tango"
+                data-undertango-cta="Quiero aprender tango"
+              >
+                <span className="intent-number">02</span>
+                <h2>Quiero aprender tango</h2>
+                <p>Clases privadas o grupales para empezar, mejorar o vivir una experiencia durante tu viaje.</p>
+                <span className="intent-card-cta">Ver opciones de clases →</span>
+              </a>
+
+              <a
+                href="#shows"
+                className="intent-card"
+                data-undertango-event="intent_click"
+                data-undertango-intent="contratar_show"
+                data-undertango-cta="Quiero contratar un show"
+              >
+                <span className="intent-number">03</span>
+                <h2>Quiero contratar un show</h2>
+                <p>Producciones para hoteles, gastronomía, agencias, empresas, eventos y celebraciones privadas.</p>
+                <span className="intent-card-cta">Conocer propuestas →</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
         <section id="shows" className="section-animate commercial-intro">
           <div className="content-wrapper">
             <div className="text-content">
-              <p className="commercial-eyebrow">PRODUCTORA ARTÍSTICA · PUERTO IGUAZÚ · TRIPLE FRONTERA</p>
-              <h2>Producimos espectáculos para hoteles, gastronomía y eventos</h2>
-              <p>Tango, música en vivo y experiencias escénicas de la Triple Frontera, diseñadas a medida para cada espacio, público y ocasión.</p>
+              <p className="commercial-eyebrow">PRODUCCIÓN ARTÍSTICA A MEDIDA</p>
+              <h2>Contratá un show en la Triple Frontera</h2>
+              <p>Tango, música en vivo y experiencias escénicas diseñadas para cada espacio, público y ocasión.</p>
               <div className="button-group">
-                <a href="https://wa.me/5493757618270?text=Hola%2C%20quisiera%20consultar%20por%20una%20producci%C3%B3n%20art%C3%ADstica%20para%20mi%20establecimiento%20o%20evento." className="action-button" target="_blank" rel="noopener noreferrer">Solicitar una propuesta</a>
-                <a href="/reservas#shows" className="catalog-button secondary-button">Conocer los espectáculos</a>
+                <a
+                  href="https://wa.me/5493757618270?text=Hola%2C%20llegu%C3%A9%20desde%20la%20web%20de%20UnderTango%20y%20quiero%20consultar%20por%20la%20contrataci%C3%B3n%20de%20un%20show."
+                  className="action-button"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-undertango-intent="contratar_show"
+                  data-undertango-subintent="consulta_comercial"
+                  data-undertango-cta="Solicitar una propuesta"
+                >
+                  Solicitar una propuesta
+                </a>
+                <a
+                  href="/reservas#shows"
+                  className="catalog-button secondary-button"
+                  data-undertango-event="subintent_click"
+                  data-undertango-intent="contratar_show"
+                  data-undertango-subintent="catalogo_shows"
+                  data-undertango-cta="Conocer los espectáculos"
+                >
+                  Conocer los espectáculos
+                </a>
               </div>
               <p className="commercial-note">Trabajamos por contratación y adaptamos artistas, duración, sonido y despliegue técnico a las necesidades de cada producción.</p>
-              <a href="https://wa.me/5493757618270?text=Hola%2C%20quisiera%20consultar%20el%20cronograma%20de%20actividades%20abiertas%20al%20p%C3%BAblico%20en%20Puerto%20Iguaz%C3%BA." className="agenda-link" target="_blank" rel="noopener noreferrer">¿Buscás actividades abiertas al público? Consultar cronograma</a>
+              <a
+                href="https://wa.me/5493757618270?text=Hola%2C%20llegu%C3%A9%20desde%20la%20web%20de%20UnderTango%20y%20quiero%20saber%20qu%C3%A9%20shows%20o%20actividades%20puedo%20ver."
+                className="agenda-link"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-undertango-intent="ver_tango"
+                data-undertango-subintent="cronograma_publico"
+                data-undertango-cta="Consultar cronograma"
+              >
+                ¿Buscás actividades abiertas al público? Consultar cronograma
+              </a>
             </div>
             <div className="image-content">
               <img src="/assets/images/showsImage1.png" alt="Producción artística de UnderTango Club en Puerto Iguazú" />
@@ -67,11 +148,30 @@ export default function HomePage() {
         <section id="classes" className="section-animate">
           <div className="content-wrapper classes-wrapper">
             <div className="text-content">
+              <p className="commercial-eyebrow">APRENDER TANGO</p>
               <h2>Clases de Tango en Iguazú</h2>
-              <p>Aprende de los mejores maestros y vive la esencia del tango en la frontera con Brasil y Paraguay.</p>
+              <p>Elegí una experiencia privada o grupal y aprendé tango en la frontera con Brasil y Paraguay.</p>
               <div className="button-group">
-                <a href="/clasesPrivadas" className="action-button">Clases Privadas</a>
-                <a href="/clasesGrupales" className="action-button">Clases Grupales</a>
+                <a
+                  href="/clasesPrivadas"
+                  className="action-button"
+                  data-undertango-event="subintent_click"
+                  data-undertango-intent="aprender_tango"
+                  data-undertango-subintent="clase_privada"
+                  data-undertango-cta="Clases Privadas"
+                >
+                  Clases Privadas
+                </a>
+                <a
+                  href="/clasesGrupales"
+                  className="action-button"
+                  data-undertango-event="subintent_click"
+                  data-undertango-intent="aprender_tango"
+                  data-undertango-subintent="clase_grupal"
+                  data-undertango-cta="Clases Grupales"
+                >
+                  Clases Grupales
+                </a>
               </div>
             </div>
             <div className="image-content">

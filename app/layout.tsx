@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Libre_Baskerville } from "next/font/google";
 import { AuthProvider } from "./context/AuthContext";
 import ChatRobot from "./components/ChatRobot";
 import UnderTangoTracker from "./components/UnderTangoTracker";
@@ -14,6 +14,13 @@ import "./styles/home-current.css";
 
 const inter = Inter({
   subsets: ["latin"],
+});
+
+const libreBaskerville = Libre_Baskerville({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+  variable: "--font-undertango-editorial",
 });
 
 export const metadata: Metadata = {
@@ -46,7 +53,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={inter.className}>
+      <body className={`${inter.className} ${libreBaskerville.variable}`}>
         <AuthProvider>{children}</AuthProvider>
         <UnderTangoTracker />
         <ChatRobot />

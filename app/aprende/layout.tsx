@@ -11,6 +11,14 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  icons: {
+    icon: [
+      {
+        url: "/aprende/icon.svg",
+        type: "image/svg+xml",
+      },
+    ],
+  },
   openGraph: {
     title: "APRENDE | Memoria y aprendizaje acelerado",
     description:

@@ -40,6 +40,56 @@
   );
 }
 
+/*
+   Public-home typography.
+   Direction: classic editorial serif, inspired by the user's Poor Charlie's
+   reference, but optimized for effortless reading on screens and for an older
+   audience. Scope stays on the public homepage/navigation so internal tools and
+   APRENDE keep their own visual systems.
+*/
+#navbar-menu a,
+#navbar-menu button,
+#intentions h1,
+#intentions h2,
+#intentions p,
+#intentions span,
+#shows h2,
+#shows p,
+#shows a,
+#classes h2,
+#classes p,
+#classes a,
+#fashion h2,
+#fashion p,
+#fashion a,
+#description1 h2,
+#description1 p,
+#historia h2,
+#historia h3,
+#historia p,
+#map h2,
+#map h3,
+#map li,
+#clients h2 {
+  font-family: var(--font-undertango-editorial), Georgia, "Times New Roman", serif !important;
+}
+
+#navbar-menu a,
+#navbar-menu button {
+  font-size: 1rem !important;
+  line-height: 1.35;
+}
+
+#shows .text-content p,
+#classes .text-content p,
+#fashion .text-content p,
+#description1 .text-content p,
+#historia p,
+#map li {
+  font-size: 1.08rem !important;
+  line-height: 1.75 !important;
+}
+
 .intent-gateway {
   background:
     radial-gradient(circle at 50% 0%, rgba(214, 179, 106, 0.08), transparent 34%),
@@ -55,27 +105,30 @@
 }
 
 .intent-eyebrow {
-  color: #d6b36a;
-  font-size: 0.78rem;
+  color: #e2c37d;
+  font-size: 0.86rem;
   font-weight: 700;
-  letter-spacing: 0.18em;
-  margin: 0 0 14px;
+  letter-spacing: 0.14em;
+  line-height: 1.55;
+  margin: 0 0 16px;
   text-transform: uppercase;
 }
 
 .intent-gateway h1 {
   color: #ffffff;
-  font-size: clamp(2.15rem, 5vw, 4.5rem);
-  line-height: 1.02;
+  font-size: clamp(2.5rem, 5vw, 4.6rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
   margin: 0;
 }
 
 .intent-lede {
-  color: #bdbdbd;
-  font-size: clamp(1rem, 2vw, 1.2rem);
-  line-height: 1.6;
-  margin: 22px auto 38px;
-  max-width: 720px;
+  color: #d3d3d3;
+  font-size: clamp(1.08rem, 1.8vw, 1.28rem);
+  line-height: 1.75;
+  margin: 22px auto 40px;
+  max-width: 760px;
 }
 
 .intent-grid {
@@ -86,13 +139,13 @@
 
 .intent-card {
   background: linear-gradient(145deg, #111111 0%, #090909 100%);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 18px;
   color: #ffffff;
   display: flex;
   flex-direction: column;
-  min-height: 290px;
-  padding: 30px 28px;
+  min-height: 310px;
+  padding: 32px 30px;
   text-align: left;
   text-decoration: none;
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
@@ -103,23 +156,26 @@
   background: linear-gradient(145deg, #18150f 0%, #0b0b0b 100%);
   border-color: rgba(214, 179, 106, 0.9);
   color: #ffffff;
-  outline: none;
+  outline: 2px solid rgba(226, 195, 125, 0.55);
+  outline-offset: 3px;
   transform: translateY(-4px);
 }
 
 .intent-number {
-  color: #d6b36a;
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  margin-bottom: 46px;
+  color: #e2c37d;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin-bottom: 42px;
 }
 
 .intent-card h2 {
   color: #ffffff;
   display: block;
-  font-size: clamp(1.4rem, 2.1vw, 1.85rem);
-  line-height: 1.15;
+  font-size: clamp(1.48rem, 2vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
   margin: 0 0 14px;
   text-align: left;
 }
@@ -130,16 +186,17 @@
 }
 
 .intent-card p {
-  color: #bcbcbc;
-  font-size: 0.98rem;
-  line-height: 1.55;
-  margin: 0 0 24px;
+  color: #d2d2d2;
+  font-size: 1.04rem;
+  line-height: 1.72;
+  margin: 0 0 26px;
 }
 
 .intent-card-cta {
-  color: #d6b36a;
-  font-size: 0.92rem;
+  color: #e2c37d;
+  font-size: 1rem;
   font-weight: 700;
+  line-height: 1.5;
   margin-top: auto;
 }
 
@@ -149,17 +206,18 @@
 }
 
 .commercial-eyebrow {
-  color: #d6b36a !important;
-  font-size: 0.82rem !important;
+  color: #e2c37d !important;
+  font-size: 0.88rem !important;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
+  line-height: 1.55 !important;
   margin-bottom: 14px !important;
   text-transform: uppercase;
 }
 
 .commercial-intro .secondary-button {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.7);
 }
 
 .commercial-intro .secondary-button:hover {
@@ -168,16 +226,18 @@
 }
 
 .commercial-intro .commercial-note {
-  color: #bdbdbd;
-  font-size: 0.95rem;
+  color: #d0d0d0;
+  font-size: 1.02rem !important;
   margin: 24px 0 10px;
   max-width: 680px;
 }
 
 .agenda-link {
-  color: #d6b36a;
+  color: #e2c37d;
   display: inline-block;
-  font-size: 0.95rem;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.55;
   text-decoration: none;
   transition: color 0.3s ease;
 }
@@ -211,16 +271,38 @@
     object-position: 50% 50%;
   }
 
+  #navbar-menu a,
+  #navbar-menu button {
+    font-size: 1.08rem !important;
+    line-height: 1.45;
+  }
+
   .intent-gateway {
     padding: 56px 18px 64px;
   }
 
+  .intent-gateway h1 {
+    font-size: clamp(2.35rem, 11vw, 3.35rem);
+    line-height: 1.1;
+  }
+
   .intent-lede {
+    font-size: 1.08rem;
+    line-height: 1.72;
     margin-bottom: 30px;
   }
 
   .intent-card {
     border-radius: 15px;
-    padding: 26px 22px;
+    padding: 28px 24px;
+  }
+
+  .intent-card h2 {
+    font-size: 1.5rem;
+  }
+
+  .intent-card p {
+    font-size: 1.05rem;
+    line-height: 1.72;
   }
 }

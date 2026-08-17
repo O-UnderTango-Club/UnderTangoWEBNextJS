@@ -1,9 +1,12 @@
+import AprendeTracker from "./AprendeTracker";
+
 const whatsappHref =
   "https://wa.me/5493757618270?text=Hola%2C%20quiero%20conocer%20APRENDE%20y%20recibir%20novedades%20del%20curso%20de%20memoria%20y%20aprendizaje%20acelerado.";
 
 export default function AprendePage() {
   return (
     <main className="aprendePage">
+      <AprendeTracker />
       <div className="aprendeGlow aprendeGlowOne" aria-hidden="true" />
       <div className="aprendeGlow aprendeGlowTwo" aria-hidden="true" />
 
@@ -33,7 +36,12 @@ export default function AprendePage() {
           </p>
 
           <div className="aprendeActions">
-            <a className="aprendePrimary" href="/aprende/guia">
+            <a
+              className="aprendePrimary"
+              href="/aprende/guia"
+              data-aprende-event="download_click"
+              data-aprende-destination="guia_pdf"
+            >
               Descargar guía gratis
               <span aria-hidden="true">↓</span>
             </a>
@@ -42,13 +50,15 @@ export default function AprendePage() {
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
+              data-aprende-event="whatsapp_click"
+              data-aprende-destination="whatsapp_metodo"
             >
               Quiero aprender el método
             </a>
           </div>
 
           <p className="aprendeMicrocopy">
-            Primera guía gratuita: <strong>7 técnicas de memoria que podés usar hoy.</strong>
+            Primera guía gratuita: <strong>7 páginas para recordar mejor.</strong>
           </p>
         </div>
 
@@ -118,32 +128,39 @@ export default function AprendePage() {
       <section className="aprendeChallenge">
         <div>
           <p className="aprendeEyebrow">PROBALO ANTES DE COMPRAR NADA</p>
-          <h2>Tu primer entrenamiento empieza con una guía de 6 páginas.</h2>
+          <h2>Tu primer entrenamiento empieza con una guía de 7 páginas.</h2>
           <p>
-            Asociación exagerada, chunking, palacio de la memoria, recuperación activa,
-            repetición espaciada, doble codificación y explicación desde memoria.
+            Jerarquía de información, asociaciones para nombres, puentes entre ideas,
+            imágenes para números, historias, recuperación sin mirar y metacognición.
           </p>
         </div>
-        <a className="aprendeDownloadCard" href="/aprende/guia">
+        <a
+          className="aprendeDownloadCard"
+          href="/aprende/guia"
+          data-aprende-event="download_click"
+          data-aprende-destination="guia_pdf"
+        >
           <span className="aprendePdfBadge">PDF</span>
-          <strong>7 técnicas de memoria que podés usar hoy</strong>
-          <small>Guía gratuita · Edición 01</small>
+          <strong>7 páginas para recordar mejor</strong>
+          <small>Guía gratuita · Primera validación</small>
           <span className="aprendeDownloadArrow" aria-hidden="true">↘</span>
         </a>
       </section>
 
       <section className="aprendeFinal">
-        <p className="aprendeEyebrow">PRIMERA EDICIÓN EN CONSTRUCCIÓN</p>
-        <h2>Estamos convirtiendo estas técnicas en un entrenamiento completo.</h2>
+        <p className="aprendeEyebrow">SIGUIENTE PASO</p>
+        <h2>Estamos convirtiendo esta experiencia en un acompañamiento de 7 días.</h2>
         <p>
           Si querés entrar desde el comienzo, escribinos <strong>APRENDE</strong> y te
-          sumamos a las novedades de la primera edición.
+          contamos cómo seguir entrenando con una práctica breve por día.
         </p>
         <a
           className="aprendePrimary"
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
+          data-aprende-event="whatsapp_click"
+          data-aprende-destination="whatsapp_final"
         >
           Escribir APRENDE por WhatsApp
           <span aria-hidden="true">→</span>

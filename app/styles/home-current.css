@@ -40,6 +40,107 @@
   );
 }
 
+.intent-gateway {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(214, 179, 106, 0.08), transparent 34%),
+    #050505;
+  color: #ffffff;
+  padding: 72px 24px 82px;
+}
+
+.intent-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.intent-eyebrow {
+  color: #d6b36a;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  margin: 0 0 14px;
+  text-transform: uppercase;
+}
+
+.intent-gateway h1 {
+  color: #ffffff;
+  font-size: clamp(2.15rem, 5vw, 4.5rem);
+  line-height: 1.02;
+  margin: 0;
+}
+
+.intent-lede {
+  color: #bdbdbd;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  line-height: 1.6;
+  margin: 22px auto 38px;
+  max-width: 720px;
+}
+
+.intent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.intent-card {
+  background: linear-gradient(145deg, #111111 0%, #090909 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  min-height: 290px;
+  padding: 30px 28px;
+  text-align: left;
+  text-decoration: none;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.intent-card:hover,
+.intent-card:focus-visible {
+  background: linear-gradient(145deg, #18150f 0%, #0b0b0b 100%);
+  border-color: rgba(214, 179, 106, 0.9);
+  color: #ffffff;
+  outline: none;
+  transform: translateY(-4px);
+}
+
+.intent-number {
+  color: #d6b36a;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  margin-bottom: 46px;
+}
+
+.intent-card h2 {
+  color: #ffffff;
+  font-size: clamp(1.4rem, 2.1vw, 1.85rem);
+  line-height: 1.15;
+  margin: 0 0 14px;
+}
+
+.intent-card p {
+  color: #bcbcbc;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  margin: 0 0 24px;
+}
+
+.intent-card-cta {
+  color: #d6b36a;
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin-top: auto;
+}
+
+#shows,
+#classes {
+  scroll-margin-top: 72px;
+}
+
 .commercial-eyebrow {
   color: #d6b36a !important;
   font-size: 0.82rem !important;
@@ -79,6 +180,20 @@
   text-decoration: underline;
 }
 
+@media (max-width: 900px) {
+  .intent-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .intent-card {
+    min-height: 0;
+  }
+
+  .intent-number {
+    margin-bottom: 26px;
+  }
+}
+
 @media (max-width: 768px) {
   #video-slider {
     height: calc(100svh - 58px);
@@ -87,5 +202,18 @@
 
   #video-background {
     object-position: 50% 50%;
+  }
+
+  .intent-gateway {
+    padding: 56px 18px 64px;
+  }
+
+  .intent-lede {
+    margin-bottom: 30px;
+  }
+
+  .intent-card {
+    border-radius: 15px;
+    padding: 26px 22px;
   }
 }

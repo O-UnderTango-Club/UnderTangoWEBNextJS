@@ -1,0 +1,38 @@
+name: Sync APRENDE validation PDF
+
+on:
+  push:
+    branches:
+      - agent/aprende-validacion-01
+    paths:
+      - .github/workflows/sync-aprende-pdf.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync-pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout validation branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/aprende-validacion-01
+
+      - name: Download final APRENDE PDF
+        run: |
+          mkdir -p public
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -o public/APRENDE_7_paginas_para_recordar_mejor.pdf \
+            'https://at.adobe.com/rQlQ1CKv6fOmo8UP'
+          test "$(head -c 4 public/APRENDE_7_paginas_para_recordar_mejor.pdf)" = '%PDF'
+          test "$(stat -c%s public/APRENDE_7_paginas_para_recordar_mejor.pdf)" -gt 100000
+
+      - name: Commit PDF to validation branch
+        run: |
+          git config user.name 'undertango-automation'
+          git config user.email 'undertangoclub@users.noreply.github.com'
+          git add public/APRENDE_7_paginas_para_recordar_mejor.pdf
+          git diff --cached --quiet && exit 0
+          git commit -m 'Add final APRENDE validation PDF'
+          git push origin HEAD:agent/aprende-validacion-01

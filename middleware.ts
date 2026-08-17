@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const APRENDE_GUIDE_PATH = "/APRENDE_7_paginas_para_recordar_mejor.pdf";
+const APRENDE_ICON_PATH = "/aprende/icon.svg";
 
 export function middleware(request: NextRequest) {
   const hostname = (request.headers.get("host") || "")
@@ -10,6 +11,14 @@ export function middleware(request: NextRequest) {
 
   if (!hostname.startsWith("aprende.")) {
     return NextResponse.next();
+  }
+
+  // The main site keeps its original favicon. Only the APRENDE subdomain
+  // rewrites the conventional /favicon.ico request to the APRENDE icon.
+  if (pathname === "/favicon.ico") {
+    const url = request.nextUrl.clone();
+    url.pathname = APRENDE_ICON_PATH;
+    return NextResponse.rewrite(url);
   }
 
   // Keep the public PDF reachable from the APRENDE subdomain.
@@ -36,5 +45,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image).*)"],
 };

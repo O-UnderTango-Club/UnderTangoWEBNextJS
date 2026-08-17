@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="APRENDE">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFE08A"/>
+      <stop offset="0.45" stop-color="#F0BE43"/>
+      <stop offset="1" stop-color="#B97A16"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="#06172B"/>
+  <path fill="url(#gold)" fill-rule="evenodd" d="M8 51 29.2 9.5c1.2-2.3 4.4-2.3 5.6 0L56 51h-9.2l-5.4-11H22.6l-5.4 11H8Zm18.5-19h11L32 20.8 26.5 32Z"/>
+  <path d="M19 49.2c4.8-2.8 8.7-3.1 13-.5v6.1c-4.2-2.7-8.2-2.4-13 .4v-6Zm26 0c-4.8-2.8-8.7-3.1-13-.5v6.1c4.2-2.7 8.2-2.4 13 .4v-6Z" fill="none" stroke="#F0BE43" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 46.8v8" stroke="#F0BE43" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

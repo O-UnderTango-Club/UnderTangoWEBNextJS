@@ -12,8 +12,15 @@ export default function ChatRobot() {
     const hostname = window.location.hostname.toLowerCase();
     const isAprendeHost = hostname.startsWith('aprende.');
     const isAprendePath = pathname?.startsWith('/aprende');
+    const isElitrosHost = hostname.startsWith('elitros.');
+    const isElitrosPath = pathname?.startsWith('/elitros');
 
-    setEnabled(!isAprendeHost && !isAprendePath);
+    setEnabled(
+      !isAprendeHost &&
+      !isAprendePath &&
+      !isElitrosHost &&
+      !isElitrosPath
+    );
   }, [pathname]);
 
   if (!enabled) return null;

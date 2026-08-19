@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./route-fix.css";
 
 export const metadata: Metadata = {
   title: "Ø UnderTango · ÉLITROS 2026 | Aprendizaje aplicado",

@@ -56,10 +56,10 @@ export default function ElitrosPage() {
         </div>
         <div className="elitros-canvas-frame">
           <img
-            src="/elitros/modelo-negocio-undertango.jpg"
+            src="/elitros/modelo-negocio-undertango.svg"
             alt="Lienzo del Modelo de Negocios de UnderTango desarrollado a partir del Módulo 2 de ÉLITROS"
-            width="1200"
-            height="675"
+            width="1600"
+            height="900"
             loading="eager"
           />
         </div>

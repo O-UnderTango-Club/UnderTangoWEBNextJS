@@ -97,6 +97,80 @@ export default function HomePage() {
           </div>
         </section>
 
+        <section
+          id="class-experience"
+          className="section-animate"
+          aria-labelledby="class-experience-title"
+          style={{
+            background: '#0a0a0a',
+            color: '#ffffff',
+            padding: '64px 20px 76px',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+            <p className="commercial-eyebrow">VIVÍ LA EXPERIENCIA</p>
+            <h2
+              id="class-experience-title"
+              style={{
+                color: '#ffffff',
+                fontFamily: 'var(--font-undertango-editorial), Georgia, "Times New Roman", serif',
+                fontSize: 'clamp(2rem, 5vw, 3.2rem)',
+                lineHeight: 1.15,
+                margin: '0 0 14px',
+              }}
+            >
+              Así se vive una clase de tango
+            </h2>
+            <p
+              style={{
+                color: '#d3d3d3',
+                fontFamily: 'var(--font-undertango-editorial), Georgia, "Times New Roman", serif',
+                fontSize: '1.08rem',
+                lineHeight: 1.7,
+                margin: '0 auto 30px',
+                maxWidth: '650px',
+              }}
+            >
+              Una experiencia simple, participativa y pensada para disfrutar el tango desde el primer momento.
+            </p>
+
+            <div
+              style={{
+                width: 'min(100%, 390px)',
+                aspectRatio: '9 / 16',
+                margin: '0 auto',
+                borderRadius: '18px',
+                overflow: 'hidden',
+                background: '#000000',
+                boxShadow: '0 22px 55px rgba(0, 0, 0, 0.42)',
+              }}
+            >
+              <iframe
+                src="https://www.youtube.com/embed/yJZnlJgrsGc?rel=0"
+                title="Experiencia de una clase de tango con UnderTango Club"
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+                style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
+              />
+            </div>
+
+            <a
+              href="#classes"
+              className="action-button"
+              data-undertango-event="subintent_click"
+              data-undertango-intent="aprender_tango"
+              data-undertango-subintent="video_experiencia_clase"
+              data-undertango-cta="Ver opciones de clases"
+              style={{ marginTop: '30px' }}
+            >
+              Ver opciones de clases
+            </a>
+          </div>
+        </section>
+
         <section id="shows" className="section-animate commercial-intro">
           <div className="content-wrapper">
             <div className="text-content">

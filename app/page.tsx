@@ -139,6 +139,19 @@ export default function HomePage() {
                 >
                   Quiero tomar una clase →
                 </a>
+                <a
+                  href="https://wa.me/5493757618270?text=Hola%2C%20llegu%C3%A9%20desde%20la%20web%20de%20UnderTango%20y%20quiero%20consultar%20por%20una%20clase%20de%20tango%20para%20incluir%20en%20un%20paquete%20tur%C3%ADstico."
+                  className="intent-card-cta"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-undertango-event="intent_click"
+                  data-undertango-intent="aprender_tango"
+                  data-undertango-subintent="clase_paquete_turistico"
+                  data-undertango-cta="Quiero una clase para un paquete turístico"
+                  style={{ display: 'block', marginTop: '10px' }}
+                >
+                  Quiero una clase para un paquete turístico →
+                </a>
               </article>
 
               <article className="intent-card">

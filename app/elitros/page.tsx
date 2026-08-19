@@ -1,4 +1,3 @@
-import Image from "next/image";
 import "./elitros.css";
 
 const businessModelDoc =
@@ -56,12 +55,12 @@ export default function ElitrosPage() {
           <h2 id="resultado-title">Lienzo del Modelo de Negocios — Ø UnderTango</h2>
         </div>
         <div className="elitros-canvas-frame">
-          <Image
-            src="/elitros/modelo-negocio-v1.jpg"
+          <img
+            src="/elitros/modelo-negocio-undertango.jpg"
             alt="Lienzo del Modelo de Negocios de UnderTango desarrollado a partir del Módulo 2 de ÉLITROS"
-            width={1400}
-            height={788}
-            priority
+            width="1200"
+            height="675"
+            loading="eager"
           />
         </div>
         <p className="elitros-caption">
@@ -85,8 +84,8 @@ export default function ElitrosPage() {
       </section>
 
       <section className="elitros-section elitros-shell elitros-manifesto" aria-labelledby="undertango-title">
-        <p className="elitros-eyebrow">Apología de UnderTango</p>
-        <h2 id="undertango-title">No partimos de una hipótesis de escritorio.</h2>
+        <p className="elitros-eyebrow">Base operativa de UnderTango</p>
+        <h2 id="undertango-title">Partimos de operación real, no de una idea abstracta.</h2>
         <p>
           UnderTango nace de años de producir cultura, shows, clases, equipos y relaciones reales. Esa práctica genera
           repertorio, procesos, problemas, datos y conocimiento operativo. La apuesta de esta etapa es preguntar qué
@@ -103,8 +102,13 @@ export default function ElitrosPage() {
           <p className="elitros-eyebrow">Hacia dónde estamos apuntando</p>
           <h2>La primera tecnologización es esta misma página.</h2>
           <p className="elitros-dark-lede">
-            En vez de esperar a tener “la aplicación”, empezamos por publicar información útil y estructurada. Cada
-            clase deberá dejar un cambio verificable. La siguiente hipótesis se llama <strong>Experimento de app para ÉLITROS</strong>.
+            Este subdominio ya funciona como un primer gesto concreto de sistematización. No es solamente una página de
+            resumen: es una interfaz mínima para convertir la formación en objetos visibles, compartibles y revisables.
+          </p>
+          <p className="elitros-dark-lede">
+            La dirección que estamos explorando es un prototipo llamado <strong>Experimento de app para ÉLITROS</strong>.
+            La hipótesis es sencilla: si estructuramos personas, startups, capacidades, necesidades y aprendizajes en una
+            interfaz común, podrían aparecer nuevas formas de colaboración, seguimiento y validación.
           </p>
 
           <div className="elitros-flow" aria-label="Flujo del experimento">
@@ -123,8 +127,8 @@ export default function ElitrosPage() {
 
       <section className="elitros-section elitros-shell" aria-labelledby="equipo-title">
         <div className="elitros-section-heading">
-          <p>Primeros usuarios internos</p>
-          <h2 id="equipo-title">Equipo que prueba la interfaz</h2>
+          <p>Perfiles iniciales</p>
+          <h2 id="equipo-title">Tres personas, una startup y una interfaz mínima para probar si esto sirve.</h2>
         </div>
         <div className="elitros-team-grid">
           {team.map((member) => (
@@ -143,7 +147,7 @@ export default function ElitrosPage() {
         <div className="elitros-shell elitros-next-test">
           <div>
             <p className="elitros-eyebrow">Próximo experimento de red</p>
-            <h2>¿Sirve también cuando aparece una segunda startup?</h2>
+            <h2>¿Qué ocurre cuando sumamos una segunda startup al sistema?</h2>
             <p>
               Una vez probada la V1 con el equipo de UnderTango, la propuesta es invitar a dos o tres startups de
               ÉLITROS a armar un perfil mínimo con el mismo formato. La pregunta no es cuántos perfiles podemos cargar,

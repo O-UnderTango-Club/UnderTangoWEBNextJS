@@ -1,0 +1,8 @@
+.elitros-page section {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.elitros-page section h2::after {
+  display: none !important;
+}

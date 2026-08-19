@@ -9,6 +9,18 @@ export function middleware(request: NextRequest) {
     .toLowerCase();
   const pathname = request.nextUrl.pathname;
 
+  // ELITROS is a public experiment that lives inside the UnderTango codebase.
+  // The subdomain keeps clean public URLs while reusing the same deployment.
+  if (hostname.startsWith("elitros.")) {
+    if (pathname.startsWith("/elitros")) {
+      return NextResponse.next();
+    }
+
+    const url = request.nextUrl.clone();
+    url.pathname = pathname === "/" ? "/elitros" : `/elitros${pathname}`;
+    return NextResponse.rewrite(url);
+  }
+
   if (!hostname.startsWith("aprende.")) {
     return NextResponse.next();
   }

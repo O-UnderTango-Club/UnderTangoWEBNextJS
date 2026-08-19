@@ -5,6 +5,35 @@ import Header from './components/header';
 import Footer from './components/footer';
 import { useHomeEffects } from './hooks/useHomeEffects';
 
+const videoFrameStyle = {
+  width: '100%',
+  aspectRatio: '9 / 16',
+  borderRadius: '16px',
+  overflow: 'hidden',
+  background: '#000000',
+  boxShadow: '0 16px 38px rgba(0, 0, 0, 0.36)',
+  margin: '4px 0 22px',
+  position: 'relative' as const,
+};
+
+const verticalIframeStyle = {
+  width: '100%',
+  height: '100%',
+  border: 0,
+  display: 'block',
+};
+
+const croppedHorizontalIframeStyle = {
+  position: 'absolute' as const,
+  top: '50%',
+  left: '50%',
+  height: '100%',
+  width: '316%',
+  border: 0,
+  display: 'block',
+  transform: 'translate(-50%, -50%)',
+};
+
 export default function HomePage() {
   useHomeEffects();
 
@@ -50,124 +79,144 @@ export default function HomePage() {
             <p className="intent-eyebrow">Ø UNDERTANGO CLUB · PUERTO IGUAZÚ · TRIPLE FRONTERA</p>
             <h1 id="intentions-title">¿Qué estás buscando?</h1>
             <p className="intent-lede">
-              Elegí el camino que mejor describe lo que necesitás y te llevamos directo a la información útil.
+              Mirá cómo se vive cada experiencia y elegí la que mejor encaja con lo que necesitás.
             </p>
 
             <div className="intent-grid">
-              <a
-                href="/usersCalendar"
-                className="intent-card"
-                data-undertango-event="intent_click"
-                data-undertango-intent="ver_tango"
-                data-undertango-subintent="agenda_publica"
-                data-undertango-cta="Quiero ver tango"
-              >
-                <span className="intent-number">01</span>
-                <h2>Quiero ver tango</h2>
-                <p>Shows, milongas, clases abiertas y experiencias para disfrutar en la Triple Frontera.</p>
-                <span className="intent-card-cta">Ver agenda pública →</span>
-              </a>
+              <article className="intent-card">
+                <span className="intent-number" style={{ marginBottom: '18px' }}>01</span>
+                <h2>Así se vive un show de tango</h2>
+                <p>Una pareja de tango en escena: un formato directo, elegante y adaptable a hoteles, eventos y gastronomía.</p>
 
-              <a
-                href="#classes"
-                className="intent-card"
-                data-undertango-event="intent_click"
-                data-undertango-intent="aprender_tango"
-                data-undertango-cta="Quiero aprender tango"
-              >
-                <span className="intent-number">02</span>
-                <h2>Quiero aprender tango</h2>
-                <p>Clases privadas o grupales para empezar, mejorar o vivir una experiencia durante tu viaje.</p>
-                <span className="intent-card-cta">Ver opciones de clases →</span>
-              </a>
+                <div style={videoFrameStyle}>
+                  <iframe
+                    src="https://www.youtube.com/embed/samrNxK2nNw?rel=0&playsinline=1"
+                    title="Así se vive un show de tango con UnderTango Club"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                    style={verticalIframeStyle}
+                  />
+                </div>
 
-              <a
-                href="#shows"
-                className="intent-card"
-                data-undertango-event="intent_click"
-                data-undertango-intent="contratar_show"
-                data-undertango-cta="Quiero contratar un show"
-              >
-                <span className="intent-number">03</span>
-                <h2>Quiero contratar un show</h2>
-                <p>Producciones para hoteles, gastronomía, agencias, empresas, eventos y celebraciones privadas.</p>
-                <span className="intent-card-cta">Conocer propuestas →</span>
-              </a>
+                <a
+                  href="/reservas#shows"
+                  className="intent-card-cta"
+                  data-undertango-event="intent_click"
+                  data-undertango-intent="contratar_show"
+                  data-undertango-subintent="show_danza_tango"
+                  data-undertango-cta="Quiero este show de tango"
+                >
+                  Quiero este show →
+                </a>
+              </article>
+
+              <article className="intent-card">
+                <span className="intent-number" style={{ marginBottom: '18px' }}>02</span>
+                <h2>Así se vive una clase de tango</h2>
+                <p>Una experiencia simple, participativa y pensada para disfrutar el tango desde el primer momento.</p>
+
+                <div style={videoFrameStyle}>
+                  <iframe
+                    src="https://www.youtube.com/embed/yJZnlJgrsGc?rel=0&playsinline=1"
+                    title="Así se vive una clase de tango con UnderTango Club"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                    style={verticalIframeStyle}
+                  />
+                </div>
+
+                <a
+                  href="#classes"
+                  className="intent-card-cta"
+                  data-undertango-event="intent_click"
+                  data-undertango-intent="aprender_tango"
+                  data-undertango-subintent="clase_experiencia"
+                  data-undertango-cta="Quiero tomar una clase"
+                >
+                  Quiero tomar una clase →
+                </a>
+              </article>
+
+              <article className="intent-card">
+                <span className="intent-number" style={{ marginBottom: '18px' }}>03</span>
+                <h2>Así se vive una producción Triple Frontera</h2>
+                <p>Música, danza y producción escénica integradas para experiencias de mayor escala y presencia.</p>
+
+                <div style={videoFrameStyle}>
+                  <iframe
+                    src="https://www.youtube.com/embed/ONRopDSKkro?rel=0&playsinline=1"
+                    title="Así se vive una producción Triple Frontera de UnderTango Club"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                    style={croppedHorizontalIframeStyle}
+                  />
+                </div>
+
+                <a
+                  href="/reservas#shows"
+                  className="intent-card-cta"
+                  data-undertango-event="intent_click"
+                  data-undertango-intent="contratar_show"
+                  data-undertango-subintent="produccion_triple_frontera"
+                  data-undertango-cta="Quiero una producción completa"
+                >
+                  Quiero una producción completa →
+                </a>
+              </article>
             </div>
-          </div>
-        </section>
 
-        <section
-          id="class-experience"
-          className="section-animate"
-          aria-labelledby="class-experience-title"
-          style={{
-            background: '#0a0a0a',
-            color: '#ffffff',
-            padding: '64px 20px 76px',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-            <p className="commercial-eyebrow">VIVÍ LA EXPERIENCIA</p>
-            <h2
-              id="class-experience-title"
+            <article
               style={{
-                color: '#ffffff',
-                fontFamily: 'var(--font-undertango-editorial), Georgia, "Times New Roman", serif',
-                fontSize: 'clamp(2rem, 5vw, 3.2rem)',
-                lineHeight: 1.15,
-                margin: '0 0 14px',
-              }}
-            >
-              Así se vive una clase de tango
-            </h2>
-            <p
-              style={{
-                color: '#d3d3d3',
-                fontFamily: 'var(--font-undertango-editorial), Georgia, "Times New Roman", serif',
-                fontSize: '1.08rem',
-                lineHeight: 1.7,
-                margin: '0 auto 30px',
-                maxWidth: '650px',
-              }}
-            >
-              Una experiencia simple, participativa y pensada para disfrutar el tango desde el primer momento.
-            </p>
-
-            <div
-              style={{
-                width: 'min(100%, 390px)',
-                aspectRatio: '9 / 16',
-                margin: '0 auto',
+                margin: '24px auto 0',
+                maxWidth: '1180px',
+                textAlign: 'left',
+                border: '1px solid rgba(226, 195, 125, 0.45)',
                 borderRadius: '18px',
-                overflow: 'hidden',
-                background: '#000000',
-                boxShadow: '0 22px 55px rgba(0, 0, 0, 0.42)',
+                padding: '30px',
+                background: 'linear-gradient(145deg, rgba(226, 195, 125, 0.08), #090909)',
               }}
             >
-              <iframe
-                src="https://www.youtube.com/embed/yJZnlJgrsGc?rel=0"
-                title="Experiencia de una clase de tango con UnderTango Club"
-                loading="lazy"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-                style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
-              />
-            </div>
-
-            <a
-              href="#classes"
-              className="action-button"
-              data-undertango-event="subintent_click"
-              data-undertango-intent="aprender_tango"
-              data-undertango-subintent="video_experiencia_clase"
-              data-undertango-cta="Ver opciones de clases"
-              style={{ marginTop: '30px' }}
-            >
-              Ver opciones de clases
-            </a>
+              <p className="intent-eyebrow" style={{ marginBottom: '10px' }}>04 · PRODUCTO DE AUTORÍA</p>
+              <h2
+                style={{
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-undertango-editorial), Georgia, "Times New Roman", serif',
+                  fontSize: 'clamp(1.7rem, 3vw, 2.4rem)',
+                  margin: '0 0 12px',
+                  textAlign: 'left',
+                }}
+              >
+                UnderTango Rave
+              </h2>
+              <p
+                style={{
+                  color: '#d2d2d2',
+                  fontFamily: 'var(--font-undertango-editorial), Georgia, "Times New Roman", serif',
+                  fontSize: '1.05rem',
+                  lineHeight: 1.7,
+                  margin: '0 0 12px',
+                }}
+              >
+                Banda en vivo, bailarines y electrónica en un formato original de Ø UnderTango Club.
+                La inauguración del producto será el 29 de agosto en Bernardo de Irigoyen.
+              </p>
+              <p
+                style={{
+                  color: '#e2c37d',
+                  fontFamily: 'var(--font-undertango-editorial), Georgia, "Times New Roman", serif',
+                  fontSize: '1rem',
+                  margin: 0,
+                }}
+              >
+                Después del estreno incorporaremos acá el registro audiovisual del show.
+              </p>
+            </article>
           </div>
         </section>
 
@@ -200,7 +249,9 @@ export default function HomePage() {
                   Conocer los espectáculos
                 </a>
               </div>
-              <p className="commercial-note">Trabajamos por contratación y adaptamos artistas, duración, sonido y despliegue técnico a las necesidades de cada producción.</p>
+              <p className="commercial-note">
+                Trabajamos por contratación y adaptamos artistas, duración, sonido y despliegue técnico a las necesidades de cada producción.
+              </p>
               <a
                 href="https://wa.me/5493757618270?text=Hola%2C%20llegu%C3%A9%20desde%20la%20web%20de%20UnderTango%20y%20quiero%20saber%20qu%C3%A9%20shows%20o%20actividades%20puedo%20ver."
                 className="agenda-link"
@@ -274,7 +325,10 @@ export default function HomePage() {
           <div className="content-wrapper">
             <div className="text-content">
               <h2>Nuestra Pasión por el Tango en Iguazú</h2>
-              <p>En UnderTango, vivimos y respiramos tango. Nuestra misión es compartir esta pasión con el mundo, creando experiencias únicas que trascienden el baile y conectan personas en la Triple Frontera.</p>
+              <p>
+                En UnderTango, vivimos y respiramos tango. Nuestra misión es compartir esta pasión con el mundo,
+                creando experiencias únicas que trascienden el baile y conectan personas en la Triple Frontera.
+              </p>
             </div>
             <div className="image-content">
               <img src="/assets/images/NuestraPasionIcon.png" alt="Pasión por el Tango en la Triple Frontera" />
@@ -297,7 +351,9 @@ export default function HomePage() {
         <section id="map" className="section-animate">
           <h2>Encuéntranos</h2>
           <div className="map-container">
-            <a href="https://www.google.com/maps/place/Undertango+Club/" target="_blank" rel="noopener noreferrer" className="map-link"><img src="/assets/images/mapsScreen3.png" alt="Ubicación de UnderTango Club en Puerto Iguazú" /></a>
+            <a href="https://www.google.com/maps/place/Undertango+Club/" target="_blank" rel="noopener noreferrer" className="map-link">
+              <img src="/assets/images/mapsScreen3.png" alt="Ubicación de UnderTango Club en Puerto Iguazú" />
+            </a>
             <div className="info-overlay">
               <div className="info-content">
                 <h3>Información de Contacto</h3>

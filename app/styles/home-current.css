@@ -193,12 +193,18 @@
   margin: 0 0 26px;
 }
 
+/* Transactional links must be immediately legible: keep the editorial type
+   for storytelling, but use a clean UI face for the actions themselves. */
 .intent-card-cta {
   color: #e2c37d;
-  font-size: 1rem;
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 1.02rem;
   font-weight: 700;
-  line-height: 1.5;
+  letter-spacing: 0;
+  line-height: 1.45;
   margin-top: auto;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 #shows,
@@ -305,5 +311,10 @@
   .intent-card p {
     font-size: 1.05rem;
     line-height: 1.72;
+  }
+
+  .intent-card-cta {
+    font-size: 1.05rem;
+    line-height: 1.5;
   }
 }

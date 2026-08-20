@@ -18,6 +18,7 @@
 .elitros-page h1,
 .elitros-page h2,
 .elitros-page h3,
+.elitros-page h4,
 .elitros-page p { margin-top: 0; }
 
 .elitros-shell {
@@ -146,6 +147,54 @@
   color: var(--ink);
 }
 
+.elitros-objective-card {
+  margin-bottom: 28px;
+  padding: 30px;
+  border: 1px solid rgba(11, 93, 168, .28);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(11,93,168,.08), rgba(13,142,145,.05)),
+    #fff;
+  box-shadow: 0 18px 48px rgba(16, 35, 63, .07);
+}
+
+.elitros-objective-label {
+  color: var(--blue-dark);
+  text-transform: uppercase;
+  letter-spacing: .11em;
+  font-size: .76rem;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.elitros-objective-card h3 {
+  max-width: 930px;
+  margin: 0 0 16px;
+  color: var(--ink);
+  font-family: var(--font-undertango-editorial), Georgia, serif;
+  font-size: clamp(1.7rem, 3vw, 2.65rem);
+  line-height: 1.08;
+  letter-spacing: -.025em;
+}
+
+.elitros-objective-card > p {
+  max-width: 1000px;
+  color: #475b70;
+  line-height: 1.7;
+  font-size: 1.04rem;
+}
+
+.elitros-objective-principle {
+  margin-top: 20px;
+  padding: 17px 20px;
+  border-radius: 14px;
+  background: #0b1d31;
+  color: #dce8ee;
+  line-height: 1.58;
+}
+
+.elitros-objective-principle strong { color: #8be0dc; }
+
 .elitros-maturity-board {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(290px, .75fr);
@@ -155,7 +204,8 @@
 
 .elitros-radar-column,
 .elitros-quick-read,
-.elitros-conclusions {
+.elitros-conclusions,
+.elitros-roadmap {
   border: 1px solid var(--blue-line);
   background: #fff;
   border-radius: 22px;
@@ -169,7 +219,8 @@
 
 .elitros-visual-label,
 .elitros-quick-title,
-.elitros-conclusions-heading > div > p {
+.elitros-conclusions-heading > div > p,
+.elitros-roadmap-heading > p:first-child {
   color: var(--blue-dark);
   text-transform: uppercase;
   letter-spacing: .11em;
@@ -327,6 +378,134 @@
   line-height: 1.45;
   font-size: .93rem;
 }
+
+.elitros-roadmap {
+  margin-top: 28px;
+  padding: 30px;
+}
+
+.elitros-roadmap-heading {
+  max-width: 960px;
+  margin-bottom: 24px;
+}
+
+.elitros-roadmap-heading > p:first-child { margin-bottom: 7px; }
+
+.elitros-roadmap-heading h3 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-family: var(--font-undertango-editorial), Georgia, serif;
+  font-size: clamp(1.65rem, 3vw, 2.5rem);
+  line-height: 1.08;
+}
+
+.elitros-roadmap-heading > p:last-child {
+  color: #536579;
+  line-height: 1.65;
+  font-size: 1.02rem;
+}
+
+.elitros-roadmap-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.elitros-milestone-card {
+  border: 1px solid rgba(11, 93, 168, .16);
+  border-radius: 18px;
+  background: #fbfdff;
+  padding: 22px;
+}
+
+.elitros-milestone-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(11, 93, 168, .12);
+}
+
+.elitros-milestone-top > div:first-child > span {
+  display: inline-block;
+  color: var(--blue-dark);
+  font-size: .72rem;
+  font-weight: 950;
+  letter-spacing: .12em;
+  margin-bottom: 4px;
+}
+
+.elitros-milestone-top h4 {
+  margin-bottom: 0;
+  color: var(--ink);
+  font-size: 1.2rem;
+}
+
+.elitros-level-path {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.elitros-level-path > span {
+  width: 46px;
+  min-height: 48px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #edf5fc;
+  color: var(--blue-dark);
+  font-size: 1.1rem;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.elitros-level-path small {
+  display: block;
+  font-size: .59rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #6a7d91;
+  font-weight: 800;
+}
+
+.elitros-level-path b { color: #8b9caf; }
+
+.elitros-milestone-step strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: .9rem;
+}
+
+.elitros-milestone-step p {
+  margin-bottom: 0;
+  color: #536579;
+  line-height: 1.55;
+  font-size: .94rem;
+}
+
+.elitros-milestone-target {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(11, 93, 168, .18);
+}
+
+.elitros-alignment-note {
+  margin-top: 20px;
+  padding: 17px 20px;
+  border-radius: 14px;
+  background: #f0f8f7;
+  border: 1px solid var(--line);
+  color: #455a6d;
+  line-height: 1.6;
+}
+
+.elitros-alignment-note strong { color: var(--teal-dark); }
 
 .elitros-conclusions {
   margin-top: 28px;
@@ -553,6 +732,7 @@ body:has(.elitros-page) [class*="chat-robot"] {
   .elitros-quick-read { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; }
   .elitros-quick-title { grid-column: 1 / -1; }
   .elitros-flow-compact { grid-template-columns: repeat(4, 1fr); }
+  .elitros-roadmap-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 820px) {
@@ -565,7 +745,9 @@ body:has(.elitros-page) [class*="chat-robot"] {
   .elitros-flow,
   .elitros-flow-compact { grid-template-columns: 1fr 1fr; }
   .elitros-radar-column,
-  .elitros-conclusions { padding: 22px; }
+  .elitros-conclusions,
+  .elitros-roadmap,
+  .elitros-objective-card { padding: 22px; }
   .elitros-gap-callout { align-items: flex-start; flex-direction: column; }
 }
 
@@ -575,6 +757,8 @@ body:has(.elitros-page) [class*="chat-robot"] {
   .elitros-radar-label { font-size: 12px; }
   .elitros-radar-code { font-size: 11px; }
   .elitros-conclusions-heading { align-items: flex-start; }
+  .elitros-milestone-top { flex-direction: column; }
+  .elitros-level-path { width: 100%; justify-content: flex-start; }
 }
 
 @media (max-width: 520px) {
@@ -582,5 +766,7 @@ body:has(.elitros-page) [class*="chat-robot"] {
   .elitros-flow-compact { grid-template-columns: 1fr; }
   .elitros-hero h1 { font-size: 2.65rem; }
   .elitros-radar-column { padding: 16px; }
-  .elitros-conclusions { padding: 18px; }
+  .elitros-conclusions,
+  .elitros-roadmap,
+  .elitros-objective-card { padding: 18px; }
 }

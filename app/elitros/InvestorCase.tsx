@@ -72,30 +72,30 @@ export default function InvestorCase() {
     <section className="elitros-investor-case" aria-labelledby="investor-case-title">
       <div className="elitros-investor-heading">
         <p>Arquitectura económica · caso base 2027</p>
-        <h3 id="investor-case-title">El objetivo no es que todas las unidades crezcan igual: es que juntas hagan sostenible el sistema.</h3>
+        <h3 id="investor-case-title">Duplicar una base conocida, pero repartiendo el crecimiento entre varias unidades.</h3>
         <p>
-          UnderTango combina servicios que ya pueden generar caja con productos y capacidades que todavía deben probar
-          su escalabilidad. La hipótesis base para 2027 es deliberadamente prudente: <strong>USD 25.000 de facturación anual</strong>,
-          distribuida entre unidades con distinto grado de madurez. El número no es una promesa; es un tablero para decidir
-          qué validar y qué evidencia necesitamos producir.
+          UnderTango combina servicios que ya generan caja con capacidades que todavía deben probar su escalabilidad.
+          La hipótesis base para 2027 es deliberadamente prudente: <strong>USD 25.000 de facturación anual</strong>,
+          distribuidos entre unidades con distinto grado de madurez. El número funciona como tablero de gestión, no como
+          promesa cerrada.
         </p>
       </div>
 
       <div className="elitros-baseline-grid">
         <article>
-          <span>Evidencia histórica</span>
-          <strong>2025 ya tuvo facturación real</strong>
+          <span>Referencia 2025</span>
+          <strong>≈ USD 13.000 facturados</strong>
           <p>
-            La mayor parte provino de shows. El siguiente trabajo financiero es reconstruir esa facturación operación por
-            operación y compararla en moneda dura, costos y margen para disponer de una línea de base consistente.
+            Es una reconstrucción prudente de la facturación conocida y la mayor parte provino de shows. Puede haber
+            operaciones no registradas, por eso se usa como piso orientativo y no como cierre contable auditado.
           </p>
         </article>
         <article>
           <span>Caso base 2027</span>
           <strong>{usd(totalRevenue)} anuales</strong>
           <p>
-            Equivale a unos USD 2.083 mensuales promedio. Shows no necesita cargar solo con el crecimiento: las otras
-            unidades empiezan a aportar ventas, margen, evidencia y aprendizaje comercial.
+            Equivale a unos USD 2.083 mensuales promedio. Shows aporta una base importante, mientras el resto empieza a
+            demostrar ventas, margen, recurrencia y aprendizaje comercial propios.
           </p>
         </article>
         <article>
@@ -103,7 +103,7 @@ export default function InvestorCase() {
           <strong>Servicios financian producto</strong>
           <p>
             Shows, clases y producción pueden sostener caja con menor inversión; tecnología, Red UnderTango, método e IP
-            se desarrollan de forma gradual y sólo escalan cuando existe evidencia de uso y disposición a pagar.
+            se desarrollan gradualmente y sólo escalan cuando existe evidencia de uso y disposición a pagar.
           </p>
         </article>
       </div>
@@ -113,8 +113,8 @@ export default function InvestorCase() {
           <p>Departamentos · metas y evidencia</p>
           <h4>Qué le corresponde demostrar a cada unidad</h4>
           <p>
-            La meta anual sirve para ordenar magnitudes, pero el hito real es observable: una venta, una recurrencia, un
-            margen conocido, un cliente externo, una comisión cobrada o un activo que efectivamente genera ingresos.
+            La meta anual ordena magnitudes, pero el hito real es observable: una venta, una recurrencia, un margen conocido,
+            un cliente externo, una comisión cobrada o un activo que efectivamente genera ingresos.
           </p>
         </div>
 
@@ -146,8 +146,8 @@ export default function InvestorCase() {
           <p>
             El artista define cuánto necesita cobrar. UnderTango agrega curaduría, reputación, coordinación, comunicación,
             seguimiento y una capa operativa común; cuando la contratación se concreta, puede capturar una comisión o
-            margen de facilitación. La reputación y el registro histórico reducen el riesgo para ambas partes. Antes de
-            escalar ciudad por ciudad, el hito es mucho más simple: demostrar las primeras operaciones reales.
+            margen de facilitación. Antes de escalar ciudad por ciudad, el hito es simple: demostrar operaciones reales y
+            documentar si el mecanismo mejora la experiencia de ambas partes.
           </p>
         </div>
         <div className="elitros-network-flow" aria-label="Flujo de la Red UnderTango">
@@ -156,11 +156,11 @@ export default function InvestorCase() {
       </div>
 
       <div className="elitros-live-system">
-        <h3>La siguiente capa es que cada departamento tenga una página viva.</h3>
+        <h3>El primer prototipo de memoria operativa ya está en marcha.</h3>
         <p>
-          El plan no debería quedar congelado en una presentación. La arquitectura buscada es que cada unidad permita ver
-          qué se hizo, para quién, cuándo, cuánto se cobró cuando corresponda, qué costo tuvo, cuál fue el resultado y qué
-          evidencia quedó. Lo antiguo puede archivarse; lo útil permanece como memoria operativa y prueba de ejecución.
+          Cada módulo puede reunir fechas, clientes, operaciones, cobros vinculados, margen cuando los costos están
+          registrados y evidencia del resultado. El registro estructurado empezó en agosto de 2026 y también incorpora
+          algunos hechos anteriores cargados retrospectivamente; por eso 2026 todavía es una muestra parcial del año.
         </p>
         <div className="elitros-live-flow" aria-label="Ciclo de documentación viva">
           <div><b>01</b><span>Plan / hito</span></div>
@@ -170,21 +170,24 @@ export default function InvestorCase() {
           <div><b>05</b><span>Evidencia</span></div>
           <div><b>06</b><span>Resultado</span></div>
         </div>
+        <p style={{ marginTop: 20, marginBottom: 0 }}>
+          <a href="/operacion" className="elitros-doc-link">Ver la Operación viva 2026 →</a>
+        </p>
       </div>
 
       <div className="elitros-capital-study">
-        <span>Arquitectura de capital · en estudio</span>
-        <h3>El antiguo FDI queda como antecedente experimental, no como unidad de facturación ni como oferta actual.</h3>
+        <span>Participación privada · etapa inicial</span>
+        <h3>UnderTango está abierto a conversar con personas que quieran aportar capital y acompañar el crecimiento.</h3>
         <p>
-          UnderTango ya probó de manera casera una lógica de participación, registro y transparencia con un grupo reducido
-          de personas de confianza. Esa experiencia sirve como evidencia de interés y como material de diseño, pero la
-          estructura futura todavía debe definirse con asesoramiento jurídico y contable antes de recibir capital bajo un
-          mecanismo formal.
+          En esta etapa cualquier participación es privada, por invitación y se documenta individualmente antes de recibir
+          un aporte: cuánto entra, para qué se utiliza, qué derechos existen, qué información se comparte y cuál es el
+          mecanismo acordado para una eventual salida o retorno. No fijamos una suma mínima ni una rentabilidad universal:
+          primero buscamos que cada acuerdo sea comprensible para ambas partes.
         </p>
         <p>
-          El objetivo de noviembre no es prometer una rentabilidad ni fijar una suma a levantar. Es llegar con una empresa
-          mejor documentada, una arquitectura de capital comprensible y criterios para reconocer capital inteligente y
-          paciente: personas que, además de dinero, puedan aportar mercado, vínculos, conocimiento o capacidad de escala.
+          La intención es conservar una lógica de registro, trazabilidad y transparencia. Si en el futuro el mecanismo crece
+          o se abre a una participación más amplia, se adoptará la estructura jurídica y regulatoria que corresponda a esa
+          escala.
         </p>
       </div>
 

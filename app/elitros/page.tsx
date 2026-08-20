@@ -60,6 +60,75 @@ const radarDimensions = [
   },
 ] as const;
 
+const roadmapMilestones = [
+  {
+    code: "TRL",
+    title: "Tecnología",
+    current: 6,
+    november: 7,
+    target: 8,
+    novemberMilestone:
+      "Usar durante al menos ocho semanas una V1 integrada web/mobile con acceso, base operativa y calendario funcionando como herramienta interna real.",
+    targetMilestone:
+      "Validar la misma arquitectura con al menos tres organizaciones externas y documentar uso, fallas y mejoras.",
+  },
+  {
+    code: "CRL",
+    title: "Cliente",
+    current: 7,
+    november: 8,
+    target: 9,
+    novemberMilestone:
+      "Consolidar al menos seis clientes institucionales recurrentes en dos países y medir conversión, repetición y origen de cada oportunidad.",
+    targetMilestone:
+      "Tener un flujo comercial predecible en Argentina, Brasil y Paraguay, con al menos 40% de los ingresos provenientes de recurrencia o acuerdos estables.",
+  },
+  {
+    code: "BRL",
+    title: "Negocio",
+    current: 5,
+    november: 7,
+    target: 8,
+    novemberMilestone:
+      "Estandarizar tres ofertas vendibles con precio mínimo, costos, margen, alcance y variables claras; registrar el pipeline comercial en un único sistema.",
+    targetMilestone:
+      "Demostrar economía unitaria positiva y un mecanismo comercial replicable que no dependa exclusivamente de la venta personal del fundador.",
+  },
+  {
+    code: "FRL",
+    title: "Financiación",
+    current: 3,
+    november: 6,
+    target: 8,
+    novemberMilestone:
+      "Operar con flujo de caja semanal, calendario completo de obligaciones y una reserva equivalente a un mes de costos operativos críticos.",
+    targetMilestone:
+      "Sostener tres meses de capital de trabajo y dejar de utilizar deuda de emergencia para financiar la operación cotidiana.",
+  },
+  {
+    code: "TMRL",
+    title: "Equipo",
+    current: 5,
+    november: 7,
+    target: 8,
+    novemberMilestone:
+      "Definir roles, responsables y suplencias del núcleo Pablo–Ale–Maxi y de la producción artística, con una rutina de coordinación y reglas de remuneración documentadas.",
+    targetMilestone:
+      "Lograr que las operaciones críticas puedan ejecutarse con procesos documentados, responsables claros y una red estable de reemplazos sin depender de una sola persona.",
+  },
+  {
+    code: "IPRL",
+    title: "Prop. intelectual",
+    current: 6,
+    november: 7,
+    target: 8,
+    novemberMilestone:
+      "Inventariar marca, contenidos, software y método; ordenar titularidad y licencias y realizar una revisión de antecedentes y estrategia de protección del Sistema UnderTango.",
+    targetMilestone:
+      "Aplicar una estrategia de protección y licenciamiento coherente en los mercados prioritarios y convertir los activos diferenciales en acuerdos utilizables comercialmente.",
+  },
+] as const;
+
 const conclusions = [
   {
     title: "Existe validación real de mercado.",
@@ -156,17 +225,35 @@ export default function ElitrosPage() {
         <div className="elitros-shell">
           <div className="elitros-section-heading elitros-class-heading">
             <p>Clase 2 · Madurez de la innovación</p>
-            <h2 id="clase-2-title">De la idea al mercado: diagnóstico de madurez de Ø UnderTango Club</h2>
+            <h2 id="clase-2-title">De la idea al mercado: diagnóstico y hoja de ruta de Ø UnderTango Club</h2>
             <p className="elitros-lede">
-              Aplicamos el modelo KTH IRL sobre la evidencia disponible de UnderTango para ubicar el proyecto en seis
-              dimensiones y detectar fortalezas, brechas y prioridades de desarrollo.
+              El modelo KTH IRL no se usa solamente para describir dónde estamos: parte de un objetivo y obliga a
+              definir hitos verificables en seis dimensiones. La tela de araña muestra la madurez alcanzada respecto de
+              esos hitos y permite detectar dónde una brecha mayor a tres niveles puede frenar el desarrollo completo.
             </p>
+          </div>
+
+          <div className="elitros-objective-card" aria-labelledby="objetivo-kth-title">
+            <div className="elitros-objective-label">Objetivo de trabajo · hipótesis para alinear y validar</div>
+            <h3 id="objetivo-kth-title">Ø UnderTango facturará USD 100.000 durante 2027 con una operación regional sostenible.</h3>
+            <p>
+              El objetivo combina shows, clases y servicios/productos operativos; busca que al menos 40% de los
+              ingresos provenga de clientes recurrentes o acuerdos estables, que la operación funcione en Argentina,
+              Brasil y Paraguay y que una V1 del Sistema UnderTango sea validada con al menos tres organizaciones
+              externas. No es una promesa cerrada: es una meta cuantificable para ordenar decisiones, discutirla con el
+              equipo y reemplazarla si aparece evidencia mejor.
+            </p>
+            <div className="elitros-objective-principle">
+              <strong>Regla de uso:</strong> cada eje necesita hitos concretos que conduzcan al objetivo. El nivel 1–9
+              describe cuánto se avanzó en esos hitos; si dos dimensiones quedan separadas por más de tres niveles,
+              esa asimetría se convierte en prioridad.
+            </div>
           </div>
 
           <div className="elitros-maturity-board">
             <div className="elitros-radar-column">
-              <div className="elitros-visual-label">Autodiagnóstico visual</div>
-              <h3>Perfil actual de madurez e innovación</h3>
+              <div className="elitros-visual-label">Línea de base · 20 agosto 2026</div>
+              <h3>Perfil actual de madurez respecto del objetivo</h3>
 
               <figure className="elitros-radar-figure" aria-labelledby="radar-caption">
                 <svg viewBox="0 0 600 525" role="img" aria-label="Radar KTH IRL de UnderTango Club: Tecnología 6, Cliente 7, Negocio 5, Financiación 3, Equipo 5 y Propiedad Intelectual 6">
@@ -234,14 +321,14 @@ export default function ElitrosPage() {
                 </svg>
                 <figcaption id="radar-caption">
                   La mayor asimetría está entre <strong>Cliente (7)</strong> y <strong>Financiación (3)</strong>. La
-                  diferencia de cuatro niveles señala un riesgo concreto de que la estructura financiera frene una
-                  demanda que ya existe.
+                  diferencia de cuatro niveles señala un riesgo concreto: la demanda y la validación comercial pueden
+                  avanzar más rápido que la capacidad financiera para sostenerlas.
                 </figcaption>
               </figure>
 
               <div className="elitros-gap-callout">
-                <span>Brecha principal</span>
-                <strong>Fuerte validación con clientes, pero fragilidad financiera.</strong>
+                <span>Foco inmediato</span>
+                <strong>Subir Financiación sin frenar Cliente, y acompañar ese movimiento con Negocio y Equipo.</strong>
               </div>
             </div>
 
@@ -257,6 +344,52 @@ export default function ElitrosPage() {
                 </div>
               ))}
             </aside>
+          </div>
+
+          <div className="elitros-roadmap" aria-labelledby="hitos-title">
+            <div className="elitros-roadmap-heading">
+              <p>De diagnóstico a herramienta de gestión</p>
+              <h3 id="hitos-title">Hitos por eje para llegar al objetivo</h3>
+              <p>
+                La puntuación actual funciona como línea de base. Para noviembre buscamos una figura más equilibrada,
+                aproximadamente 7–8–7–6–7–7; para 2027, 8–9–8–8–8–8. La intención no es “subir números”, sino producir
+                evidencia verificable que justifique cada nivel.
+              </p>
+            </div>
+
+            <div className="elitros-roadmap-grid">
+              {roadmapMilestones.map((milestone) => (
+                <article className="elitros-milestone-card" key={milestone.code}>
+                  <div className="elitros-milestone-top">
+                    <div>
+                      <span>{milestone.code}</span>
+                      <h4>{milestone.title}</h4>
+                    </div>
+                    <div className="elitros-level-path" aria-label={`${milestone.title}: nivel actual ${milestone.current}, objetivo noviembre ${milestone.november}, objetivo 2027 ${milestone.target}`}>
+                      <span><small>Hoy</small>{milestone.current}</span>
+                      <b>→</b>
+                      <span><small>Nov.</small>{milestone.november}</span>
+                      <b>→</b>
+                      <span><small>2027</small>{milestone.target}</span>
+                    </div>
+                  </div>
+                  <div className="elitros-milestone-step">
+                    <strong>Hito hacia noviembre</strong>
+                    <p>{milestone.novemberMilestone}</p>
+                  </div>
+                  <div className="elitros-milestone-step elitros-milestone-target">
+                    <strong>Hito de consolidación 2027</strong>
+                    <p>{milestone.targetMilestone}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="elitros-alignment-note">
+              <strong>Trabajo de equipo:</strong> estos hitos quedan deliberadamente abiertos a revisión. Pablo, Ale y
+              Maxi los irán contrastando con evidencia real y usándolos para alinear qué construir, qué vender, qué
+              financiar y qué proteger rumbo a la presentación final de ÉLITROS en noviembre.
+            </div>
           </div>
 
           <div className="elitros-conclusions" aria-labelledby="conclusiones-title">
@@ -280,8 +413,9 @@ export default function ElitrosPage() {
             </div>
 
             <div className="elitros-synthesis">
-              <strong>Síntesis:</strong> UnderTango ya demostró valor en el mercado; ahora necesita estabilizar su
-              estructura financiera y operativa para escalar con menos riesgo.
+              <strong>Síntesis:</strong> UnderTango ya demostró valor en el mercado. El trabajo de esta herramienta es
+              convertir ese valor en una secuencia de hitos coordinados para que cliente, tecnología, negocio,
+              financiación, equipo y propiedad intelectual maduren sin dejar brechas que bloqueen el crecimiento.
             </div>
           </div>
         </div>
@@ -347,8 +481,9 @@ export default function ElitrosPage() {
         <div className="elitros-shell">
           <p>Ø UnderTango · Aprendizaje aplicado · ÉLITROS 2026</p>
           <p className="elitros-disclaimer">
-            El experimento de red y app es un prototipo de UnderTango para explorar colaboración y aprendizaje; no es
-            un producto oficial del programa ÉLITROS.
+            Los niveles KTH IRL mostrados son una hipótesis de trabajo interna para orientar decisiones y evidencia; no
+            constituyen una certificación oficial del modelo. El experimento de red y app es un prototipo de UnderTango
+            para explorar colaboración y aprendizaje y no es un producto oficial del programa ÉLITROS.
           </p>
         </div>
       </footer>

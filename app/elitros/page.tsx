@@ -1,4 +1,5 @@
 import "./elitros.css";
+import InvestorCase from "./InvestorCase";
 
 const businessModelDoc =
   "https://docs.google.com/document/d/1s2bI10gDtYp8TjXPduSVDV6EFC-9sVfa724Ev0lvNdE/edit?usp=drivesdk";
@@ -237,11 +238,11 @@ export default function ElitrosPage() {
             <div className="elitros-objective-label">Objetivo de trabajo · hipótesis para alinear y validar</div>
             <h3 id="objetivo-kth-title">Ø UnderTango facturará USD 100.000 durante 2027 con una operación regional sostenible.</h3>
             <p>
-              El objetivo combina shows, clases y servicios/productos operativos; busca que al menos 40% de los
-              ingresos provenga de clientes recurrentes o acuerdos estables, que la operación funcione en Argentina,
-              Brasil y Paraguay y que una V1 del Sistema UnderTango sea validada con al menos tres organizaciones
-              externas. No es una promesa cerrada: es una meta cuantificable para ordenar decisiones, discutirla con el
-              equipo y reemplazarla si aparece evidencia mejor.
+              No planteamos los USD 100.000 como un salto apoyado en un único producto. UnderTango tiene una cartera
+              modular de servicios que puede venderse por separado o combinarse: shows, clases, marketing, música,
+              regalías, moda, producción escénica y técnica, audiovisual, programación y —más adelante— una red de
+              facilitación entre artistas y clientes. El objetivo sirve para obligarnos a explicar qué tiene que crecer,
+              cuánto y con qué capital.
             </p>
             <div className="elitros-objective-principle">
               <strong>Regla de uso:</strong> cada eje necesita hitos concretos que conduzcan al objetivo. El nivel 1–9
@@ -249,6 +250,8 @@ export default function ElitrosPage() {
               esa asimetría se convierte en prioridad.
             </div>
           </div>
+
+          <InvestorCase />
 
           <div className="elitros-maturity-board">
             <div className="elitros-radar-column">
@@ -481,9 +484,10 @@ export default function ElitrosPage() {
         <div className="elitros-shell">
           <p>Ø UnderTango · Aprendizaje aplicado · ÉLITROS 2026</p>
           <p className="elitros-disclaimer">
-            Los niveles KTH IRL mostrados son una hipótesis de trabajo interna para orientar decisiones y evidencia; no
-            constituyen una certificación oficial del modelo. El experimento de red y app es un prototipo de UnderTango
-            para explorar colaboración y aprendizaje y no es un producto oficial del programa ÉLITROS.
+            Los niveles KTH IRL, la meta de facturación, la necesidad de capital y las estructuras de retorno mostradas
+            son hipótesis internas para orientar discusión, validación y evidencia; no constituyen una certificación,
+            oferta pública de inversión ni promesa de rendimiento. El experimento de red y app es un prototipo de
+            UnderTango y no un producto oficial del programa ÉLITROS.
           </p>
         </div>
       </footer>

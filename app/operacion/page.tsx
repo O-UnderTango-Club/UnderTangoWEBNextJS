@@ -182,7 +182,11 @@ export default function OperacionPage() {
           <div className="op-headline-grid">
             <article><span>Referencia 2025</span><strong>≈ USD 13K</strong><p>Base prudente conocida, concentrada principalmente en shows.</p></article>
             <article><span>Caso base 2027</span><strong>USD 25K</strong><p>La meta se reparte entre módulos y cada uno debe producir evidencia propia.</p></article>
-            <article><span>Registro visible</span><strong>{data ? visibleRecords : "…"}</strong><p>{data?.live ? "Datos consultados en Airtable." : "Cargando memoria operativa…"}</p></article>
+            <article>
+              <span>Registro visible</span>
+              <strong>{data ? visibleRecords : "…"}</strong>
+              <p>{!data ? "Cargando memoria operativa…" : data.live ? "Lectura directa desde Airtable." : "Instantánea segura construida desde los registros de Airtable."}</p>
+            </article>
           </div>
         </div>
       </header>

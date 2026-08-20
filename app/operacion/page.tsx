@@ -73,13 +73,24 @@ function dateLabel(value?: string) {
 }
 
 function FinanceRow({ row }: { row: Money }) {
+  const marginValue = row.margin ?? (row.income > 0 ? row.income - row.expense : null);
+  const marginPercent = row.income > 0 && marginValue != null
+    ? Math.round((marginValue / row.income) * 100)
+    : null;
+
   return (
     <div className="op-money-row">
       {row.income > 0 && <span><small>Cobrado registrado</small><b>{money(row.income, row.currency)}</b></span>}
-      {row.expense > 0 && <span><small>Costo vinculado</small><b>{money(row.expense, row.currency)}</b></span>}
+      {(row.income > 0 || row.expense > 0) && (
+        <span><small>Gasto directo registrado</small><b>{money(row.expense, row.currency)}</b></span>
+      )}
       <span>
-        <small>Margen registrado</small>
-        <b>{row.margin == null ? "Aún no determinable" : money(row.margin, row.currency)}</b>
+        <small>Margen bruto registrado</small>
+        <b>
+          {marginValue == null
+            ? "Aún no determinable"
+            : `${money(marginValue, row.currency)}${marginPercent == null ? "" : ` · ${marginPercent}%`}`}
+        </b>
       </span>
     </div>
   );
@@ -175,7 +186,7 @@ export default function OperacionPage() {
           <h1>Operación viva 2026</h1>
           <p className="op-lede">
             Un prototipo para que el trabajo no se pierda. Cada módulo reúne lo que se hizo, cuándo, para quién, qué
-            resultado quedó y —cuando el registro financiero alcanza— cuánto se cobró, qué costo se vinculó y qué margen
+            resultado quedó y —cuando el registro financiero alcanza— cuánto se cobró, qué gasto directo se vinculó y qué margen
             puede demostrarse.
           </p>
 
@@ -205,7 +216,7 @@ export default function OperacionPage() {
       <section className="op-shell op-privacy">
         <strong>Qué se publica y qué no.</strong>
         <p>
-          Se muestran hechos comerciales y productivos útiles para demostrar ejecución. Los movimientos financieros sólo
+          Se muestran hechos comerciales y productivos útiles para demostrar ejecución. Los ingresos y gastos directos sólo
           aparecen cuando están vinculados a una operación concreta. Caja interna, créditos, deudas y obligaciones privadas
           quedan fuera de esta vista pública.
         </p>
@@ -232,7 +243,7 @@ export default function OperacionPage() {
         <h2>Plan → operación → evidencia → aprendizaje.</h2>
         <p>
           Este es el primer prototipo. La evolución natural es que cada venta y cada proyecto nazcan vinculados a su módulo,
-          de modo que facturación, costos, material audiovisual, cliente y resultado se acumulen automáticamente sin tener
+          de modo que facturación, gastos directos, material audiovisual, cliente y resultado se acumulen automáticamente sin tener
           que reconstruir la historia meses después.
         </p>
         <a href="/elitros">Volver al tablero de ÉLITROS →</a>

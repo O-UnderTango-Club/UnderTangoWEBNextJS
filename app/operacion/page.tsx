@@ -44,6 +44,18 @@ type Payload = {
   };
 };
 
+const melia2026 = [
+  { month: "Enero", amount: 1665000, invoice: "Factura C 69" },
+  { month: "Febrero", amount: 1480000, invoice: "Factura C 70" },
+  { month: "Marzo", amount: 1665000, invoice: "Factura C 72" },
+  { month: "Abril", amount: 1480000, invoice: "Factura C 75" },
+  { month: "Mayo", amount: 1850000, invoice: "Factura C 76" },
+  { month: "Junio", amount: 1332000, invoice: "Factura C 77" },
+] as const;
+
+const meliaDocumentedTotal = melia2026.reduce((total, month) => total + month.amount, 0);
+const meliaMonthlyAverage = Math.round(meliaDocumentedTotal / melia2026.length);
+
 function usd(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -210,6 +222,49 @@ export default function OperacionPage() {
         <p>
           {data?.coverage.note || "Estamos conectando la operación histórica con una estructura nueva. Algunas actividades anteriores ya fueron cargadas retrospectivamente y otras todavía no."}
           {" "}Por eso esta página es una <strong>memoria operativa en construcción</strong>, no un balance contable del año.
+        </p>
+      </section>
+
+      <section className="op-shell op-history">
+        <div className="op-history-heading">
+          <div>
+            <p className="op-eyebrow">Base documental · enero a junio 2026</p>
+            <h2>Antes del registro estructurado ya había una operación recurrente medible.</h2>
+          </div>
+          <p>
+            Las facturas emitidas a Gran Meliá Iguazú permiten reconstruir un <strong>piso documental</strong> de la facturación
+            del primer semestre. No representa toda la facturación de UnderTango: todavía faltan reconstruir otros shows y
+            servicios realizados en esos meses.
+          </p>
+        </div>
+
+        <div className="op-history-summary">
+          <article>
+            <span>Piso documentado ene–jun</span>
+            <strong>{money(meliaDocumentedTotal, "ARS")}</strong>
+            <p>Sólo facturación Gran Meliá documentada mediante facturas emitidas.</p>
+          </article>
+          <article>
+            <span>Promedio mensual documentado</span>
+            <strong>{money(meliaMonthlyAverage, "ARS")}</strong>
+            <p>Promedio de seis meses; no se usa para inventar meses posteriores.</p>
+          </article>
+        </div>
+
+        <div className="op-history-months" aria-label="Facturación mensual Gran Meliá enero a junio 2026">
+          {melia2026.map((month) => (
+            <div key={month.month}>
+              <span>{month.month}</span>
+              <strong>{money(month.amount, "ARS")}</strong>
+              <small>{month.invoice}</small>
+            </div>
+          ))}
+        </div>
+
+        <p className="op-history-note">
+          <strong>Lectura correcta:</strong> esto es facturación emitida y documentada, no una estimación de caja total. La
+          etapa recurrente de Gran Meliá está documentada hasta junio de 2026; julio no se completa por promedio. A medida
+          que reconstruyamos otros clientes, este piso histórico irá creciendo sin perder trazabilidad.
         </p>
       </section>
 

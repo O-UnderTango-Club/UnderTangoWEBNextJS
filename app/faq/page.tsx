@@ -119,11 +119,12 @@ export default function FAQPage() {
       answer: (
         <>
           <p>
-            De martes a domingos de 17 a 19hs en Cruceros Iguazú, combinación de
-            show de tango electrónico + música internacional en vivo.
+            Actualmente no tenemos una función pública fija todos los días.
+            Publicamos las próximas fechas y experiencias de tango en Puerto
+            Iguazú y también coordinamos shows con reserva previa.
           </p>
           <p>
-            Para más información, contacta al{" "}
+            Para consultar la próxima fecha disponible, contacta al{" "}
             <a href="https://wa.me/+5493757618270" className="contact-link">
               +54 3757 618270
             </a>

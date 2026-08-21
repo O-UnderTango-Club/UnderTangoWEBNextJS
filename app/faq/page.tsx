@@ -119,12 +119,12 @@ export default function FAQPage() {
       answer: (
         <>
           <p>
-            Actualmente no tenemos una función pública fija todos los días.
-            Publicamos las próximas fechas y experiencias de tango en Puerto
-            Iguazú y también coordinamos shows con reserva previa.
+            Ø UnderTango ofrece shows recurrentes de tango en Pata Negra, en
+            Puerto Iguazú. Las funciones se coordinan según disponibilidad del
+            espacio y del elenco.
           </p>
           <p>
-            Para consultar la próxima fecha disponible, contacta al{" "}
+            Para consultar disponibilidad y la próxima fecha, contacta al{" "}
             <a href="https://wa.me/+5493757618270" className="contact-link">
               +54 3757 618270
             </a>

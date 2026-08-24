@@ -55,6 +55,14 @@ export default function Header() {
           </Link>
         </li>
         <li>
+          <Link
+            href="/produccion-artistica"
+            className={pathname === "/produccion-artistica" ? "active" : ""}
+          >
+            Producción artística
+          </Link>
+        </li>
+        <li>
           <Link href="/proyectos" className={pathname === "/proyectos" ? "active" : ""}>
             Proyectos activos
           </Link>

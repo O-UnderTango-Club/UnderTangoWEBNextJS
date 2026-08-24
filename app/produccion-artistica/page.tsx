@@ -122,9 +122,12 @@ export default function ProduccionArtisticaPage() {
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
             <p className={styles.eyebrow}>Ø UNDERTANGO · PRODUCCIÓN ARTÍSTICA · TRIPLE FRONTERA</p>
-            <h1>Tu evento. Nuestro trabajo es convertirlo en espectáculo.</h1>
+            <h1>
+              <span>Tu evento.</span>
+              <span>Lo convertimos en espectáculo.</span>
+            </h1>
             <p className={styles.lead}>
-              Diseñamos, coordinamos y producimos experiencias artísticas en Argentina, Brasil y Paraguay. Podés llegar con una idea definida o simplemente con una necesidad: <strong>queremos que pase algo extraordinario.</strong>
+              Diseñamos, coordinamos y producimos experiencias artísticas en Argentina, Brasil y Paraguay. Podés llegar con una idea definida o simplemente con una necesidad. <strong>Nosotros construimos la propuesta.</strong>
             </p>
             <div className={styles.heroActions}>
               <a
@@ -143,9 +146,17 @@ export default function ProduccionArtisticaPage() {
                 Ver shows listos
               </Link>
             </div>
+            <div className={styles.heroProof} aria-label="Cobertura y alcance de producción">
+              <span>Argentina · Brasil · Paraguay</span>
+              <span>Dirección artística · artistas · ensayos · coordinación</span>
+            </div>
           </div>
 
           <div className={styles.heroVideoWrap}>
+            <div className={styles.videoTopline}>
+              <span>Producción Triple Frontera</span>
+              <span>01:00</span>
+            </div>
             <div className={styles.videoFrame}>
               <iframe
                 src={HERO_VIDEO}
@@ -264,7 +275,7 @@ export default function ProduccionArtisticaPage() {
             <p className={styles.eyebrow}>SI TODAVÍA NO SABÉS QUÉ SHOW QUERÉS</p>
             <h2>Éste es el lugar correcto.</h2>
             <p>Contanos dónde es, cuándo es, cuánta gente habrá y qué querés que el público sienta. Nosotros empezamos desde ahí.</p>
-            <a className={styles.primaryCta} href={whatsappFor("una producción artística") } target="_blank" rel="noopener noreferrer">
+            <a className={styles.primaryCta} href={whatsappFor("una producción artística")} target="_blank" rel="noopener noreferrer">
               Contarnos el evento
             </a>
           </div>

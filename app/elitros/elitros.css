@@ -329,6 +329,39 @@
 
 .elitros-gap-callout strong { line-height: 1.45; }
 
+.elitros-radar-milestones {
+  margin-top: 14px;
+  border: 1px solid var(--blue-line);
+  border-radius: 14px;
+  background: #f7fbff;
+  overflow: hidden;
+}
+.elitros-radar-milestones summary {
+  list-style: none;
+  padding: 15px 18px;
+  color: var(--blue-dark);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  font-size: .82rem;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.elitros-radar-milestones summary::-webkit-details-marker { display: none; }
+.elitros-radar-milestones summary b { font-size: 1.2rem; transition: transform .18s ease; }
+.elitros-radar-milestones[open] summary b { transform: rotate(45deg); }
+.elitros-radar-milestones .elitros-hide-label { display: none; }
+.elitros-radar-milestones[open] .elitros-show-label { display: none; }
+.elitros-radar-milestones[open] .elitros-hide-label { display: inline; }
+.elitros-radar-milestone-list { padding: 0 14px 14px; display: grid; gap: 9px; }
+.elitros-radar-milestone-list article { padding: 13px 14px; border-radius: 10px; background: #fff; border: 1px solid rgba(11,93,168,.14); }
+.elitros-radar-milestone-list article > span { display: block; color: var(--blue); font-size: .69rem; font-weight: 900; letter-spacing: .08em; }
+.elitros-radar-milestone-list article > strong { display: block; margin: 4px 0; color: var(--ink); }
+.elitros-radar-milestone-list p { margin: 0; color: #5a6b7d; font-size: .85rem; line-height: 1.48; }
+
 .elitros-quick-read {
   padding: 26px 24px;
   background: linear-gradient(180deg, #f8fbff 0%, #edf5fc 100%);

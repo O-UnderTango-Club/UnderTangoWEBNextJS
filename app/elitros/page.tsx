@@ -200,6 +200,7 @@ export default function ElitrosPage() {
           <nav className="elitros-class-index" aria-label="Índice de contenidos de ÉLITROS">
             <a href="#clase-1"><small>Módulo 2</small> Clase 1 · Canvas</a>
             <a href="#clase-2"><small>Módulo 2</small> Clase 2 · Madurez</a>
+            <a href="/fricciones"><small>Experimento</small> Fricciones relacionales</a>
             <a href="#equipo"><small>Equipo</small> Pablo · Ale · Maxi</a>
             <a href="/operacion"><small>Sistema vivo</small> Operación 2026</a>
             <a href="#modelo-vivo"><small>Documento</small> Modelo vivo</a>
@@ -313,6 +314,22 @@ export default function ElitrosPage() {
                 <span>Foco</span>
                 <strong>Financiación + Negocio + Equipo deben acercarse a Cliente antes de exigirle más escala al sistema.</strong>
               </div>
+              <details className="elitros-radar-milestones">
+                <summary>
+                  <span className="elitros-show-label">Mostrar hitos de validación</span>
+                  <span className="elitros-hide-label">Ocultar hitos de validación</span>
+                  <b aria-hidden="true">＋</b>
+                </summary>
+                <div className="elitros-radar-milestone-list">
+                  {roadmapMilestones.map((milestone) => (
+                    <article key={`radar-${milestone.code}`}>
+                      <span>{milestone.code} · {milestone.current} → {milestone.next}</span>
+                      <strong>{milestone.title}</strong>
+                      <p>{milestone.nextMilestone}</p>
+                    </article>
+                  ))}
+                </div>
+              </details>
             </div>
 
             <aside className="elitros-quick-read" aria-label="Lectura rápida del diagnóstico">

@@ -68,6 +68,11 @@ export default function Header() {
           </Link>
         </li>
         <li>
+          <Link href="/finanzas" className={pathname === "/finanzas" ? "active" : ""}>
+            Finanzas
+          </Link>
+        </li>
+        <li>
           <Link href="/#historia">Historia</Link>
         </li>
         <li>

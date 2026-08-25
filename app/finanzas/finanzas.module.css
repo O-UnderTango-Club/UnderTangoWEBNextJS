@@ -1,0 +1,422 @@
+.shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 560px at 10% -10%, rgba(82, 132, 230, 0.18), transparent 64%),
+    radial-gradient(760px 520px at 100% 0%, rgba(85, 211, 168, 0.10), transparent 62%),
+    #071018;
+  color: #eef4ff;
+}
+
+.main {
+  width: min(1320px, 94vw) !important;
+  margin: 0 auto !important;
+  padding: 34px 0 72px !important;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.eyebrow,
+.sectionEyebrow {
+  margin: 0 0 8px;
+  color: #8ca1bb;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(32px, 4.4vw, 58px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.subtitle {
+  max-width: 800px;
+  margin: 13px 0 0;
+  color: #aebdd0;
+  line-height: 1.55;
+}
+
+.source {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(131, 156, 190, 0.26);
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: rgba(17, 29, 43, 0.78);
+  color: #bac8d9;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.liveDot,
+.snapshotDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 16px currentColor;
+}
+
+.liveDot { background: #71e5b8; color: #71e5b8; }
+.snapshotDot { background: #f3c66f; color: #f3c66f; }
+
+.notice {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(243, 198, 111, 0.26);
+  border-radius: 14px;
+  background: rgba(243, 198, 111, 0.08);
+  color: #e4cfaa;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.balanceGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 13px;
+  margin-bottom: 26px;
+}
+
+.balanceCard {
+  min-height: 162px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(129, 157, 193, 0.18);
+  border-radius: 20px;
+  background:
+    radial-gradient(400px 160px at 0% 0%, rgba(126, 171, 255, 0.10), transparent 62%),
+    linear-gradient(180deg, rgba(18, 32, 47, 0.94), rgba(11, 22, 34, 0.94));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.20);
+  padding: 17px;
+}
+
+.primaryCard {
+  border-color: rgba(113, 229, 184, 0.32);
+  background:
+    radial-gradient(430px 180px at 0% 0%, rgba(113, 229, 184, 0.13), transparent 64%),
+    linear-gradient(180deg, rgba(17, 35, 45, 0.96), rgba(10, 23, 31, 0.96));
+}
+
+.receivableCard {
+  border-color: rgba(243, 198, 111, 0.24);
+}
+
+.cardLabel {
+  color: #8398b2;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.balanceValue {
+  display: block;
+  margin-top: 14px;
+  font-size: clamp(25px, 3vw, 39px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.cardHint {
+  margin-top: auto;
+  padding-top: 15px;
+  color: #8fa2bb;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.ledgerSection,
+.receivablesSection {
+  border: 1px solid rgba(129, 157, 193, 0.17);
+  border-radius: 22px;
+  background: rgba(9, 19, 29, 0.78);
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.receivablesSection {
+  margin-top: 16px;
+  padding: 18px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid rgba(129, 157, 193, 0.13);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.filterButton {
+  appearance: none;
+  border: 1px solid rgba(129, 157, 193, 0.20);
+  border-radius: 999px;
+  background: rgba(21, 35, 51, 0.76);
+  color: #b9c6d8;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: 120ms ease;
+}
+
+.filterButton:hover {
+  border-color: rgba(135, 180, 255, 0.48);
+  transform: translateY(-1px);
+}
+
+.activeFilter {
+  border-color: rgba(113, 229, 184, 0.48);
+  background: rgba(113, 229, 184, 0.10);
+  color: #ecfff8;
+}
+
+.ledger {
+  display: flex;
+  flex-direction: column;
+}
+
+.movementRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(129, 157, 193, 0.10);
+}
+
+.movementRow:last-child {
+  border-bottom: 0;
+}
+
+.direction {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.incoming {
+  border: 1px solid rgba(113, 229, 184, 0.25);
+  background: rgba(113, 229, 184, 0.08);
+  color: #83e9c2;
+}
+
+.outgoing {
+  border: 1px solid rgba(255, 125, 125, 0.25);
+  background: rgba(255, 105, 105, 0.07);
+  color: #ffaaaa;
+}
+
+.movementMain {
+  min-width: 0;
+  flex: 1;
+}
+
+.movementTopline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.movementName {
+  min-width: 0;
+  color: #d8e4f3;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.amount {
+  flex: 0 0 auto;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.positive { color: #8be8c5; }
+.negative { color: #ffb1b1; }
+
+.movementMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 7px;
+  color: #778da8;
+  font-size: 10px;
+}
+
+.movementMeta span:not(:last-child)::after {
+  content: "·";
+  margin-left: 12px;
+  color: #50657e;
+}
+
+.stateBox {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  color: #8da1bb;
+  text-align: center;
+}
+
+.receivablesSection > div:first-child {
+  margin-bottom: 14px;
+}
+
+.receivableList {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.receivableItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid rgba(129, 157, 193, 0.13);
+  border-radius: 15px;
+  background: rgba(17, 29, 43, 0.60);
+  padding: 13px 14px;
+}
+
+.receivableItem strong {
+  font-size: 13px;
+}
+
+.receivableItem p {
+  margin: 5px 0 0;
+  color: #8fa2bb;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.receivableAmount {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.receivableAmount strong {
+  color: #f2d39a;
+  font-size: 16px;
+}
+
+.receivableAmount span {
+  color: #8c9eb5;
+  font-size: 10px;
+}
+
+.footerNote {
+  margin-top: 16px;
+  color: #687e98;
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media (max-width: 1000px) {
+  .balanceGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .main {
+    width: min(94vw, 620px) !important;
+    padding-top: 24px !important;
+  }
+
+  .hero,
+  .sectionHead,
+  .movementTopline,
+  .receivableItem {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .source {
+    align-self: flex-start;
+  }
+
+  .balanceGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .balanceCard {
+    min-height: 148px;
+    padding: 14px;
+  }
+
+  .balanceValue {
+    font-size: clamp(22px, 8vw, 31px);
+  }
+
+  .sectionHead {
+    gap: 13px;
+  }
+
+  .movementRow {
+    align-items: flex-start;
+    padding: 13px;
+  }
+
+  .movementTopline {
+    gap: 7px;
+  }
+
+  .amount {
+    font-size: 13px;
+  }
+
+  .movementMeta span:not(:last-child)::after {
+    display: none;
+  }
+
+  .receivableAmount {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 430px) {
+  .balanceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .balanceCard {
+    min-height: 132px;
+  }
+}

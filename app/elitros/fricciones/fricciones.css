@@ -51,6 +51,20 @@
 .friction-final-line { margin-top: 25px; padding: 25px; border-radius: 14px; background: #0b5d68; display: grid; grid-template-columns: 130px 1fr; gap: 20px; }
 .friction-final-line span { color: #8be0dc; font-size: .72rem; font-weight: 900; letter-spacing: .12em; }
 .friction-final-line strong { line-height: 1.5; }
+.friction-transfer-flow { margin-top: 38px; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 14px; align-items: stretch; }
+.friction-transfer-flow article { padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+.friction-transfer-flow article > span { color: var(--teal-dark); font-size: .7rem; font-weight: 900; letter-spacing: .1em; }
+.friction-transfer-flow h3 { margin: 24px 0 9px; color: var(--ink); font-size: 1.18rem; }
+.friction-transfer-flow p { margin: 0; color: #596b7e; line-height: 1.58; font-size: .94rem; }
+.friction-transfer-flow > b { align-self: center; color: var(--teal); font-size: 1.25rem; }
+.friction-transfer-flow article.destination { background: var(--navy); border-color: var(--navy); }
+.friction-transfer-flow article.destination > span { color: #78d8d5; }
+.friction-transfer-flow article.destination h3 { color: #f8fbfb; }
+.friction-transfer-flow article.destination p { color: #bdccd5; }
+.friction-transfer-proof { margin-top: 22px; padding: 30px; border-left: 4px solid var(--blue); background: #fff; display: grid; grid-template-columns: .8fr 1.2fr; gap: 34px; align-items: center; }
+.friction-transfer-proof small { color: var(--blue-dark); font-size: .7rem; font-weight: 900; letter-spacing: .1em; }
+.friction-transfer-proof h3 { margin: 8px 0 0; color: var(--ink); font-size: 1.4rem; }
+.friction-transfer-proof p { margin: 0; color: #526578; line-height: 1.7; }
 .friction-roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .friction-roles article { padding: 25px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
 .friction-roles article > span { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: var(--soft); color: var(--teal-dark); font-weight: 900; }
@@ -76,6 +90,9 @@
   .friction-transversal-copy { grid-template-columns: 1fr; gap: 4px; }
   .friction-axis, .friction-daily-flow { grid-template-columns: 1fr; }
   .friction-axis i { justify-self: center; }
+  .friction-transfer-flow { grid-template-columns: 1fr; }
+  .friction-transfer-flow > b { justify-self: center; transform: rotate(90deg); }
+  .friction-transfer-proof { grid-template-columns: 1fr; }
 }
 @media (max-width: 620px) {
   .friction-hero { padding-top: 38px; }

@@ -56,7 +56,8 @@ const milestones = [
   { n: "H3", title: "Crecimiento controlado", metric: "+3 personas", text: "Se incorporan al menos tres integrantes adicionales y la experiencia sigue funcionando de forma clara y cuidada." },
   { n: "H4", title: "Aplicación móvil funcional", metric: "1 descarga", text: "La app puede descargarse, abrirse y usarse prolijamente en un teléfono real." },
   { n: "H5", title: "Sistema abierto", metric: "Acceso ampliado", text: "El experimento queda disponible para otras startups de ÉLITROS con un mecanismo de ingreso comprensible." },
-  { n: "H6", title: "Recorrido expuesto", metric: "Noviembre 2026", text: "El desarrollo, los aprendizajes y los resultados se presentan en la exposición final del proyecto." },
+  { n: "H6", title: "Transferencia a la Red UnderTango", metric: "1 implementación", text: "El mecanismo validado se adapta, con identidad y criterios propios, a la base de artistas de UnderTango." },
+  { n: "H7", title: "Recorrido expuesto", metric: "Noviembre 2026", text: "El desarrollo, los aprendizajes y el paso del circuito ÉLITROS a la Red UnderTango se presentan en la exposición final." },
 ] as const;
 
 export default function FriccionesPage() {
@@ -75,6 +76,7 @@ export default function FriccionesPage() {
             <a href="#perfil"><small>Qué probamos</small> Perfil mínimo</a>
             <a href="#secuencia"><small>Cómo</small> Secuencia</a>
             <a href="#metricas"><small>Qué cuenta</small> Hitos de éxito</a>
+            <a href="#transferencia"><small>Después</small> Red UnderTango</a>
             <a href="#equipo"><small>Quién</small> Responsabilidades</a>
           </nav>
         </div>
@@ -196,7 +198,36 @@ export default function FriccionesPage() {
               </article>
             ))}
           </div>
-          <div className="friction-final-line"><span>HORIZONTE</span><strong>Una aplicación móvil funcional y un recorrido completo para mostrar ante inversores y en la exposición final de noviembre.</strong></div>
+          <div className="friction-final-line"><span>HORIZONTE</span><strong>Una aplicación móvil funcional, un mecanismo transferido a la Red UnderTango y un recorrido completo para mostrar ante inversores y en la exposición final de noviembre.</strong></div>
+        </div>
+      </section>
+
+      <section id="transferencia" className="elitros-section elitros-section-soft elitros-anchor-section" aria-labelledby="transferencia-title">
+        <div className="elitros-shell">
+          <div className="elitros-section-heading friction-heading-narrow">
+            <p>Del laboratorio a la implementación</p>
+            <h2 id="transferencia-title">ÉLITROS es el circuito de prueba. La Red UnderTango es el destino de la evidencia.</h2>
+            <p className="elitros-lede">
+              Probar primero entre quienes desarrollan el sistema, el equipo cercano y startups amigas permite detectar
+              errores sin exponer de entrada a una comunidad más grande ni comprometer confianza innecesariamente.
+            </p>
+          </div>
+          <div className="friction-transfer-flow" aria-label="Recorrido desde el experimento ÉLITROS hasta la Red UnderTango">
+            <article><span>01 · CÍRCULO INTERNO</span><h3>Pablo, Ale y Maxi</h3><p>El equipo prueba el recorrido completo y corrige problemas básicos de carga, identidad, privacidad y uso.</p></article>
+            <b aria-hidden="true">→</b>
+            <article><span>02 · VALIDACIÓN CERRADA</span><h3>Startups de confianza</h3><p>Se incorpora una startup amiga, luego otras personas, y se observa si el mecanismo funciona fuera del equipo creador.</p></article>
+            <b aria-hidden="true">→</b>
+            <article className="destination"><span>03 · IMPLEMENTACIÓN</span><h3>Red UnderTango</h3><p>Lo validado se adapta a la base de artistas con una identidad, reglas y experiencia acordes a la empresa.</p></article>
+          </div>
+          <div className="friction-transfer-proof">
+            <div><small>LO QUE QUEREMOS DEMOSTRAR EN NOVIEMBRE</small><h3>El experimento produjo una implementación real.</h3></div>
+            <p>
+              La evidencia más convincente no será sólo una app terminada: será poder mostrar cómo un mecanismo se probó
+              en un entorno pequeño, se corrigió con participantes reales y luego permitió una implementación más sólida
+              para la Red UnderTango. La tecnología puede ser espejo; la investidura, los datos y las reglas de confianza
+              deben pertenecer claramente a cada comunidad.
+            </p>
+          </div>
         </div>
       </section>
 

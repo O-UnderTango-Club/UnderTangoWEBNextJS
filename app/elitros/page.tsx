@@ -200,7 +200,7 @@ export default function ElitrosPage() {
           <nav className="elitros-class-index" aria-label="Índice de contenidos de ÉLITROS">
             <a href="#clase-1"><small>Módulo 2</small> Clase 1 · Canvas</a>
             <a href="#clase-2"><small>Módulo 2</small> Clase 2 · Madurez</a>
-            <a href="/fricciones"><small>Experimento</small> Fricciones relacionales</a>
+            <a href="/proyeccion"><small>Experimento</small> Proyección Red ÉLITROS</a>
             <a href="#equipo"><small>Equipo</small> Pablo · Ale · Maxi</a>
             <a href="/operacion"><small>Sistema vivo</small> Operación 2026</a>
             <a href="#modelo-vivo"><small>Documento</small> Modelo vivo</a>

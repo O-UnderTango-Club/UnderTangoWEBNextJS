@@ -32,8 +32,8 @@ const roles = [
   },
   {
     name: "Alejandro Míguez",
-    role: "Invitación y expansión cuidada",
-    text: "Define la primera invitación externa de forma elegante, gradual y de bajo riesgo. Su conocimiento presencial del grupo ayuda a elegir a la persona adecuada.",
+    role: "Invitaciones y arquitectura relacional",
+    text: "Organiza la primera invitación y las siguientes. Observa formas, tiempos y modos de vinculación para que la conexión entre participantes fluya con elegancia, gradualidad y bajo riesgo.",
   },
   {
     name: "Maximiliano Rodríguez",
@@ -45,8 +45,8 @@ const roles = [
 const steps = [
   { n: "01", title: "Construir el núcleo", text: "Pablo prepara formulario, base de datos y perfiles diferenciados de Pablo, Ale y Maxi." },
   { n: "02", title: "Validar entre tres", text: "El equipo completa el formulario y comprueba que la carga, la visualización y cada perfil funcionen correctamente." },
-  { n: "03", title: "Invitar con criterio", text: "Ale selecciona a un representante confiable de otra startup y realiza una invitación personal, clara y sin presión." },
-  { n: "04", title: "Aprender antes de ampliar", text: "Se observa qué facilita la interacción, qué incomoda y qué debe ajustarse. Sólo después se incorporan nuevas personas." },
+  { n: "03", title: "Invitar con criterio", text: "Ale organiza la primera invitación a un representante confiable y define una forma de acercamiento personal, clara y sin presión." },
+  { n: "04", title: "Aprender antes de ampliar", text: "Ale analiza qué facilita la interacción, qué incomoda y qué formas de conexión necesitan ajuste; con ese aprendizaje organiza las invitaciones futuras." },
   { n: "05", title: "Preparar la experiencia móvil", text: "Con evidencia y contenido reales, Maxi desarrolla una versión móvil espejo de la web; Pablo sostiene el frente full-stack web." },
 ] as const;
 

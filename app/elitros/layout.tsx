@@ -2,23 +2,31 @@ import type { Metadata } from "next";
 import "./route-fix.css";
 
 export const metadata: Metadata = {
-  title: "Ø UnderTango · ÉLITROS 2026 | Aprendizaje aplicado",
+  title: "UnderTango · Business Model Canvas | ÉLITROS 2026",
   description:
-    "Seguimiento público del trabajo de Ø UnderTango dentro de ÉLITROS 2026: modelo de negocio, hipótesis, decisiones, prototipos y evidencia por módulo.",
+    "El modelo de negocio, la arquitectura económica y el diagnóstico de madurez KTH de UnderTango.",
   alternates: {
     canonical: "https://elitros.undertangoclub.com",
   },
   openGraph: {
-    title: "Ø UnderTango · ÉLITROS 2026",
+    title: "UnderTango · Business Model Canvas",
     description:
-      "Cómo cada clase de ÉLITROS se convierte en decisiones, hipótesis, prototipos y evidencia dentro de UnderTango.",
+      "ÉLITROS 2026 · Modelo vivo de negocio y madurez KTH.",
     url: "https://elitros.undertangoclub.com",
     siteName: "Ø UnderTango · ÉLITROS 2026",
     locale: "es_AR",
     type: "website",
+    images: [{ url: "/elitros/og.png", width: 1200, height: 630, alt: "UnderTango Business Model Canvas · ÉLITROS 2026" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "UnderTango · Business Model Canvas",
+    description: "ÉLITROS 2026 · Modelo vivo de negocio y madurez KTH.",
+    images: ["/elitros/og.png"],
   },
 };
 
 export default function ElitrosLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return children;
 }
+

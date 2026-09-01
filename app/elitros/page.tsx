@@ -72,8 +72,8 @@ export default function ElitrosPage() {
       </section>
       <footer className="bmc-footer">
         <p><span>Ø</span> UnderTango Club · ÉLITROS 2026</p>
-        <a href="/elitros/Undertango_Validation_Blueprint.pdf" target="_blank" rel="noopener noreferrer">
-          Descargar Validation Blueprint (PDF) ↗
+        <a href="/elitros/Undertango_Validation_Blueprint.pdf" download="Undertango_Validation_Blueprint.pdf">
+          Descargar el PDF ↓
         </a>
         <p>Modelo vivo — se actualiza con evidencia.</p>
       </footer>

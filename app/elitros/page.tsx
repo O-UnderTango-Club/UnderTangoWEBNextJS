@@ -70,7 +70,13 @@ export default function ElitrosPage() {
         <div className="bmc-diagnosis-copy"><p>La asimetría confirma una etapa inicial típica: <strong>BRL 4 y TMRL 4</strong> superan a <strong>TRL 2 y FRL 2</strong>. Avanzar directo a desarrollo técnico ampliaría la brecha y el costo fijo antes de validar el mecanismo.</p><ul><li><b>✓</b> Ejecutar contrataciones reales con operación manual.</li><li><b>✓</b> Medir tiempo ahorrado, errores, margen y repetición.</li><li><b>✓</b> Convertir esa evidencia en requisitos de producto.</li></ul></div>
         <div className="bmc-next"><span>PRÓXIMO HITO</span><strong>Diseñar y ejecutar un MVT manual de baja fidelidad con una productora real.</strong></div>
       </section>
-      <footer className="bmc-footer"><p><span>Ø</span> UnderTango Club · ÉLITROS 2026</p><p>Modelo vivo — se actualiza con evidencia.</p></footer>
+      <footer className="bmc-footer">
+        <p><span>Ø</span> UnderTango Club · ÉLITROS 2026</p>
+        <a href="/elitros/Undertango_Validation_Blueprint.pdf" target="_blank" rel="noopener noreferrer">
+          Descargar Validation Blueprint (PDF) ↗
+        </a>
+        <p>Modelo vivo — se actualiza con evidencia.</p>
+      </footer>
     </main>
   );
 }

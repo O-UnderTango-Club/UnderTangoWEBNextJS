@@ -14,6 +14,8 @@ import "./styles/home-current.css";
 
 const inter = Inter({
   subsets: ["latin"],
+  display: "swap",
+  variable: "--font-undertango-sans",
 });
 
 const libreBaskerville = Libre_Baskerville({
@@ -53,7 +55,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={`${inter.className} ${libreBaskerville.variable}`}>
+      <body className={`${inter.className} ${inter.variable} ${libreBaskerville.variable}`}>
         <AuthProvider>{children}</AuthProvider>
         <UnderTangoTracker />
         <ChatRobot />

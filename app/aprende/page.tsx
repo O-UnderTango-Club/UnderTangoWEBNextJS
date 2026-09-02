@@ -1,8 +1,5 @@
 import AprendeTracker from "./AprendeTracker";
 
-const whatsappHref =
-  "https://wa.me/5493757618270?text=Hola%2C%20quiero%20conocer%20APRENDE%20y%20recibir%20novedades%20del%20curso%20de%20memoria%20y%20aprendizaje%20acelerado.";
-
 export default function AprendePage() {
   return (
     <main className="aprendePage">
@@ -44,16 +41,6 @@ export default function AprendePage() {
             >
               Descargar guía gratis
               <span aria-hidden="true">↓</span>
-            </a>
-            <a
-              className="aprendeSecondary"
-              href={whatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-aprende-event="whatsapp_click"
-              data-aprende-destination="whatsapp_metodo"
-            >
-              Quiero aprender el método
             </a>
           </div>
 
@@ -144,26 +131,6 @@ export default function AprendePage() {
           <strong>7 páginas para recordar mejor</strong>
           <small>Guía gratuita · Primera validación</small>
           <span className="aprendeDownloadArrow" aria-hidden="true">↘</span>
-        </a>
-      </section>
-
-      <section className="aprendeFinal">
-        <p className="aprendeEyebrow">SIGUIENTE PASO</p>
-        <h2>Estamos convirtiendo esta experiencia en un acompañamiento de 7 días.</h2>
-        <p>
-          Si querés entrar desde el comienzo, escribinos <strong>APRENDE</strong> y te
-          contamos cómo seguir entrenando con una práctica breve por día.
-        </p>
-        <a
-          className="aprendePrimary"
-          href={whatsappHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-aprende-event="whatsapp_click"
-          data-aprende-destination="whatsapp_final"
-        >
-          Escribir APRENDE por WhatsApp
-          <span aria-hidden="true">→</span>
         </a>
       </section>
 

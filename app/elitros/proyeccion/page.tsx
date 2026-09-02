@@ -28,7 +28,7 @@ const roles = [
   {
     name: "Pablo Cieslik",
     role: "Base del experimento y full-stack web",
-    text: "Arma el formulario, la base de datos y los tres perfiles iniciales. Puede asumir más desarrollo web para que Maxi concentre energía en la aplicación móvil.",
+    text: "Arma el formulario, la base de datos y los tres perfiles iniciales. Puede asumir más desarrollo web para que Maxi evalúe la interfaz móvil únicamente a partir de evidencia real.",
   },
   {
     name: "Alejandro Míguez",
@@ -38,7 +38,7 @@ const roles = [
   {
     name: "Maximiliano Rodríguez",
     role: "Aplicación móvil",
-    text: "Cuando la base produzca sustancia, evalúa y pule una aplicación móvil que refleje la experiencia web, con una versión funcional para noviembre.",
+    text: "Cuando la base produzca sustancia, evalúa si una interfaz móvil facilita el acceso a la arquitectura de UnderTango y qué versión mínima justifica la evidencia para noviembre.",
   },
 ] as const;
 
@@ -199,7 +199,7 @@ export default function FriccionesPage() {
               </article>
             ))}
           </div>
-          <div className="friction-final-line"><span>HORIZONTE</span><strong>Una aplicación móvil funcional, un mecanismo transferido a la Red UnderTango y un recorrido completo para mostrar ante inversores y en la exposición final de noviembre.</strong></div>
+          <div className="friction-final-line"><span>HORIZONTE</span><strong>Un mecanismo validado y transferido a la Red UnderTango, con la interfaz mínima que la evidencia justifique y un recorrido completo para mostrar ante inversores y en la exposición final de noviembre.</strong></div>
         </div>
       </section>
 

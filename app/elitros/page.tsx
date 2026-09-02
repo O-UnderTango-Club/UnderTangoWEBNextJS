@@ -3,14 +3,14 @@ import "./elitros.css";
 
 const canvas = [
   ["01", "Socios clave", "Artistas validados, proveedores técnicos, estudios contables y fiscales, espacios culturales y aliados territoriales."],
-  ["02", "Actividades clave", "Curaduría, contratación, logística física, seguimiento del show, facturación y registro de evidencia operativa."],
-  ["03", "Recursos clave", "Marca UnderTango, red artística, criterio de selección, memoria operativa y método de coordinación."],
-  ["04", "Propuesta de valor", "Una operación artística resuelta de punta a punta: menos fricción, trazabilidad y un único responsable frente al cliente."],
+  ["02", "Actividades clave", "Comprensión del problema, diseño de la solución, dirección de proyectos, conformación de equipos, coordinación, ejecución y registro de evidencia."],
+  ["03", "Recursos clave", "Marca UnderTango, red global de confianza, criterio de selección, capacidad de gerencia, memoria operativa y herramientas tecnológicas."],
+  ["04", "Propuesta de valor", "Una solución gestionada de punta a punta: el equipo adecuado, menos fricción, trazabilidad y un único responsable frente al cliente."],
   ["05", "Relación con clientes", "Acompañamiento consultivo, respuesta rápida, coordinación humana y seguimiento posterior para habilitar recurrencia."],
   ["06", "Canales", "Venta directa B2B, referencias, alianzas con hoteles y productoras, casos documentados y rutas de legitimación fiscal."],
-  ["07", "Segmentos", "Productoras, hoteles, empresas, instituciones y coordinadores que necesitan tercerizar una operación artística confiable."],
+  ["07", "Segmentos", "Personas, empresas e instituciones que necesitan resolver proyectos vinculados con arte, lógica o tecnología. La producción artística es el primer campo de validación."],
   ["08", "Estructura de costos", "COGs objetivo de USD 150–160 por artista, coordinación variable, logística y una base tecnológica liviana."],
-  ["09", "Fuentes de ingreso", "Fee transaccional o margen de facilitación por contratación, con posibilidad de sumar módulos de producción."],
+  ["09", "Fuentes de ingreso", "Honorarios de dirección y gestión, diseño y ejecución de soluciones, producción artística, desarrollos tecnológicos, auditoría, acompañamiento, márgenes o fees según el proyecto."],
 ] as const;
 
 const readiness = [
@@ -34,11 +34,11 @@ export default function ElitrosPage() {
       <section className="bmc-hero" id="inicio">
         <div>
           <p className="bmc-eyebrow">MÓDULO 2 · MODELO VIVO · 28 AGOSTO 2026</p>
-          <h1>Del parche operativo a una <em>plataforma de producción gestionada.</em></h1>
-          <p className="bmc-lead">UnderTango reduce la fricción de contratar, coordinar y documentar talento artístico. El Canvas convierte esa visión en una hipótesis comercial medible.</p>
+          <h1>De capacidades dispersas a un <em>estudio escalable de resolución y gestión de proyectos.</em></h1>
+          <p className="bmc-lead">UnderTango comprende una necesidad, diseña la solución, conforma el equipo adecuado y dirige su ejecución combinando arte, lógica y tecnología. La producción artística aporta el primer campo de evidencia de este modelo.</p>
           <a className="bmc-cta" href="#canvas">Explorar el modelo <span>↓</span></a>
         </div>
-        <aside className="bmc-hero-note"><span>TESIS CENTRAL</span><strong>Delegar la complejidad sin convertir la red en costo fijo.</strong><p>El cliente compra previsibilidad; el artista conserva autonomía; UnderTango captura valor por coordinar el sistema.</p></aside>
+        <aside className="bmc-hero-note"><span>TESIS CENTRAL</span><strong>Delegar la complejidad sin convertir la red en costo fijo.</strong><p>El cliente compra una solución y un resultado; la red conserva autonomía; UnderTango captura valor por diseñar, dirigir y coordinar el sistema.</p></aside>
       </section>
 
       <section className="bmc-section" id="canvas">
@@ -57,7 +57,7 @@ export default function ElitrosPage() {
 
       <section className="bmc-economics">
         <div><p className="bmc-eyebrow">DISEÑO FINANCIERO REVERSO · DDP</p><h2>El precio posible define la arquitectura operativa.</h2><p className="bmc-copy">No se construye una plataforma costosa para luego buscar margen. Se parte del límite aceptable por show y se diseña una operación de bajo CAPEX.</p></div>
-        <div className="bmc-numbers"><div><small>PARCHE ACTUAL</small><strong>US$ 110</strong><p>Costo operativo estimado por show con coordinación manual.</p></div><div><small>COGs PERMITIDOS</small><strong>US$ 150–160</strong><p>Techo objetivo por artista para preservar margen y competitividad.</p></div><div><small>INGRESO</small><strong>Fee</strong><p>Margen o comisión transaccional al concretar la contratación.</p></div></div>
+        <div className="bmc-numbers"><div><small>HIPÓTESIS · PARCHE ACTUAL</small><strong>US$ 110</strong><p>Costo operativo estimado por show con coordinación manual.</p></div><div><small>HIPÓTESIS · COGs PERMITIDOS</small><strong>US$ 150–160</strong><p>Techo objetivo por artista para preservar margen y competitividad.</p></div><div><small>INGRESO</small><strong>Proyecto</strong><p>Honorario, margen o fee definido según la solución gestionada.</p></div></div>
       </section>
 
       <section className="bmc-section" id="madurez">

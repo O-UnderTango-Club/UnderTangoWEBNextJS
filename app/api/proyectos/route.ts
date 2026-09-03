@@ -1,10 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
 const BASE_ID = process.env.AIRTABLE_BASE_ID || "appJwwHP1Wkoxo54q";
 const TABLE_ID = process.env.AIRTABLE_PROJECTS_TABLE_ID || "tblf6DZBViGbvxRzS";
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const EDITOR_EMAILS = new Set(
+  (process.env.PROJECT_EDITOR_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean),
+);
 
 const F = {
   name: "fldChULRkd1GrXY3w",
@@ -14,11 +23,30 @@ const F = {
   areas: "fldr4SXQDM49FfkJF",
   purpose: "fldrApFZcuzKj3Gax",
   current: "fldvAlTbZGGByf7VO",
+  nextMilestone: "fld7AkmdGr0WIHPDl",
   nextAction: "fldrIyFBxDY9EVswS",
   targetDate: "fldHhLYPae82IABn2",
   progress: "fld2H3CK8lkOnywNs",
   order: "fldLt3tLBaTh4GE1R",
   parent: "fldH5FKttARA0ns6V",
+};
+
+const OPTIONS = {
+  statuses: ["Activo", "En espera", "Bloqueado", "Idea", "Completado", "Archivado"],
+  priorities: ["Crítica", "Alta", "Media", "Baja"],
+  horizons: ["Hoy", "Semana", "Mes", "Trimestre", "6 meses", "Año"],
+  areas: [
+    "Shows",
+    "Música",
+    "Web / Producto",
+    "Programación",
+    "Comercial",
+    "Finanzas",
+    "Comunicación",
+    "Investigación",
+    "Literatura",
+    "Operaciones",
+  ],
 };
 
 type Project = {
@@ -30,6 +58,7 @@ type Project = {
   areas: string[];
   purpose?: string;
   current?: string;
+  nextMilestone?: string;
   nextAction?: string;
   targetDate?: string;
   progress?: number | null;
@@ -64,6 +93,7 @@ function normalize(record: any): Project {
     areas: Array.isArray(f[F.areas]) ? f[F.areas] : [],
     purpose: f[F.purpose] || "",
     current: f[F.current] || "",
+    nextMilestone: f[F.nextMilestone] || "",
     nextAction: f[F.nextAction] || "",
     targetDate: f[F.targetDate] || "",
     progress: typeof f[F.progress] === "number" ? f[F.progress] : null,
@@ -81,15 +111,12 @@ async function readAirtable(): Promise<Project[]> {
   do {
     const qs = new URLSearchParams({ pageSize: "100", returnFieldsByFieldId: "true" });
     if (offset) qs.set("offset", offset);
-    const url = `https://api.airtable.com/v0/${BASE_ID}/${TABLE_ID}?${qs.toString()}`;
-    const response = await fetch(url, {
+    const response = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${TABLE_ID}?${qs.toString()}`, {
       headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
       cache: "no-store",
     });
 
-    if (!response.ok) {
-      throw new Error(`Airtable responded ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Airtable responded ${response.status}`);
 
     const data = await response.json();
     all.push(...(data.records || []));
@@ -102,18 +129,171 @@ async function readAirtable(): Promise<Project[]> {
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
-export async function GET() {
+async function getEditor(request: NextRequest) {
+  const authorization = request.headers.get("authorization") || "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+
+  if (!token || !SUPABASE_URL || !SUPABASE_ANON_KEY || EDITOR_EMAILS.size === 0) {
+    return { canEdit: false, email: "" };
+  }
+
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user?.email) return { canEdit: false, email: "" };
+
+    const email = data.user.email.toLowerCase();
+    return { canEdit: EDITOR_EMAILS.has(email), email };
+  } catch {
+    return { canEdit: false, email: "" };
+  }
+}
+
+function text(value: unknown, max = 20000) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, max);
+}
+
+function buildFields(changes: Record<string, unknown>) {
+  const fields: Record<string, unknown> = {};
+
+  if (Object.prototype.hasOwnProperty.call(changes, "name")) {
+    const value = text(changes.name, 255);
+    if (!value) throw new Error("El proyecto necesita un nombre.");
+    fields[F.name] = value;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, "status")) {
+    if (!OPTIONS.statuses.includes(String(changes.status))) throw new Error("Estado inválido.");
+    fields[F.status] = changes.status;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, "priority")) {
+    if (!OPTIONS.priorities.includes(String(changes.priority))) throw new Error("Prioridad inválida.");
+    fields[F.priority] = changes.priority;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, "horizon")) {
+    if (!OPTIONS.horizons.includes(String(changes.horizon))) throw new Error("Horizonte inválido.");
+    fields[F.horizon] = changes.horizon;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, "areas")) {
+    if (!Array.isArray(changes.areas)) throw new Error("Áreas inválidas.");
+    const areas = changes.areas.map(String);
+    if (areas.some((area) => !OPTIONS.areas.includes(area))) throw new Error("Área inválida.");
+    fields[F.areas] = areas;
+  }
+
+  for (const [key, fieldId] of [
+    ["purpose", F.purpose],
+    ["current", F.current],
+    ["nextMilestone", F.nextMilestone],
+    ["nextAction", F.nextAction],
+  ] as const) {
+    if (Object.prototype.hasOwnProperty.call(changes, key)) fields[fieldId] = text(changes[key]);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, "targetDate")) {
+    const value = changes.targetDate;
+    if (value === null || value === "") {
+      fields[F.targetDate] = null;
+    } else if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      fields[F.targetDate] = value;
+    } else {
+      throw new Error("Fecha inválida.");
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, "progress")) {
+    const value = Number(changes.progress);
+    if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error("Progreso inválido.");
+    fields[F.progress] = value;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, "order")) {
+    const value = Number(changes.order);
+    if (!Number.isInteger(value) || value < 0 || value > 100000) throw new Error("Orden inválido.");
+    fields[F.order] = value;
+  }
+
+  if (Object.keys(fields).length === 0) throw new Error("No hay cambios para guardar.");
+  return fields;
+}
+
+export async function GET(request: NextRequest) {
+  const editor = await getEditor(request);
+
   try {
     const projects = await readAirtable();
     return NextResponse.json(
-      { projects, source: "airtable", live: true, updatedAt: new Date().toISOString() },
+      {
+        projects,
+        source: "airtable",
+        live: true,
+        canEdit: editor.canEdit,
+        editorConfigured: EDITOR_EMAILS.size > 0,
+        options: OPTIONS,
+        updatedAt: new Date().toISOString(),
+      },
       { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   } catch (error) {
     console.warn("Projects API is using the Airtable snapshot fallback:", error);
     return NextResponse.json(
-      { projects: snapshot, source: "snapshot", live: false, updatedAt: new Date().toISOString() },
+      {
+        projects: snapshot,
+        source: "snapshot",
+        live: false,
+        canEdit: false,
+        editorConfigured: EDITOR_EMAILS.size > 0,
+        options: OPTIONS,
+        updatedAt: new Date().toISOString(),
+      },
       { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const editor = await getEditor(request);
+  if (!editor.canEdit) {
+    return NextResponse.json({ error: "Esta cuenta no tiene permiso para editar proyectos." }, { status: 403 });
+  }
+
+  if (!AIRTABLE_TOKEN) {
+    return NextResponse.json({ error: "Falta configurar AIRTABLE_TOKEN en el servidor." }, { status: 503 });
+  }
+
+  try {
+    const body = await request.json();
+    const id = typeof body?.id === "string" ? body.id : "";
+    if (!/^rec[A-Za-z0-9]{14}$/.test(id)) {
+      return NextResponse.json({ error: "Proyecto inválido." }, { status: 400 });
+    }
+
+    const fields = buildFields(body?.changes || {});
+    const response = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${TABLE_ID}/${id}?returnFieldsByFieldId=true`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${AIRTABLE_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fields, typecast: false }),
+      cache: "no-store",
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error("Airtable project update failed:", data);
+      return NextResponse.json({ error: "Airtable rechazó la actualización." }, { status: 502 });
+    }
+
+    return NextResponse.json({ project: normalize(data), updatedAt: new Date().toISOString() });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo guardar el proyecto.";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -318,3 +318,5 @@
     line-height: 1.5;
   }
 }
+.home-rave-feature { display: grid; grid-template-columns: minmax(0,1fr) minmax(230px,290px); gap: 40px; align-items: center; }
+@media (max-width: 720px) { .home-rave-feature { grid-template-columns: 1fr; gap: 24px; } }

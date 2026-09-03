@@ -25,13 +25,16 @@
 .sectionHeading > p:last-child, .finalBlock p { max-width: 760px; margin: 20px 0 0; color: rgba(244,242,237,.7); font-size: 1.02rem; line-height: 1.7; }
 .grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .card { display: flex; min-height: 395px; flex-direction: column; padding: 30px; border: 1px solid rgba(255,255,255,.115); border-radius: 20px; background: linear-gradient(155deg,rgba(255,255,255,.045),rgba(255,255,255,.014)); }
+.cardCopy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .flagship { grid-column: 1 / -1; min-height: 440px; border-color: rgba(226,195,125,.52); background: radial-gradient(620px 340px at 82% 20%,rgba(226,195,125,.12),transparent 70%),linear-gradient(145deg,rgba(128,0,32,.24),rgba(226,195,125,.055)); }
 .flagship h3 { max-width: 760px; font-size: clamp(3rem,5vw,5rem); }
-.flagship > p { max-width: 720px; font-size: 1.08rem; }
+.flagship { display: grid; grid-template-columns: minmax(0,1fr) minmax(230px,290px); gap: 48px; scroll-margin-top: 100px; }
+.flagship .cardCopy > p { max-width: 720px; font-size: 1.08rem; }
 .custom { border-color: rgba(226,195,125,.28); background: linear-gradient(145deg,rgba(226,195,125,.065),rgba(255,255,255,.014)); }
 .cardTopline { display: flex; justify-content: space-between; gap: 20px; color: #e2c37d; font-size: .69rem; font-weight: 800; letter-spacing: .13em; }
 .card h3 { margin: 46px 0 14px; font-size: clamp(2rem,3vw,2.7rem); line-height: 1.04; letter-spacing: -.025em; }
-.card > p { max-width: 520px; margin: 0; color: rgba(244,242,237,.68); line-height: 1.65; }
+.cardCopy > p { max-width: 520px; margin: 0; color: rgba(244,242,237,.68); line-height: 1.65; }
+.flagship h3 { font-size: clamp(3rem,5vw,5rem); }
 .details { display: grid; gap: 8px; margin: auto 0 24px; padding-top: 30px; }
 .details div { display: grid; grid-template-columns: 92px 1fr; gap: 12px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.085); font-size: .88rem; line-height: 1.45; }
 .details dt { color: rgba(244,242,237,.45); }
@@ -50,5 +53,7 @@
 .finalActions { display: grid; gap: 18px; justify-items: start; }
 .textCta { color: #f4f2ed; font-weight: 700; text-decoration: none; }
 .mobileWhatsapp { display: none; }
+.card a:focus-visible { outline: 2px solid #e2c37d; outline-offset: 5px; }
+@media (max-width: 720px) { .flagship { grid-template-columns: 1fr; gap: 28px; } }
 @media (max-width: 900px) { .hero { grid-template-columns: 1fr; min-height: 0; } .showcase { max-width: 480px; } .grid, .process ol, .finalBlock { grid-template-columns: 1fr; } .flagship { grid-column: auto; } .process li { border-right: 0; border-bottom: 1px solid rgba(255,255,255,.1); } }
 @media (max-width: 720px) { .page { padding: 88px 16px 90px; } .hero { gap: 34px; margin-bottom: 74px; } .hero h1 { font-size: clamp(3rem,13vw,4.5rem); } .heroActions { display: grid; } .primaryCta, .secondaryCta { width: 100%; } .showcase { max-width: 100%; padding: 10px; } .videoFrame { max-height: 560px; } .section { margin-bottom: 72px; } .card, .process, .finalBlock { padding: 27px 22px; } .card { min-height: 0; } .details { margin-top: 28px; } .finalActions { width: 100%; } .mobileWhatsapp { position: fixed; z-index: 50; left: 12px; right: 12px; bottom: 12px; min-height: 52px; display: flex; align-items: center; justify-content: center; border-radius: 12px; color: #11100d; background: #e2c37d; box-shadow: 0 14px 36px rgba(0,0,0,.42); font-weight: 800; text-decoration: none; } }

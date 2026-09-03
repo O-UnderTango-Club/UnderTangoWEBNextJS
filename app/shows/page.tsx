@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "../components/header";
 import Footer from "../components/footer";
+import TangoRaveVideo from "../components/TangoRaveVideo";
 import styles from "./shows.module.css";
 
 const WHATSAPP_NUMBER = "5493757618270";
@@ -78,7 +79,8 @@ export default function ShowsPage() {
           </div>
           <div className={styles.grid}>
             {products.map((product) => (
-              <article key={product.number} className={`${styles.card} ${product.flagship ? styles.flagship : ""} ${product.custom ? styles.custom : ""}`}>
+              <article key={product.number} id={product.flagship ? "tango-rave" : undefined} className={`${styles.card} ${product.flagship ? styles.flagship : ""} ${product.custom ? styles.custom : ""}`}>
+                <div className={styles.cardCopy}>
                 <div className={styles.cardTopline}><span>{product.number}</span><span>{product.label}</span></div>
                 <h3>{product.title}</h3>
                 <p>{product.description}</p>
@@ -91,6 +93,8 @@ export default function ShowsPage() {
                 ) : (
                   <a className={styles.cardCta} href={whatsappFor(product.title)} target="_blank" rel="noopener noreferrer">Consultar este formato <span aria-hidden="true">→</span></a>
                 )}
+                </div>
+                {product.flagship && <TangoRaveVideo />}
               </article>
             ))}
           </div>

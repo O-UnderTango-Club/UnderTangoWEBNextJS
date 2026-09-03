@@ -3,6 +3,7 @@
 import Script from 'next/script';
 import Header from './components/header';
 import Footer from './components/footer';
+import TangoRaveVideo from './components/TangoRaveVideo';
 import { useHomeEffects } from './hooks/useHomeEffects';
 
 const videoFrameStyle = {
@@ -185,6 +186,7 @@ export default function HomePage() {
             </div>
 
             <article
+              className="home-rave-feature"
               style={{
                 margin: '24px auto 0',
                 maxWidth: '1180px',
@@ -195,6 +197,7 @@ export default function HomePage() {
                 background: 'linear-gradient(145deg, rgba(226, 195, 125, 0.08), #090909)',
               }}
             >
+              <div>
               <p className="intent-eyebrow" style={{ marginBottom: '10px' }}>04 · PRODUCTO DE AUTORÍA</p>
               <h2
                 style={{
@@ -217,18 +220,19 @@ export default function HomePage() {
                 }}
               >
                 Banda en vivo, bailarines y electrónica en un formato original de Ø UnderTango Club.
-                La inauguración del producto será el 29 de agosto en Bernardo de Irigoyen.
               </p>
-              <p
-                style={{
-                  color: '#e2c37d',
-                  fontFamily: 'var(--font-undertango-editorial), Georgia, "Times New Roman", serif',
-                  fontSize: '1rem',
-                  margin: 0,
-                }}
+              <a
+                href="/shows#tango-rave"
+                className="intent-card-cta"
+                data-undertango-event="intent_click"
+                data-undertango-intent="contratar_show"
+                data-undertango-subintent="tango_rave"
+                data-undertango-cta="Conocer Tango Rave"
               >
-                Después del estreno incorporaremos acá el registro audiovisual del show.
-              </p>
+                Conocer Tango Rave →
+              </a>
+              </div>
+              <TangoRaveVideo />
             </article>
           </div>
         </section>

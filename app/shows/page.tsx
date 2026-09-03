@@ -25,6 +25,11 @@ export const metadata: Metadata = {
     locale: "es_AR",
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Shows de tango y música en vivo | Ø UnderTango",
+    description: "Formatos escénicos elegantes y adaptables para eventos en la Triple Frontera.",
+  },
 };
 
 const products = [

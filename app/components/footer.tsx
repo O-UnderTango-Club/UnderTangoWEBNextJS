@@ -48,6 +48,9 @@ export default function Footer() {
           <h3>Shows</h3>
           <ul>
             <li>
+              <a href="/galeria">Galería de presentaciones</a>
+            </li>
+            <li>
               <a href="/usersCalendar">Próximos Shows</a>
             </li>
             <li>

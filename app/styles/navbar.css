@@ -308,3 +308,62 @@
     right: 8px;
   }
 }
+
+/* La navegación pública creció: pasar antes al menú móvil evita cortes en tablet. */
+@media screen and (min-width: 1181px) {
+  #navbar-menu li {
+    margin-left: clamp(10px, 1.15vw, 18px) !important;
+  }
+
+  #navbar-menu li a {
+    font-size: 0.94rem;
+  }
+}
+
+@media screen and (min-width: 769px) and (max-width: 1180px) {
+  #navbar {
+    padding: 10px 15px;
+  }
+
+  .logo img {
+    height: 70px;
+  }
+
+  #menu-toggle {
+    display: flex !important;
+  }
+
+  #navbar-menu {
+    position: fixed !important;
+    top: 0 !important;
+    right: -100% !important;
+    width: min(420px, 82%) !important;
+    height: 100vh !important;
+    padding: 80px 0 !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    overflow-y: auto;
+    background-color: rgba(0, 0, 0, 0.96) !important;
+    backdrop-filter: blur(10px);
+    transition: right 0.3s ease;
+    z-index: 1001;
+  }
+
+  #navbar-menu.active {
+    right: 0 !important;
+  }
+
+  #navbar-menu li {
+    display: block !important;
+    width: 100%;
+    margin: 9px 0 !important;
+    text-align: center;
+  }
+
+  #navbar-menu li a {
+    display: block;
+    padding: 8px 20px;
+    font-size: 1.05rem;
+  }
+}

@@ -13,7 +13,7 @@ export default function Header() {
 
   const { user, logout } = useAuth();
 
-  const toggleMenu = () => setMenuOpen(!menuOpen);
+  const toggleMenu = () => setMenuOpen((isOpen) => !isOpen);
 
   const handleLogout = async () => {
     await logout();
@@ -57,6 +57,11 @@ export default function Header() {
         <li>
           <Link href="/shows" className={pathname === "/shows" ? "active" : ""}>
             Shows
+          </Link>
+        </li>
+        <li>
+          <Link href="/galeria" className={pathname === "/galeria" ? "active" : ""}>
+            Galería
           </Link>
         </li>
         <li>

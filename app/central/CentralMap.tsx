@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { departments } from "./departments";
 import styles from "./central.module.css";
 
@@ -22,25 +22,25 @@ export default function CentralMap() {
     setSelectedNumber(number);
   };
 
-  const closeDepartment = () => {
+  const closeDepartment = useCallback(() => {
     setActiveSection(null);
     setSelectedNumber(null);
     requestAnimationFrame(() => returnFocus.current?.focus());
-  };
+  }, []);
 
   const openSection = (section: "members" | "projects") => {
     setActiveSection(section);
     requestAnimationFrame(() => detailBackButton.current?.focus());
   };
 
-  const closeSection = () => {
+  const closeSection = useCallback(() => {
     const previousSection = activeSection;
     setActiveSection(null);
     requestAnimationFrame(() => {
       if (previousSection === "members") membersButton.current?.focus();
       if (previousSection === "projects") projectsButton.current?.focus();
     });
-  };
+  }, [activeSection]);
 
   useEffect(() => {
     if (!selected) return;
@@ -61,7 +61,7 @@ export default function CentralMap() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selected, activeSection]);
+  }, [selected, activeSection, closeDepartment, closeSection]);
 
   return (
     <main className={styles.main}>

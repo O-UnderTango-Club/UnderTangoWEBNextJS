@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { isAcademiaHost, isAcademiaPath } from "../../src/lib/academia-routing";
 
 type Attribution = {
   utmSource: string;
@@ -61,6 +62,8 @@ function inferIntent(pathname: string) {
 function shouldTrack() {
   const hostname = window.location.hostname.toLowerCase();
   const pathname = window.location.pathname.toLowerCase();
+
+  if (isAcademiaHost(hostname) || isAcademiaPath(pathname)) return false;
 
   if (hostname.startsWith("aprende.")) return false;
   if (pathname.startsWith("/aprende")) return false;

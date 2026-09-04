@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Script from 'next/script';
+import { isAcademiaHost, isAcademiaPath } from '../../src/lib/academia-routing';
 
 export default function ChatRobot() {
   const pathname = usePathname();
@@ -19,7 +20,9 @@ export default function ChatRobot() {
       !isAprendeHost &&
       !isAprendePath &&
       !isElitrosHost &&
-      !isElitrosPath
+      !isElitrosPath &&
+      !isAcademiaHost(hostname) &&
+      !isAcademiaPath(pathname || '')
     );
   }, [pathname]);
 

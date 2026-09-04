@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { academiaRewrite, isAcademiaHost } from "./src/lib/academia-routing";
 
 const APRENDE_GUIDE_PATH = "/APRENDE_7_paginas_para_recordar_mejor.pdf";
 const APRENDE_ICON_PATH = "/aprende/icon.svg";
@@ -8,6 +9,14 @@ export function middleware(request: NextRequest) {
     .split(":")[0]
     .toLowerCase();
   const pathname = request.nextUrl.pathname;
+
+  if (isAcademiaHost(hostname)) {
+    const destination = academiaRewrite(hostname, pathname);
+    if (!destination) return NextResponse.next();
+    const url = request.nextUrl.clone();
+    url.pathname = destination;
+    return NextResponse.rewrite(url);
+  }
 
   // ELITROS is a public experiment that lives inside the UnderTango codebase.
   // The subdomain keeps clean public URLs while reusing the same deployment.

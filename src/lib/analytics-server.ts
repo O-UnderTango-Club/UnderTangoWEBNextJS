@@ -35,9 +35,11 @@ export async function recordAnalytics(request: Request, source: Source): Promise
   }
 
   const intent = clean(body.intent, 60);
+  const eventId = clean(body.eventId, 100) || crypto.randomUUID();
   const row = {
+    storage_id: `${source}:${eventId}`,
     source,
-    event_id: clean(body.eventId, 100) || crypto.randomUUID(),
+    event_id: eventId,
     occurred_at: new Date().toISOString(),
     event,
     visitor_id: clean(body.visitorId, 100),
@@ -56,7 +58,7 @@ export async function recordAnalytics(request: Request, source: Source): Promise
   };
 
   try {
-    const response = await fetch(`${url.replace(/\/$/, "")}/rest/v1/analytics_events?on_conflict=source,event_id`, {
+    const response = await fetch(`${url.replace(/\/$/, "")}/rest/v1/analytics_events?on_conflict=storage_id`, {
       method: "POST",
       headers: {
         apikey: secret,

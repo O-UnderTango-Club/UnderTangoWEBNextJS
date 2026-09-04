@@ -18,7 +18,7 @@ La tabla tiene RLS habilitado y ningún permiso para `anon` o `authenticated`. S
 
 Pruebas del receptor: `node --test scripts/analytics.test.mjs` (Node 24).
 
-La clave primaria `(source,event_id)` evita duplicar reintentos. Los eventos históricos conservan su ID de Airtable y el objeto original completo. Un clic de descarga no acredita una descarga terminada; eventos enviados por el navegador como `payment` no acreditan cobros.
+La clave `storage_id` combina sitio e identificador para evitar duplicar reintentos nuevos. Para el historial usa `airtable:ID_DEL_REGISTRO`: conserva incluso eventos con identificadores repetidos en Airtable, además de su ID de evento original y el objeto completo. Un clic de descarga no acredita una descarga terminada; eventos enviados por el navegador como `payment` no acreditan cobros.
 
 ## Consultas y respaldo
 

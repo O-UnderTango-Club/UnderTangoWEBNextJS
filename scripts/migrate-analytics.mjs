@@ -15,7 +15,7 @@ const rows = backup.tables.flatMap(table => {
   const source = maps[table.id];
   assert.ok(source, 'Unexpected source table');
   return table.records.map(record => {
-    const row = { source, airtable_record_id: record.id, airtable_record: record };
+    const row = { storage_id: `airtable:${record.id}`, source, airtable_record_id: record.id, airtable_record: record };
     for (const field of table.fields) {
       const column = fields[field.name];
       if (!column) continue;
@@ -28,13 +28,22 @@ const rows = backup.tables.flatMap(table => {
     return row;
   });
 });
-assert.equal(new Set(rows.map(r => `${r.source}:${r.event_id}`)).size, rows.length, 'Repeated historical event IDs: investigate before migration');
+assert.equal(new Set(rows.map(r => r.storage_id)).size, rows.length, 'Repeated Airtable record IDs');
+if (process.argv[3] === '--csv') {
+  const output = process.argv[4];
+  if (!output) throw new Error('CSV output path required');
+  const columns = Object.keys(rows[0]);
+  const quote = value => '"' + (typeof value === 'object' ? JSON.stringify(value) : String(value)).replaceAll('"', '""') + '"';
+  fs.writeFileSync(output, [columns.map(quote).join(','), ...rows.map(row => columns.map(column => quote(row[column])).join(','))].join('\r\n'));
+  console.log(JSON.stringify({ csvRows: rows.length, uniqueStorageIds: true, repeatedHistoricalEventIdsPreserved: rows.length - new Set(rows.map(r => `${r.source}:${r.event_id}`)).size }));
+  process.exit(0);
+}
 const url = process.env.ANALYTICS_SUPABASE_URL;
 const key = process.env.ANALYTICS_SUPABASE_SECRET_KEY;
 if (!url || !key) throw new Error('Private server configuration missing');
 const headers = { apikey: key, 'Content-Type': 'application/json' };
 for (let offset = 0; offset < rows.length; offset += 100) {
-  const result = await fetch(`${url}/rest/v1/analytics_events?on_conflict=source,event_id`, { method: 'POST', headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(rows.slice(offset, offset + 100)), signal: AbortSignal.timeout(30000) });
+  const result = await fetch(`${url}/rest/v1/analytics_events?on_conflict=storage_id`, { method: 'POST', headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(rows.slice(offset, offset + 100)), signal: AbortSignal.timeout(30000) });
   if (!result.ok) throw new Error(`Import failed: HTTP ${result.status}`);
 }
 const result = await fetch(`${url}/rest/v1/analytics_events?airtable_record_id=not.is.null&select=*&limit=10000`, { headers, signal: AbortSignal.timeout(30000) });

@@ -32,7 +32,8 @@ test('preserves attribution, separates sites and uses idempotent private storage
       assert.equal(x.row.event_id, 'same-id');
       assert.equal(x.row.utm_campaign, 'test');
       assert.equal(x.row.visitor_id, 'v1');
-      assert.match(x.url, /on_conflict=source,event_id$/);
+      assert.equal(x.row.storage_id, `${x.row.source}:same-id`);
+      assert.match(x.url, /on_conflict=storage_id$/);
       assert.match(x.init.headers.Prefer, /ignore-duplicates/);
       assert.equal(x.init.headers.apikey, 'test-server-key');
     }

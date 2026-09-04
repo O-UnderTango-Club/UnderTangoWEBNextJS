@@ -1,5 +1,6 @@
 begin;
 create table public.analytics_events (
+  storage_id text primary key,
   source text not null check (source in ('undertango', 'aprende')),
   event_id text not null,
   occurred_at timestamptz not null,
@@ -19,8 +20,7 @@ create table public.analytics_events (
   notes text not null default '',
   airtable_record_id text unique,
   airtable_record jsonb,
-  ingested_at timestamptz not null default now(),
-  primary key (source, event_id)
+  ingested_at timestamptz not null default now()
 );
 create index analytics_events_source_time on public.analytics_events (source, occurred_at desc);
 create index analytics_events_campaign_time on public.analytics_events (utm_campaign, occurred_at desc);

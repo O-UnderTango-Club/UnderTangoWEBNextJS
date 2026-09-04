@@ -25,6 +25,7 @@ const F = {
 const ALLOWED_EVENTS = new Set([
   "page_view",
   "download_click",
+  "form_click",
   "whatsapp_click",
   "profile_submit",
   "offer_sent",

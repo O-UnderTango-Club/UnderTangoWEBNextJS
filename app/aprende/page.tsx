@@ -1,7 +1,5 @@
 import AprendeTracker from "./AprendeTracker";
 
-const profileFormHref = "https://forms.gle/YUxHFZq4ixsmcmjJA";
-
 export default function AprendePage() {
   return (
     <main className="aprendePage">
@@ -126,47 +124,13 @@ export default function AprendePage() {
         <a
           className="aprendeDownloadCard"
           href="/aprende/guia"
+          aria-label="Abrir la guía para completar mi Perfil APRENDE"
           data-aprende-event="download_click"
-          data-aprende-destination="guia_pdf"
+          data-aprende-destination="guia_pdf_perfil"
         >
-          <span className="aprendePdfBadge">PDF</span>
-          <strong>7 páginas para recordar mejor</strong>
-          <small>Guía gratuita · Incluye el acceso al Perfil APRENDE</small>
-          <span className="aprendeDownloadArrow" aria-hidden="true">↘</span>
+          <strong>Completar mi Perfil APRENDE</strong>
+          <span className="aprendeDownloadArrow" aria-hidden="true">→</span>
         </a>
-      </section>
-
-      <section className="aprendeFinal" id="perfil">
-        <p className="aprendeEyebrow">DESPUÉS DE HACER LA GUÍA</p>
-        <h2>Dejá tu Perfil APRENDE.</h2>
-        <p>
-          Volcá las respuestas de la página 6 en el formulario. No es un examen ni una
-          etiqueta fija: es un punto de partida para observar cómo asociás, recuperás y
-          organizás información. Después del perfil podés continuar con
-          <strong> 7 días para aprender mejor</strong>, por ARS 7.000, pago único y precio
-          fundador.
-        </p>
-        <div className="aprendeActions">
-          <a
-            className="aprendePrimary"
-            href={profileFormHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-aprende-event="form_click"
-            data-aprende-destination="perfil_aprende"
-          >
-            Completar mi Perfil APRENDE
-            <span aria-hidden="true">→</span>
-          </a>
-          <a
-            className="aprendeSecondary"
-            href="/aprende/guia"
-            data-aprende-event="download_click"
-            data-aprende-destination="guia_pdf_revisit"
-          >
-            Volver a abrir la guía
-          </a>
-        </div>
       </section>
 
       <footer className="aprendeFooter">

@@ -41,7 +41,6 @@ export const academyProjects: AcademyProject[] = [
   },
 ];
 
-// Use the working address until ownership and DNS of 83.undertangoclub.com are verified.
-export const academyOrigin = "https://www.undertangoclub.com/academia";
+export const academyOrigin = "https://83.undertangoclub.com";
 export const tangoContact = (modality: string) =>
   `https://wa.me/5493757618270?text=${encodeURIComponent(`Hola, llegué desde Academia Under Tango y quiero consultar por clases de tango ${modality}.`)}`;

@@ -15,9 +15,9 @@ La Academia se integra en el proyecto existente `undertangoweb`, sin dependencia
 
 La dirección es `83.undertangoclub.com`: utiliza el dominio existente `undertangoclub.com` y no requiere comprar otro dominio. El host exacto se reescribe a `/academia` y sus rutas hijas, sin capturar otros hosts. Las rutas `/academia/...` también funcionan desde ese host para conservar enlaces y permitir publicación desde el dominio principal.
 
-El subdominio está agregado al entorno Production de `undertangoweb`. Los DNS autoritativos de `undertangoclub.com` pertenecen a la familia `ns-cloud-d*.googledomains.com`; el registro de `83` debe configurarse en ese proveedor, conservando los demás registros.
+El subdominio está agregado al entorno Production de `undertangoweb`. El CNAME `83` apunta a `63801b4d9ab61603.vercel-dns-017.com`, guardado en Squarespace el 4 de septiembre de 2026. Se conservaron los demás registros del dominio.
 
-Mientras se verifica DNS y HTTPS, `academyOrigin` conserva la dirección operativa principal. Al activar el subdominio, actualizar ese valor con su URL canónica. La configuración anteriormente asociada por error a `83.undertango.club` se reemplazó por la dirección correcta; no se compra ni se utiliza `undertango.club`.
+`academyOrigin` define `https://83.undertangoclub.com` como URL canónica de la Academia. Sus rutas públicas son `/`, `/tango` y `/contador-de-palabras`; las rutas `/academia/...` continúan disponibles. La configuración anteriormente asociada por error a `83.undertango.club` se reemplazó por la dirección correcta; no se compra ni se utiliza `undertango.club`.
 
 ## Contador y privacidad
 

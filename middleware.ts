@@ -10,6 +10,16 @@ export function middleware(request: NextRequest) {
     .toLowerCase();
   const pathname = request.nextUrl.pathname;
 
+  if (pathname === "/panel-de-control" || pathname.startsWith("/panel-de-control/")) {
+    const response = NextResponse.next();
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    response.headers.set("X-Frame-Options", "DENY");
+    response.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'" + (process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "") + "; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    return response;
+  }
+
   if (hostname === "rave.undertangoclub.com") {
     if (pathname === "/rave" || pathname.startsWith("/rave/")) {
       const url = request.nextUrl.clone();

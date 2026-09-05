@@ -68,6 +68,7 @@ function shouldTrack() {
   if (hostname.startsWith("aprende.")) return false;
   if (pathname.startsWith("/aprende")) return false;
   if (pathname.startsWith("/proyectos")) return false;
+  if (pathname.startsWith("/panel-de-control")) return false;
   if (pathname.startsWith("/finanzas")) return false;
   return true;
 }

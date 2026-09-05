@@ -19,6 +19,7 @@ export default function ChatRobot() {
     setEnabled(
       hostname !== 'rave.undertangoclub.com' &&
       pathname !== '/rave' &&
+      !pathname?.startsWith('/panel-de-control') &&
       !pathname?.startsWith('/rave/') &&
       !isAprendeHost &&
       !isAprendePath &&

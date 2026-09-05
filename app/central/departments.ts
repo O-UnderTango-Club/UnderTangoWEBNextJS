@@ -87,7 +87,7 @@ export const departments: Department[] = [
   {
     number: "85", keyword: "Taller", title: "Taller y fábrica",
     description: "Construcción, fabricación, reparación y prototipado. Resuelve objetos, escenografía, equipamiento, utilería y soportes físicos para los proyectos.",
-    members: [],
+    members: [{ name: "Johnny Wagner", role: "Diseñador, constructor y carpintero" }],
     projects: ["Video institucional Ø UnderTango — sistema de diez departamentos"],
   },
   {

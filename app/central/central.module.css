@@ -99,3 +99,28 @@
 }
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
 
+
+.groupedMembers { display: flex; flex-direction: column; gap: 14px; }
+.groupHeading { margin: 0; color: #e8dfce; font-family: var(--font-undertango-editorial), Georgia, serif; font-size: clamp(18px, 2vw, 25px); font-weight: 400; line-height: 1.15; }
+.countryGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.countryGroup, .otherMembers { min-width: 0; margin: 0 !important; padding: 0 !important; }
+.countryGroup h5 { margin: 0 0 8px; color: #d2c6af; font-size: 12px; font-weight: 600; }
+.countryGroup h5 span { color: #d5b35c; margin-right: 6px; font-weight: 800; }
+.countryMembers { display: grid; gap: 6px; }
+.otherMembers h4 { margin: 0 0 8px; color: #8f8a82; font-size: 11px; font-weight: 600; }
+.groupedMembers .memberCard { min-width: 0; box-sizing: border-box; }
+.groupedMembers .memberCard > div { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .groupedMembers { gap: 10px; }
+  .countryGrid { grid-template-columns: 1fr; gap: 10px; }
+  .countryMembers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .groupedMembers .memberCard { min-height: 64px; gap: 6px; padding: 7px; }
+  .groupedMembers .memberCard > span { flex-basis: 26px; height: 26px; font-size: 9px; }
+  .groupedMembers .memberCard strong { font-size: 11px; }
+  .groupedMembers .memberCard p { font-size: 9px; }
+  .countryGroup h5 { margin-bottom: 5px; font-size: 11px; }
+}
+@media (max-height: 610px) and (min-width: 721px) {
+  .groupedMembers { gap: 8px; }
+  .groupedMembers .memberCard { min-height: 50px; padding: 6px; }
+}

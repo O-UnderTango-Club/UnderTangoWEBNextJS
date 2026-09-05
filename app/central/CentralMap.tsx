@@ -1,8 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { departments } from "./departments";
+import { departments, type DepartmentMember } from "./departments";
 import styles from "./central.module.css";
+
+const countries = [{ code: "AR", name: "Argentina" }, { code: "BR", name: "Brasil" }, { code: "PY", name: "Paraguay" }] as const;
+
+function MemberCard({ member }: { member: DepartmentMember }) {
+  return (
+    <article className={styles.memberCard}>
+      <span>{member.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</span>
+      <div><strong>{member.name}</strong><p>{member.role}</p></div>
+    </article>
+  );
+}
 
 export default function CentralMap() {
   const [selectedNumber, setSelectedNumber] = useState<string | null>(null);
@@ -120,14 +131,33 @@ export default function CentralMap() {
                   <span>{activeSection === "members" ? selected.members.length : selected.projects.length}</span>
                 </header>
                 {activeSection === "members" ? (
-                  <div className={`${styles.subpanelContent} ${styles.memberGrid}`}>
-                    {selected.members.length ? selected.members.map((member) => (
-                      <article className={styles.memberCard} key={`${selected.number}-${member.name}`}>
-                        <span>{member.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</span>
-                        <div><strong>{member.name}</strong><p>{member.role}</p></div>
-                      </article>
-                    )) : <p className={styles.empty}>Todavía no hay integrantes asignados a este departamento en Airtable.</p>}
-                  </div>
+                  selected.memberHeading ? (
+                    <div className={`${styles.subpanelContent} ${styles.groupedMembers}`}>
+                      <h4 className={styles.groupHeading}>{selected.memberHeading}</h4>
+                      <div className={styles.countryGrid}>
+                        {countries.map((country) => (
+                          <section className={styles.countryGroup} key={country.code} aria-labelledby={`country-${selected.number}-${country.code}`}>
+                            <h5 id={`country-${selected.number}-${country.code}`}><span>{country.code}</span> {country.name}</h5>
+                            <div className={styles.countryMembers}>
+                              {selected.members.filter((member) => member.country === country.code).map((member) => <MemberCard key={member.name} member={member} />)}
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                      {selected.members.some((member) => !member.country) && (
+                        <section className={styles.otherMembers} aria-label="Otros integrantes">
+                          <h4>Otros integrantes</h4>
+                          <div className={styles.memberGrid}>
+                            {selected.members.filter((member) => !member.country).map((member) => <MemberCard key={member.name} member={member} />)}
+                          </div>
+                        </section>
+                      )}
+                    </div>
+                  ) : (
+                    <div className={`${styles.subpanelContent} ${styles.memberGrid}`}>
+                      {selected.members.length ? selected.members.map((member) => <MemberCard key={member.name} member={member} />) : <p className={styles.empty}>Todavía no hay integrantes asignados a este departamento en Airtable.</p>}
+                    </div>
+                  )
                 ) : (
                   <ol className={`${styles.subpanelContent} ${styles.projectGrid}`}>
                     {selected.projects.map((project, index) => <li key={project}><span>{String(index + 1).padStart(2, "0")}</span><strong>{project}</strong></li>)}

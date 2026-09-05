@@ -3,6 +3,7 @@ import { Inter, Libre_Baskerville } from "next/font/google";
 import { AuthProvider } from "./context/AuthContext";
 import ChatRobot from "./components/ChatRobot";
 import UnderTangoTracker from "./components/UnderTangoTracker";
+import PanelShortcut from "./components/PanelShortcut";
 
 import "./styles/index.css";
 import "./styles/footer.css";
@@ -59,6 +60,7 @@ export default function RootLayout({
         <AuthProvider>{children}</AuthProvider>
         <UnderTangoTracker />
         <ChatRobot />
+        <PanelShortcut />
       </body>
     </html>
   );

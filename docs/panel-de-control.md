@@ -4,9 +4,11 @@ Ruta privada: https://www.undertangoclub.com/panel-de-control
 
 ## Acceso y configuración
 
-La sesión del sitio se verifica en el servidor con Supabase Auth `getUser` (endpoint `/auth/v1/user`). Sólo se admite un correo confirmado incluido en `PANEL_ALLOWED_EMAILS`; el valor inicial autorizado es `pablocieslik@gmail.com`. Registrarse en el sitio no concede acceso al panel. No se envían registros en el HTML ni se guardan datos de Airtable en el almacenamiento del navegador.
+El botón transparente de 48 × 48 píxeles en la esquina inferior derecha abre la ruta privada. El navegador de Pablo se habilita una vez con una cookie firmada, HttpOnly, Secure, SameSite=Strict, restringida al host y con duración de 90 días. Abrir el botón o conocer la ruta no concede acceso a los datos. El panel no depende de Supabase; el servidor conserva la validación del antiguo Bearer como compatibilidad, pero la página ya no la usa. No se envían registros en el HTML ni se guardan datos de Airtable en el almacenamiento persistente del navegador.
 
-Vercel necesita `AIRTABLE_PANEL_TOKEN`, con `data.records:read` y `data.records:write`, limitado a la base `appJwwHP1Wkoxo54q`. Se usa una variable separada para no activar accidentalmente las rutas públicas antiguas de Airtable. También se reutilizan `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Las credenciales nunca se incluyen en código ni en variables públicas.
+Vercel necesita `AIRTABLE_PANEL_TOKEN`, con `data.records:read` y `data.records:write`, limitado a la base `appJwwHP1Wkoxo54q`. Se usa una variable separada para no activar accidentalmente las rutas públicas antiguas de Airtable. Una clave HMAC con dominio dedicado deriva de ese secreto para firmar las sesiones; el token de Airtable nunca sale del servidor. Rotar el token revoca todas las sesiones. No incluir credenciales en código ni variables públicas.
+
+La habilitación inicial admite un archivo local con un secreto aleatorio de 256 bits. Sólo su SHA-256 y un vencimiento corto se publican en `panel-bootstrap.ts`; después de habilitar el navegador se retira el permiso temporal y se elimina el archivo local. La sesión ya emitida continúa funcionando. Para otro navegador hace falta una nueva habilitación autorizada. POST y DELETE exigen origen exacto y JSON; los datos y cookies no se exponen a otros orígenes. DELETE `/api/panel/access` elimina la sesión del navegador. Borrar las cookies también elimina el acceso.
 
 La ruta excluye el chat y las estadísticas del sitio y aplica CSP, noindex, no-store y prohibición de iframes. Acceso por navegación completa a la URL privada.
 

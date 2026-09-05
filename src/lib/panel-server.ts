@@ -1,8 +1,11 @@
 import { createHash } from "node:crypto";
+import { deviceActor } from "./panel-access";
 import { BASE, TABLES, F, Snapshot, Raw, Stage, board, closed, classify, projectOpen, taskProjects, validateTask } from "./panel-model";
 
 export class PanelError extends Error { constructor(message: string, public status=400) { super(message); } }
 export async function authorize(request: Request) {
+  const device = deviceActor(request);
+  if (device) return device;
   const token=request.headers.get("authorization");
   if(!token?.startsWith("Bearer ") || token.length>10000) throw new PanelError("Ingresá para abrir el panel.",401);
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL, key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

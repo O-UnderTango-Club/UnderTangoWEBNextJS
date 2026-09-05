@@ -1,18 +1,17 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { supabase } from "../../src/lib/supabase";
 import { BASE, TABLES, type Board, type Stage } from "../../src/lib/panel-model";
 import css from "./panel.module.css";
-type Data=Board&{revisions:Record<string,string>};
+type Data=Board&{revisions:Record<string,string>;actor:string};
 type Task=Board["tasks"][number];
 type Editor={kind:"task"|"project"|"event";id?:string;revision?:string;initial:Record<string,any>};
 const labels:Record<Stage,string>={ready:"Disponible",doing:"En curso",waiting:"En espera",catalog:"Por catalogar",done:"Finalizada",cancelled:"Descartada"};
 function safeDoc(v:string){try{const u=new URL(v);return u.protocol==="https:"&&["docs.google.com","drive.google.com"].includes(u.hostname)?v:undefined;}catch{return undefined;}}
 function date(v:string){return v?new Date(`${v.slice(0,10)}T12:00:00`).toLocaleDateString("es-AR",{day:"numeric",month:"short"}):"Sin fecha";}
+class ApiError extends Error { constructor(message:string,public status:number){super(message);} }
 async function api(path="",body?:unknown){
-  const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("Ingresá para abrir el panel.");
-  const r=await fetch(`/api/panel${path}`,{method:body?"POST":"GET",headers:{Authorization:`Bearer ${session.access_token}`,...(body?{"Content-Type":"application/json"}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:"no-store"});
-  const v=await r.json();if(!r.ok)throw new Error(v.error||"No se pudo completar la operación.");return v;
+  const r=await fetch(`/api/panel${path}`,{method:body?"POST":"GET",credentials:"same-origin",headers:body?{"Content-Type":"application/json"}:{},...(body?{body:JSON.stringify(body)}:{}),cache:"no-store"});
+  const v=await r.json();if(!r.ok)throw new ApiError(v.error||"No se pudo completar la operación.",r.status);return v;
 }
 function Choices({label,options,value,onChange}:{label:string;options:{id:string;name:string}[];value:string[];onChange:(v:string[])=>void}){
   const [query,setQuery]=useState("");
@@ -26,22 +25,16 @@ function Modal({children,onClose,busy}:{children:ReactNode;onClose:()=>void;busy
 }
 export default function Panel(){
   const [sessionEmail,setSessionEmail]=useState<string|null>(null),[authLoading,setAuthLoading]=useState(true);
-  const [email,setEmail]=useState("pablocieslik@gmail.com"),[password,setPassword]=useState("");
   const [data,setData]=useState<Data>(),[busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
   const [tab,setTab]=useState("fronts"),[search,setSearch]=useState(""),[limit,setLimit]=useState(36),[editor,setEditor]=useState<Editor>();
-  const refreshRef=useRef(false),sessionRef=useRef<string|null>(null);
-  useEffect(()=>{
-    supabase.auth.getSession().then(({data})=>{setSessionEmail(data.session?.user.email||null);sessionRef.current=data.session?.user.email||null;setAuthLoading(false);});
-    const {data}=supabase.auth.onAuthStateChange((_event,session)=>{sessionRef.current=session?.user.email||null;setSessionEmail(sessionRef.current);if(!session){setData(undefined);setEditor(undefined);}setAuthLoading(false);});
-    return()=>data.subscription.unsubscribe();
-  },[]);
+  const refreshRef=useRef(false);
   const refresh=useCallback(async(fresh=false)=>{
     if(refreshRef.current)return;refreshRef.current=true;setRefreshing(true);
-    try{const value=await api(fresh?"?refresh=1":"");if(sessionRef.current){setData(value);setError("");}}
-    catch(e){setError(e instanceof Error?e.message:"No se pudo actualizar.");throw e;}
-    finally{refreshRef.current=false;setRefreshing(false);}
+    try{const value=await api(fresh?"?refresh=1":"");setSessionEmail(value.actor);setData(value);setError("");}
+    catch(e){if(e instanceof ApiError&&[401,403].includes(e.status)){setSessionEmail(null);setData(undefined);setEditor(undefined);setError("Este navegador todavía no está habilitado para el panel.");}else{setError(e instanceof ApiError?e.message:"No se pudo conectar. Revisá tu conexión y volvé a intentar.");}throw e;}
+    finally{refreshRef.current=false;setRefreshing(false);setAuthLoading(false);}
   },[]);
-  useEffect(()=>{if(sessionEmail)refresh().catch(()=>{});},[sessionEmail,refresh]);
+  useEffect(()=>{refresh().catch(()=>{});},[refresh]);
   useEffect(()=>{
     if(!sessionEmail||editor)return;
     const update=()=>{if(document.visibilityState==="visible")refresh().catch(()=>{});};
@@ -49,7 +42,6 @@ export default function Panel(){
     return()=>{clearInterval(timer);document.removeEventListener("visibilitychange",update);window.removeEventListener("online",update);};
   },[sessionEmail,editor,refresh]);
   useEffect(()=>setLimit(36),[tab,search]);
-  async function login(e:FormEvent){e.preventDefault();setBusy(true);setError("");try{const {error}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(error)throw error;setPassword("");}catch{setError("No se pudo ingresar. Revisá el correo y la contraseña del sitio.");}finally{setBusy(false);}}
   function editTask(t:Task,next?:Stage){setEditor({kind:"task",id:t.id,revision:data!.revisions[t.id],initial:{name:t.name,owner:t.owner,priority:t.priority||"Media",due:t.due,stage:next||t.stage,reason:t.reason,doc:t.doc,order:t.order,projects:t.directProjectIds,cases:t.caseIds,dependencies:t.dependencies,events:t.eventIds,...(next?{_previousStage:t.stage}:{})}});}
   function newTask(project?:string){setEditor({kind:"task",initial:{name:"",owner:"Pablo Cieslik",priority:"Media",due:"",stage:project?"ready":"catalog",reason:"",doc:"",order:0,projects:project?[project]:[],cases:[],dependencies:[],events:[]}});}
   function editProject(id:string){const p=data!.projects.find(p=>p.id===id)!;setEditor({kind:"project",id,revision:data!.revisions[id],initial:{front:p.front,rank:p.rank===9999?1:p.rank,status:p.status,doc:p.doc}});}
@@ -60,10 +52,10 @@ export default function Panel(){
   const matches=(name:string)=>name.toLocaleLowerCase().includes(search.toLocaleLowerCase());
   const taskCard=(t:Task)=><article key={t.id} className={css.card}><div className={css.projectName}>{data!.projects.filter(p=>t.projectIds.includes(p.id)).map(p=>`${p.name} · ${p.open?p.front+" "+(p.rank===9999?"—":p.rank):"cerrado"}`).join(" / ")||"Sin proyecto"}</div><h3>{t.name}</h3><span className={`${css.badge} ${["waiting","catalog"].includes(t.stage)?css.warning:""}`}>{labels[t.stage]}</span>{t.released&&<p className={css.muted}>Dependencias resueltas · lista para continuar</p>}{!!t.issues.length&&<ul className={css.smallList}>{t.issues.map((s,i)=><li key={i}>{s}</li>)}</ul>}{!!t.blockers.length&&<p className={css.help}>Espera: {t.blockers.join("; ")}</p>}<div className={css.meta}><span>{t.owner||"Sin responsable"}</span><span>{t.priority}</span><span>{date(t.due)}</span>{t.order>0&&<span>Paso {t.order}</span>}</div><div className={css.actions}><button className={css.button} disabled={busy||!!error} onClick={()=>editTask(t)}>Abrir / editar</button>{t.stage==="ready"&&<button className={css.primary} disabled={busy||!!error} onClick={()=>editTask(t,"doing")}>Empezar</button>}{t.stage==="doing"&&<button className={css.primary} disabled={busy||!!error} onClick={()=>editTask(t,"done")}>Finalizar</button>}{safeDoc(t.doc)&&<a href={safeDoc(t.doc)} target="_blank" rel="noreferrer">Documento ↗</a>}</div></article>;
   if(authLoading)return <main className={css.panel}><div className={css.login}>Verificando acceso…</div></main>;
-  if(!sessionEmail)return <main className={css.panel}><div className={`${css.card} ${css.login}`}><span className={css.brand}>Ø UnderTango · privado</span><h1>Panel de control</h1><p>Frentes, acciones y próximos pasos en un solo lugar.</p><form onSubmit={login}><label htmlFor="email">Correo</label><input id="email" type="email" autoComplete="username" required value={email} onChange={e=>setEmail(e.target.value)}/><label htmlFor="password">Contraseña del sitio</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/><button className={css.primary} disabled={busy}>{busy?"Ingresando…":"Ingresar al panel"}</button></form>{error&&<p className={css.error} role="alert">{error}</p>}<p className={css.help}>Acceso reservado a la cuenta habilitada por Pablo. Usá la misma cuenta de UnderTango.</p><a href="/">Volver al sitio</a></div></main>;
+  if(!sessionEmail)return <main className={css.panel}><div className={`${css.card} ${css.login}`}><span className={css.brand}>Ø UnderTango · privado</span><h1>Panel de control</h1><p>Frentes, acciones y próximos pasos en un solo lugar.</p>{error&&<p className={css.error} role="alert">{error}</p>}<button className={css.primary} disabled={refreshing} onClick={()=>refresh().catch(()=>{})}>{refreshing?"Verificando…":"Volver a intentar"}</button><p className={css.help}>El acceso queda guardado en el navegador habilitado por Pablo.</p><a href="/">Volver al sitio</a></div></main>;
   const counts=(stage:Stage)=>data?.tasks.filter(t=>t.stage===stage).length||0;
   const filtered=data?.tasks.filter(t=>(tab==="all"?!["done","cancelled"].includes(t.stage):tab==="history"?["done","cancelled"].includes(t.stage):t.stage===tab)&&matches([t.name,t.owner,...data.projects.filter(p=>t.projectIds.includes(p.id)).map(p=>p.name)].join(" ")))||[];
-  return <main className={css.panel}><header className={css.top}><div><span className={css.brand}>Ø UnderTango · operación</span><h1>Panel de control</h1><div className={css.muted}>{data?`Airtable · última lectura ${new Date(data.updatedAt).toLocaleTimeString("es-AR",{timeZone:"America/Argentina/Cordoba",hour:"2-digit",minute:"2-digit"})}`:"Conectando con Airtable…"}</div></div><div className={css.actions}><button className={css.button} disabled={refreshing||busy} onClick={()=>refresh(true).catch(()=>{})}>{refreshing?"Actualizando…":"Actualizar"}</button><button className={css.primary} disabled={!data||busy||!!error} onClick={()=>newTask()}>+ Capturar acción</button><button className={css.linkButton} onClick={()=>supabase.auth.signOut()}>Salir</button></div></header>
+  return <main className={css.panel}><header className={css.top}><div><span className={css.brand}>Ø UnderTango · operación</span><h1>Panel de control</h1><div className={css.muted}>{data?`Airtable · última lectura ${new Date(data.updatedAt).toLocaleTimeString("es-AR",{timeZone:"America/Argentina/Cordoba",hour:"2-digit",minute:"2-digit"})}`:"Conectando con Airtable…"}</div></div><div className={css.actions}><button className={css.button} disabled={refreshing||busy} onClick={()=>refresh(true).catch(()=>{})}>{refreshing?"Actualizando…":"Actualizar"}</button><button className={css.primary} disabled={!data||busy||!!error} onClick={()=>newTask()}>+ Capturar acción</button><a className={css.linkButton} href="/">Volver al sitio</a></div></header>
     {error&&<div className={css.error} role="alert">{error}{data&&<div>La información visible corresponde a la última lectura. Actualizá para seguir editando.</div>}</div>}{notice&&<div className={css.notice} role="status">{notice}<button className={css.linkButton} onClick={()=>setNotice("")}>Cerrar aviso</button></div>}
     {data?<><nav className={css.tabs} aria-label="Vistas del panel">{[["fronts","Frentes",data.fronts.reduce((n,f)=>n+f.tasks.length,0)],["doing","En curso",counts("doing")],["waiting","En espera",counts("waiting")],["catalog","Por catalogar",counts("catalog")+data.projectIssues.length],["all","Todas las acciones",data.tasks.filter(t=>!["done","cancelled"].includes(t.stage)).length],["projects","Proyectos",data.projects.filter(p=>p.open).length],["events","Disparadores",data.events.length],["history","Historial",counts("done")+counts("cancelled")]].map(([key,label,count])=><button key={key} className={`${css.tab} ${tab===key?css.active:""}`} aria-current={tab===key?"page":undefined} onClick={()=>setTab(String(key))}>{label}<span className={css.count}>{count}</span></button>)}</nav>
     {tab==="fronts"?<><p className={css.help}>Hasta tres acciones disponibles por frente, según el ranking guardado. La cola completa queda en Todas las acciones. Se actualiza cada dos minutos mientras esta página está visible.</p><div className={css.fronts}>{data.fronts.map(front=><section key={front.name} className={css.front}><h2>{front.name}</h2><p className={css.muted}>{front.tasks.length} de 3 plazas</p>{front.tasks.length?front.tasks.map(id=>taskCard(data.tasks.find(t=>t.id===id)!)):<div className={css.empty}><strong>Sin acciones disponibles</strong>Revisá los próximos pasos o las dependencias de este frente.</div>}</section>)}</div></>:<><div className={css.toolbar}><input className={css.search} aria-label="Buscar en esta vista" placeholder="Buscar por acción, proyecto o responsable…" value={search} onChange={e=>setSearch(e.target.value)}/>{tab==="events"&&<button className={css.primary} disabled={!!error} onClick={()=>editEvent()}>+ Registrar lo que espero</button>}</div>

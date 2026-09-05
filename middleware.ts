@@ -10,6 +10,20 @@ export function middleware(request: NextRequest) {
     .toLowerCase();
   const pathname = request.nextUrl.pathname;
 
+  if (hostname === "rave.undertangoclub.com") {
+    if (pathname === "/rave" || pathname.startsWith("/rave/")) {
+      const url = request.nextUrl.clone();
+      url.pathname = pathname.slice(5) || "/";
+      return NextResponse.redirect(url);
+    }
+    if (pathname === "/" || pathname === "/tango-rave" || pathname === "/pena-rave") {
+      const url = request.nextUrl.clone();
+      url.pathname = pathname === "/" ? "/rave" : `/rave${pathname}`;
+      return NextResponse.rewrite(url);
+    }
+    return NextResponse.next();
+  }
+
   if (isAcademiaHost(hostname)) {
     const destination = academiaRewrite(hostname, pathname);
     if (!destination) return NextResponse.next();

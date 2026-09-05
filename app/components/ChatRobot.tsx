@@ -17,6 +17,9 @@ export default function ChatRobot() {
     const isElitrosPath = pathname?.startsWith('/elitros');
 
     setEnabled(
+      hostname !== 'rave.undertangoclub.com' &&
+      pathname !== '/rave' &&
+      !pathname?.startsWith('/rave/') &&
       !isAprendeHost &&
       !isAprendePath &&
       !isElitrosHost &&

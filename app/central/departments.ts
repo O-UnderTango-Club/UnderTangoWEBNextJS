@@ -1,4 +1,4 @@
-export type DepartmentMember = { name: string; role: string };
+export type DepartmentMember = { name: string; role: string; country?: "AR" | "BR" | "PY" };
 
 export type Department = {
   number: string;
@@ -6,6 +6,7 @@ export type Department = {
   title: string;
   description: string;
   members: DepartmentMember[];
+  memberHeading?: string;
   projects: string[];
 };
 
@@ -71,12 +72,16 @@ export const departments: Department[] = [
   {
     number: "81", keyword: "Shows", title: "Producción, shows y propuestas",
     description: "Produce y opera propuestas escénicas para hoteles, eventos, espacios, marcas y audiencias, desde la idea inicial hasta la negociación y la función.",
+    memberHeading: "Bailarines profesionales de tango",
     members: [
+      { name: "Evayan Behr", role: "Bailarina de tango", country: "AR" },
+      { name: "Luján Rojas", role: "Bailarina de tango", country: "AR" },
+      { name: "Thaís Andrade", role: "Bailarina de tango", country: "BR" },
+      { name: "Renan Araujo", role: "Bailarín de tango", country: "BR" },
+      { name: "Aracely Maizares", role: "Bailarina de tango", country: "PY" },
+      { name: "Gustavo Paez", role: "Bailarín de tango", country: "PY" },
       { name: "Pablo Cieslik", role: "Producción" },
-      { name: "Evayan Behr", role: "Bailarina" },
       { name: "Eva Janberg", role: "Bailarina" },
-      { name: "Thays Andrade", role: "Bailarina" },
-      { name: "Renan", role: "Equipo artístico" },
     ],
     projects: [
       "Producto estrella — saxo + dupla de tango",

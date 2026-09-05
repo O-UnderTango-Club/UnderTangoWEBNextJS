@@ -81,7 +81,6 @@ export const departments: Department[] = [
       { name: "Aracely Maizares", role: "Bailarina de tango", country: "PY" },
       { name: "Gustavo Paez", role: "Bailarín de tango", country: "PY" },
       { name: "Pablo Cieslik", role: "Producción" },
-      { name: "Eva Janberg", role: "Bailarina" },
     ],
     projects: [
       "Producto estrella — saxo + dupla de tango",

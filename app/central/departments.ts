@@ -49,7 +49,12 @@ export const departments: Department[] = [
   {
     number: "80", keyword: "Programación", title: "Documentación, programación y sistema operativo",
     description: "Sistema nervioso digital de UnderTango. Construye productos, conecta información y transforma procesos de trabajo en herramientas confiables.",
-    members: [{ name: "Pablo Cieslik", role: "Dirección tecnológica" }],
+    members: [
+      { name: "Maximiliano Rodriguez", role: "Programador" },
+      { name: "Giuliano Sohrobigarat", role: "Programador" },
+      { name: "Alejandro Miguez", role: "Representante Institucional" },
+      { name: "Pablo Cieslik", role: "Gerente de Proyectos" },
+    ],
     projects: [
       "Startup Ø UnderTango — Gerencia de proyectos + arquitectura digital",
       "Tablero central — Proyectos activos",

@@ -24,5 +24,23 @@ export default function RavePage() {
       </Link>
     </section>
     <section className={styles.contact}><p className={styles.eyebrow}>PARA ESPACIOS Y PROGRAMADORES</p><h2>Hagamos lugar<br/>a la próxima fecha.</h2><p>Contanos dónde estás, qué tipo de evento organizás y qué propuesta te interesa.</p><a className={styles.button} href="https://wa.me/5493757618270?text=Hola%2C%20quiero%20conversar%20sobre%20una%20fecha%20para%20la%20banda%20de%20UnderTango.%20Mi%20ciudad%20y%20espacio%20son%3A%20" target="_blank" rel="noopener noreferrer">Proponer una fecha ↗</a></section>
+    <section id="video" className={styles.contact} aria-labelledby="rave-video-title">
+      <p className={styles.eyebrow}>Ø UNDERTANGO RAVE · VIDEO</p>
+      <h2 id="rave-video-title">Un shock de energía.</h2>
+      <figure style={{ margin: "32px auto 0", maxWidth: 360 }}>
+        <div style={{ aspectRatio: "9 / 16", overflow: "hidden", borderRadius: 16, border: "1px solid #dce8793a", background: "#000" }}>
+          <iframe
+            src="https://www.youtube.com/embed/sdWzQDMeiYY?playsinline=1&rel=0"
+            title="Un shock de energía — Ø UnderTango Rave"
+            style={{ width: "100%", height: "100%", border: 0, display: "block" }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+        <figcaption><a className={styles.textLink} href="https://youtube.com/shorts/sdWzQDMeiYY" target="_blank" rel="noopener noreferrer">Ver en YouTube ↗</a></figcaption>
+      </figure>
+    </section>
   </main>;
 }

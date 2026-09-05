@@ -54,6 +54,7 @@ export const departments: Department[] = [
       { name: "Giuliano Sohrobigarat", role: "Programador" },
       { name: "Alejandro Miguez", role: "Representante Institucional" },
       { name: "Pablo Cieslik", role: "Gerente de Proyectos" },
+      { name: "Vanesa Cabello", role: "Inversora" },
     ],
     projects: [
       "Startup Ø UnderTango — Gerencia de proyectos + arquitectura digital",

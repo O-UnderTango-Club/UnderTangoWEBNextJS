@@ -73,11 +73,9 @@ export function board(data: Snapshot) {
     const pa=priorityProject(a.projectIds),pb=priorityProject(b.projectIds);
     return (pa?FRONTS.indexOf(pa.front):9)-(pb?FRONTS.indexOf(pb.front):9)||(pa?.rank||9999)-(pb?.rank||9999)||(a.order||9999)-(b.order||9999)||a.name.localeCompare(b.name,"es")||a.id.localeCompare(b.id);
   });
-  const usedProjects=new Set<string>();
   const fronts=FRONTS.map(name=>({name,tasks:tasks.filter(t=>{
     const p=priorityProject(t.projectIds);
-    if(t.stage!=="ready"||p?.front!==name||!Number.isInteger(p.rank)||p.rank<1||p.rank>3||usedProjects.has(p.id)) return false;
-    usedProjects.add(p.id); return true;
+    return t.stage==="ready"&&p?.front===name&&Number.isInteger(p.rank)&&p.rank>=1&&p.rank!==9999;
   }).slice(0,3).map(t=>t.id)}));
   const projectIssues=projects.filter(p=>p.open).flatMap(p=>{
     const reasons=[];

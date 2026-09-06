@@ -13,7 +13,7 @@ export function frontPosition(front: string, rank: number) {
 }
 export type Raw = { id: string; fields: Record<string, any> };
 export type Snapshot = { projects: Raw[]; tasks: Raw[]; events: Raw[]; cases: Raw[]; updatedAt: string };
-export type Stage = "ready" | "doing" | "waiting" | "catalog" | "done" | "cancelled";
+export type Stage = "ready" | "recurring" | "doing" | "waiting" | "catalog" | "done" | "cancelled";
 const s = (v: unknown): string => typeof v === "string" ? v : "";
 const links = (v: unknown): string[] => Array.isArray(v) ? v.filter(x => typeof x === "string") : [];
 const unique = (v: string[]) => [...new Set(v)];
@@ -42,7 +42,7 @@ export function classify(t: Raw, data: Snapshot): { stage: Stage; issues: string
   if (caseIds.some(id=>!data.cases.some(c=>c.id===id))) issues.push("Caso vinculado no encontrado");
   if (projects.length && !data.projects.some(p=>projects.includes(p.id)&&projectOpen(p))) issues.push("Sólo vinculada a proyectos cerrados");
   if (!gate || gate==="Por revisar") issues.push("Definir la acción y su estado");
-  const expected: Record<string,string>={"Acción inmediata":"Pendiente","En acción":"En curso","En espera":"En espera"};
+  const expected: Record<string,string>={"Acción inmediata":"Pendiente","Acción recurrente":"Pendiente","En acción":"En curso","En espera":"En espera"};
   if (gate && gate!=="Por revisar" && expected[gate]!==status) issues.push("Estados incompatibles en Seguimientos");
   if (gate==="En espera" && !deps.length && !events.length) issues.push("Espera sin dependencia vinculada");
   if (cycleFrom(t.id,data.tasks)) issues.push("Dependencias circulares");
@@ -59,7 +59,7 @@ export function classify(t: Raw, data: Snapshot): { stage: Stage; issues: string
     else if (event.fields[F.events.status]!=="Ocurrido" || !s(event.fields[F.events.evidence]).trim() || !event.fields[F.events.occurred]) blockers.push(s(event.fields[F.events.name]));
   }
   const released=gate==="En espera" && !!(deps.length+events.length) && !blockers.length && !issues.length;
-  const stage: Stage=issues.length?"catalog":blockers.length?"waiting":gate==="En acción"?"doing":"ready";
+  const stage: Stage=issues.length?"catalog":blockers.length?"waiting":gate==="En acción"?"doing":gate==="Acción recurrente"?"recurring":"ready";
   return {stage,issues,blockers,released};
 }
 export function board(data: Snapshot) {
@@ -75,7 +75,7 @@ export function board(data: Snapshot) {
   });
   const fronts=FRONTS.map(name=>({name,tasks:tasks.filter(t=>{
     const p=priorityProject(t.projectIds);
-    return t.stage==="ready"&&p?.front===name&&Number.isInteger(p.rank)&&p.rank>=1&&p.rank!==9999;
+    return ["ready","recurring"].includes(t.stage)&&p?.front===name&&Number.isInteger(p.rank)&&p.rank>=1&&p.rank!==9999;
   }).slice(0,3).map(t=>t.id)}));
   const projectIssues=projects.filter(p=>p.open).flatMap(p=>{
     const reasons=[];
@@ -90,7 +90,7 @@ export function board(data: Snapshot) {
 export type Board = ReturnType<typeof board>;
 export function projectActionSummary(projectId: string, tasks: Board["tasks"]) {
   const open = tasks.filter(t=>t.projectIds.includes(projectId)&&!["done","cancelled"].includes(t.stage));
-  const ready = open.filter(t=>t.stage==="ready").length;
+  const ready = open.filter(t=>["ready","recurring"].includes(t.stage)).length;
   const counts = ([ ["catalog","por catalogar"], ["waiting","en espera"], ["doing","en curso"] ] as const)
     .map(([stage,label])=>{const count=open.filter(t=>t.stage===stage).length;return count?`${count} ${label}`:"";}).filter(Boolean);
   return {
@@ -106,6 +106,6 @@ export function validateTask(t: Raw, data: Snapshot, stage: Stage) {
   if(["catalog","done","cancelled"].includes(stage)) return;
   const check=classify(t,{...data,tasks:data.tasks.filter(x=>x.id!==t.id).concat(t)});
   if(check.issues.length) throw new Error(check.issues.join(". "));
-  if(["ready","doing"].includes(stage)&&check.blockers.length) throw new Error("Todavía hay dependencias pendientes. Usá En espera.");
+  if(["ready","recurring","doing"].includes(stage)&&check.blockers.length) throw new Error("Todavía hay dependencias pendientes. Usá En espera.");
   if(stage==="waiting"&&!check.blockers.length) throw new Error("Las dependencias ya están resueltas. La acción está disponible.");
 }

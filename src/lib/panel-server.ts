@@ -65,7 +65,7 @@ export function revision(record: Raw) {
 export function responseBoard(data: Snapshot) {
   return {...board(data),revisions:Object.fromEntries([...data.projects,...data.tasks,...data.events].map(r=>[r.id,revision(r)]))};
 }
-const states: Record<Stage,[string,string|null]>={ready:["Pendiente","Acción inmediata"],doing:["En curso","En acción"],waiting:["En espera","En espera"],catalog:["Pendiente","Por revisar"],done:["Hecho","Terminada"],cancelled:["Cancelado",null]};
+const states: Record<Stage,[string,string|null]>={ready:["Pendiente","Acción inmediata"],recurring:["Pendiente","Acción recurrente"],doing:["En curso","En acción"],waiting:["En espera","En espera"],catalog:["Pendiente","Por revisar"],done:["Hecho","Terminada"],cancelled:["Cancelado",null]};
 function text(value: unknown,max=500) { if(typeof value!=="string"||value.length>max) throw new PanelError(`Texto inválido (máximo ${max} caracteres).`); return value.trim(); }
 function refs(value: unknown, rows: Raw[]) {
   if(!Array.isArray(value)||value.length>30||value.some(id=>typeof id!=="string"||!rows.some(r=>r.id===id))) throw new PanelError("Revisá los registros vinculados.");

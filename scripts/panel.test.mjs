@@ -12,6 +12,15 @@ const t=(id,extra={})=>row(id,{[F.tasks.name]:id,[F.tasks.projects]:['p'],[F.tas
 const d={projects:[p],tasks:[],events:[],cases:[],updatedAt:new Date().toISOString()};
 let count=0;
 function check(name,fn){fn();count++;console.log('OK',name);}
+check('recurrente participa en el ranking, sigue abierta y respeta dependencias',()=>{
+ const a=t('recurrente',{[F.tasks.gate]:'Acción recurrente'});
+ let data={...d,tasks:[a]};assert.equal(m.classify(a,data).stage,'recurring');assert.equal(m.closed(a),false);
+ assert.deepEqual(m.board(data).fronts[0].tasks,['recurrente']);assert.equal(m.projectActionSummary('p',m.board(data).tasks).ready,1);
+ a.fields[F.tasks.events]=['espera'];data.events=[row('espera',{[F.events.name]:'Confirmación',[F.events.status]:'Esperando'})];
+ assert.deepEqual(m.board(data).fronts[0].tasks,[]);assert.throws(()=>m.validateTask(a,data,'recurring'),/dependencias pendientes/);
+ data.events[0].fields[F.events.status]='Ocurrido';data.events[0].fields[F.events.evidence]='Confirmado';data.events[0].fields[F.events.occurred]='2026-09-06';
+ assert.equal(m.classify(a,data).stage,'recurring');assert.deepEqual(m.board(data).fronts[0].tasks,['recurrente']);
+});
 check('tres acciones por frente, incluso del mismo proyecto, con reposición al empezar',()=>{
  const tasks=[1,2,3,4].map(n=>t(`paso${n}`,{[F.tasks.order]:n}));
  let data={...d,tasks};assert.deepEqual(m.board(data).fronts[0].tasks,['paso1','paso2','paso3']);

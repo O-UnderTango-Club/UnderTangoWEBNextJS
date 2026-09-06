@@ -3,3 +3,11 @@
 @media(max-width:1000px){.fronts{grid-template-columns:1fr}.front{border-top-width:3px}.top{align-items:flex-start}.top h1{font-size:28px}}@media(max-width:600px){.panel{padding:20px 16px 60px}.top{display:block}.top>.actions{margin-top:18px}.two{grid-template-columns:1fr}.toolbar{align-items:stretch;flex-direction:column}.dialog{padding:20px}.overlay{padding:0}.dialog{border-radius:0}.projectRow{align-items:flex-start;flex-direction:column}.list{grid-template-columns:1fr}.dialog footer{bottom:-20px}.fronts{gap:22px}}
 .dialog{position:fixed;inset:16px 16px 16px auto;margin:0;min-height:0;max-height:calc(100vh - 32px);border:0;overflow-y:auto;color:#202b2a}.dialog::backdrop{background:#18271fc7}.choices{border:1px solid #d4ddd1;border-radius:8px;margin:20px 0;padding:12px}.choices legend{font-size:14px;font-weight:600}.choices>div{max-height:200px;overflow:auto;margin-top:8px}.choices label{display:flex;align-items:flex-start;gap:10px;font-size:14px;font-weight:400;margin:0;padding:10px 4px}.choices input[type=checkbox]{width:18px;height:18px;flex-shrink:0;margin:2px 0}.dialog h3{font-size:18px}@media(max-width:600px){.dialog{inset:0;width:100%;max-width:100%;max-height:100%;height:100vh;border-radius:0}}
 .panel *{font-family:inherit}.panel h2,.panel h3{color:#202b2a;text-transform:none;letter-spacing:normal}.panel .dialog{font-size:16px;line-height:1.5}
+
+/* The public landing page hides sections until animated; operational content must always be visible. */
+.panel section{opacity:1;transform:none;transition:none;animation:none}
+.panel .front{padding:0;position:static}
+.panel .front h2{display:block;text-align:left;font-size:24px}
+.panel .front h2::after{display:none}
+.actionLabel{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:#60716b;margin-top:18px}
+.card .actionLabel+h3{margin-top:4px}

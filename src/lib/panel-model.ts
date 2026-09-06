@@ -90,6 +90,18 @@ export function board(data: Snapshot) {
   return {updatedAt:data.updatedAt,projects,tasks,fronts,projectIssues,events:data.events.map(e=>({id:e.id,name:s(e.fields[F.events.name]),status:s(e.fields[F.events.status]),type:s(e.fields[F.events.type]),evidence:s(e.fields[F.events.evidence]),occurred:s(e.fields[F.events.occurred])})),cases:data.cases.map(c=>({id:c.id,name:s(c.fields[F.cases.name])}))};
 }
 export type Board = ReturnType<typeof board>;
+export function projectActionSummary(projectId: string, tasks: Board["tasks"]) {
+  const open = tasks.filter(t=>t.projectIds.includes(projectId)&&!["done","cancelled"].includes(t.stage));
+  const ready = open.filter(t=>t.stage==="ready").length;
+  const counts = ([ ["catalog","por catalogar"], ["waiting","en espera"], ["doing","en curso"] ] as const)
+    .map(([stage,label])=>{const count=open.filter(t=>t.stage===stage).length;return count?`${count} ${label}`:"";}).filter(Boolean);
+  return {
+    open: open.length,
+    ready,
+    text: ready?`${ready} ${ready===1?"acción inmediata":"acciones inmediatas"}`:open.length?`Sin acción inmediata: ${counts.join(" · ")}.`:"Falta definir una próxima acción.",
+    issues: ready?[]:unique(open.flatMap(t=>t.issues)).slice(0,3)
+  };
+}
 export function validateTask(t: Raw, data: Snapshot, stage: Stage) {
   if(!s(t.fields[F.tasks.name]).trim()) throw new Error("Escribí una acción concreta.");
   if(cycleFrom(t.id,data.tasks.filter(x=>x.id!==t.id).concat(t))) throw new Error("La dependencia crea un ciclo.");

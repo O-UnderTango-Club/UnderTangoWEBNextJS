@@ -16,6 +16,8 @@ La ruta excluye el chat y las estadísticas del sitio y aplica CSP, noindex, no-
 
 Cada tarjeta distingue el proyecto de la acción. El botón Frente y posición abre un editor corto con frente y número: 1.3 significa Primario, posición 3; 2.2 significa Secundario, posición 2. Para acciones compartidas se muestra un control por cada proyecto abierto. Mover un proyecto conserva los estados de sus acciones y reordena las posiciones existentes.
 
+El ranking muestra si cada proyecto tiene una acción inmediata y ofrece Ver acciones, que filtra por el vínculo real del proyecto. El editor de posición advierte cuando moverlo no bastará para mostrarlo. Frentes explica los puestos 1–3 sin acción inmediata en un apartado separado con acceso a sus acciones o a definir el próximo paso. Los estados contradictorios y las esperas sin vínculo siguen excluidos hasta revisarlos; no se reactivan automáticamente por cambiar el ranking.
+
 Cambiar estado abre un editor corto. Sólo Acción inmediata ocupa Frentes; En curso, En espera y Por catalogar tienen sus propias pestañas, y Finalizada/Descartada quedan en Historial. Una acción sólo sale después de confirmar el guardado. En espera exige una dependencia pendiente real; pueden elegirse acciones o hechos y registrarse un nuevo hecho desde el mismo editor. Crear un hecho lo registra en Disparadores, y guardar el estado lo vincula a la acción. Finalizar o descartar requiere evidencia.
 
 ## Datos y reglas

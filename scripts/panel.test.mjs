@@ -37,6 +37,20 @@ check('Frentes sólo incluye acciones inmediatas y repone la plaza al cambiar de
  current.fields[F.tasks.status]='Pendiente';current.fields[F.tasks.gate]='Acción inmediata';assert.deepEqual(m.board(data).fronts[0].tasks,['actual']);
 });
 check('una espera sin vínculo queda visible por catalogar',()=>{const a=t('a',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera'});assert.equal(m.classify(a,{...d,tasks:[a]}).stage,'catalog');assert.throws(()=>m.validateTask(a,{...d,tasks:[a]},'waiting'));});
+check('el ranking explica estados contradictorios y esperas sin vínculo sin habilitar la acción',()=>{
+ const a=t('O2',{[F.tasks.status]:'En curso',[F.tasks.gate]:'En espera'}),b=m.board({...d,tasks:[a]});
+ const summary=m.projectActionSummary('p',b.tasks);
+ assert.equal(summary.ready,0);assert.equal(summary.open,1);assert.match(summary.text,/por catalogar/);
+ assert.ok(summary.issues.includes('Estados incompatibles en Seguimientos'));assert.ok(summary.issues.includes('Espera sin dependencia vinculada'));
+ assert.deepEqual(b.fronts[0].tasks,[]);
+});
+check('el resumen distingue un próximo paso ausente, una acción en curso y una inmediata',()=>{
+ const done=t('cerrada',{[F.tasks.status]:'Hecho',[F.tasks.gate]:'Terminada'});
+ assert.equal(m.projectActionSummary('p',m.board({...d,tasks:[done]}).tasks).open,0);
+ const doing=t('en curso',{[F.tasks.status]:'En curso',[F.tasks.gate]:'En acción'});
+ assert.match(m.projectActionSummary('p',m.board({...d,tasks:[done,doing]}).tasks).text,/en curso/);
+ assert.equal(m.projectActionSummary('p',m.board({...d,tasks:[done,doing,t('lista')]}).tasks).ready,1);
+});
 check('todos los predecesores deben terminar; cancelar no equivale a terminar',()=>{
  const a=t('a',{[F.tasks.status]:'Hecho'}),b=t('b'),c=t('c',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera',[F.tasks.dependencies]:['a','b']});
  const data={...d,tasks:[a,b,c]};assert.equal(m.classify(c,data).stage,'waiting');b.fields[F.tasks.status]='Hecho';assert.equal(m.classify(c,data).stage,'ready');b.fields[F.tasks.status]='Cancelado';assert.equal(m.classify(c,data).stage,'catalog');

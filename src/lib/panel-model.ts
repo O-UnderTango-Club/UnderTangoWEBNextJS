@@ -76,7 +76,7 @@ export function board(data: Snapshot) {
   const usedProjects=new Set<string>();
   const fronts=FRONTS.map(name=>({name,tasks:tasks.filter(t=>{
     const p=priorityProject(t.projectIds);
-    if(t.stage!=="ready"||p?.front!==name||usedProjects.has(p.id)) return false;
+    if(t.stage!=="ready"||p?.front!==name||!Number.isInteger(p.rank)||p.rank<1||p.rank>3||usedProjects.has(p.id)) return false;
     usedProjects.add(p.id); return true;
   }).slice(0,3).map(t=>t.id)}));
   const projectIssues=projects.filter(p=>p.open).flatMap(p=>{

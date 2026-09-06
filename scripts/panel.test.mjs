@@ -13,6 +13,20 @@ const d={projects:[p],tasks:[],events:[],cases:[],updatedAt:new Date().toISOStri
 let count=0;
 function check(name,fn){fn();count++;console.log('OK',name);}
 check('frente y posición usan códigos 1.3 y 2.2 sin confundir el paso de la acción',()=>{assert.equal(m.frontPosition('Primario',3),'1.3');assert.equal(m.frontPosition('Secundario',2),'2.2');assert.equal(m.frontPosition('Terciario',12),'3.12');assert.equal(m.frontPosition('',1),'Sin posición');assert.equal(m.frontPosition('Primario',9999),'Sin posición');});
+check('cada frente respeta las posiciones 1–3 sin rellenar esperas con la posición 4',()=>{
+ for(const front of m.FRONTS){
+   const projects=[1,2,3,4].map(rank=>row(`p${rank}`,{...p.fields,[F.projects.front]:front,[F.projects.rank]:rank}));
+   const tasks=projects.map((p,i)=>t(`a${i+1}`,{[F.tasks.projects]:[p.id]}));
+   tasks[1].fields[F.tasks.status]='En curso';tasks[1].fields[F.tasks.gate]='En acción';
+   tasks[2].fields[F.tasks.status]='En espera';tasks[2].fields[F.tasks.gate]='En espera';tasks[2].fields[F.tasks.events]=['e'];
+   const data={...d,projects,tasks,events:[row('e',{[F.events.name]:'Confirmación',[F.events.status]:'Esperando'})]};
+   let b=m.board(data);assert.deepEqual(b.fronts.find(f=>f.name===front).tasks,['a1']);assert.equal(b.tasks.find(t=>t.id==='a4').stage,'ready');
+   tasks[0].fields[F.tasks.gate]='Por revisar';b=m.board(data);assert.deepEqual(b.fronts.find(f=>f.name===front).tasks,[]);assert.equal(b.tasks.length,4);
+ }
+});
+check('posiciones ausentes, fraccionarias o fuera del rango no aparecen en Frentes',()=>{
+ for(const rank of [0,-1,1.5,4,9999]){const data={...d,projects:[row('p',{...p.fields,[F.projects.rank]:rank})],tasks:[t('a')]};assert.deepEqual(m.board(data).fronts[0].tasks,[]);}
+});
 check('Frentes sólo incluye acciones inmediatas y repone la plaza al cambiar de estado',()=>{
  const current=t('actual',{[F.tasks.order]:1}),next=t('siguiente',{[F.tasks.order]:2}),data={...d,tasks:[current,next]};
  assert.deepEqual(m.board(data).fronts[0].tasks,['actual']);
@@ -108,5 +122,13 @@ try{
  const moved=m.board(await server.snapshot(true));assert.equal(moved.projects.find(p=>p.id==='p').front,'Secundario');assert.equal(moved.projects.find(p=>p.id==='p').rank,2);assert.equal(moved.projects.find(p=>p.id==='s2').rank,3);
  assert.deepEqual(moved.fronts[0].tasks,[]);assert.equal(moved.fronts[1].tasks.length,1);assert.ok(['abierta','segunda accion'].includes(moved.fronts[1].tasks[0]));
  assert.equal(moved.tasks.find(t=>t.id==='a').stage,'done');count++;console.log('OK mover proyecto a 2.2 mueve sus acciones inmediatas y conserva estados');
+ records[TABLES.projects]=[1,2,3,4].map(rank=>row(`r${rank}`,{...p.fields,[F.projects.front]:'Primario',[F.projects.rank]:rank}));
+ records[TABLES.tasks]=[1,2,3,4].map(rank=>t(`accion${rank}`,{[F.tasks.projects]:[`r${rank}`]}));records[TABLES.events]=[];
+ let ordered=await server.snapshot(true);assert.deepEqual(m.board(ordered).fronts[0].tasks,['accion1','accion2','accion3']);
+ await server.mutate({kind:'project',id:'r1',revision:server.revision(ordered.projects.find(p=>p.id==='r1')),changes:{rank:4}},'test');
+ ordered=await server.snapshot(true);assert.deepEqual(m.board(ordered).fronts[0].tasks,['accion2','accion3','accion4']);assert.deepEqual(ordered.projects.map(p=>p.fields[F.projects.rank]),[4,1,2,3]);
+ assert.equal(m.board(ordered).tasks.find(t=>t.id==='accion1').stage,'ready');
+ await server.mutate({kind:'project',id:'r1',revision:server.revision(ordered.projects.find(p=>p.id==='r1')),changes:{rank:1}},'test');
+ assert.deepEqual(m.board(await server.snapshot(true)).fronts[0].tasks,['accion1','accion2','accion3']);count++;console.log('OK bajar 1.1 a 1.4 retira su acción y sube los puestos 2, 3 y 4; promoverla revierte el orden');
 }finally{globalThis.fetch=originalFetch;}
 console.log(`${count} verificaciones aprobadas.`);

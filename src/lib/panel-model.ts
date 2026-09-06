@@ -7,6 +7,10 @@ export const F = {
   cases: { name:"fldTyP9DE3ANVtoBN", projects:"fldCd5XSjO7ySQYoj" }
 };
 export const FRONTS = ["Primario", "Secundario", "Terciario"];
+export function frontPosition(front: string, rank: number) {
+  const group = FRONTS.indexOf(front) + 1;
+  return group && Number.isInteger(rank) && rank > 0 && rank !== 9999 ? `${group}.${rank}` : "Sin posición";
+}
 export type Raw = { id: string; fields: Record<string, any> };
 export type Snapshot = { projects: Raw[]; tasks: Raw[]; events: Raw[]; cases: Raw[]; updatedAt: string };
 export type Stage = "ready" | "doing" | "waiting" | "catalog" | "done" | "cancelled";

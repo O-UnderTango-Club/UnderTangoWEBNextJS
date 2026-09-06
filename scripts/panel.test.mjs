@@ -12,6 +12,16 @@ const t=(id,extra={})=>row(id,{[F.tasks.name]:id,[F.tasks.projects]:['p'],[F.tas
 const d={projects:[p],tasks:[],events:[],cases:[],updatedAt:new Date().toISOString()};
 let count=0;
 function check(name,fn){fn();count++;console.log('OK',name);}
+check('frente y posición usan códigos 1.3 y 2.2 sin confundir el paso de la acción',()=>{assert.equal(m.frontPosition('Primario',3),'1.3');assert.equal(m.frontPosition('Secundario',2),'2.2');assert.equal(m.frontPosition('Terciario',12),'3.12');assert.equal(m.frontPosition('',1),'Sin posición');assert.equal(m.frontPosition('Primario',9999),'Sin posición');});
+check('Frentes sólo incluye acciones inmediatas y repone la plaza al cambiar de estado',()=>{
+ const current=t('actual',{[F.tasks.order]:1}),next=t('siguiente',{[F.tasks.order]:2}),data={...d,tasks:[current,next]};
+ assert.deepEqual(m.board(data).fronts[0].tasks,['actual']);
+ for(const [status,gate] of [['En curso','En acción'],['Pendiente','Por revisar'],['Hecho','Terminada'],['Cancelado',null]]){
+   current.fields[F.tasks.status]=status;current.fields[F.tasks.gate]=gate;
+   const b=m.board(data);assert.deepEqual(b.fronts[0].tasks,['siguiente']);assert.ok(b.tasks.some(t=>t.id==='actual'));
+ }
+ current.fields[F.tasks.status]='Pendiente';current.fields[F.tasks.gate]='Acción inmediata';assert.deepEqual(m.board(data).fronts[0].tasks,['actual']);
+});
 check('una espera sin vínculo queda visible por catalogar',()=>{const a=t('a',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera'});assert.equal(m.classify(a,{...d,tasks:[a]}).stage,'catalog');assert.throws(()=>m.validateTask(a,{...d,tasks:[a]},'waiting'));});
 check('todos los predecesores deben terminar; cancelar no equivale a terminar',()=>{
  const a=t('a',{[F.tasks.status]:'Hecho'}),b=t('b'),c=t('c',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera',[F.tasks.dependencies]:['a','b']});
@@ -72,6 +82,17 @@ try{
  await assert.rejects(server.mutate({kind:'task',id:'a',revision:'stale',changes:{stage:'doing'}},'test'),/cambió/);assert.equal(writes,0);count++;console.log('OK conflicto evita sobreescritura');
  await assert.rejects(server.mutate({kind:'task',id:'a',revision:rev,changes:{stage:'waiting',reason:'texto suelto'}},'test'),/sin dependencia/);assert.equal(writes,0);count++;console.log('OK espera inválida rechazada antes de escribir');
  await server.mutate({kind:'task',id:'a',revision:rev,changes:{stage:'doing'}},'test');assert.equal(records[TABLES.tasks][0].fields[F.tasks.status],'En curso');assert.equal(records[TABLES.tasks][0].fields[F.tasks.gate],'En acción');count++;console.log('OK escritura y lectura de confirmación');
+ assert.deepEqual(m.board(await server.snapshot(true)).fronts[0].tasks,[]);
+ let current=await server.snapshot(true);
+ await server.mutate({kind:'task',id:'a',revision:server.revision(current.tasks[0]),changes:{stage:'ready'}},'test');
+ assert.deepEqual(m.board(await server.snapshot(true)).fronts[0].tasks,['a']);count++;console.log('OK estado guardado retira y devuelve la tarjeta a Frentes');
+ records[TABLES.events].push(row('espera',{[F.events.name]:'Confirmación',[F.events.status]:'Esperando'}));
+ current=await server.snapshot(true);
+ await server.mutate({kind:'task',id:'a',revision:server.revision(current.tasks[0]),changes:{stage:'waiting',events:['espera']}},'test');
+ let waiting=m.board(await server.snapshot(true));assert.equal(waiting.tasks[0].stage,'waiting');assert.deepEqual(waiting.fronts[0].tasks,[]);
+ let eventSnap=await server.snapshot(true);
+ await server.mutate({kind:'event',id:'espera',revision:server.revision(eventSnap.events[0]),changes:{status:'Ocurrido',evidence:'Confirmación recibida'}},'test');
+ let released=m.board(await server.snapshot(true));assert.equal(released.tasks[0].released,true);assert.deepEqual(released.fronts[0].tasks,['a']);count++;console.log('OK la espera sale de Frentes con vínculo real y vuelve al confirmarse el hecho');
  snap=await server.snapshot(true);rev=server.revision(snap.tasks[0]);
  await assert.rejects(server.mutate({kind:'task',id:'a',revision:rev,changes:{stage:'done'}},'test'),/resultado/);
  await server.mutate({kind:'task',id:'a',revision:rev,changes:{stage:'done',evidence:'Resultado comprobado'}},'test');assert.match(records[TABLES.tasks][0].fields[F.tasks.result],/Resultado comprobado/);count++;console.log('OK cierre requiere resultado y conserva evidencia');
@@ -80,5 +101,12 @@ try{
  records[TABLES.projects].push(row('p2',{...p.fields,[F.projects.rank]:2}),row('p3',{...p.fields,[F.projects.rank]:3}));
  const ranking=await server.snapshot(true);await server.mutate({kind:'project',id:'p',revision:server.revision(ranking.projects.find(p=>p.id==='p')),changes:{rank:3}},'test');
  assert.deepEqual(records[TABLES.projects].map(p=>p.fields[F.projects.rank]),[3,1,2]);count++;console.log('OK ranking inserta posición y conserva orden relativo');
+ records[TABLES.projects].push(row('s1',{...p.fields,[F.projects.front]:'Secundario',[F.projects.rank]:1}),row('s2',{...p.fields,[F.projects.front]:'Secundario',[F.projects.rank]:2}));
+ records[TABLES.tasks].push(t('segunda accion',{[F.tasks.order]:2}));
+ const beforeMove=await server.snapshot(true);
+ await server.mutate({kind:'project',id:'p',revision:server.revision(beforeMove.projects.find(p=>p.id==='p')),changes:{front:'Secundario',rank:2}},'test');
+ const moved=m.board(await server.snapshot(true));assert.equal(moved.projects.find(p=>p.id==='p').front,'Secundario');assert.equal(moved.projects.find(p=>p.id==='p').rank,2);assert.equal(moved.projects.find(p=>p.id==='s2').rank,3);
+ assert.deepEqual(moved.fronts[0].tasks,[]);assert.equal(moved.fronts[1].tasks.length,1);assert.ok(['abierta','segunda accion'].includes(moved.fronts[1].tasks[0]));
+ assert.equal(moved.tasks.find(t=>t.id==='a').stage,'done');count++;console.log('OK mover proyecto a 2.2 mueve sus acciones inmediatas y conserva estados');
 }finally{globalThis.fetch=originalFetch;}
 console.log(`${count} verificaciones aprobadas.`);

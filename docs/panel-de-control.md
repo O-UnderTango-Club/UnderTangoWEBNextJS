@@ -12,6 +12,12 @@ La habilitación inicial admite un archivo local con un secreto aleatorio de 256
 
 La ruta excluye el chat y las estadísticas del sitio y aplica CSP, noindex, no-store y prohibición de iframes. Acceso por navegación completa a la URL privada.
 
+## Controles directos
+
+Cada tarjeta distingue el proyecto de la acción. El botón Frente y posición abre un editor corto con frente y número: 1.3 significa Primario, posición 3; 2.2 significa Secundario, posición 2. Para acciones compartidas se muestra un control por cada proyecto abierto. Mover un proyecto conserva los estados de sus acciones y reordena las posiciones existentes.
+
+Cambiar estado abre un editor corto. Sólo Acción inmediata ocupa Frentes; En curso, En espera y Por catalogar tienen sus propias pestañas, y Finalizada/Descartada quedan en Historial. Una acción sólo sale después de confirmar el guardado. En espera exige una dependencia pendiente real; pueden elegirse acciones o hechos y registrarse un nuevo hecho desde el mismo editor. Crear un hecho lo registra en Disparadores, y guardar el estado lo vincula a la acción. Finalizar o descartar requiere evidencia.
+
 ## Datos y reglas
 
 - Proyectos conserva propósito, ciclo de vida, frente, ranking y documento. El panel obtiene sus acciones de Seguimientos, incluyendo relaciones indirectas por Casos. No escribe la antigua copia de “Estado de acción” ni “Próxima acción” del proyecto.

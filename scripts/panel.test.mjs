@@ -77,7 +77,8 @@ check('acciones compartidas se muestran una sola vez y proyectos no compiten con
 check('ninguna acción desaparece por filtros; plazas limitadas y próximos pasos faltantes visibles',()=>{const projects=Array.from({length:5},(_,i)=>row('p'+i,{...p.fields,[F.projects.rank]:i+1})),tasks=projects.slice(0,4).map((p,i)=>t('t'+i,{[F.tasks.projects]:[p.id]})).concat(t('huérfana',{[F.tasks.projects]:[]}));const b=m.board({...d,projects,tasks});assert.equal(b.tasks.length,5);assert.equal(b.fronts[0].tasks.length,3);assert.ok(b.projectIssues.some(p=>p.id==='p4'));assert.equal(b.tasks.find(t=>t.id==='huérfana').stage,'catalog');});
 const accessUrl=moduleUrl(compile('../src/lib/panel-access.ts'));
 const access=await import(accessUrl);
-const server=await import(moduleUrl(compile('../src/lib/panel-server.ts').replace('"./panel-model"',JSON.stringify(modelUrl)).replace('"./panel-access"',JSON.stringify(accessUrl))));
+const operationsUrl=moduleUrl(compile('../src/lib/panel-operations.ts').replace('"./panel-model"',JSON.stringify(modelUrl)));
+const server=await import(moduleUrl(compile('../src/lib/panel-server.ts').replace('"./panel-model"',JSON.stringify(modelUrl)).replace('"./panel-access"',JSON.stringify(accessUrl)).replace('"./panel-operations"',JSON.stringify(operationsUrl))));
 process.env.NEXT_PUBLIC_SUPABASE_URL='https://auth.example.test';process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY='test';process.env.AIRTABLE_PANEL_TOKEN='test';
 const originalFetch=globalThis.fetch;
 const records={[TABLES.projects]:[p],[TABLES.tasks]:[t('a')],[TABLES.events]:[],[TABLES.cases]:[]};let writes=0;

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { deviceActor } from "./panel-access";
+import { operationsSelected, readOperationsSnapshot, operationsReceipt, commitOperations, OperationsError, type OperationsSnapshot, type OperationsPatch } from "./panel-operations";
 import { BASE, TABLES, F, Snapshot, Raw, Stage, board, closed, classify, projectOpen, taskProjects, validateTask } from "./panel-model";
 
 export class PanelError extends Error { constructor(message: string, public status=400) { super(message); } }
@@ -21,7 +22,7 @@ export async function authorize(request: Request) {
 }
 let lastRequest=0;
 let queue: Promise<unknown>=Promise.resolve();
-async function airtable(table: string, query="", options: RequestInit={}) {
+async function airtableSource(table: string, query="", options: RequestInit={}) {
   const token=process.env.AIRTABLE_PANEL_TOKEN||process.env.AIRTABLE_TOKEN;
   if(!token) throw new PanelError("Falta conectar Airtable al servidor del panel. No se muestran datos antiguos.",503);
   const run=async()=>{
@@ -36,6 +37,11 @@ async function airtable(table: string, query="", options: RequestInit={}) {
   };
   const result=queue.then(run,run); queue=result.catch(()=>{}); return result;
 }
+// Stay on Airtable until the relational import and transactional adapter are verified.
+// Credentials or partial staging rows must never activate a different backend.
+async function airtable(table: string, query="", options: RequestInit={}) {
+  return airtableSource(table,query,options);
+}
 async function list(table: string, fields: string[]) {
   let offset=""; const rows: Raw[]=[];
   do {
@@ -46,8 +52,24 @@ async function list(table: string, fields: string[]) {
   } while(offset);
   return rows;
 }
+type ServerSnapshot = Snapshot | OperationsSnapshot;
 let cached: Snapshot|undefined, loading: Promise<Snapshot>|undefined;
-export async function snapshot(fresh=false): Promise<Snapshot> {
+async function operationsCall<T>(work: () => Promise<T>): Promise<T> {
+  try { return await work(); } catch (error) {
+    if (error instanceof OperationsError) throw new PanelError(error.message,error.status);
+    throw error;
+  }
+}
+function usesOperations() {
+  try { return operationsSelected(); } catch(error) {
+    if(error instanceof OperationsError) throw new PanelError(error.message,error.status);
+    throw error;
+  }
+}
+export async function snapshot(fresh=false): Promise<ServerSnapshot> {
+  // Explicit source selection AND active database status are required. There is
+  // no failover after cutover, and Airtable's cache cannot leak into this branch.
+  if(usesOperations()) return operationsCall(()=>readOperationsSnapshot());
   if(!fresh&&cached&&Date.now()-Date.parse(cached.updatedAt)<90000) return cached;
   if(!fresh&&loading) return loading;
   const read=async()=>{
@@ -62,8 +84,11 @@ export async function snapshot(fresh=false): Promise<Snapshot> {
 export function revision(record: Raw) {
   return createHash("sha256").update(JSON.stringify(Object.entries(record.fields).sort(([a],[b])=>a.localeCompare(b)))).digest("hex");
 }
-export function responseBoard(data: Snapshot) {
-  return {...board(data),revisions:Object.fromEntries([...data.projects,...data.tasks,...data.events].map(r=>[r.id,revision(r)]))};
+export function responseBoard(data: ServerSnapshot) {
+  return {...board(data),source:"source" in data?data.source:"airtable",snapshotRevision:"globalRevision" in data?data.globalRevision:undefined,migrationAvailable:false,revisions:Object.fromEntries([...data.projects,...data.tasks,...data.events].map(r=>[r.id,revision(r)]))};
+}
+export async function migratePanelToSupabase(){
+  throw new PanelError("La importación se valida fuera del panel. Airtable sigue operativo; no se cambió la fuente de datos.",409);
 }
 const states: Record<Stage,[string,string|null]>={ready:["Pendiente","Acción inmediata"],recurring:["Pendiente","Acción recurrente"],doing:["En curso","En acción"],waiting:["En espera","En espera"],catalog:["Pendiente","Por revisar"],done:["Hecho","Terminada"],cancelled:["Cancelado",null]};
 function text(value: unknown,max=500) { if(typeof value!=="string"||value.length>max) throw new PanelError(`Texto inválido (máximo ${max} caracteres).`); return value.trim(); }
@@ -79,12 +104,23 @@ function doc(value: unknown) {
 }
 let writeQueue: Promise<unknown>=Promise.resolve();
 export function mutate(input: any, actor: string) {
+  if(process.env.VERCEL_ENV==="preview") return Promise.reject(new PanelError("Esta publicación de prueba es de solo lectura. Los cambios operativos se registran en el panel de producción.",409));
   const work=()=>performMutation(input,actor);
   const result=writeQueue.then(work,work); writeQueue=result.catch(()=>{}); return result;
 }
 async function performMutation(input: any, actor: string) {
   if(!input||!["task","project","event"].includes(input.kind)) throw new PanelError("Operación desconocida.");
+  const operational=usesOperations();
+  if(operational){
+    if(typeof input.requestId!=="string"||! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId)
+      ||typeof input.snapshotRevision!=="string"||! /^(0|[1-9]\d*)$/.test(input.snapshotRevision)) throw new PanelError("Actualizá el panel antes de guardar este cambio.",409);
+    // Recover a committed result BEFORE stale-state validation. Retries never
+    // append evidence twice or create a second task after an uncertain response.
+    const receipt=await operationsCall(()=>operationsReceipt(input.requestId,actor,input));
+    if(receipt) return receipt;
+  }
   const data=await snapshot(true), kind=input.kind as "task"|"project"|"event";
+  if(operational&&(!("globalRevision" in data)||input.snapshotRevision!==data.globalRevision)) throw new PanelError("El panel cambió desde que abriste el editor. Actualizá y revisá antes de guardar.",409);
   const rows=kind==="task"?data.tasks:kind==="project"?data.projects:data.events;
   const table=kind==="task"?TABLES.tasks:kind==="project"?TABLES.projects:TABLES.events;
   const current=input.id?rows.find(r=>r.id===input.id):undefined;
@@ -113,12 +149,12 @@ async function performMutation(input: any, actor: string) {
     const evidence="evidence" in change?text(change.evidence,1500):"";
     if((stage==="done"||stage==="cancelled")&&!evidence)throw new PanelError(stage==="done"?"Registrá brevemente el resultado para finalizar.":"Registrá por qué se descarta.");
     if(evidence){
-      const original=current?await airtable(table,`/${current.id}?returnFieldsByFieldId=true`):undefined;
+      const original=current?(operational?current:await airtable(table,`/${current.id}?returnFieldsByFieldId=true`)):undefined;
       fields[F.tasks.result]=[original?.fields[F.tasks.result],`${new Date().toISOString()} · ${actor}\n${evidence}`].filter(Boolean).join("\n\n");
     }
     if(!current&&data.tasks.some(t=>!closed(t)&&String(t.fields[F.tasks.name]).trim().toLowerCase()===String(candidate.fields[F.tasks.name]).toLowerCase()))throw new PanelError("Ya existe una acción abierta con ese nombre. Buscala para continuar.",409);
   } else if(kind==="project") {
-    if(!current) throw new PanelError("Los proyectos se crean en Airtable; aquí podés ordenar los existentes.");
+    if(!current) throw new PanelError(operational?"Los proyectos se crean en el área operativa de Supabase; aquí podés ordenar los existentes.":"Los proyectos se crean en Airtable; aquí podés ordenar los existentes.");
     if(Object.keys(change).some(k=>!["front","rank","status","doc"].includes(k)))throw new PanelError("Campo no editable.");
     if("doc" in change)fields[F.projects.doc]=doc(change.doc);
     const front=change.front||current.fields[F.projects.front],rank=change.rank??current.fields[F.projects.rank];
@@ -153,6 +189,13 @@ async function performMutation(input: any, actor: string) {
     }
   }
   if(!Object.keys(fields).length)throw new PanelError("No hay cambios para guardar.");
+  if(operational&&"globalRevision" in data){
+    const destination: OperationsPatch["table"]=kind==="task"?"follow_ups":kind==="project"?"projects":"trigger_events";
+    return operationsCall(()=>commitOperations(input.requestId,actor,input,data.globalRevision,[
+      {table:destination,id:current?.id||null,fields,create:!current},
+      ...rankChanges.map(p=>({table:"projects" as const,id:p.id,fields:p.fields,create:false})),
+    ]));
+  }
   const saved=await airtable(table,current?`/${current.id}?returnFieldsByFieldId=true`:"?returnFieldsByFieldId=true",{method:current?"PATCH":"POST",body:JSON.stringify({fields,typecast:false})});
   cached=undefined;
   for(let i=0;i<rankChanges.length;i+=10){

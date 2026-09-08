@@ -27,7 +27,7 @@ export default function ElitrosPage() {
     <main className="elitros-page bmc-page">
       <header className="bmc-topbar">
         <a className="bmc-brand" href="#inicio" aria-label="UnderTango ÉLITROS — inicio"><span>Ø</span> UNDERTANGO</a>
-        <nav aria-label="Navegación principal"><a href="#canvas">Canvas</a><a href="#actores">Actores</a><a href="#madurez">Madurez</a></nav>
+        <nav aria-label="Navegación principal"><a href="#canvas">Canvas</a><a href="#actores">Actores</a><a href="#madurez">Madurez</a><a href="#marco">Marco</a></nav>
         <p>ÉLITROS · 2026</p>
       </header>
 
@@ -70,6 +70,16 @@ export default function ElitrosPage() {
         <div className="bmc-diagnosis-copy"><p>La asimetría confirma una etapa inicial típica: <strong>BRL 4 y TMRL 4</strong> superan a <strong>TRL 2 y FRL 2</strong>. Avanzar directo a desarrollo técnico ampliaría la brecha y el costo fijo antes de validar el mecanismo.</p><ul><li><b>✓</b> Ejecutar contrataciones reales con operación manual.</li><li><b>✓</b> Medir tiempo ahorrado, errores, margen y repetición.</li><li><b>✓</b> Convertir esa evidencia en requisitos de producto.</li></ul></div>
         <div className="bmc-next"><span>PRÓXIMO HITO</span><strong>Diseñar y ejecutar un MVT manual de baja fidelidad con una productora real.</strong></div>
       </section>
+      <section className="bmc-framework" id="marco" aria-labelledby="framework-title">
+        <div className="bmc-framework-intro"><p className="bmc-eyebrow">MARCO DE TRABAJO · VISIÓN → ESTRATEGIA → PRODUCTO</p><h2 id="framework-title">Élitros se prueba a sí mismo.</h2><p>La dirección que UnderTango ya viene construyendo se hace transparente: Élitros no es sólo el caso inicial, sino el entorno donde se valida la primera versión del método.</p></div>
+        <aside className="bmc-framework-signal"><span>SEÑAL DE RUMBO</span><strong>Autorreferencialidad</strong><p>El sistema opera sobre una necesidad propia, registra su evidencia y transforma ese aprendizaje en la guía para los siguientes casos.</p></aside>
+        <div className="bmc-horizons">
+          <article><span>HORIZONTE ORIENTATIVO · 3 AÑOS</span><h3>Visión</h3><p>Convertir la experiencia operativa de UnderTango en una plataforma de producción gestionada que permita a redes culturales coordinar talento, operaciones y evidencia con autonomía, trazabilidad y menor fricción.</p></article>
+          <article><span>HORIZONTE ORIENTATIVO · 3 MESES</span><h3>Estrategia</h3><p>Usar Élitros como laboratorio real: consolidar un flujo de validación primaria, observar dónde se pierde tiempo o control y convertir las decisiones repetidas en hipótesis medibles antes de escalar desarrollo.</p></article>
+          <article><span>HORIZONTE ORIENTATIVO · 3 SEMANAS</span><h3>Producto</h3><p>Probar una app mínima de validación primaria dentro de Élitros. Debe registrar una operación, sus supuestos, la evidencia obtenida y el próximo experimento; el resultado buscado es aprendizaje verificable, no automatización completa.</p></article>
+        </div>
+      </section>
+      <section className="bmc-team" aria-labelledby="team-title"><div><p className="bmc-eyebrow">STARTUP Ø UNDERTANGO</p><h2 id="team-title">Integrantes</h2></div><ul><li>Alejandro Míguez</li><li>Maxi Rodríguez</li><li>Pablo Cieslik</li></ul></section>
       <footer className="bmc-footer">
         <p><span>Ø</span> UnderTango Club · ÉLITROS 2026</p>
         <a href="/elitros/Undertango_Validation_Blueprint.pdf" download="Undertango_Validation_Blueprint.pdf">

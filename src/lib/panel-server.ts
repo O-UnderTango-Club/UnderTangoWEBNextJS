@@ -74,7 +74,7 @@ export async function snapshot(fresh=false): Promise<ServerSnapshot> {
   if(!fresh&&loading) return loading;
   const read=async()=>{
     const projects=await list(TABLES.projects,Object.values(F.projects));
-    const tasks=await list(TABLES.tasks,Object.values(F.tasks).filter(x=>x!==F.tasks.result));
+    const tasks=await list(TABLES.tasks,Object.values(F.tasks).filter(x=>![F.tasks.result,F.tasks.front,F.tasks.rank].includes(x)));
     const events=await list(TABLES.events,Object.values(F.events));
     const cases=await list(TABLES.cases,Object.values(F.cases));
     cached={projects,tasks,events,cases,updatedAt:new Date().toISOString()}; return cached;

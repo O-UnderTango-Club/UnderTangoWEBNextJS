@@ -1,5 +1,7 @@
 # Panel de control de frentes
 
+> Documento histórico de la etapa Airtable. Desde el cambio a Supabase, las reglas vigentes de fuente, ranking, transacciones y consumo están en [Ranking de acciones en Supabase](ranking-de-acciones.md). Las afirmaciones de este documento sobre Airtable, ranking de proyectos y caché no describen la producción actual.
+
 Ruta privada: https://www.undertangoclub.com/panel-de-control
 
 ## Acceso y configuración

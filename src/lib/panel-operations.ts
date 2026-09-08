@@ -1,6 +1,7 @@
 // Server-side relational adapter. Not activated by credentials or imported rows.
 // Keep this module out of client components; keys are server-only environment vars.
 import { F, type Raw, type Snapshot } from "./panel-model";
+import { isOperationsPreview, previewConfig } from "./panel-preview";
 
 export class OperationsError extends Error {
   constructor(message: string, public status = 503) { super(message); }
@@ -13,6 +14,7 @@ export type OperationsSnapshot = Snapshot & {
 export type OperationsReceipt = { ok: true; id: string; ids: string[]; requestId: string; revision: string; savedAt: string };
 export type OperationsPatch = { table: "follow_ups" | "projects" | "trigger_events"; id: string | null; fields: Record<string, unknown>; create: boolean };
 export function operationsSelected(env: NodeJS.ProcessEnv = process.env) {
+  if (isOperationsPreview(env)) return true;
   if (!env.PANEL_DATA_SOURCE || env.PANEL_DATA_SOURCE === "airtable") return false;
   if (env.PANEL_DATA_SOURCE === "supabase") return true;
   throw new OperationsError("La fuente del panel necesita una configuración explícita válida.");
@@ -82,13 +84,14 @@ export async function readOperationsSnapshot(options: {
   env?: NodeJS.ProcessEnv;
   fetcher?: typeof fetch;
 } = {}): Promise<OperationsSnapshot> {
-  const { url, key } = operationsConfig(options.env);
+  const preview = isOperationsPreview(options.env) ? previewConfig(options.env) : null;
+  const { url, key } = preview ? { url: operationalOrigin, key: preview.publishableKey } : operationsConfig(options.env);
   let response: Response;
   try {
     // Modern secret keys go in apikey, never in Authorization: Bearer.
-    response = await (options.fetcher || fetch)(`${url}/rest/v1/rpc/ut_panel_snapshot_v1`, {
+    response = await (options.fetcher || fetch)(`${url}/rest/v1/rpc/${preview ? "ut_panel_preview_v1" : "ut_panel_snapshot_v1"}`, {
       method: "POST", headers: { apikey: key, "Content-Type": "application/json" },
-      body: "{}", cache: "no-store", signal: AbortSignal.timeout(20000),
+      body: preview ? JSON.stringify({ p_token: preview.readToken }) : "{}", cache: "no-store", signal: AbortSignal.timeout(20000),
       redirect: "error",
     });
   } catch {
@@ -98,7 +101,7 @@ export async function readOperationsSnapshot(options: {
   let payload: unknown;
   try { payload = await response.json(); }
   catch { throw new OperationsError("La respuesta de Supabase no pudo verificarse."); }
-  return parseOperationsSnapshot(payload, options.allowStaged);
+  return parseOperationsSnapshot(payload, !!preview || options.allowStaged);
 }
 
 function parseReceipt(value: unknown): OperationsReceipt {

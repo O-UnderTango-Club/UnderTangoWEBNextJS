@@ -85,7 +85,7 @@ export function revision(record: Raw) {
   return createHash("sha256").update(JSON.stringify(Object.entries(record.fields).sort(([a],[b])=>a.localeCompare(b)))).digest("hex");
 }
 export function responseBoard(data: ServerSnapshot) {
-  return {...board(data),source:"source" in data?data.source:"airtable",snapshotRevision:"globalRevision" in data?data.globalRevision:undefined,migrationAvailable:false,revisions:Object.fromEntries([...data.projects,...data.tasks,...data.events].map(r=>[r.id,revision(r)]))};
+  return {...board(data),readOnly:process.env.VERCEL_ENV==="preview",source:"source" in data?data.source:"airtable",snapshotRevision:"globalRevision" in data?data.globalRevision:undefined,migrationAvailable:false,revisions:Object.fromEntries([...data.projects,...data.tasks,...data.events].map(r=>[r.id,revision(r)]))};
 }
 export async function migratePanelToSupabase(){
   throw new PanelError("La importación se valida fuera del panel. Airtable sigue operativo; no se cambió la fuente de datos.",409);

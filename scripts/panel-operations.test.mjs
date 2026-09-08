@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import ts from 'typescript';
 const compile = path => ts.transpileModule(fs.readFileSync(new URL(path, import.meta.url), 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
-}).outputText;
+}).outputText.replace('"./panel-preview"', JSON.stringify('data:text/javascript;base64,' + Buffer.from(ts.transpileModule(fs.readFileSync(new URL('../src/lib/panel-preview.ts', import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText).toString('base64')));
 const url = source => 'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
 const modelUrl = url(compile('../src/lib/panel-model.ts'));
 const { F } = await import(modelUrl);
@@ -142,4 +142,23 @@ try {
     assert.ok(evidence.startsWith('Historia conservada')); assert.equal(evidence.split('Resultado de prueba').length, 2);
   });
 } finally { globalThis.fetch = nativeFetch; delete process.env.PANEL_DATA_SOURCE; }
+await check('preview usa solo RPC limitado; staged no activa producción ni consume Airtable', async () => {
+  const config = { publishableKey: 'sb_publishable_test', readToken: '1'.repeat(64), deviceSecret: '2'.repeat(64), bootstrapHash: '3'.repeat(64), expiresAt: Date.now()+3600000 };
+  const env = { VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'codex/supabase-operativo-preview', OPERATIONS_PREVIEW_CONFIG: JSON.stringify(config) };
+  assert.equal(m.operationsSelected(env), true);
+  assert.equal(m.operationsSelected({...env,VERCEL_ENV:'production'}), false);
+  assert.equal(m.operationsSelected({...env,VERCEL_GIT_COMMIT_REF:'other'}), false);
+  let calls=0;
+  const result=await m.readOperationsSnapshot({env,fetcher:async (url,options)=>{
+    calls++; assert.equal(url,'https://lqsnrqnmmeyzcnurfpos.supabase.co/rest/v1/rpc/ut_panel_preview_v1');
+    assert.equal(options.headers.apikey,config.publishableKey);
+    assert.deepEqual(JSON.parse(options.body),{p_token:config.readToken});
+    assert.equal(options.redirect,'error'); assert.equal(options.cache,'no-store');
+    return new Response(JSON.stringify({...fixture(),status:'staged'}));
+  }});
+  assert.equal(calls,1); assert.equal(result.migrationStatus,'staged');
+  for(const bad of ['',JSON.stringify({...config,expiresAt:0}),JSON.stringify({...config,publishableKey:'sb_secret_FORBIDDEN'})]) {
+    await assert.rejects(m.readOperationsSnapshot({env:{...env,OPERATIONS_PREVIEW_CONFIG:bad},fetcher:()=>{throw new Error('Must not call any backend');}}),/prueba/);
+  }
+});
 console.log(`${count} relational adapter and server checks passed`);

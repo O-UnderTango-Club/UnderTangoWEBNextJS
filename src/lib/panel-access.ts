@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { isOperationsPreview, previewConfig } from "./panel-preview";
 
 export const DEVICE_COOKIE = "__Host-ut-panel";
 export const DEVICE_MAX_AGE = 90 * 24 * 60 * 60;
@@ -6,7 +7,7 @@ const OWNER = "pablocieslik@gmail.com";
 type Grant = { hash: string; expiresAt: number };
 
 function signingKey() {
-  const secret = process.env.AIRTABLE_PANEL_TOKEN;
+  const secret = isOperationsPreview() ? previewConfig().deviceSecret : process.env.AIRTABLE_PANEL_TOKEN;
   if (!secret) throw new Error("Falta configurar el acceso del panel.");
   // Dedicated domain: the Airtable credential itself never becomes a browser credential.
   return createHmac("sha256", secret).update("undertango/panel/device-session/v1").digest();

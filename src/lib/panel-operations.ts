@@ -37,7 +37,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 export function parseOperationsSnapshot(value: unknown, allowStaged = false): OperationsSnapshot {
   const invalid = () => new OperationsError("Supabase devolvió una lectura incompleta. No se muestran datos antiguos.");
-  if (!object(value) || value.contract !== 1 || typeof value.revision !== "string" ||
+  if (!object(value) || (value.contract!==1&&value.contract!==2) || typeof value.revision !== "string" ||
       !/^(0|[1-9]\d*)$/.test(value.revision) ||
       !["staged", "validated", "active"].includes(String(value.status)) ||
       typeof value.updatedAt !== "string" || !Number.isFinite(Date.parse(value.updatedAt))) throw invalid();
@@ -46,7 +46,7 @@ export function parseOperationsSnapshot(value: unknown, allowStaged = false): Op
   }
   const fields = { projects: F.projects, tasks: F.tasks, events: F.events, cases: F.cases };
   const links = new Set<string>([F.tasks.projects, F.tasks.cases, F.tasks.events, F.tasks.dependencies, F.cases.projects]);
-  const numbers = new Set<string>([F.tasks.order, F.projects.rank]);
+  const numbers = new Set<string>([F.tasks.order, F.tasks.rank, F.projects.rank]);
   const parsed = {} as Record<keyof typeof fields, Raw[]>;
   for (const group of Object.keys(fields) as (keyof typeof fields)[]) {
     const rows = value[group];
@@ -75,7 +75,7 @@ export function parseOperationsSnapshot(value: unknown, allowStaged = false): Op
     const targetIds = new Set(parsed[target].map(row => row.id));
     if (parsed[group].some(row => (row.fields[field] || []).some((id: string) => !targetIds.has(id)))) throw invalid();
   }
-  return { ...parsed, source: "supabase", globalRevision: value.revision,
+  return { ...parsed, rankingMode:value.contract===2?"action":"project", source: "supabase", globalRevision: value.revision,
     migrationStatus: value.status as OperationsSnapshot["migrationStatus"], updatedAt: value.updatedAt };
 }
 
@@ -89,7 +89,7 @@ export async function readOperationsSnapshot(options: {
   let response: Response;
   try {
     // Modern secret keys go in apikey, never in Authorization: Bearer.
-    response = await (options.fetcher || fetch)(`${url}/rest/v1/rpc/${preview ? "ut_panel_preview_v1" : "ut_panel_snapshot_v1"}`, {
+    response = await (options.fetcher || fetch)(`${url}/rest/v1/rpc/${preview ? "ut_panel_preview_v1" : "ut_panel_snapshot_v2"}`, {
       method: "POST", headers: { apikey: key, "Content-Type": "application/json" },
       body: preview ? JSON.stringify({ p_token: preview.readToken }) : "{}", cache: "no-store", signal: AbortSignal.timeout(20000),
       redirect: "error",

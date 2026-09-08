@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { deviceActor } from "./panel-access";
 import { operationsSelected, readOperationsSnapshot, operationsReceipt, commitOperations, OperationsError, type OperationsSnapshot, type OperationsPatch } from "./panel-operations";
-import { BASE, TABLES, F, Snapshot, Raw, Stage, board, closed, classify, projectOpen, taskProjects, validateTask } from "./panel-model";
+import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, board, closed, classify, projectOpen, taskProjects, validateTask } from "./panel-model";
 
 export class PanelError extends Error { constructor(message: string, public status=400) { super(message); } }
 export async function authorize(request: Request) {
@@ -131,7 +131,7 @@ async function performMutation(input: any, actor: string) {
   const fields: Record<string,any>={};
   const rankChanges: {id:string;fields:Record<string,any>}[]=[];
   if(kind==="task") {
-    const allowed=["name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence"];
+    const allowed=["front","rank","name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence"];
     if(Object.keys(change).some(k=>!allowed.includes(k))) throw new PanelError("Campo no editable.");
     for(const k of ["name","owner","reason"] as const) if(k in change) fields[F.tasks[k]]=text(change[k],k==="reason"?1000:250);
     if("doc" in change) fields[F.tasks.doc]=doc(change.doc);
@@ -143,9 +143,38 @@ async function performMutation(input: any, actor: string) {
     if(stage&&!states[stage])throw new PanelError("Estado inválido.");
     if(!current&&!stage) stage="catalog";
     if(stage){[fields[F.tasks.status],fields[F.tasks.gate]]=states[stage];}
+    const actionRanking=operational&&data.rankingMode==="action";
+    if(("front" in change||"rank" in change)&&!actionRanking)throw new PanelError("El ranking individual todavía no está habilitado.",409);
     const candidate={id:current?.id||"new",fields:{...current?.fields,...fields}};
+    if(actionRanking){
+      const wasClosed=current?closed(current):false, isClosed=closed(candidate);
+      if(isClosed&&("front" in change||"rank" in change))throw new PanelError("Reabrí la acción antes de cambiar su posición.");
+      const front=change.front??candidate.fields[F.tasks.front];
+      const moving=("front" in change||"rank" in change||(wasClosed&&!!front))&&!isClosed;
+      if(moving){
+        if(!FRONTS.includes(front))throw new PanelError("Elegí el frente de la acción.");
+        const ordered=(group:string)=>data.tasks.filter(t=>t.id!==candidate.id&&!closed(t)&&t.fields[F.tasks.front]===group).sort((a,b)=>(Number(a.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)-(Number(b.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)||a.id.localeCompare(b.id));
+        const destination=ordered(front);
+        const rank=change.rank??(change.front!==undefined||wasClosed?destination.length+1:candidate.fields[F.tasks.rank]);
+        if(!Number.isInteger(rank)||rank<1)throw new PanelError("Elegí una posición entera positiva.");
+        const position=Math.min(rank,destination.length+1);
+        Object.assign(fields,{[F.tasks.front]:front,[F.tasks.rank]:position});
+        Object.assign(candidate.fields,fields);
+        destination.splice(position-1,0,candidate);
+        const recordRanks=(group:Raw[])=>group.forEach((t,i)=>{if(t.id!==candidate.id&&t.fields[F.tasks.rank]!==i+1)rankChanges.push({id:t.id,fields:{[F.tasks.rank]:i+1}});});
+        recordRanks(destination);
+        const oldFront=current?.fields[F.tasks.front];
+        if(FRONTS.includes(oldFront)&&oldFront!==front)recordRanks(ordered(oldFront));
+      }
+      if(isClosed&&!wasClosed&&current&&FRONTS.includes(current.fields[F.tasks.front])){
+        data.tasks.filter(t=>t.id!==current.id&&!closed(t)&&t.fields[F.tasks.front]===current.fields[F.tasks.front])
+          .sort((a,b)=>(Number(a.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)-(Number(b.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)||a.id.localeCompare(b.id))
+          .forEach((t,i)=>{if(t.fields[F.tasks.rank]!==i+1)rankChanges.push({id:t.id,fields:{[F.tasks.rank]:i+1}});});
+      }
+    }
     const target=stage||classify(candidate,{...data,tasks:data.tasks.filter(t=>t.id!==candidate.id).concat(candidate)}).stage;
-    validateTask(candidate,data,target);
+    const validationData=rankChanges.length?{...data,tasks:data.tasks.map(t=>{const patch=rankChanges.find(p=>p.id===t.id);return patch?{...t,fields:{...t.fields,...patch.fields}}:t;})}:data;
+    validateTask(candidate,validationData,target);
     const evidence="evidence" in change?text(change.evidence,1500):"";
     if((stage==="done"||stage==="cancelled")&&!evidence)throw new PanelError(stage==="done"?"Registrá brevemente el resultado para finalizar.":"Registrá por qué se descarta.");
     if(evidence){
@@ -154,6 +183,7 @@ async function performMutation(input: any, actor: string) {
     }
     if(!current&&data.tasks.some(t=>!closed(t)&&String(t.fields[F.tasks.name]).trim().toLowerCase()===String(candidate.fields[F.tasks.name]).toLowerCase()))throw new PanelError("Ya existe una acción abierta con ese nombre. Buscala para continuar.",409);
   } else if(kind==="project") {
+    if(data.rankingMode==="action"&&("front" in change||"rank" in change))throw new PanelError("El ranking se edita en cada acción, no en el proyecto.");
     if(!current) throw new PanelError(operational?"Los proyectos se crean en el área operativa de Supabase; aquí podés ordenar los existentes.":"Los proyectos se crean en Airtable; aquí podés ordenar los existentes.");
     if(Object.keys(change).some(k=>!["front","rank","status","doc"].includes(k)))throw new PanelError("Campo no editable.");
     if("doc" in change)fields[F.projects.doc]=doc(change.doc);
@@ -193,7 +223,7 @@ async function performMutation(input: any, actor: string) {
     const destination: OperationsPatch["table"]=kind==="task"?"follow_ups":kind==="project"?"projects":"trigger_events";
     return operationsCall(()=>commitOperations(input.requestId,actor,input,data.globalRevision,[
       {table:destination,id:current?.id||null,fields,create:!current},
-      ...rankChanges.map(p=>({table:"projects" as const,id:p.id,fields:p.fields,create:false})),
+      ...rankChanges.map(p=>({table:kind==="task"?"follow_ups" as const:"projects" as const,id:p.id,fields:p.fields,create:false})),
     ]));
   }
   const saved=await airtable(table,current?`/${current.id}?returnFieldsByFieldId=true`:"?returnFieldsByFieldId=true",{method:current?"PATCH":"POST",body:JSON.stringify({fields,typecast:false})});

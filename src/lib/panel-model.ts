@@ -2,7 +2,7 @@ export const BASE = "appJwwHP1Wkoxo54q";
 export const TABLES = { projects: "tblf6DZBViGbvxRzS", tasks: "tblnmNNkFemgOlOlw", events: "tblQhjY5HpSlMPCpp", cases: "tblguHWSAk4wyfNjQ" };
 export const F = {
   projects: { name:"fldChULRkd1GrXY3w", status:"fldcypAILEecLnLGQ", front:"fldy1wMKKlc6TRvmf", rank:"fldGtRBM8QYXGZQPd", purpose:"fldrApFZcuzKj3Gax", doc:"fldiMnJUvRox1quBE" },
-  tasks: { name:"fldLO5zuV38eu576D", description:"fldlv5rjVOU4TLjD5", owner:"fldi6lt4W8IAlBlAm", status:"fldLXBjnEHgHDJvX0", priority:"fldkWFX5EzySkDrLi", due:"fldixmckZrFiyJ6xd", result:"fldn1XmmTwRDnzQDd", cases:"fldazeCmB0kKeC56A", projects:"fldOCm8x8sOWDNlw6", events:"fldFwHCG8zQkO2gHv", gate:"fldh7b5L9hg89tle4", reason:"fldnNMs1CYSffH0Cc", trigger:"fldcTRjO3pX2hy60N", dependencies:"fldoqev0eaVgZVt6G", order:"fldZCklniYktPL5NA", doc:"fldZfQfRxnxZD2WZI" },
+  tasks: { front:"action_front", rank:"action_rank", name:"fldLO5zuV38eu576D", description:"fldlv5rjVOU4TLjD5", owner:"fldi6lt4W8IAlBlAm", status:"fldLXBjnEHgHDJvX0", priority:"fldkWFX5EzySkDrLi", due:"fldixmckZrFiyJ6xd", result:"fldn1XmmTwRDnzQDd", cases:"fldazeCmB0kKeC56A", projects:"fldOCm8x8sOWDNlw6", events:"fldFwHCG8zQkO2gHv", gate:"fldh7b5L9hg89tle4", reason:"fldnNMs1CYSffH0Cc", trigger:"fldcTRjO3pX2hy60N", dependencies:"fldoqev0eaVgZVt6G", order:"fldZCklniYktPL5NA", doc:"fldZfQfRxnxZD2WZI" },
   events: { key:"fldDFsxIuKAGvzCW8", name:"fldnJbUExwp1QxEet", status:"fldYDOPJvKg4RAkSo", type:"fld03HgdmMkrXQsz9", occurred:"fldwIQR5BHirvuLLD", evidence:"fldap8xuzZwCpqouP" },
   cases: { name:"fldTyP9DE3ANVtoBN", projects:"fldCd5XSjO7ySQYoj" }
 };
@@ -12,7 +12,7 @@ export function frontPosition(front: string, rank: number) {
   return group && Number.isInteger(rank) && rank > 0 && rank !== 9999 ? `${group}.${rank}` : "Sin posición";
 }
 export type Raw = { id: string; fields: Record<string, any> };
-export type Snapshot = { projects: Raw[]; tasks: Raw[]; events: Raw[]; cases: Raw[]; updatedAt: string };
+export type Snapshot = { projects: Raw[]; tasks: Raw[]; events: Raw[]; cases: Raw[]; updatedAt: string; rankingMode?: "project" | "action" };
 export type Stage = "ready" | "recurring" | "doing" | "waiting" | "catalog" | "done" | "cancelled";
 const s = (v: unknown): string => typeof v === "string" ? v : "";
 const links = (v: unknown): string[] => Array.isArray(v) ? v.filter(x => typeof x === "string") : [];
@@ -41,6 +41,11 @@ export function classify(t: Raw, data: Snapshot): { stage: Stage; issues: string
   if (!projects.length && !caseIds.length) issues.push("Vincular a un proyecto o caso");
   if (caseIds.some(id=>!data.cases.some(c=>c.id===id))) issues.push("Caso vinculado no encontrado");
   if (projects.length && !data.projects.some(p=>projects.includes(p.id)&&projectOpen(p))) issues.push("Sólo vinculada a proyectos cerrados");
+  if (data.rankingMode==="action") {
+    if(!FRONTS.includes(s(f[F.tasks.front]))) issues.push("Asignar frente a la acción");
+    if(!Number.isInteger(f[F.tasks.rank]) || f[F.tasks.rank]<1) issues.push("Asignar posición a la acción");
+    if(data.tasks.some(other=>other.id!==t.id&&!closed(other)&&other.fields[F.tasks.front]===f[F.tasks.front]&&other.fields[F.tasks.rank]===f[F.tasks.rank]&&!!f[F.tasks.rank])) issues.push("Posición repetida entre acciones");
+  }
   if (!gate || gate==="Por revisar") issues.push("Definir la acción y su estado");
   const expected: Record<string,string>={"Acción inmediata":"Pendiente","Acción recurrente":"Pendiente","En acción":"En curso","En espera":"En espera"};
   if (gate && gate!=="Por revisar" && expected[gate]!==status) issues.push("Estados incompatibles en Seguimientos");
@@ -66,26 +71,28 @@ export function board(data: Snapshot) {
   const projects=data.projects.map(p=>({id:p.id,name:s(p.fields[F.projects.name]),status:s(p.fields[F.projects.status]),front:s(p.fields[F.projects.front]),rank:Number(p.fields[F.projects.rank])||9999,purpose:s(p.fields[F.projects.purpose]).slice(0,500),doc:s(p.fields[F.projects.doc]),open:projectOpen(p)}));
   const tasks=data.tasks.map(t=>{
     const f=t.fields;
-    return {id:t.id,name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data)};
+    return {id:t.id,front:s(f[F.tasks.front]),rank:Number(f[F.tasks.rank])||0,name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data)};
   });
   const priorityProject=(ids:string[])=>projects.filter(p=>ids.includes(p.id)&&p.open&&FRONTS.includes(p.front)).sort((a,b)=>FRONTS.indexOf(a.front)-FRONTS.indexOf(b.front)||a.rank-b.rank||a.id.localeCompare(b.id))[0];
   tasks.sort((a,b)=>{
+    if(data.rankingMode==="action") return (FRONTS.includes(a.front)?FRONTS.indexOf(a.front):9)-(FRONTS.includes(b.front)?FRONTS.indexOf(b.front):9)||(a.rank||Number.MAX_SAFE_INTEGER)-(b.rank||Number.MAX_SAFE_INTEGER)||a.name.localeCompare(b.name,"es")||a.id.localeCompare(b.id);
     const pa=priorityProject(a.projectIds),pb=priorityProject(b.projectIds);
     return (pa?FRONTS.indexOf(pa.front):9)-(pb?FRONTS.indexOf(pb.front):9)||(pa?.rank||9999)-(pb?.rank||9999)||(a.order||9999)-(b.order||9999)||a.name.localeCompare(b.name,"es")||a.id.localeCompare(b.id);
   });
   const fronts=FRONTS.map(name=>({name,tasks:tasks.filter(t=>{
+    if(data.rankingMode==="action") return ["ready","recurring"].includes(t.stage)&&t.front===name&&Number.isInteger(t.rank)&&t.rank>0;
     const p=priorityProject(t.projectIds);
     return ["ready","recurring"].includes(t.stage)&&p?.front===name&&Number.isInteger(p.rank)&&p.rank>=1&&p.rank!==9999;
   }).slice(0,3).map(t=>t.id)}));
   const projectIssues=projects.filter(p=>p.open).flatMap(p=>{
     const reasons=[];
-    if(!FRONTS.includes(p.front)) reasons.push("Asignar frente");
-    if(p.rank===9999||p.rank<1||!Number.isInteger(p.rank)) reasons.push("Asignar posición");
-    if(projects.some(q=>q.open&&q.id!==p.id&&q.front===p.front&&q.rank===p.rank)) reasons.push("Posición repetida en el frente");
+    if(data.rankingMode!=="action"&&!FRONTS.includes(p.front)) reasons.push("Asignar frente");
+    if(data.rankingMode!=="action"&&(p.rank===9999||p.rank<1||!Number.isInteger(p.rank))) reasons.push("Asignar posición");
+    if(data.rankingMode!=="action"&&projects.some(q=>q.open&&q.id!==p.id&&q.front===p.front&&q.rank===p.rank)) reasons.push("Posición repetida en el frente");
     if(!tasks.some(t=>t.projectIds.includes(p.id)&&!["done","cancelled"].includes(t.stage))) reasons.push("Definir próximo paso");
     return reasons.length?[{id:p.id,reasons}]:[];
   });
-  return {updatedAt:data.updatedAt,projects,tasks,fronts,projectIssues,events:data.events.map(e=>({id:e.id,name:s(e.fields[F.events.name]),status:s(e.fields[F.events.status]),type:s(e.fields[F.events.type]),evidence:s(e.fields[F.events.evidence]),occurred:s(e.fields[F.events.occurred])})),cases:data.cases.map(c=>({id:c.id,name:s(c.fields[F.cases.name])}))};
+  return {rankingMode:data.rankingMode||"project",updatedAt:data.updatedAt,projects,tasks,fronts,projectIssues,events:data.events.map(e=>({id:e.id,name:s(e.fields[F.events.name]),status:s(e.fields[F.events.status]),type:s(e.fields[F.events.type]),evidence:s(e.fields[F.events.evidence]),occurred:s(e.fields[F.events.occurred])})),cases:data.cases.map(c=>({id:c.id,name:s(c.fields[F.cases.name])}))};
 }
 export type Board = ReturnType<typeof board>;
 export function projectActionSummary(projectId: string, tasks: Board["tasks"]) {

@@ -28,7 +28,7 @@ await check('staged y validated no activan el panel', () => {
   }
 });
 await check('rechaza lecturas incompletas o contratos incompatibles', () => {
-  for (const patch of [{ tasks: null }, { contract: 2 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
+  for (const patch of [{ tasks: null }, { contract: 3 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
     assert.throws(() => m.parseOperationsSnapshot({ ...fixture(), ...patch }), /incompleta/);
   }
 });
@@ -51,7 +51,7 @@ await check('no reutiliza Analytics ni claves públicas', () => {
 const env = { OPERATIONS_SUPABASE_URL: 'https://lqsnrqnmmeyzcnurfpos.supabase.co/', OPERATIONS_SUPABASE_SECRET_KEY: 'sb_secret_TEST_ONLY' };
 await check('RPC usa apikey privado, sin bearer ni caché ni redirecciones', async () => {
   const s = await m.readOperationsSnapshot({ env, fetcher: async (endpoint, init) => {
-    assert.equal(endpoint, 'https://lqsnrqnmmeyzcnurfpos.supabase.co/rest/v1/rpc/ut_panel_snapshot_v1');
+    assert.equal(endpoint, 'https://lqsnrqnmmeyzcnurfpos.supabase.co/rest/v1/rpc/ut_panel_snapshot_v2');
     assert.equal(init.headers.apikey, env.OPERATIONS_SUPABASE_SECRET_KEY); assert.equal(init.headers.Authorization, undefined);
     assert.equal(init.cache, 'no-store'); assert.equal(init.redirect, 'error'); assert.equal(init.body, '{}');
     return Response.json(fixture());
@@ -84,7 +84,7 @@ const nativeFetch = globalThis.fetch;
 globalThis.fetch = async (endpoint, init) => {
   assert.ok(String(endpoint).startsWith('https://lqsnrqnmmeyzcnurfpos.supabase.co/rest/v1/rpc/'), 'Never fall back to Airtable or Analytics');
   const body = JSON.parse(init.body);
-  if (endpoint.endsWith('/ut_panel_snapshot_v1')) { readCalls++; return Response.json({ ...db, revision: String(revision) }); }
+  if (endpoint.endsWith('/ut_panel_snapshot_v2')) { readCalls++; return Response.json({ ...db, revision: String(revision) }); }
   if (endpoint.endsWith('/ut_panel_receipt_v1')) return Response.json(receipts.get(body.p_request_id) || null);
   assert.ok(endpoint.endsWith('/ut_panel_commit_v1')); commitCalls++;
   if (race) { revision++; race = false; }
@@ -140,6 +140,55 @@ try {
     assert.equal(result.ok, true); assert.equal(commitCalls, beforeCommit); assert.equal(readCalls, beforeRead);
     const evidence = db.tasks[0].fields[F.tasks.result];
     assert.ok(evidence.startsWith('Historia conservada')); assert.equal(evidence.split('Resultado de prueba').length, 2);
+  });
+  db={...fixture(),contract:2};
+  db.projects=[row('p',{[F.projects.name]:'Proyecto A',[F.projects.status]:'Activo',[F.projects.front]:'Terciario',[F.projects.rank]:50}),row('q',{[F.projects.name]:'Proyecto B',[F.projects.status]:'Activo',[F.projects.front]:'Primario',[F.projects.rank]:1})];
+  const task=(id,rank,project='p',more={})=>row(id,{[F.tasks.name]:id,[F.tasks.status]:'Pendiente',[F.tasks.gate]:'Acción inmediata',[F.tasks.projects]:[project],[F.tasks.front]:'Primario',[F.tasks.rank]:rank,...more});
+  db.tasks=[task('t',1),task('u',3),task('v',2,'q'),task('w',4,'p',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera',[F.tasks.dependencies]:['t']})];
+  await check('v2 ordena acciones del mismo proyecto de forma independiente y salta esperas',async()=>{
+    const result=server.responseBoard(await server.snapshot());
+    assert.equal(result.rankingMode,'action');
+    assert.deepEqual(result.tasks.map(t=>t.id),['t','v','u','w']);
+    assert.deepEqual(result.fronts[0].tasks,['t','v','u']);
+    assert.equal(result.fronts[2].tasks.length,0);
+  });
+  await check('bajar una acción reordena sólo las posiciones afectadas, no su proyecto',async()=>{
+    const projectsBefore=structuredClone(db.projects);
+    await server.mutate(await intent('task','t',{front:'Primario',rank:4}),'test-actor');
+    assert.ok(lastPatches.every(p=>p.table==='follow_ups'));
+    assert.deepEqual(db.projects,projectsBefore);
+    assert.deepEqual(server.responseBoard(await server.snapshot()).tasks.map(t=>t.id),['v','u','w','t']);
+    assert.equal(db.tasks.find(t=>t.id==='u').fields[F.tasks.rank],2);
+  });
+  await check('mover entre frentes afecta sólo a esa acción y compacta el origen',async()=>{
+    await server.mutate(await intent('task','u',{front:'Secundario',rank:1}),'test-actor');
+    assert.equal(db.tasks.find(t=>t.id==='u').fields[F.tasks.front],'Secundario');
+    assert.equal(db.tasks.find(t=>t.id==='t').fields[F.tasks.front],'Primario');
+    assert.deepEqual(server.responseBoard(await server.snapshot()).fronts[1].tasks,['u']);
+  });
+  await check('vincular otros proyectos conserva posición y una sola tarjeta',async()=>{
+    const before=db.tasks.find(t=>t.id==='t').fields[F.tasks.rank];
+    await server.mutate(await intent('task','t',{projects:['p','q']}),'test-actor');
+    const result=server.responseBoard(await server.snapshot());
+    assert.equal(result.tasks.filter(t=>t.id==='t').length,1);
+    assert.equal(result.tasks.find(t=>t.id==='t').rank,before);
+  });
+  await check('finalizar libera posición; reabrir agrega al final sin colisión',async()=>{
+    await server.mutate(await intent('task','v',{stage:'done',evidence:'Verificado'}),'test-actor');
+    let result=server.responseBoard(await server.snapshot());
+    assert.deepEqual(result.tasks.filter(t=>t.front==='Primario'&&!['done','cancelled'].includes(t.stage)).map(t=>t.rank),[1,2]);
+    await server.mutate(await intent('task','v',{stage:'ready'}),'test-actor');
+    result=server.responseBoard(await server.snapshot());
+    assert.equal(result.tasks.find(t=>t.id==='v').rank,3);
+  });
+  await check('ranking inválido y edición del ranking de proyectos se rechazan',async()=>{
+    await assert.rejects(server.mutate(await intent('task','t',{rank:1.5}),'test-actor'),/entera/);
+    await assert.rejects(server.mutate(await intent('task','t',{front:'Incorrecto',rank:1}),'test-actor'),/frente/);
+    await assert.rejects(server.mutate(await intent('project','p',{rank:2}),'test-actor'),/cada acción/);
+    db.tasks.push(task('missing',0,'p',{[F.tasks.front]:''}));
+    const result=server.responseBoard(await server.snapshot());
+    assert.equal(result.tasks.find(t=>t.id==='missing').stage,'catalog');
+    assert.ok(!result.fronts.some(f=>f.tasks.includes('missing')));
   });
 } finally { globalThis.fetch = nativeFetch; delete process.env.PANEL_DATA_SOURCE; }
 await check('preview usa solo RPC limitado; staged no activa producción ni consume Airtable', async () => {

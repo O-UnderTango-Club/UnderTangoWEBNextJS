@@ -90,7 +90,7 @@ export default function LaCavaPage() {
             <h1 id="la-cava-title">La Cava</h1>
             <p className={styles.heroLine}>Tango, vinho e encontro no ritmo de cada grupo.</p>
             <p className={styles.heroIntro}>
-              Experiências cobradas <strong>por pessoa</strong>. O tamanho do grupo define a formação artística: começamos com uma dupla de tango e ampliamos até músicos ao vivo, bailarinos e uma vivência integral.
+              Experiências <strong>por pessoa</strong>. O tamanho do grupo define a formação artística: começamos com uma dupla de tango e ampliamos até músicos ao vivo, bailarinos e uma vivência integral.
             </p>
 
             <dl className={styles.heroFacts}>

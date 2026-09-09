@@ -1,4 +1,4 @@
-import { financeText, decimalCents, validFinanceDate, type FinanceRecord, type FinanceSnapshot, type FinanceTable } from "./finance-model";
+import { financeText, financeLinks, decimalCents, validFinanceDate, type FinanceRecord, type FinanceSnapshot, type FinanceTable } from "./finance-model";
 
 const cohort = "reconstruccion-2026-20260909";
 const value = (row: FinanceRecord, table: FinanceTable, field: string) => financeText(row, table, field) || "";
@@ -54,10 +54,30 @@ export function buildFinanceReport(snapshot: FinanceSnapshot, asOf = new Intl.Da
   const policyTotals = Object.fromEntries(["ARS", "USD"].map(currency => [currency, sum(policies.filter(row => value(row, "obligations", "currency") === currency).flatMap(row => {
     const total = amount(row, "obligations", "originalAmount"); return total === null ? [] : [total];
   }))]));
-  const receipts = snapshot.movements.filter(row => value(row, "movements", "notes").includes(cohort) && value(row, "movements", "status") === "Confirmado").map(row => ({
+  const receipts = snapshot.movements.filter(row => (value(row, "movements", "notes").includes(cohort) || value(row, "movements", "notes").includes("Informe financiero 2026.")) && value(row, "movements", "status") === "Confirmado" && value(row, "movements", "date").startsWith("2026-")).map(row => ({
     id: row.id, title: value(row, "movements", "name"), probableDebtCollection: row.id === "sb-bc732d30-2ccf-4a32-aa99-7f62fc3f18e4", date: value(row, "movements", "date"), type: value(row, "movements", "type"),
-    amount: amount(row, "movements", "amount"), currency: value(row, "movements", "currency"), concept: value(row, "movements", "concept"),
-  }));
+    amount: amount(row, "movements", "amount"), currency: value(row, "movements", "currency"), concept: value(row, "movements", "concept"), operations: financeLinks(row, "movements", "operations"),
+  })).sort((a, b) => b.date.localeCompare(a.date));
+  const collectionMonths = months.map(({ month }) => {
+    const rows = receipts.filter(row => row.type === "Ingreso" && row.date.startsWith(month));
+    return { month, count: rows.length, amounts: Object.fromEntries(["ARS", "USD"].map(currency => {
+      const matching = rows.filter(row => row.currency === currency && row.amount !== null);
+      return [currency, matching.length ? sum(matching.map(row => row.amount!)) : null];
+    })) };
+  });
+  const honoraria = snapshot.obligations.filter(row => value(row, "obligations", "notes").includes("distribucion-honorarios-2026.") && value(row, "obligations", "type") === "Por pagar");
+  const allocationKeys = [...new Set(honoraria.flatMap(row => financeLinks(row, "obligations", "operations").map(id => JSON.stringify([id, value(row, "obligations", "currency")]))))];
+  const allocations = allocationKeys.map(key => {
+    const [operationId, currency] = JSON.parse(key) as [string, string];
+    const rows = honoraria.filter(row => financeLinks(row, "obligations", "operations").includes(operationId) && value(row, "obligations", "currency") === currency);
+    const incoming = receipts.filter(row => row.type === "Ingreso" && row.operations.includes(operationId) && row.currency === currency);
+    const payments = rows.map(row => ({ id: row.id, title: value(row, "obligations", "name"), amount: amount(row, "obligations", "originalAmount"), balance: amount(row, "obligations", "balance"), status: value(row, "obligations", "status") }));
+    const received = incoming.length && incoming.every(row => row.amount !== null) ? sum(incoming.map(row => row.amount!)) : null;
+    const committed = payments.every(row => row.amount !== null) ? sum(payments.map(row => row.amount!)) : null;
+    const pending = payments.every(row => row.balance !== null) ? sum(payments.map(row => row.balance!)) : null;
+    return { operationId, currency, title: snapshot.operations.find(row => row.id === operationId)?.name || "Operación", payments, received, committed, pending,
+      unassigned: received !== null && committed !== null ? Math.round((received - committed) * 100) / 100 : null };
+  });
   const financial = snapshot.obligations.filter(row => financialIds.includes(row.id)).map(row => ({
     id: row.id, title: value(row, "obligations", "name").split(" — ").slice(0, 2).join(" · "), currency: value(row, "obligations", "currency"),
     balance: amount(row, "obligations", "balance"), due: value(row, "obligations", "dueDate"), status: value(row, "obligations", "status"),
@@ -69,8 +89,8 @@ export function buildFinanceReport(snapshot: FinanceSnapshot, asOf = new Intl.Da
   const original = pataNegra ? amount(pataNegra, "obligations", "originalAmount") : null;
   const balance = pataNegra ? amount(pataNegra, "obligations", "balance") : null;
   const difference = original !== null && balance !== null ? Math.round((original - balance) * 100) / 100 : null;
-  return { year: 2026, asOf, readAt: snapshot.updatedAt, revision: snapshot.revision, scope: "Documentos recuperados en la revisión del 09/09/2026; cobertura parcial.",
-    invoices, annual, prior, totals, months, customers, policies: { count: policies.length, totals: policyTotals }, receipts, financial,
+  return { year: 2026, asOf, readAt: snapshot.updatedAt, revision: snapshot.revision, scope: "Documentos recuperados desde la revisión del 09/09/2026 y movimientos confirmados por Pablo incorporados al informe; cobertura parcial.",
+    invoices, annual, prior, totals, months, collectionMonths, allocations, customers, policies: { count: policies.length, totals: policyTotals }, receipts, financial,
     pataNegra: { original, balance, receipt: nabila?.amount ?? null, possibleAlreadyAllocated: !!pataNegra && value(pataNegra, "obligations", "currency") === "ARS" && difference !== null && difference > 0 && nabila?.amount === difference && nabila.currency === "ARS" },
     warnings: [...new Set(warnings)], cash: null, profit: null };
 }

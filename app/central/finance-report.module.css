@@ -40,7 +40,7 @@
 .shares i { display: block; height: 6px; flex: 0 0 auto; margin-top: 3px; }
 .note { padding: 12px 14px; border-left: 2px solid #b08d51; background: #eae2d2; color: #66563d; font-family: var(--font-undertango-sans), Arial, sans-serif !important; font-size: 12px; }
 .receipts article { padding: 22px; background: #e7ece3; border-top: 3px solid #52705a; }
-.receipts article:nth-child(2) { background: #eae3d7; border-color: #a28658; }
+.receipts article[data-kind="Egreso"] { background: #eae3d7; border-color: #a28658; }
 .receipts span { display: block; color: #536254; font-family: var(--font-undertango-sans), Arial, sans-serif; font-size: 11px; }
 .receipts strong { display: block; font-size: 27px; font-weight: 400; margin: 6px 0 14px; }
 .callout { margin: 22px 0; padding: 20px; border: 1px solid #b39466; }
@@ -87,3 +87,6 @@
 }
 
 @media (min-width: 1000px) { .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); } .metrics article { padding: 20px 16px; } .metrics strong { font-size: 23px; } .unknown strong { font-size: 20px; } }
+
+.switch + .caption { margin-top: 14px; }
+.callout .tableWrap { margin-bottom: 18px; }

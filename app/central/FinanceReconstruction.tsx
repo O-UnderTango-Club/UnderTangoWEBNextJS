@@ -15,6 +15,7 @@ export default function FinanceReconstruction() {
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [currency, setCurrency] = useState("ARS");
+  const [graphMode, setGraphMode] = useState<"collections" | "invoices">("collections");
   useEffect(() => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25000);
@@ -39,7 +40,8 @@ export default function FinanceReconstruction() {
   const data = report?.dashboard;
   const customers = data?.customers.filter(row => row.currency === currency) || [];
   const leading = customers[0];
-  const maxMonth = Math.max(1, ...(data?.months.map(row => row.amounts[currency] || 0) || []));
+  const chartMonths = (graphMode === "collections" ? data?.collectionMonths : data?.months) || [];
+  const maxMonth = Math.max(1, ...chartMonths.map(row => row.amounts[currency] || 0));
   const maxDebt = Math.max(1, ...(data?.financial.map(row => row.balance || 0) || []));
 
   return <div className={css.report}>
@@ -62,27 +64,34 @@ export default function FinanceReconstruction() {
       </div>
 
       <section className={css.section} aria-labelledby="report-monthly-title">
-        <div className={css.sectionHead}><div><p className={css.eyebrow}>01 · La actividad que podemos demostrar</p><h4 id="report-monthly-title">Facturación por mes de servicio</h4></div><div className={css.switch} aria-label="Moneda del gráfico">{["ARS", "USD"].map(unit => <button key={unit} type="button" aria-pressed={currency === unit} onClick={() => setCurrency(unit)}>{unit}</button>)}</div></div>
-        <p className={css.caption}>Cada barra corresponde al período trabajado. Un mes sin comprobante en esta revisión queda marcado como «sin documento», nunca como venta cero.</p>
-        <div className={css.chart} role="img" aria-label={`Facturación documentada por mes en ${currency}. Detalle accesible en la tabla siguiente.`}>
-          {data.months.map((row, index) => { const value = row.amounts[currency]; return <div className={css.column} key={row.month}>
-            <div className={css.barSpace}>{value === null ? <div className={css.missing}><span>Sin doc.</span></div> : <div className={css.bar} style={{ height: `${Math.max(3, value / maxMonth * 100)}%` }}><b>{short(value)}</b></div>}</div>
+        <div className={css.sectionHead}><div><p className={css.eyebrow}>01 · La actividad que podemos demostrar</p><h4 id="report-monthly-title">{graphMode === "collections" ? "Cobros por mes de recepción" : "Facturación por mes de servicio"}</h4></div><div className={css.switch} aria-label="Moneda del gráfico">{["ARS", "USD"].map(unit => <button key={unit} type="button" aria-pressed={currency === unit} onClick={() => setCurrency(unit)}>{unit}</button>)}</div></div>
+        <div className={css.switch} aria-label="Contenido del gráfico"><button type="button" aria-pressed={graphMode === "collections"} onClick={() => setGraphMode("collections")}>Cobros</button><button type="button" aria-pressed={graphMode === "invoices"} onClick={() => setGraphMode("invoices")}>Facturación</button></div>
+        <p className={css.caption}>{graphMode === "collections" ? "Cobros confirmados incluidos en este informe, por fecha de recepción. Pueden corresponder a deudas anteriores o a trabajos posteriores. Un mes sin registro no equivale a ingreso cero; este gráfico no es el saldo disponible." : "Cada barra corresponde al período trabajado. Un mes sin factura en esta revisión queda marcado como «sin documento», nunca como venta cero."}</p>
+        <div className={css.chart} role="img" aria-label={`${graphMode === "collections" ? "Cobros confirmados" : "Facturación documentada"} por mes en ${currency}. Detalle accesible en la tabla siguiente.`}>
+          {chartMonths.map((row, index) => { const value = row.amounts[currency]; return <div className={css.column} key={row.month}>
+            <div className={css.barSpace}>{value === null ? <div className={css.missing}><span>{graphMode === "collections" ? "Sin reg." : "Sin doc."}</span></div> : <div className={css.bar} style={{ height: `${Math.max(3, value / maxMonth * 100)}%` }}><b>{short(value)}</b></div>}</div>
             <span>{monthNames[index]}</span>
           </div>; })}
         </div>
-        <details className={css.details}><summary>Ver los importes del gráfico</summary><div className={css.tableWrap}><table><thead><tr><th>Mes de servicio</th><th>ARS</th><th>USD</th></tr></thead><tbody>{data.months.map((row, index) => <tr key={row.month}><td>{monthNames[index]} 2026</td>{["ARS", "USD"].map(unit => <td key={unit}>{row.amounts[unit] === null ? "Sin documento en este lote" : money(row.amounts[unit]!, unit)}</td>)}</tr>)}</tbody></table></div></details>
-        <div className={css.twoColumns}>
+        <details className={css.details}><summary>Ver los importes del gráfico</summary><div className={css.tableWrap}><table><thead><tr><th>{graphMode === "collections" ? "Mes de cobro" : "Mes de servicio"}</th><th>ARS</th><th>USD</th></tr></thead><tbody>{chartMonths.map((row, index) => <tr key={row.month}><td>{monthNames[index]} 2026</td>{["ARS", "USD"].map(unit => <td key={unit}>{row.amounts[unit] === null ? "Sin registro en este informe" : money(row.amounts[unit]!, unit)}</td>)}</tr>)}</tbody></table></div></details>
+        {graphMode === "invoices" && <div className={css.twoColumns}>
           <article className={css.insight}><h5>Una base muy concentrada</h5>{leading ? <><strong className={css.bigNumber}>{new Intl.NumberFormat("es-AR", { style: "percent", maximumFractionDigits: 1 }).format(leading.share)}</strong><p>de la facturación documentada en {currency} corresponde a <b>{leading.customer}</b>. Describe esta muestra, no toda la actividad de UnderTango.</p><div className={css.shares}>{customers.map((row, index) => <div key={row.customer}><span>{row.customer}</span><b>{money(row.amount, row.currency)}</b><i style={{ width: `${row.share * 100}%`, backgroundColor: index ? "#b99b65" : "#6c2838" }} /></div>)}</div></> : <p>Todavía no hay documentos para calcular esta distribución.</p>}</article>
           <article className={css.insight}><h5>Qué significa para 2027</h5><p>La muestra en pesos depende principalmente de un cliente. Conviene construir continuidad comercial y registrar el margen de cada proyecto; facturar más, por sí solo, no demuestra que quede más caja.</p><p>La ausencia de comprobantes en los últimos meses de la revisión pide recuperar documentación. No permite concluir que no hubo ventas.</p></article>
-        </div>
-        {data.prior.length > 0 && <p className={css.note}>Corte entre años: {data.prior.map(row => `${row.document}, ${money(row.amount, row.currency)}`).join("; ")} corresponde a servicios anteriores a 2026 y queda fuera de estos totales.</p>}
+        </div>}
+        {graphMode === "invoices" && data.prior.length > 0 && <p className={css.note}>Corte entre años: {data.prior.map(row => `${row.document}, ${money(row.amount, row.currency)}`).join("; ")} corresponde a servicios anteriores a 2026 y queda fuera de estos totales.</p>}
       </section>
 
       <section className={css.section} aria-labelledby="report-cash-title">
-        <p className={css.eyebrow}>02 · Lo cobrado no es lo facturado</p><h4 id="report-cash-title">Dinero que pudimos comprobar</h4>
-        <div className={css.receipts}>{data.receipts.map(row => <article key={row.id}><span>{date(row.date)} · {row.type === "Ingreso" ? "Recibido" : "Pagado"}</span><strong>{row.amount === null ? "Importe por verificar" : money(row.amount, row.currency)}</strong><h5>{row.title}</h5><p>{row.probableDebtCollection ? "Probable cobro de una deuda anterior. Falta identificar su imputación; no se cuenta como una venta nueva." : "El pago existe. Falta identificar el concepto y el proyecto al que corresponde."}</p></article>)}</div>
+        <p className={css.eyebrow}>02 · Lo cobrado no es lo facturado</p><h4 id="report-cash-title">Cobros, pagos y honorarios asignados</h4>
+        <div className={css.receipts}>{data.receipts.map(row => <article key={row.id} data-kind={row.type}><span>{date(row.date)} · {row.type === "Ingreso" ? "Recibido" : "Pagado"}</span><strong>{row.amount === null ? "Importe por verificar" : money(row.amount, row.currency)}</strong><h5>{row.title}</h5><p>{row.probableDebtCollection ? "Probable cobro de una deuda anterior. Falta identificar su imputación; no se cuenta como una venta nueva." : row.concept || "Concepto por completar."}</p></article>)}</div>
+        {data.allocations.map(allocation => <article className={css.callout} key={`${allocation.operationId}-${allocation.currency}`}>
+          <h5>{allocation.title}</h5><p>Distribución de los honorarios en {allocation.currency}. Los importes pendientes todavía no son pagos realizados.</p>
+          <div className={css.tableWrap}><table><thead><tr><th>Honorario</th><th>Asignado</th><th>Pendiente</th><th>Estado</th></tr></thead><tbody>{allocation.payments.map(row => <tr key={row.id}><td>{row.title}</td><td>{row.amount === null ? "Sin determinar" : money(row.amount, allocation.currency)}</td><td>{row.balance === null ? "Sin determinar" : money(row.balance, allocation.currency)}</td><td>{row.status}</td></tr>)}</tbody></table></div>
+          <p><b>Cobrado:</b> {allocation.received === null ? "Sin determinar" : money(allocation.received, allocation.currency)} · <b>Honorarios asignados:</b> {allocation.committed === null ? "Sin determinar" : money(allocation.committed, allocation.currency)}</p>
+          <p className={css.note}><b>Remanente sin asignar tras honorarios: {allocation.unassigned === null ? "Sin determinar" : money(allocation.unassigned, allocation.currency)}.</b> Es la distribución de este cobro; no representa la caja total ni una ganancia final. Otros gastos, si los hubiera, se revisan por separado.</p>
+        </article>)}
         {data.pataNegra.possibleAlreadyAllocated && <div className={css.callout}><h5>Evitar una doble resta en el cobro recuperado</h5><p>El importe original registrado ({money(data.pataNegra.original!, "ARS")}) menos el saldo registrado ({money(data.pataNegra.balance!, "ARS")}) coincide con la transferencia recuperada ({money(data.pataNegra.receipt!, "ARS")}). Es una señal de que podría estar ya imputada. La coincidencia numérica no confirma la conciliación.</p></div>}
-        <p className={css.caption}>Son los movimientos históricos recuperados en este lote. No son todos los cobros del año y no permiten calcular la caja de hoy.</p>
+        <p className={css.caption}>Incluye movimientos recuperados de documentos y cobros confirmados directamente por Pablo. No son todos los movimientos del año ni permiten calcular la caja de hoy.</p>
       </section>
 
       <section className={css.section} aria-labelledby="report-pressure-title">

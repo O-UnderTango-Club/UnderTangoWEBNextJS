@@ -14,10 +14,11 @@ const packages = [
     description:
       "Uma dupla de tango conduz uma hora de descoberta, demonstração e aula participativa. Não é necessário saber dançar.",
     includes: ["2 bailarinos", "1 hora", "Aula + demonstração", "ES · PT · EN"],
-    publicPrice: "R$ 100",
+    publicPrice: "R$ 125",
+    agencyRate: "R$ 100",
     underTango: "R$ 70",
     carimaMargin: "R$ 30",
-    example: "10 pessoas · R$ 1.000",
+    example: "10 pessoas · R$ 1.250",
   },
   {
     step: "02",
@@ -26,10 +27,11 @@ const packages = [
     description:
       "A dupla recebe um saxofonista ao vivo. Dança, música, contexto cultural e participação se encontram em uma experiência de 1 hora e meia a 2 horas.",
     includes: ["Dupla + saxofone", "1h30–2h", "Música ao vivo", "Momento participativo"],
-    publicPrice: "R$ 150",
+    publicPrice: "R$ 190",
+    agencyRate: "R$ 150",
     underTango: "R$ 100",
     carimaMargin: "R$ 50",
-    example: "15 pessoas · R$ 2.250",
+    example: "15 pessoas · R$ 2.850",
     featured: true,
   },
   {
@@ -39,10 +41,11 @@ const packages = [
     description:
       "Para grupos maiores, o valor total permite ampliar a formação: músicos ao vivo, bailarinos e uma experiência mais profunda, desenhada para o perfil do grupo.",
     includes: ["Bailarinos", "Músicos ao vivo", "Interação ampliada", "Formação sob medida"],
-    publicPrice: "Desde R$ 150",
+    publicPrice: "Desde R$ 190",
+    agencyRate: "Desde R$ 150",
     underTango: "Desde R$ 100",
     carimaMargin: "Desde R$ 50",
-    example: "25 pessoas · desde R$ 3.750",
+    example: "25 pessoas · desde R$ 4.750",
   },
 ] as const;
 
@@ -162,34 +165,34 @@ export default function LaCavaPage() {
                 </ul>
 
                 <div className={styles.priceBlock}>
-                  <p>Preço-base Carimã</p>
+                  <p>Preço ao público · experiência</p>
                   <strong>{item.publicPrice}</strong>
                   <span>por pessoa</span>
                 </div>
 
                 <dl className={styles.split}>
                   <div>
-                    <dt>Neto Ø UnderTango</dt>
+                    <dt>Repasse Ø UnderTango</dt>
                     <dd>{item.underTango} / pessoa</dd>
                   </div>
                   <div>
-                    <dt>Margem Carimã</dt>
-                    <dd>{item.carimaMargin} / pessoa</dd>
+                    <dt>Tarifa para agência</dt>
+                    <dd>{item.agencyRate} / pessoa</dd>
                   </div>
                 </dl>
 
-                <p className={styles.example}>{item.example} no mínimo de ativação</p>
+                <p className={styles.example}>{item.example} ao preço público no mínimo de ativação</p>
               </article>
             ))}
           </div>
         </section>
 
-        <section className={styles.marginSection} aria-labelledby="margens-title">
+        <section id="comercial" className={styles.marginSection} aria-labelledby="margens-title">
           <div className={styles.marginIntro}>
             <p className={styles.sectionLabel}>ARQUITETURA COMERCIAL</p>
             <h2 id="margens-title">Cada parte conserva seu valor.</h2>
             <p>
-              O preço final pode crescer ao passar por uma agência, guia ou operador. O que não muda é a base que remunera a produção artística e o Carimã. A gestão financeira é realizada pelo Hotel Carimã, onde está localizada La Cava.
+              Uma referência de preço ao público, uma tarifa para agências e um repasse artístico preservado. O Carimã realiza a gestão financeira e amplia sua margem quando faz a venda direta. Condições comerciais propostas para validação conjunta.
             </p>
           </div>
 
@@ -198,26 +201,49 @@ export default function LaCavaPage() {
               <span>01</span>
               <div>
                 <h3>Ø UnderTango</h3>
-                <p>Recebe a tarifa líquida por pessoa correspondente ao formato contratado.</p>
+                <p>Recebe R$70 no Essencial ou R$100 no Cava Tango por pessoa, independentemente do canal de venda. No Cava ao Vivo, o repasse parte de R$100 e depende da formação confirmada.</p>
               </div>
             </li>
             <li>
               <span>02</span>
               <div>
                 <h3>Hotel Carimã</h3>
-                <p>Acrescenta e conserva sua margem por pessoa: R$30 ou R$50, conforme a experiência.</p>
+                <p>Na venda por agência, conserva R$30 no Essencial ou R$50 no Cava Tango. Vendendo diretamente ao mesmo preço público, conserva R$55 ou R$90 por pessoa.</p>
               </div>
             </li>
             <li>
               <span>03</span>
               <div>
                 <h3>Agências e revendedores</h3>
-                <p>Podem definir livremente sua margem ou incorporar a experiência a um pacote, preservando a base anterior.</p>
+                <p>Pagam R$100 ao hotel no Essencial ou R$150 no Cava Tango. Ao vender pelos preços públicos de R$125 ou R$190, conservam R$25 ou R$40 por pessoa, respectivamente.</p>
               </div>
             </li>
           </ol>
 
-          <div className={styles.marginFormula} aria-label="Exemplo de formação do preço">
+          <div className={styles.commercialRates}>
+            <table className={styles.rateTable}>
+              <caption>Valores por pessoa · somente a experiência</caption>
+              <thead><tr>
+                <th scope="col">Formato</th>
+                <th scope="col">Público final</th>
+                <th scope="col">Agência paga ao hotel</th>
+                <th scope="col">UnderTango recebe</th>
+                <th scope="col">Carimã conserva na venda por agência</th>
+              </tr></thead>
+              <tbody>{packages.map((item) => (
+                <tr key={item.step}>
+                  <th scope="row">{item.title}</th>
+                  <td data-label="Público final">{item.publicPrice}</td>
+                  <td data-label="Agência paga ao hotel">{item.agencyRate}</td>
+                  <td data-label="UnderTango recebe">{item.underTango}</td>
+                  <td data-label="Carimã · via agência">{item.carimaMargin}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            <p>A tarifa paga pela agência ao hotel já inclui o repasse da UnderTango e a margem do Carimã. Esses valores não são somados novamente.</p>
+          </div>
+
+          <div className={styles.marginFormula} aria-label="Cava Tango: divisão de R$190 por pessoa na venda por agência">
             <div>
               <span>R$ 100</span>
               <small>Ø UnderTango</small>
@@ -228,15 +254,34 @@ export default function LaCavaPage() {
               <small>Carimã</small>
             </div>
             <b>+</b>
-            <div className={styles.freeMargin}>
-              <span>Livre</span>
+            <div className={styles.agencyMargin}>
+              <span>R$ 40</span>
               <small>Agência / operador</small>
             </div>
             <b>=</b>
             <div>
-              <span>Preço final</span>
-              <small>ao passageiro</small>
+              <span>R$ 190</span>
+              <small>Cava Tango · por pessoa</small>
             </div>
+          </div>
+          <div className={styles.commercialNotes}>
+            <div>
+              <h3>Preço de referência e teto proposto</h3>
+              <p>R$125 no Essencial e R$190 no Cava Tango são o preço público de referência e o teto comercial proposto para a experiência avulsa, a acordar com os parceiros. Eventuais descontos devem preservar o repasse da UnderTango e a margem-base do Carimã.</p>
+            </div>
+            <div>
+              <h3>Cava ao Vivo: formação a confirmar</h3>
+              <p>Desde R$190 por pessoa é uma base de orçamento. Elenco, repasses e teto final são confirmados antes da oferta. Um grupo de 25 pessoas não garante qualquer formação artística.</p>
+            </div>
+            <div>
+              <h3>Experiência + hospedagem</h3>
+              <p>Hospedagem, vinhos, gastronomia e traslados são orçados separadamente. O pacote completo pode custar mais; o valor da experiência deve estar identificado na composição comercial.</p>
+            </div>
+            <div>
+              <h3>Exemplo: 15 pessoas no Cava Tango</h3>
+              <p>R$2.850 em vendas: R$1.500 para UnderTango, R$750 para Carimã e R$600 para a agência. Na venda direta pelo hotel, UnderTango recebe os mesmos R$1.500 e Carimã conserva R$1.350.</p>
+            </div>
+            <p className={styles.commercialFootnote}>Margens comerciais antes de custos próprios, tributos e taxas aplicáveis; não representam lucro líquido garantido. Proposta sujeita à validação comercial com Juan e Carimã.</p>
           </div>
         </section>
 
@@ -255,7 +300,7 @@ export default function LaCavaPage() {
 
         <section className={styles.closing}>
           <div>
-            <p className={styles.sectionLabel}>PRIMEIRA VERSÃO · PARA REVISÃO</p>
+            <p className={styles.sectionLabel}>PROPOSTA COMERCIAL · PARA REVISÃO</p>
             <h2>Uma cava que muda de escala com cada grupo.</h2>
             <p>
               Confirmamos data, quantidade de pessoas, idioma e formato antes de reservar o elenco.

@@ -529,9 +529,107 @@
   font-weight: 400;
 }
 
-.marginFormula .freeMargin {
+.marginFormula .agencyMargin {
   border: 1px dashed rgba(217, 182, 111, 0.38);
   background: rgba(217, 182, 111, 0.05);
+}
+
+.commercialRates,
+.commercialNotes {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.rateTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.rateTable caption {
+  padding-bottom: 18px;
+  color: var(--cava-gold);
+  text-align: left;
+  font-weight: 700;
+}
+
+.rateTable :is(caption, th, td) {
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.rateTable :is(th, td) {
+  padding: 18px 12px;
+  border-bottom: 1px solid rgba(243, 234, 217, 0.16);
+  vertical-align: top;
+}
+
+.rateTable thead th {
+  color: var(--cava-muted);
+  font-size: 0.78rem;
+}
+
+.rateTable tbody td:first-of-type {
+  color: var(--cava-gold);
+  font-weight: 700;
+}
+
+.commercialRates > p,
+.commercialNotes p {
+  margin: 16px 0 0;
+  color: var(--cava-muted);
+  font-size: 0.94rem;
+  line-height: 1.7;
+}
+
+.commercialNotes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 30px;
+}
+
+.commercialNotes h3 {
+  margin: 0;
+  color: var(--cava-cream);
+  font-size: 1.08rem;
+  line-height: 1.5;
+}
+
+.commercialNotes .commercialFootnote {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 780px) {
+  .commercialNotes { grid-template-columns: 1fr; }
+  .rateTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .rateTable tbody,
+  .rateTable tr { display: block; }
+  .rateTable tr + tr { margin-top: 24px; }
+  .rateTable tbody th {
+    display: block;
+    padding: 12px;
+    background: rgba(217, 182, 111, 0.08);
+  }
+  .rateTable td {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 12px;
+  }
+  .rateTable td::before {
+    content: attr(data-label);
+    color: var(--cava-muted);
+    font-weight: 400;
+  }
 }
 
 .privateLessons {

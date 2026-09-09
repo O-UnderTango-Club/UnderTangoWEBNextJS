@@ -101,6 +101,15 @@
 
 
 .groupedMembers { display: flex; flex-direction: column; gap: 14px; }
+.projectReportButton { width: 100%; min-width: 0; border: 0; background: none; color: inherit; padding: 0; text-align: left; cursor: pointer; font: inherit; }
+.projectReportButton small { display: block; margin-top: 12px; color: #d5b35c; font-size: 12px; line-height: 1.4; }
+.projectReportButton:focus-visible { outline: 2px solid #d1a844; outline-offset: 4px; }
+.financeReport { color: #e8dfce; font-size: 16px; line-height: 1.65; }
+.financeReport h4 { margin: 0 0 16px; font-size: clamp(20px, 3vw, 30px); line-height: 1.2; }
+.reportText { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reportActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; padding-bottom: 12px; }
+.reportActions a, .reportActions button { border: 1px solid #8e7746; background: #181716; color: #e8dfce; padding: 10px 14px; font: inherit; cursor: pointer; text-decoration: none; }
+.reportActions a:focus-visible, .reportActions button:focus-visible { outline: 2px solid #d1a844; outline-offset: 2px; }
 .groupHeading { margin: 0; color: #e8dfce; font-family: var(--font-undertango-editorial), Georgia, serif; font-size: clamp(18px, 2vw, 25px); font-weight: 400; line-height: 1.15; }
 .countryGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .countryGroup, .otherMembers { min-width: 0; margin: 0 !important; padding: 0 !important; }

@@ -4,7 +4,7 @@ export const metadata: Metadata = {title:"Rave Triple Frontera · TropCalia",des
 const formats = [
  {id:"01",name:"Essencial",label:"O PRIMEIRO ENCONTRO",price:80,min:30,duration:"1 hora",cast:"2 bailarinos",text:"Um casal de tango transforma a noite em descoberta: show, aula e interação, com espaço para todo mundo entrar na dança.",tags:["Casal de tango","Aula + show","Momento bailinho"]},
  {id:"02",name:"Frontera",label:"RECOMENDADO POR CARLOS",price:100,min:50,duration:"1h30",cast:"Casal de tango + saxo + pianista",text:"O ponto de equilíbrio: dança, saxofone e piano ao vivo. Presença de palco, proximidade com o público e uma experiência que termina em encontro.",tags:["4 artistas em cena","Música ao vivo","Show + participação"]},
- {id:"03",name:"Impacto",label:"A EXPERIÊNCIA PREMIUM",price:120,min:60,duration:"1h30",cast:"5 músicos + 4 bailarinos",text:"Tango eletrônico, energia de banda e dança em cena. Um espetáculo que atravessa estilos e abre espaço para viver a noite junto.",tags:["9 artistas em cena","Banda + eletrônica","Show + bailinho"]}
+ {id:"03",name:"Impacto",label:"A EXPERIÊNCIA PREMIUM",price:120,min:70,duration:"1h30",cast:"5 músicos + 4 bailarinos",text:"Tango eletrônico, energia de banda e dança em cena. Um espetáculo que atravessa estilos e abre espaço para viver a noite junto.",tags:["9 artistas em cena","Banda + eletrônica","Show + bailinho"]}
 ];
 export default function TropCaliaPage(){return <main className={styles.page} lang="pt-BR">
  <nav className={styles.nav}><a href="https://www.undertangoclub.com/">Ø UNDERTANGO CLUB</a><span>TROPCALIA · PROPOSTA PARA REVISÃO</span></nav>

@@ -843,3 +843,24 @@
     transition: none;
   }
 }
+
+/* Use readable text in the shared footer on La Cava. */
+.page + :global(footer) :is(h3, p, a, li) {
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.6;
+  letter-spacing: normal;
+}
+
+.page + :global(footer) h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.page + :global(footer) :is(p, li a) {
+  font-size: 1rem;
+}
+
+.page + :global(footer) p a {
+  font-size: inherit;
+  overflow-wrap: anywhere;
+}

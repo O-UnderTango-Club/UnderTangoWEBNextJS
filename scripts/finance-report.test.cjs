@@ -1,0 +1,34 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const ts=require('typescript');
+const path=require('node:path');
+const cache=new Map();
+function compile(file){
+ file=path.resolve(file); if(cache.has(file))return cache.get(file);
+ const context={exports:{},require:name=>compile(path.resolve(path.dirname(file),name+'.ts'))};
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,context);
+ cache.set(file,context.exports);return context.exports;
+}
+const {buildFinanceReport}=compile('src/lib/finance-report.ts');
+const {FINANCE_FIELDS:F}=compile('src/lib/finance-model.ts');
+const record=(table,id,values)=>({id,version:'1',fields:Object.fromEntries(Object.entries(F[table]).map(([name,f])=>[f.id,values[name]??(f.type==='links'?[]:null)]))});
+const invoice=(id,start,end,currency='ARS',amount='100.10')=>record('obligations',id,{name:'Factura C '+id,currency,originalAmount:amount,notes:`Lote reconstruccion-2026-20260909. Clave documental: TEST:${id}. Receptor: Cliente de prueba, identificador fiscal 123. Servicio ${start} a ${end}.`});
+const snapshot={contract:1,status:'active',revision:'7',updatedAt:'2026-09-09T12:00:00Z',obligations:[invoice('a','2026-01-01','2026-01-31'),invoice('b','2025-12-01','2025-12-31'),invoice('c','2026-03-01','2026-03-31','USD','20.20')],movements:[],contacts:[],cases:[],operations:[]};
+const read=s=>buildFinanceReport(s,'2026-09-09');
+let r=read(snapshot);
+assert.equal(r.totals.ARS,100.1);assert.equal(r.totals.USD,20.2);assert.equal(r.prior.length,1);
+assert.equal(r.months.length,9);assert.equal(r.months[1].amounts.ARS,null);assert.equal(r.cash,null);assert.equal(r.profit,null);
+assert.equal(r.invoices[0].balance,null);
+r=read({...snapshot,obligations:[...snapshot.obligations,snapshot.obligations[0]]});assert.equal(r.totals.ARS,100.1);assert.ok(r.warnings.length);
+r=read({...snapshot,obligations:[invoice('bad','2026-02-31','2026-03-01')]});assert.equal(r.invoices.length,0);assert.ok(r.warnings.length);
+r=read({...snapshot,obligations:[invoice('cross','2026-12-01','2027-01-31')]});assert.equal(r.annual.length,0);assert.ok(r.warnings.length);
+r=read({...snapshot,obligations:[invoice('two','2026-01-01','2026-02-28')]});assert.equal(r.totals.ARS,100.1);assert.equal(r.months[0].amounts.ARS,null);assert.ok(r.warnings.length);
+const p=record('obligations','rec0X5lBD5d0y4LLU',{currency:'ARS',originalAmount:'100.00',balance:'60.00'});
+const m=record('movements','sb-bc732d30-2ccf-4a32-aa99-7f62fc3f18e4',{currency:'ARS',amount:'40.00',status:'Confirmado',type:'Ingreso',notes:'Lote reconstruccion-2026-20260909.'});
+r=read({...snapshot,obligations:[p],movements:[m]});assert.equal(r.pataNegra.possibleAlreadyAllocated,true);assert.equal(r.pataNegra.balance,60);assert.equal(r.totals.ARS,0);
+p.fields[F.obligations.currency.id]='USD';assert.equal(read({...snapshot,obligations:[p],movements:[m]}).pataNegra.possibleAlreadyAllocated,false);
+m.fields[F.movements.status.id]='Pendiente';assert.equal(read({...snapshot,movements:[m]}).receipts.length,0);
+assert.equal(buildFinanceReport(snapshot,'2027-01-03').months.length,12);
+console.log('Financial report: periods, currencies, missing data, duplicates, boundaries and non-destructive allocation passed.');
+if(process.argv[2])fs.writeFileSync(process.argv[3],JSON.stringify({title:'Informe',status:'Pendiente',result:'Historial disponible en el panel privado.',dashboard:read(JSON.parse(fs.readFileSync(process.argv[2],'utf8')))}));

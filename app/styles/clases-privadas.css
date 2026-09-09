@@ -1,10 +1,3 @@
-@font-face {
-  font-family: 'Bellerose';
-  src: url('/assets/fonts/Bellerose.ttf') format('woff');
-  font-weight: normal;
-  font-style: normal;
-}
-
 :root {
   --primary: #350410;
   --secondary: #d4af37;
@@ -20,11 +13,10 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Bellerose', sans-serif;
 }
 
 body {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   background-color: var(--background);
   color: var(--text);
   margin: 0;
@@ -63,7 +55,7 @@ body {
 }
 
 .hero-title {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 4rem;
   color: var(--primary);
   margin-bottom: 1.5rem;
@@ -72,7 +64,7 @@ body {
 }
 
 .hero-subtitle {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1.5rem;
   color: var(--text);
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
@@ -81,7 +73,7 @@ body {
 }
 
 .hero-button {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   display: inline-flex;
   align-items: center;
   background-color: var(--primary);
@@ -111,7 +103,7 @@ body {
 }
 
 .class-info-title {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 3rem;
   color: var(--primary);
   margin-bottom: 1.5rem;
@@ -119,7 +111,7 @@ body {
 }
 
 .class-info-text {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1.25rem;
   max-width: 800px;
   margin: 0 auto 2.5rem auto;
@@ -159,14 +151,14 @@ body {
 }
 
 .highlight-card h3 {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1.5rem;
   margin-bottom: 15px;
   color: var(--primary);
 }
 
 .highlight-card p {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1rem;
   color: var(--text);
 }
@@ -178,7 +170,7 @@ body {
 }
 
 .benefits-title {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 3rem;
   color: var(--primary);
   margin-bottom: 1.5rem;
@@ -186,7 +178,7 @@ body {
 }
 
 .benefits-text {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1.25rem;
   max-width: 800px;
   margin: 0 auto 2.5rem auto;
@@ -226,14 +218,14 @@ body {
 }
 
 .benefit-card h3 {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1.5rem;
   margin-bottom: 15px;
   color: var(--primary);
 }
 
 .benefit-card p {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1rem;
   color: var(--text);
 }
@@ -245,7 +237,7 @@ body {
 }
 
 .disciplines-title {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 3rem;
   color: var(--primary);
   margin-bottom: 1.5rem;
@@ -253,7 +245,7 @@ body {
 }
 
 .disciplines-intro {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1.25rem;
   max-width: 800px;
   margin: 0 auto 2.5rem auto;
@@ -293,14 +285,14 @@ body {
 }
 
 .discipline-card h3 {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1.5rem;
   margin-bottom: 15px;
   color: var(--primary);
 }
 
 .discipline-card p {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1rem;
   color: var(--text);
 }
@@ -312,7 +304,7 @@ body {
 }
 
 .contact-title {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 3rem;
   color: var(--accent);
   margin-bottom: 2rem;
@@ -320,7 +312,7 @@ body {
 }
 
 .contact-button {
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   display: inline-flex;
   align-items: center;
   background-color: var(--secondary);

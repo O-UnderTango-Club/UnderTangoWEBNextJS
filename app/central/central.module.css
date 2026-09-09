@@ -133,3 +133,8 @@
   .groupedMembers { gap: 8px; }
   .groupedMembers .memberCard { min-height: 50px; padding: 6px; }
 }
+
+.financePanel { height: min(900px, calc(100svh - 32px)); }
+.financeSubpanel { margin: 0 !important; padding: 0 !important; }
+
+@media (max-width: 720px) { .financeSubpanel .subpanelHeader { padding: 40px 12px 12px; grid-template-columns: auto minmax(0, 1fr); gap: 12px; } .financeSubpanel .subpanelHeader h3 { font-size: 21px; } .financeSubpanel .subpanelHeader > span { display: none; } .financePanel .close { top: 8px; right: 12px; padding: 6px 9px; font-size: 9px; } }

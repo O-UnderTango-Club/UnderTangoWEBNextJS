@@ -2,13 +2,6 @@
    FONTS & ROOT VARIABLES (no causan conflicto)
 --------------------------------------------------------- */
 
-@font-face {
-  font-family: 'Bellerose';
-  src: url('/assets/fonts/Bellerose.ttf') format('woff');
-  font-weight: normal;
-  font-style: normal;
-}
-
 :root {
   --primary: #350410;
   --secondary: #5f0b0b;
@@ -17,7 +10,7 @@
   --accent: #ffd166;
   --highlight: #4ecdc4;
   --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --font-primary: 'Bellerose', sans-serif;
+  --font-primary: var(--font-undertango-editorial), Georgia, serif;
   --transition: all 0.3s ease;
 }
 

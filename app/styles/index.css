@@ -1,10 +1,3 @@
-@font-face {
-  font-family: "Bellerose";
-  src: url("/assets/fonts/Bellerose.ttf") format("woff");
-  font-weight: normal;
-  font-style: normal;
-}
-
 :root {
   --burgundy: #800020;
   --burgundy-light: #a52a2a;
@@ -31,15 +24,16 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: "Bellerose", sans-serif;
 }
+
+button, input, select, textarea { font: inherit; }
 
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   background-color: var(--black);
   color: var(--white);
   overflow-x: hidden;
@@ -52,12 +46,12 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   margin-bottom: 0.5em;
 }
 
 p {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   margin-bottom: 1em;
 }
 
@@ -136,7 +130,7 @@ section.visible {
 }
 
 section h2 {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 2.5rem;
   margin-bottom: 1.5rem;
   color: var(--white);
@@ -194,7 +188,7 @@ section h2::after {
 }
 
 .text-overlay h1 {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 4rem;
   color: var(--white);
   text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
@@ -227,7 +221,7 @@ section h2::after {
 }
 
 .text-content h2 {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 2.5rem;
   color: var(--burgundy);
   margin-bottom: 20px;
@@ -241,7 +235,7 @@ section h2::after {
 }
 
 .text-content p {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1.1rem;
   line-height: 1.6;
   color: var(--white);
@@ -274,7 +268,7 @@ section h2::after {
 
 .action-button,
 .catalog-button {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   display: inline-block;
   padding: 12px 24px;
   background-color: var(--burgundy);
@@ -382,14 +376,14 @@ section h2::after {
 }
 
 .news-item h3 {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   color: var(--burgundy);
   font-size: 1.5rem;
   margin-bottom: 15px;
 }
 
 .news-item p {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   color: var(--white);
   font-size: 1rem;
 }
@@ -444,7 +438,7 @@ section h2::after {
 }
 
 .info-content h3 {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 2rem;
   margin-bottom: 20px;
   color: var(--burgundy);
@@ -456,7 +450,7 @@ section h2::after {
 }
 
 .info-content ul li {
-  font-family: "Bellerose", sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   font-size: 1.1rem;
   margin-bottom: 15px;
   display: flex;

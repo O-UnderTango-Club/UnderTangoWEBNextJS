@@ -1,18 +1,11 @@
-@font-face {
-    font-family: 'Bellerose';
-    src: url('/assets/fonts/Bellerose.ttf') format('woff');
-    font-weight: normal;
-    font-style: normal;
-  }
-  
-  #menu-toggle {
+#menu-toggle {
     background: transparent;
     border: none;
     cursor: pointer;
     display: none;
     padding: 10px;
     z-index: 1001;
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
   }
   
   #menu-toggle i {

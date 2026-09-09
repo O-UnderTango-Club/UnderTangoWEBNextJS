@@ -2,13 +2,6 @@
    ================  GLOBAL SCOPE PARA MODA  ===============
    ========================================================= */
 
-@font-face {
-  font-family: 'Bellerose';
-  src: url('/assets/fonts/Bellerose.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
 /* Variables y reset dentro del scope */
 .moda-page {
   --primary-color: #8b0000;
@@ -20,7 +13,7 @@
   --hover-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
   --transition: all 0.3s ease;
 
-  font-family: 'Bellerose', sans-serif;
+  font-family: var(--font-undertango-editorial), Georgia, serif;
   background-color: var(--secondary-color);
   color: var(--text-color);
   line-height: 1.6;

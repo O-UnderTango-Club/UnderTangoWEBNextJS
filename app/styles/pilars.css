@@ -1,11 +1,4 @@
-@font-face {
-    font-family: "Bellerose";
-    src: url("/assets/fonts/Bellerose.ttf") format("woff");
-    font-weight: normal;
-    font-style: normal;
-  }
-  
-  #pillars {
+#pillars {
     display: flex;
     justify-content: space-around;
     background-color: var(--burgundy);
@@ -23,7 +16,7 @@
   }
   
   .pillar h2 {
-    font-family: "Bellerose", sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     font-size: 2.5rem;
     margin-bottom: 0px;
   }
@@ -47,14 +40,14 @@
   }
   
   .text-content h2 {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     font-size: 2.5rem;
     color: var(--burgundy);
     margin-bottom: 10px;
   }
   
   .text-content p {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     font-size: 1.2rem;
     line-height: 1.6;
     color: var(--white);

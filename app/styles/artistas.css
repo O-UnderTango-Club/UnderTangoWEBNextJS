@@ -1,11 +1,4 @@
-@font-face {
-    font-family: 'Bellerose';
-    src: url('/assets/fonts/Bellerose.ttf') format('woff');
-    font-weight: normal;
-    font-style: normal;
-  }
-  
-  :root {
+:root {
     --primary: #c62828;
     --secondary: #1a1a1a;
     --background: #f9f9f9;
@@ -20,11 +13,10 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Bellerose', sans-serif;
   }
   
   body {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     margin: 0;
     padding: 0;
     background-color: var(--background);
@@ -49,14 +41,14 @@
   }
   
   h1 {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     font-size: 36px;
     margin-bottom: 15px;
     letter-spacing: 2px;
   }
   
   h2 {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     font-size: 28px;
     color: var(--primary);
     border-bottom: 2px solid var(--primary);
@@ -93,7 +85,7 @@
   }
   
   .artist-name {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     font-size: 22px;
     color: var(--secondary);
     margin-top: 0;
@@ -101,7 +93,7 @@
   }
   
   .artist-style, .artist-role {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     font-weight: bold;
     color: var(--primary);
     font-size: 16px;
@@ -109,18 +101,18 @@
   }
   
   .artist-description {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     margin-bottom: 20px;
     line-height: 1.7;
   }
   
   .artist-services {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     margin-bottom: 20px;
   }
   
   .social-link {
-    font-family: 'Bellerose', sans-serif;
+    font-family: var(--font-undertango-editorial), Georgia, serif;
     display: inline-block;
     color: var(--secondary);
     text-decoration: none;

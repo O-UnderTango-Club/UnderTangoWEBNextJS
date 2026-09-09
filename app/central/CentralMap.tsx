@@ -3,46 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { departments, type DepartmentMember } from "./departments";
 import styles from "./central.module.css";
+import FinanceReconstruction from "./FinanceReconstruction";
 
 const countries = [{ code: "AR", name: "Argentina" }, { code: "BR", name: "Brasil" }, { code: "PY", name: "Paraguay" }] as const;
-
-function FinanceReconstruction() {
-  const [report, setReport] = useState<{ title: string; result: string; status: string }>();
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
-    let active = true;
-    setReport(undefined);
-    setError("");
-    async function read() {
-      try {
-        const response = await fetch("/api/panel/finance/reconstruction", { credentials: "same-origin", cache: "no-store", signal: controller.signal });
-        if (response.status === 401 || response.status === 403) throw new Error("Este informe requiere el acceso privado del panel en este navegador.");
-        if (!response.ok) throw new Error("No se pudo consultar el informe. Podés volver a intentar.");
-        const value = await response.json();
-        if (typeof value.title !== "string" || typeof value.result !== "string" || typeof value.status !== "string") throw new Error("El informe no pudo verificarse.");
-        if (active) setReport(value);
-      } catch (error) {
-        if (active) setError(error instanceof Error && error.name !== "AbortError" ? error.message : "La consulta tardó demasiado. Volvé a intentar.");
-      } finally { clearTimeout(timeout); }
-    }
-    void read();
-    return () => { active = false; clearTimeout(timeout); controller.abort(); };
-  }, [attempt]);
-  return <div className={`${styles.subpanelContent} ${styles.financeReport}`}>
-    <p>Informe privado · avances documentados y próximos pasos.</p>
-    {!report && !error && <p role="status">Consultando el informe registrado…</p>}
-    {error && <p role="alert">{error}</p>}
-    {report && <><h4>{report.title}</h4><p>Estado del seguimiento: {report.status}</p><div className={styles.reportText}>{report.result}</div></>}
-    <div className={styles.reportActions}>
-      <button type="button" onClick={() => setAttempt(value => value + 1)}>Actualizar informe</button>
-      <a href="/panel-de-control/finanzas">Ver facturas y movimientos</a>
-      <a href="/panel-de-control">Abrir panel de control</a>
-    </div>
-  </div>;
-}
 
 function MemberCard({ member }: { member: DepartmentMember }) {
   return (
@@ -140,7 +103,7 @@ export default function CentralMap() {
 
       {selected && (
         <div className={styles.overlay} onMouseDown={(event) => event.currentTarget === event.target && closeDepartment()}>
-          <section className={styles.panel} role="dialog" aria-modal="true" aria-labelledby={`department-${selected.number}-title`}>
+          <section className={`${styles.panel} ${activeSection === "finance" ? styles.financePanel : ""}`} role="dialog" aria-modal="true" aria-labelledby={`department-${selected.number}-title`}>
             <button ref={closeButton} type="button" className={styles.close} onClick={closeDepartment} aria-label="Cerrar departamento">Cerrar ×</button>
             <div className={styles.overview}>
               <header className={styles.panelHeader}>
@@ -161,12 +124,12 @@ export default function CentralMap() {
             </div>
 
             {activeSection && (
-              <section className={styles.subpanel} id={`department-${selected.number}-${activeSection}`} aria-labelledby={`department-${selected.number}-${activeSection}-title`}>
+              <section className={`${styles.subpanel} ${activeSection === "finance" ? styles.financeSubpanel : ""}`} id={`department-${selected.number}-${activeSection}`} aria-labelledby={`department-${selected.number}-${activeSection}-title`}>
                 <header className={styles.subpanelHeader}>
                   <button ref={detailBackButton} type="button" className={styles.back} onClick={closeSection}>← Volver</button>
                   <div>
                     <p>{selected.number} · {selected.keyword}</p>
-                    <h3 id={`department-${selected.number}-${activeSection}-title`}>{activeSection === "finance" ? "Reconstrucción financiera 2026" : activeSection === "members" ? "Integrantes" : "Proyectos activos"}</h3>
+                    <h3 id={`department-${selected.number}-${activeSection}-title`}>{activeSection === "finance" ? "Informe financiero 2026" : activeSection === "members" ? "Integrantes" : "Proyectos activos"}</h3>
                   </div>
                   <span>{activeSection === "finance" ? "87" : activeSection === "members" ? selected.members.length : selected.projects.length}</span>
                 </header>
@@ -200,7 +163,7 @@ export default function CentralMap() {
                   )
                 ) : (
                   <ol className={`${styles.subpanelContent} ${styles.projectGrid}`}>
-                    {selected.projects.map((project, index) => <li key={project}><span>{String(index + 1).padStart(2, "0")}</span>{selected.number === "87" && project === "Ø87 — Tablero financiero" ? <button ref={reportButton} type="button" className={styles.projectReportButton} onClick={() => openSection("finance")}><strong>{project}</strong><small>Ver reconstrucción financiera 2026 →</small></button> : <strong>{project}</strong>}</li>)}
+                    {selected.projects.map((project, index) => <li key={project}><span>{String(index + 1).padStart(2, "0")}</span>{selected.number === "87" && project === "Ø87 — Tablero financiero" ? <button ref={reportButton} type="button" className={styles.projectReportButton} onClick={() => openSection("finance")}><strong>{project}</strong><small>Ver informe gráfico 2026 →</small></button> : <strong>{project}</strong>}</li>)}
                   </ol>
                 )}
               </section>

@@ -8,9 +8,7 @@
   padding: 104px 28px 110px;
 }
 
-/* The historic global stylesheet forces Bellerose on every element. This route
-   intentionally isolates its commercial typography: editorial serif for ideas,
-   clean sans for reading and actions. */
+/* Route-specific editorial and interface typography. */
 .page p,
 .page a,
 .page span,

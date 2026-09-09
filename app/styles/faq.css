@@ -1,13 +1,6 @@
 /* ======================================
    FONT
 ====================================== */
-@font-face {
-  font-family: 'Bellerose';
-  src: url('/assets/fonts/Bellerose.ttf') format('woff');
-  font-weight: normal;
-  font-style: normal;
-}
-
 /* ======================================
    ROOT VARIABLES (scoped)
 ====================================== */
@@ -31,7 +24,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Bellerose', sans-serif !important;
+  font-family: var(--font-undertango-editorial), Georgia, serif !important;
 }
 
 .faq-wrapper {

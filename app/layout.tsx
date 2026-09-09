@@ -56,7 +56,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={`${inter.className} ${inter.variable} ${libreBaskerville.variable}`}>
+      <body className={`${inter.variable} ${libreBaskerville.variable}`}>
         <AuthProvider>{children}</AuthProvider>
         <UnderTangoTracker />
         <ChatRobot />

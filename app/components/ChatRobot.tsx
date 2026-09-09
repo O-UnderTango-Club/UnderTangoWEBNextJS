@@ -21,6 +21,7 @@ export default function ChatRobot() {
       pathname !== '/rave' &&
       !pathname?.startsWith('/panel-de-control') &&
       !pathname?.startsWith('/rave/') &&
+      !pathname?.startsWith('/la-cava') &&
       !isAprendeHost &&
       !isAprendePath &&
       !isElitrosHost &&

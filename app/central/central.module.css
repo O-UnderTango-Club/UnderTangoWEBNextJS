@@ -104,7 +104,7 @@
 .projectReportButton { width: 100%; min-width: 0; border: 0; background: none; color: inherit; padding: 0; text-align: left; cursor: pointer; font: inherit; }
 .projectReportButton small { display: block; margin-top: 12px; color: #d5b35c; font-size: 12px; line-height: 1.4; }
 .projectReportButton:focus-visible { outline: 2px solid #d1a844; outline-offset: 4px; }
-.financeReport { color: #e8dfce; font-size: 16px; line-height: 1.65; }
+.financeReport { overflow-y: auto; overscroll-behavior: contain; color: #e8dfce; font-size: 16px; line-height: 1.65; }
 .financeReport h4 { margin: 0 0 16px; font-size: clamp(20px, 3vw, 30px); line-height: 1.2; }
 .reportText { white-space: pre-wrap; overflow-wrap: anywhere; }
 .reportActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; padding-bottom: 12px; }

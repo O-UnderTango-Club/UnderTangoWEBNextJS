@@ -67,28 +67,28 @@ export default function ElitrosPage() {
             </article>
             <article className="bmc-onepager-block">
               <h3>PROPIEDAD INTELECTUAL</h3>
-              <p>Marca registrada ante el INPI: Nº 3.456.539, clase 41, titular Pablo Guillermo Cieslik. Evaluación pendiente de titularidad, licencias y permisos sobre desarrollos tecnológicos, contenidos y registros audiovisuales.</p>
-              <p>En paralelo, resta revisar responsabilidades, coberturas y cláusulas de no repetición para artistas y proveedores.</p>
+              <p>Marca Ø UnderTango Club registrada ante el INPI, clase 41. Nº 3.456.539</p>
+              <p>Producción de Shows, espectáculos y producciones artística.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>MERCADO Y MODELO DE NEGOCIO (BRL)</h3>
-              <p>Mercado de entrada: hoteles, organizadores e instituciones turísticas de la Triple Frontera. Ingresos por producción y coordinación de shows, con precio por proyecto según elenco, logística y alcance.</p>
-              <p>Economía por unidad: referencia de cotización de USD 200 por artista; USD 100 para honorarios, USD 50 para producción y logística y USD 50 de margen objetivo y negociación. No representa utilidad neta verificada.</p>
-              <p>Tamaño de mercado y costo de la coordinación alternativa pendientes de cuantificación. Requisitos de contratación, seguros y permisos por revisar según actividad y país.</p>
-              <p>Radar de partida: BRL 4. Licencias o suscripciones tecnológicas aún por validar.</p>
+              <p>Mercado de entrada: hoteles, espacios e instituciones turísticas de la Triple Frontera. Universo de referencia: aproximadamente 390 hoteles y otros alojamientos, pendiente de segmentar según contratación de shows y cuantificar su gasto anual.</p>
+              <p>Ingresos por producción y coordinación de espectáculos, con precio por proyecto y contratación recurrente. Expansión prevista mediante equipos, proveedores y representantes en otros destinos.</p>
+              <p>Radar de partida: BRL 4. Ejes de avance: validar frecuencia de compra, costos y margen por show, repetibilidad del servicio y condiciones de contratación y representación en cada país.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>EQUIPO</h3>
               <p>Pablo Cieslik, fundador y director: producción de espectáculos, gerencia de proyectos y desarrollo de herramientas de gestión.</p>
-              <p>Alejandro Miguez, representación institucional: director de Ingeniería en Informática y de la Licenciatura en Inteligencia Artificial y Ciencia de Datos de UADE. Trayectoria en tecnología, educación superior y liderazgo de proyectos de I+D.</p>
+              <p>Alejandro Miguez, representación institucional: exdirector de Ingeniería en Informática y de la Licenciatura en Inteligencia Artificial y Ciencia de Datos de UADE. Trayectoria en tecnología, educación superior y liderazgo de proyectos de I+D.</p>
               <p>Maximiliano Rodríguez: programación y desarrollo tecnológico.</p>
             </article>
             <article className="bmc-onepager-block bmc-onepager-ask">
               <h3>PRÓXIMOS HITOS + ASK</h3>
-              <p>Hito 1: documentar el uso del sistema en shows y medir tiempos de coordinación, intervenciones e imprevistos para reevaluar TRL/CRL y contrastar la reducción estimada del 50%.</p>
-              <p>Hito 2: probar la repetibilidad del servicio con un cliente aliado y revisar titularidad, contratos, permisos y coberturas.</p>
-              <p>Buscamos productoras, hoteles y organizadores para pilotos, junto con asesoramiento en PI y seguros y financiamiento para desarrollo y medición.</p>
-              <p>Monto, costos, plazos y niveles objetivo por definir. Sin subsidios acreditados para esta etapa.</p>
+              <p>Medición: documentar el uso de la tecnología en shows, contrastar la reducción estimada del 50% en tiempos y reevaluar TRL/CRL.</p>
+              <p>1. Modelo de negocio: segmentar compradores, medir frecuencia de contratación, costos y margen por show, y probar la repetibilidad con un cliente aliado para revisar BRL.</p>
+              <p>2. Marco legal y expansión: resolver titularidad y permisos, responsabilidades, coberturas y cláusulas de no repetición; definir contratos, comisiones y límites de actuación de representantes en otros países.</p>
+              <p>3. Etapa posterior: evaluar mecanismos cripto para cobros, pagos y distribución entre participantes, sujetos a utilidad demostrable y revisión legal, fiscal y de riesgos.</p>
+              <p>Buscamos hoteles, productoras y organizadores para pilotos; aliados para representación y asesoramiento legal, de seguros y financiero. Financiamiento requerido, costos, plazos y niveles objetivo del radar pendientes de definición.</p>
             </article>
           </div>
         </div>

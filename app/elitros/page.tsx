@@ -27,7 +27,7 @@ export default function ElitrosPage() {
     <main className="elitros-page bmc-page">
       <header className="bmc-topbar">
         <a className="bmc-brand" href="#inicio" aria-label="UnderTango ÉLITROS — inicio"><span>Ø</span> UNDERTANGO</a>
-        <nav aria-label="Navegación principal"><a href="#canvas">Canvas</a><a href="#actores">Actores</a><a href="#madurez">Madurez</a><a href="#marco">Marco</a></nav>
+        <nav aria-label="Navegación principal"><a href="#one-pager">One-pager</a><a href="#canvas">Canvas</a><a href="#actores">Actores</a><a href="#madurez">Madurez</a><a href="#marco">Marco</a></nav>
         <p>ÉLITROS · 2026</p>
       </header>
 
@@ -37,8 +37,61 @@ export default function ElitrosPage() {
           <h1>De capacidades dispersas a un <em>estudio escalable de resolución y gestión de proyectos.</em></h1>
           <p className="bmc-lead">UnderTango comprende una necesidad, diseña la solución, conforma el equipo adecuado y dirige su ejecución combinando arte, lógica y tecnología. La producción artística aporta el primer campo de evidencia de este modelo.</p>
           <a className="bmc-cta" href="#canvas">Explorar el modelo <span>↓</span></a>
+          <a className="bmc-onepager-link" href="#one-pager">Ver one-pager · Septiembre 2026 ↓</a>
         </div>
         <aside className="bmc-hero-note"><span>TESIS CENTRAL</span><strong>Delegar la complejidad sin convertir la red en costo fijo.</strong><p>El cliente compra una solución y un resultado; la red conserva autonomía; UnderTango captura valor por diseñar, dirigir y coordinar el sistema.</p></aside>
+      </section>
+
+      <section className="bmc-onepager" id="one-pager" aria-labelledby="onepager-title">
+        <div className="bmc-onepager-sheet">
+          <header className="bmc-onepager-header">
+            <p className="bmc-onepager-kicker">ONE-PAGER · PROGRAMA ÉLITROS</p>
+            <h2 id="onepager-title">UNDERTANGO</h2>
+            <p className="bmc-onepager-summary">Gestionamos proyectos de arte y tecnología, coordinando equipos, recursos y entregas.</p>
+            <p className="bmc-onepager-meta">Puerto Iguazú, Misiones, Argentina · PROGRAMA ÉLITROS · Septiembre de 2026</p>
+          </header>
+          <div className="bmc-onepager-grid">
+            <article className="bmc-onepager-block">
+              <h3>PROBLEMA</h3>
+              <p>Según nuestra experiencia, el 70% del esfuerzo de organizar un evento se destina a coordinar personas y recursos técnicos. La falta de experiencia en producción de shows y las fallas de coordinación generan imprevistos y sobrecostos que encarecen el espectáculo y ponen en riesgo su realización. UnderTango combina experiencia de producción y tecnología para anticipar esas fallas y controlar la ejecución transformando los sobrecostos en incremento de calidad.</p>
+            </article>
+            <article className="bmc-onepager-block">
+              <h3>TESIS TECNOLÓGICA Y POR QUÉ AHORA</h3>
+              <p>El avance de la IA basada en agentes permite automatizar tareas que antes requerían tiempo y recursos, conectando las necesidades del cliente con las capacidades para resolverlas. UnderTango integra esta tecnología con su experiencia de producción para reducir tiempos de coordinación, anticipar imprevistos y disminuir costos.</p>
+            </article>
+            <article className="bmc-onepager-block">
+              <h3>ESTADO ACTUAL Y TRACCIÓN (TRL/CRL)</h3>
+              <p>Tecnología aplicada a la coordinación de shows, con una reducción estimada del 50% en fricción y tiempos, según nuestra experiencia.</p>
+              <p>Tracción: Shopping China, tres shows realizados y cobrados por USD 1.200; Wish, BRL 1.500; Festival La Frontera, BRL 2.300; Gran Meliá Iguazú, shows recurrentes y ARS 9,47 millones facturados entre enero y junio de 2026; Ofi/Vitento, shows y registro audiovisual durante tres días por USD 3.600.</p>
+              <p>Radar de partida: TRL 2 / CRL 3, pendiente de reevaluación con evidencia de uso y contrataciones.</p>
+            </article>
+            <article className="bmc-onepager-block">
+              <h3>PROPIEDAD INTELECTUAL</h3>
+              <p>Marca registrada ante el INPI: Nº 3.456.539, clase 41, titular Pablo Guillermo Cieslik. Evaluación pendiente de titularidad, licencias y permisos sobre desarrollos tecnológicos, contenidos y registros audiovisuales.</p>
+              <p>En paralelo, resta revisar responsabilidades, coberturas y cláusulas de no repetición para artistas y proveedores.</p>
+            </article>
+            <article className="bmc-onepager-block">
+              <h3>MERCADO Y MODELO DE NEGOCIO (BRL)</h3>
+              <p>Mercado de entrada: hoteles, organizadores e instituciones turísticas de la Triple Frontera. Ingresos por producción y coordinación de shows, con precio por proyecto según elenco, logística y alcance.</p>
+              <p>Economía por unidad: referencia de cotización de USD 200 por artista; USD 100 para honorarios, USD 50 para producción y logística y USD 50 de margen objetivo y negociación. No representa utilidad neta verificada.</p>
+              <p>Tamaño de mercado y costo de la coordinación alternativa pendientes de cuantificación. Requisitos de contratación, seguros y permisos por revisar según actividad y país.</p>
+              <p>Radar de partida: BRL 4. Licencias o suscripciones tecnológicas aún por validar.</p>
+            </article>
+            <article className="bmc-onepager-block">
+              <h3>EQUIPO</h3>
+              <p>Pablo Cieslik, fundador y director: producción de espectáculos, gerencia de proyectos y desarrollo de herramientas de gestión.</p>
+              <p>Alejandro Miguez, representación institucional: director de Ingeniería en Informática y de la Licenciatura en Inteligencia Artificial y Ciencia de Datos de UADE. Trayectoria en tecnología, educación superior y liderazgo de proyectos de I+D.</p>
+              <p>Maximiliano Rodríguez: programación y desarrollo tecnológico.</p>
+            </article>
+            <article className="bmc-onepager-block bmc-onepager-ask">
+              <h3>PRÓXIMOS HITOS + ASK</h3>
+              <p>Hito 1: documentar el uso del sistema en shows y medir tiempos de coordinación, intervenciones e imprevistos para reevaluar TRL/CRL y contrastar la reducción estimada del 50%.</p>
+              <p>Hito 2: probar la repetibilidad del servicio con un cliente aliado y revisar titularidad, contratos, permisos y coberturas.</p>
+              <p>Buscamos productoras, hoteles y organizadores para pilotos, junto con asesoramiento en PI y seguros y financiamiento para desarrollo y medición.</p>
+              <p>Monto, costos, plazos y niveles objetivo por definir. Sin subsidios acreditados para esta etapa.</p>
+            </article>
+          </div>
+        </div>
       </section>
 
       <section className="bmc-section" id="canvas">

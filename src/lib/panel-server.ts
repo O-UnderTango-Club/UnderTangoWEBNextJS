@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { deviceActor } from "./panel-access";
 import { operationsSelected, readOperationsSnapshot, operationsReceipt, commitOperations, OperationsError, type OperationsSnapshot, type OperationsPatch } from "./panel-operations";
-import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, board, closed, classify, projectOpen, taskProjects, validateTask } from "./panel-model";
+import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, EditableStage, board, closed, classify, projectOpen, taskProjects, validateTask } from "./panel-model";
 
 export class PanelError extends Error { constructor(message: string, public status=400) { super(message); } }
 export async function authorize(request: Request) {
@@ -90,8 +90,14 @@ export function responseBoard(data: ServerSnapshot) {
 export async function migratePanelToSupabase(){
   throw new PanelError("La importación se valida fuera del panel. Airtable sigue operativo; no se cambió la fuente de datos.",409);
 }
-const states: Record<Stage,[string,string|null]>={ready:["Pendiente","Acción inmediata"],recurring:["Pendiente","Acción recurrente"],doing:["En curso","En acción"],waiting:["En espera","En espera"],catalog:["Pendiente","Por revisar"],done:["Hecho","Terminada"],cancelled:["Cancelado",null]};
+const states: Record<EditableStage,[string,string|null]>={ready:["Pendiente","Acción inmediata"],recurring:["Pendiente","Acción recurrente"],doing:["En curso","En acción"],waiting:["En espera","En espera"],catalog:["Pendiente","Por revisar"],done:["Hecho","Terminada"],cancelled:["Cancelado",null]};
 function text(value: unknown,max=500) { if(typeof value!=="string"||value.length>max) throw new PanelError(`Texto inválido (máximo ${max} caracteres).`); return value.trim(); }
+function activation(value: unknown) {
+  const v=text(value,40); if(!v) return null;
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(v)) throw new PanelError("La activación necesita fecha, hora y zona horaria.");
+  const timestamp=Date.parse(v); if(!Number.isFinite(timestamp)) throw new PanelError("Fecha de activación inválida.");
+  return new Date(timestamp).toISOString();
+}
 function refs(value: unknown, rows: Raw[]) {
   if(!Array.isArray(value)||value.length>30||value.some(id=>typeof id!=="string"||!rows.some(r=>r.id===id))) throw new PanelError("Revisá los registros vinculados.");
   return [...new Set(value)];
@@ -131,15 +137,16 @@ async function performMutation(input: any, actor: string) {
   const fields: Record<string,any>={};
   const rankChanges: {id:string;fields:Record<string,any>}[]=[];
   if(kind==="task") {
-    const allowed=["front","rank","name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence"];
+    const allowed=["front","rank","activateAt","name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence"];
     if(Object.keys(change).some(k=>!allowed.includes(k))) throw new PanelError("Campo no editable.");
     for(const k of ["name","owner","reason"] as const) if(k in change) fields[F.tasks[k]]=text(change[k],k==="reason"?1000:250);
     if("doc" in change) fields[F.tasks.doc]=doc(change.doc);
     if("priority" in change) {if(!["Alta","Media","Baja"].includes(change.priority)) throw new PanelError("Prioridad inválida."); fields[F.tasks.priority]=change.priority;}
     if("due" in change){const d=text(change.due,10); if(d&&(!/^\d{4}-\d{2}-\d{2}$/.test(d)||new Date(d).toISOString().slice(0,10)!==d))throw new PanelError("Fecha inválida.");fields[F.tasks.due]=d||null;}
+    if("activateAt" in change) fields[F.tasks.activateAt]=activation(change.activateAt);
     if("order" in change){if(!Number.isInteger(change.order)||change.order<0||change.order>9999)throw new PanelError("El orden debe ser un entero positivo."); fields[F.tasks.order]=change.order||null;}
     for(const [key,records] of [["projects",data.projects],["cases",data.cases],["dependencies",data.tasks],["events",data.events]] as const) if(key in change)fields[F.tasks[key]]=refs(change[key],records);
-    let stage:Stage=change.stage;
+    let stage:EditableStage|undefined=change.stage;
     if(stage&&!states[stage])throw new PanelError("Estado inválido.");
     if(!current&&!stage) stage="catalog";
     if(stage){[fields[F.tasks.status],fields[F.tasks.gate]]=states[stage];}

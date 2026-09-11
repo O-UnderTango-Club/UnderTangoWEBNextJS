@@ -27,6 +27,19 @@ check('tres acciones por frente, incluso del mismo proyecto, con reposición al 
  tasks[0].fields[F.tasks.status]='En curso';tasks[0].fields[F.tasks.gate]='En acción';
  assert.deepEqual(m.board(data).fronts[0].tasks,['paso2','paso3','paso4']);
 });
+check('una activación futura conserva ranking, no ocupa cupo y se habilita al llegar la fecha',()=>{
+ const activation='2026-09-20T15:00:00.000Z';
+ const tasks=[1,2,3,4].map(rank=>t(`a${rank}`,{[F.tasks.front]:'Primario',[F.tasks.rank]:rank,...(rank===1?{[F.tasks.activateAt]:activation}:{})}));
+ const data={...d,rankingMode:'action',tasks};
+ const before=m.board(data,Date.parse('2026-09-20T14:59:59.000Z'));
+ assert.equal(before.tasks.find(task=>task.id==='a1').stage,'scheduled');
+ assert.deepEqual(before.fronts[0].tasks,['a2','a3','a4']);
+ assert.deepEqual(tasks.map(task=>task.fields[F.tasks.rank]),[1,2,3,4]);
+ const active=m.board(data,Date.parse(activation));
+ assert.equal(active.tasks.find(task=>task.id==='a1').stage,'ready');
+ assert.deepEqual(active.fronts[0].tasks,['a1','a2','a3']);
+ assert.deepEqual(tasks.map(task=>task.fields[F.tasks.rank]),[1,2,3,4]);
+});
 check('frente y posición usan códigos 1.3 y 2.2 sin confundir el paso de la acción',()=>{assert.equal(m.frontPosition('Primario',3),'1.3');assert.equal(m.frontPosition('Secundario',2),'2.2');assert.equal(m.frontPosition('Terciario',12),'3.12');assert.equal(m.frontPosition('',1),'Sin posición');assert.equal(m.frontPosition('Primario',9999),'Sin posición');});
 check('cada frente salta bloqueos y toma disponibles de todo el ranking',()=>{
  for(const front of m.FRONTS){

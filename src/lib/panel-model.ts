@@ -2,7 +2,7 @@ export const BASE = "appJwwHP1Wkoxo54q";
 export const TABLES = { projects: "tblf6DZBViGbvxRzS", tasks: "tblnmNNkFemgOlOlw", events: "tblQhjY5HpSlMPCpp", cases: "tblguHWSAk4wyfNjQ" };
 export const F = {
   projects: { name:"fldChULRkd1GrXY3w", status:"fldcypAILEecLnLGQ", front:"fldy1wMKKlc6TRvmf", rank:"fldGtRBM8QYXGZQPd", purpose:"fldrApFZcuzKj3Gax", doc:"fldiMnJUvRox1quBE" },
-  tasks: { front:"action_front", rank:"action_rank", name:"fldLO5zuV38eu576D", description:"fldlv5rjVOU4TLjD5", owner:"fldi6lt4W8IAlBlAm", status:"fldLXBjnEHgHDJvX0", priority:"fldkWFX5EzySkDrLi", due:"fldixmckZrFiyJ6xd", result:"fldn1XmmTwRDnzQDd", cases:"fldazeCmB0kKeC56A", projects:"fldOCm8x8sOWDNlw6", events:"fldFwHCG8zQkO2gHv", gate:"fldh7b5L9hg89tle4", reason:"fldnNMs1CYSffH0Cc", trigger:"fldcTRjO3pX2hy60N", dependencies:"fldoqev0eaVgZVt6G", order:"fldZCklniYktPL5NA", doc:"fldZfQfRxnxZD2WZI" },
+  tasks: { front:"action_front", rank:"action_rank", activateAt:"activate_at", name:"fldLO5zuV38eu576D", description:"fldlv5rjVOU4TLjD5", owner:"fldi6lt4W8IAlBlAm", status:"fldLXBjnEHgHDJvX0", priority:"fldkWFX5EzySkDrLi", due:"fldixmckZrFiyJ6xd", result:"fldn1XmmTwRDnzQDd", cases:"fldazeCmB0kKeC56A", projects:"fldOCm8x8sOWDNlw6", events:"fldFwHCG8zQkO2gHv", gate:"fldh7b5L9hg89tle4", reason:"fldnNMs1CYSffH0Cc", trigger:"fldcTRjO3pX2hy60N", dependencies:"fldoqev0eaVgZVt6G", order:"fldZCklniYktPL5NA", doc:"fldZfQfRxnxZD2WZI" },
   events: { key:"fldDFsxIuKAGvzCW8", name:"fldnJbUExwp1QxEet", status:"fldYDOPJvKg4RAkSo", type:"fld03HgdmMkrXQsz9", occurred:"fldwIQR5BHirvuLLD", evidence:"fldap8xuzZwCpqouP" },
   cases: { name:"fldTyP9DE3ANVtoBN", projects:"fldCd5XSjO7ySQYoj" }
 };
@@ -13,7 +13,8 @@ export function frontPosition(front: string, rank: number) {
 }
 export type Raw = { id: string; fields: Record<string, any> };
 export type Snapshot = { projects: Raw[]; tasks: Raw[]; events: Raw[]; cases: Raw[]; updatedAt: string; rankingMode?: "project" | "action" };
-export type Stage = "ready" | "recurring" | "doing" | "waiting" | "catalog" | "done" | "cancelled";
+export type Stage = "ready" | "recurring" | "scheduled" | "doing" | "waiting" | "catalog" | "done" | "cancelled";
+export type EditableStage = Exclude<Stage,"scheduled">;
 const s = (v: unknown): string => typeof v === "string" ? v : "";
 const links = (v: unknown): string[] => Array.isArray(v) ? v.filter(x => typeof x === "string") : [];
 const unique = (v: string[]) => [...new Set(v)];
@@ -31,10 +32,23 @@ export function cycleFrom(id: string, tasks: Raw[]): boolean {
 export function taskProjects(t: Raw, data: Snapshot) {
   return unique([...links(t.fields[F.tasks.projects]), ...links(t.fields[F.tasks.cases]).flatMap(id => links(data.cases.find(c=>c.id===id)?.fields[F.cases.projects]))]);
 }
-export function classify(t: Raw, data: Snapshot): { stage: Stage; issues: string[]; blockers: string[]; released: boolean } {
+export function storedStage(t: Raw): EditableStage {
+  const status=s(t.fields[F.tasks.status]),gate=s(t.fields[F.tasks.gate]);
+  if(status==="Hecho") return "done";
+  if(status==="Cancelado") return "cancelled";
+  if(gate==="Acción recurrente") return "recurring";
+  if(gate==="En acción") return "doing";
+  if(gate==="En espera") return "waiting";
+  if(gate==="Acción inmediata") return "ready";
+  return "catalog";
+}
+export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage; issues: string[]; blockers: string[]; released: boolean } {
   const f=t.fields, issues: string[]=[], blockers: string[]=[];
   if (closed(t)) return {stage:f[F.tasks.status]==="Hecho"?"done":"cancelled",issues,blockers,released:false};
   const gate=s(f[F.tasks.gate]), status=s(f[F.tasks.status]);
+  const activateAt=s(f[F.tasks.activateAt]);
+  const activationTime=activateAt?Date.parse(activateAt):NaN;
+  if(activateAt&&!Number.isFinite(activationTime)) issues.push("Fecha de activación inválida");
   const deps=links(f[F.tasks.dependencies]), events=links(f[F.tasks.events]);
   const projects=taskProjects(t,data), caseIds=links(f[F.tasks.cases]);
   if (!s(f[F.tasks.name]).trim()) issues.push("Falta el nombre de la acción");
@@ -63,15 +77,16 @@ export function classify(t: Raw, data: Snapshot): { stage: Stage; issues: string
     else if (event.fields[F.events.status]==="Descartado") issues.push(`Revisar evento descartado: ${event.fields[F.events.name]}`);
     else if (event.fields[F.events.status]!=="Ocurrido" || !s(event.fields[F.events.evidence]).trim() || !event.fields[F.events.occurred]) blockers.push(s(event.fields[F.events.name]));
   }
-  const released=gate==="En espera" && !!(deps.length+events.length) && !blockers.length && !issues.length;
-  const stage: Stage=issues.length?"catalog":blockers.length?"waiting":gate==="En acción"?"doing":gate==="Acción recurrente"?"recurring":"ready";
+  const scheduled=Number.isFinite(activationTime)&&activationTime>now;
+  const released=gate==="En espera" && !!(deps.length+events.length) && !blockers.length && !issues.length && !scheduled;
+  const stage: Stage=issues.length?"catalog":scheduled?"scheduled":blockers.length?"waiting":gate==="En acción"?"doing":gate==="Acción recurrente"?"recurring":"ready";
   return {stage,issues,blockers,released};
 }
-export function board(data: Snapshot) {
+export function board(data: Snapshot, now=Date.now()) {
   const projects=data.projects.map(p=>({id:p.id,name:s(p.fields[F.projects.name]),status:s(p.fields[F.projects.status]),front:s(p.fields[F.projects.front]),rank:Number(p.fields[F.projects.rank])||9999,purpose:s(p.fields[F.projects.purpose]).slice(0,500),doc:s(p.fields[F.projects.doc]),open:projectOpen(p)}));
   const tasks=data.tasks.map(t=>{
     const f=t.fields;
-    return {id:t.id,front:s(f[F.tasks.front]),rank:Number(f[F.tasks.rank])||0,name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data)};
+    return {id:t.id,front:s(f[F.tasks.front]),rank:Number(f[F.tasks.rank])||0,activateAt:s(f[F.tasks.activateAt]),name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),baseStage:storedStage(t),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data,now)};
   });
   const priorityProject=(ids:string[])=>projects.filter(p=>ids.includes(p.id)&&p.open&&FRONTS.includes(p.front)).sort((a,b)=>FRONTS.indexOf(a.front)-FRONTS.indexOf(b.front)||a.rank-b.rank||a.id.localeCompare(b.id))[0];
   tasks.sort((a,b)=>{
@@ -98,7 +113,7 @@ export type Board = ReturnType<typeof board>;
 export function projectActionSummary(projectId: string, tasks: Board["tasks"]) {
   const open = tasks.filter(t=>t.projectIds.includes(projectId)&&!["done","cancelled"].includes(t.stage));
   const ready = open.filter(t=>["ready","recurring"].includes(t.stage)).length;
-  const counts = ([ ["catalog","por catalogar"], ["waiting","en espera"], ["doing","en curso"] ] as const)
+  const counts = ([ ["catalog","por catalogar"], ["scheduled","programadas"], ["waiting","en espera"], ["doing","en curso"] ] as const)
     .map(([stage,label])=>{const count=open.filter(t=>t.stage===stage).length;return count?`${count} ${label}`:"";}).filter(Boolean);
   return {
     open: open.length,

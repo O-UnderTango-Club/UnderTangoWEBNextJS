@@ -28,7 +28,7 @@ await check('staged y validated no activan el panel', () => {
   }
 });
 await check('rechaza lecturas incompletas o contratos incompatibles', () => {
-  for (const patch of [{ tasks: null }, { contract: 3 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
+  for (const patch of [{ tasks: null }, { contract: 4 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
     assert.throws(() => m.parseOperationsSnapshot({ ...fixture(), ...patch }), /incompleta/);
   }
 });
@@ -51,7 +51,7 @@ await check('no reutiliza Analytics ni claves públicas', () => {
 const env = { OPERATIONS_SUPABASE_URL: 'https://lqsnrqnmmeyzcnurfpos.supabase.co/', OPERATIONS_SUPABASE_SECRET_KEY: 'sb_secret_TEST_ONLY' };
 await check('RPC usa apikey privado, sin bearer ni caché ni redirecciones', async () => {
   const s = await m.readOperationsSnapshot({ env, fetcher: async (endpoint, init) => {
-    assert.equal(endpoint, 'https://lqsnrqnmmeyzcnurfpos.supabase.co/rest/v1/rpc/ut_panel_snapshot_v2');
+    assert.equal(endpoint, 'https://lqsnrqnmmeyzcnurfpos.supabase.co/rest/v1/rpc/ut_panel_snapshot_v3');
     assert.equal(init.headers.apikey, env.OPERATIONS_SUPABASE_SECRET_KEY); assert.equal(init.headers.Authorization, undefined);
     assert.equal(init.cache, 'no-store'); assert.equal(init.redirect, 'error'); assert.equal(init.body, '{}');
     return Response.json(fixture());
@@ -84,7 +84,7 @@ const nativeFetch = globalThis.fetch;
 globalThis.fetch = async (endpoint, init) => {
   assert.ok(String(endpoint).startsWith('https://lqsnrqnmmeyzcnurfpos.supabase.co/rest/v1/rpc/'), 'Never fall back to Airtable or Analytics');
   const body = JSON.parse(init.body);
-  if (endpoint.endsWith('/ut_panel_snapshot_v2')) { readCalls++; return Response.json({ ...db, revision: String(revision) }); }
+  if (endpoint.endsWith('/ut_panel_snapshot_v3')) { readCalls++; return Response.json({ ...db, revision: String(revision) }); }
   if (endpoint.endsWith('/ut_panel_receipt_v1')) return Response.json(receipts.get(body.p_request_id) || null);
   assert.ok(endpoint.endsWith('/ut_panel_commit_v1')); commitCalls++;
   if (race) { revision++; race = false; }
@@ -94,7 +94,9 @@ globalThis.fetch = async (endpoint, init) => {
     const group = { follow_ups: 'tasks', projects: 'projects', trigger_events: 'events' }[patch.table];
     const record = db[group].find(r => r.id === patch.id);
     assert.ok(record, 'This integration fixture updates existing records');
-    Object.assign(record.fields, patch.fields);
+    for (const [field,value] of Object.entries(patch.fields)) {
+      if(value===null)delete record.fields[field]; else record.fields[field]=value;
+    }
   }
   revision++;
   const result = { ok: true, id: lastPatches[0].id, ids: lastPatches.map(p => p.id), requestId: body.p_request_id, revision: String(revision), savedAt: new Date().toISOString() };
@@ -141,16 +143,28 @@ try {
     const evidence = db.tasks[0].fields[F.tasks.result];
     assert.ok(evidence.startsWith('Historia conservada')); assert.equal(evidence.split('Resultado de prueba').length, 2);
   });
-  db={...fixture(),contract:2};
+  db={...fixture(),contract:3};
   db.projects=[row('p',{[F.projects.name]:'Proyecto A',[F.projects.status]:'Activo',[F.projects.front]:'Terciario',[F.projects.rank]:50}),row('q',{[F.projects.name]:'Proyecto B',[F.projects.status]:'Activo',[F.projects.front]:'Primario',[F.projects.rank]:1})];
   const task=(id,rank,project='p',more={})=>row(id,{[F.tasks.name]:id,[F.tasks.status]:'Pendiente',[F.tasks.gate]:'Acción inmediata',[F.tasks.projects]:[project],[F.tasks.front]:'Primario',[F.tasks.rank]:rank,...more});
   db.tasks=[task('t',1),task('u',3),task('v',2,'q'),task('w',4,'p',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera',[F.tasks.dependencies]:['t']})];
-  await check('v2 ordena acciones del mismo proyecto de forma independiente y salta esperas',async()=>{
+  await check('v3 ordena acciones del mismo proyecto de forma independiente y salta esperas',async()=>{
     const result=server.responseBoard(await server.snapshot());
     assert.equal(result.rankingMode,'action');
     assert.deepEqual(result.tasks.map(t=>t.id),['t','v','u','w']);
     assert.deepEqual(result.fronts[0].tasks,['t','v','u']);
     assert.equal(result.fronts[2].tasks.length,0);
+  });
+  await check('guardar activar_en usa timestamp zonificado y la fecha futura bloquea sin reordenar',async()=>{
+    const beforeRanks=db.tasks.map(task=>task.fields[F.tasks.rank]);
+    await server.mutate(await intent('task','t',{activateAt:'2099-09-20T15:00:00-03:00'}),'test-actor');
+    assert.equal(lastPatches[0].fields[F.tasks.activateAt],'2099-09-20T18:00:00.000Z');
+    let result=server.responseBoard(await server.snapshot());
+    assert.equal(result.tasks.find(task=>task.id==='t').stage,'scheduled');
+    assert.ok(!result.fronts[0].tasks.includes('t'));
+    assert.deepEqual(db.tasks.map(task=>task.fields[F.tasks.rank]),beforeRanks);
+    await server.mutate(await intent('task','t',{activateAt:''}),'test-actor');
+    result=server.responseBoard(await server.snapshot());
+    assert.equal(result.tasks.find(task=>task.id==='t').stage,'ready');
   });
   await check('bajar una acción reordena sólo las posiciones afectadas, no su proyecto',async()=>{
     const projectsBefore=structuredClone(db.projects);

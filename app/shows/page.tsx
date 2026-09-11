@@ -1,52 +1,62 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import Header from "../components/header";
 import Footer from "../components/footer";
-import TangoRaveVideo from "../components/TangoRaveVideo";
 import styles from "./shows.module.css";
 
 const WHATSAPP_NUMBER = "5493757618270";
-const SHOWCASE_VIDEO = "https://www.youtube.com/embed/lrqyoXQiv_A?playsinline=1&rel=0";
+const TANGO_RAVE_VIDEO = "https://www.youtube.com/embed/bwUnN7k22bE?playsinline=1&rel=0";
 
 function whatsappFor(subject: string) {
-  const text = `Hola, vi los shows de Ø UnderTango y quisiera consultar una propuesta para ${subject}. El evento sería en [lugar], el [fecha], para [cantidad] personas.`;
+  const text = `Hola, vi la propuesta de Ø UnderTango y quisiera conversar sobre ${subject}. Mi nombre es [nombre] y represento a [organización / espacio].`;
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
 }
 
 export const metadata: Metadata = {
-  title: "Shows de tango y música en vivo | Ø UnderTango",
-  description: "Shows de tango, música en vivo y formatos escénicos para hoteles, empresas y eventos en la Triple Frontera.",
+  title: "Ø Tango Rave | Presentación para representantes",
+  description:
+    "Tango Rave cruza banda en vivo, electrónica y danza en una propuesta escénica adaptable para festivales, escenarios y eventos.",
   alternates: { canonical: "/shows" },
   openGraph: {
-    title: "Shows de tango y música en vivo | Ø UnderTango",
-    description: "Formatos escénicos elegantes y adaptables para eventos en la Triple Frontera.",
+    title: "Ø Tango Rave | UnderTango",
+    description: "Banda en vivo, electrónica y danza. Una propuesta escénica nacida en la Triple Frontera.",
     url: "https://www.undertangoclub.com/shows",
     siteName: "Ø UnderTango Club",
     locale: "es_AR",
     type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Shows de tango y música en vivo | Ø UnderTango",
-    description: "Formatos escénicos elegantes y adaptables para eventos en la Triple Frontera.",
+    images: [
+      {
+        url: "/assets/images/tango-rave-elenco.jpg",
+        width: 2048,
+        height: 1365,
+        alt: "Elenco de Ø Tango Rave",
+      },
+    ],
   },
 };
 
 const products = [
-  { number: "01", title: "Ø Tango Rave", label: "PRODUCTO INSIGNIA", description: "Banda en vivo, electrónica, danza y visuales reunidos en una experiencia escénica de alto impacto.", format: "Banda + electrónica + danza + visuales", ideal: "Escenarios, festivales y eventos de gran impacto", flagship: true },
-  { number: "02", title: "Tango Show — formato pareja / compacto", label: "FORMATO COMPACTO", description: "Una propuesta directa y adaptable para espacios que necesitan una intervención de tango clara, elegante y de escala contenida.", format: "Pareja de tango", ideal: "Hoteles, restaurantes, cenas, recepciones y eventos chicos" },
-  { number: "03", title: "Tango Show — formato ampliado", label: "FORMATO AMPLIADO", description: "Una pareja de tango integrada con músicos en vivo o una intervención escénica ajustada a las necesidades del evento.", format: "Pareja + músicos en vivo", ideal: "Eventos que requieren mayor presencia escénica" },
-  { number: "04", title: "Experiencia Tango con el público", label: "FORMATO PARTICIPATIVO", description: "Show de tango con participación guiada, mini clase o interacción para incorporar al público a la experiencia.", format: "Show + participación guiada", ideal: "Grupos, turismo, celebraciones y experiencias privadas" },
-  { number: "05", title: "Tango & Sax / formato lounge", label: "FORMATO LOUNGE", description: "Una propuesta elegante y liviana que combina tango y saxofón para acompañar el ritmo social del evento.", format: "Tango + saxofón", ideal: "Hoteles, cocktails, recepciones y cenas" },
-  { number: "06", title: "Folklore / Peña Rave", label: "FOLKLORE EN VIVO", description: "Banda con repertorio argentino y misionero, con una versión descontracturada para peñas, fiestas y eventos.", format: "Banda en vivo", ideal: "Peñas, fiestas y eventos" },
-  { number: "07", title: "Producción artística a medida", label: "PROYECTOS COMPLEJOS", description: "Una puerta a producciones que combinan tango, folklore, samba, fuego, zancos, músicos, danza y recursos especiales.", format: "Diseño y producción integral", ideal: "Proyectos complejos y combinaciones especiales", custom: true },
-  { number: "08", title: "Formato corporativo / institucional Triple Frontera", label: "EMPRESAS E INSTITUCIONES", description: "Una propuesta pensada para representar el contexto regional y adaptarse a objetivos institucionales o de marca.", format: "Escala y puesta adaptables", ideal: "Inauguraciones, congresos, turismo, lanzamientos y eventos empresariales" },
+  { number: "01", title: "Ø Tango Rave", label: "PRODUCTO INSIGNIA", description: "Banda en vivo, electrónica y danza reunidas en una experiencia escénica de alto impacto.", format: "Banda + electrónica + danza", ideal: "Escenarios, festivales y eventos de gran impacto", flagship: true },
+  { number: "02", title: "Tango Show — formato pareja / compacto", label: "FORMATO COMPACTO", description: "Una intervención de tango directa y adaptable para espacios de escala contenida.", format: "Pareja de tango", ideal: "Hoteles, restaurantes, cenas, recepciones y eventos chicos" },
+  { number: "03", title: "Tango Show — formato ampliado", label: "FORMATO AMPLIADO", description: "Una pareja de tango integrada con músicos en vivo y una puesta ajustada al evento.", format: "Pareja + músicos en vivo", ideal: "Eventos que requieren mayor presencia escénica" },
+  { number: "04", title: "Experiencia Tango con el público", label: "FORMATO PARTICIPATIVO", description: "Show con participación guiada, mini clase o interacción para incorporar al público.", format: "Show + participación guiada", ideal: "Grupos, turismo, celebraciones y experiencias privadas" },
+  { number: "05", title: "Tango & Sax / formato lounge", label: "FORMATO LOUNGE", description: "Tango y saxofón para acompañar el ritmo social de un evento.", format: "Tango + saxofón", ideal: "Hoteles, cocktails, recepciones y cenas" },
+  { number: "06", title: "Folklore / Peña Rave", label: "FOLKLORE EN VIVO", description: "Banda con repertorio argentino y misionero en una propuesta descontracturada.", format: "Banda en vivo", ideal: "Peñas, fiestas y eventos" },
+  { number: "07", title: "Producción artística a medida", label: "PROYECTOS COMPLEJOS", description: "Producciones que combinan disciplinas, elencos y recursos de acuerdo con cada proyecto.", format: "Diseño y producción integral", ideal: "Proyectos complejos y combinaciones especiales", custom: true },
+  { number: "08", title: "Formato corporativo / institucional Triple Frontera", label: "EMPRESAS E INSTITUCIONES", description: "Una propuesta vinculada con el contexto regional y adaptable a objetivos institucionales o de marca.", format: "Escala y puesta adaptables", ideal: "Inauguraciones, congresos, turismo, lanzamientos y eventos empresariales" },
+];
+
+const representationPoints = [
+  ["01", "Una imagen reconocible", "Un lenguaje visual propio para comunicar el show antes de que empiece."],
+  ["02", "Un cruce contemporáneo", "Tango, banda, electrónica y danza conviven dentro de una misma puesta."],
+  ["03", "Una escala adaptable", "La formación, la duración y el despliegue se definen según el escenario y la producción."],
 ];
 
 const steps = [
-  ["01", "Nos contás el contexto", "Fecha, ciudad, espacio, público y momento del evento."],
-  ["02", "Recomendamos el formato", "Definimos elenco, duración y necesidades técnicas."],
-  ["03", "Confirmamos la propuesta", "Coordinamos disponibilidad, producción y presupuesto."],
+  ["01", "Compartimos el contexto", "Ciudad, fecha, espacio, público y objetivo de la presentación."],
+  ["02", "Definimos el formato", "Acordamos elenco, duración, puesta y necesidades técnicas."],
+  ["03", "Armamos la propuesta", "Confirmamos disponibilidad, producción y presupuesto."],
 ];
 
 export default function ShowsPage() {
@@ -56,36 +66,59 @@ export default function ShowsPage() {
       <main className={styles.page}>
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}>Ø UNDERTANGO · SHOWS PARA EVENTOS</p>
-            <h1>Tango en escena, con el formato justo para cada ocasión.</h1>
-            <p className={styles.lead}>Propuestas de danza y música en vivo para hoteles, empresas, gastronomía y eventos privados en la Triple Frontera. Elegí un punto de partida; nosotros lo adaptamos al espacio y al público.</p>
+            <p className={styles.eyebrow}>Ø TANGO RAVE · PRESENTACIÓN PARA REPRESENTANTES</p>
+            <h1>El tango también puede sonar a presente.</h1>
+            <p className={styles.lead}>
+              Una propuesta de UnderTango que cruza banda en vivo, electrónica y danza para escenarios, festivales y eventos.
+            </p>
             <div className={styles.heroActions}>
-              <a className={styles.primaryCta} href={whatsappFor("mi evento")} target="_blank" rel="noopener noreferrer">Consultar disponibilidad</a>
-              <Link className={styles.secondaryCta} href="/produccion-artistica">Necesito una producción a medida</Link>
+              <a className={styles.primaryCta} href="#spot">Ver el spot</a>
+              <a className={styles.secondaryCta} href={whatsappFor("la representación de Ø Tango Rave")} target="_blank" rel="noopener noreferrer">Conversar sobre representación</a>
             </div>
-            <div className={styles.heroProof}>
-              <span>Puerto Iguazú · Foz do Iguaçu · Ciudad del Este</span>
-              <span>Elenco, duración y puesta adaptables</span>
-            </div>
+            <dl className={styles.heroFacts}>
+              <div><dt>Origen</dt><dd>Triple Frontera</dd></div>
+              <div><dt>Lenguaje</dt><dd>Música + danza</dd></div>
+              <div><dt>Formato</dt><dd>Adaptable</dd></div>
+            </dl>
           </div>
-          <div className={styles.showcase}>
+
+          <figure className={styles.heroVisual}>
+            <Image src="/assets/images/tango-rave-elenco.jpg" alt="Elenco de Ø Tango Rave" width={2048} height={1365} priority sizes="(max-width: 900px) 100vw, 55vw" />
+            <figcaption>Ø Tango Rave · elenco</figcaption>
+          </figure>
+        </section>
+
+        <section className={`${styles.section} ${styles.spotSection}`} id="spot" aria-labelledby="spot-title">
+          <div className={styles.spotCopy}>
+            <p className={styles.eyebrow}>SPOT OFICIAL · 48 SEGUNDOS</p>
+            <h2 id="spot-title">Una síntesis para verlo en acción.</h2>
+            <p>El registro reúne el pulso musical, la escena y el vínculo con el público. Es el punto de partida para presentar la propuesta.</p>
+            <a className={styles.textCta} href="https://youtu.be/bwUnN7k22bE" target="_blank" rel="noopener noreferrer">Abrir en YouTube <span aria-hidden="true">↗</span></a>
+          </div>
+          <div className={styles.videoShell}>
             <div className={styles.videoFrame}>
-              <iframe src={SHOWCASE_VIDEO} title="Aracely Maizares en un show de Ø UnderTango" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />
+              <iframe src={TANGO_RAVE_VIDEO} title="Spot oficial de Ø Tango Rave" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />
             </div>
-            <p>Aracely Maizares · registro audiovisual en YouTube</p>
           </div>
+        </section>
+
+        <section className={`${styles.section} ${styles.representation}`} aria-labelledby="representacion-title">
+          <div className={styles.sectionHeading}>
+            <p className={styles.eyebrow}>LA PROPUESTA</p>
+            <h2 id="representacion-title">Pensada para circular. Preparada para adaptarse.</h2>
+          </div>
+          <ol>{representationPoints.map(([number, title, copy]) => <li key={number}><span>{number}</span><h3>{title}</h3><p>{copy}</p></li>)}</ol>
         </section>
 
         <section className={styles.section} aria-labelledby="formatos-title">
           <div className={styles.sectionHeading}>
-            <p className={styles.eyebrow}>FORMATOS</p>
-            <h2 id="formatos-title">Una selección clara. Una puesta adaptable.</h2>
-            <p>Cada formato funciona como base. Ajustamos repertorio, cantidad de intervenciones, duración y despliegue técnico según la producción.</p>
+            <p className={styles.eyebrow}>CATÁLOGO UNDERTANGO</p>
+            <h2 id="formatos-title">Tango Rave abre una familia de formatos.</h2>
+            <p>Además del producto insignia, UnderTango trabaja con propuestas de distinta escala. Cada una funciona como base y se adapta al espacio, el público y la producción.</p>
           </div>
           <div className={styles.grid}>
             {products.map((product) => (
-              <article key={product.number} id={product.flagship ? "tango-rave" : undefined} className={`${styles.card} ${product.flagship ? styles.flagship : ""} ${product.custom ? styles.custom : ""}`}>
-                <div className={styles.cardCopy}>
+              <article key={product.number} className={`${styles.card} ${product.flagship ? styles.flagship : ""} ${product.custom ? styles.custom : ""}`}>
                 <div className={styles.cardTopline}><span>{product.number}</span><span>{product.label}</span></div>
                 <h3>{product.title}</h3>
                 <p>{product.description}</p>
@@ -98,24 +131,22 @@ export default function ShowsPage() {
                 ) : (
                   <a className={styles.cardCta} href={whatsappFor(product.title)} target="_blank" rel="noopener noreferrer">Consultar este formato <span aria-hidden="true">→</span></a>
                 )}
-                </div>
-                {product.flagship && <TangoRaveVideo />}
               </article>
             ))}
           </div>
         </section>
 
         <section className={`${styles.section} ${styles.process}`} aria-labelledby="proceso-title">
-          <div className={styles.sectionHeading}><p className={styles.eyebrow}>CONTRATACIÓN</p><h2 id="proceso-title">Simple para decidir. Cuidado en la ejecución.</h2></div>
+          <div className={styles.sectionHeading}><p className={styles.eyebrow}>SIGUIENTE PASO</p><h2 id="proceso-title">Una conversación concreta para definir encaje.</h2></div>
           <ol>{steps.map(([number, title, copy]) => <li key={number}><span>{number}</span><div><h3>{title}</h3><p>{copy}</p></div></li>)}</ol>
         </section>
 
         <section className={styles.finalBlock}>
-          <div><p className={styles.eyebrow}>PRODUCCIÓN ARTÍSTICA INTEGRAL</p><h2>¿El evento necesita algo más que un formato listo?</h2><p>Diseñamos conceptos, convocamos artistas y coordinamos una solución escénica completa alrededor de la experiencia que querés crear.</p></div>
-          <div className={styles.finalActions}><Link className={styles.primaryCta} href="/produccion-artistica">Conocer la productora</Link><a className={styles.textCta} href={whatsappFor("una propuesta a medida")} target="_blank" rel="noopener noreferrer">Contarnos el evento →</a></div>
+          <div><p className={styles.eyebrow}>Ø UNDERTANGO · TRIPLE FRONTERA</p><h2>¿Ves un escenario para Tango Rave?</h2><p>Conversemos sobre territorio, públicos y oportunidades de representación.</p></div>
+          <div className={styles.finalActions}><a className={styles.primaryCta} href={whatsappFor("una oportunidad para Ø Tango Rave")} target="_blank" rel="noopener noreferrer">Iniciar conversación</a><Link className={styles.textCta} href="/produccion-artistica">Conocer la productora →</Link></div>
         </section>
       </main>
-      <a className={styles.mobileWhatsapp} href={whatsappFor("mi evento")} target="_blank" rel="noopener noreferrer">Consultar disponibilidad</a>
+      <a className={styles.mobileWhatsapp} href={whatsappFor("la representación de Ø Tango Rave")} target="_blank" rel="noopener noreferrer">Conversar sobre representación</a>
       <Footer />
     </>
   );

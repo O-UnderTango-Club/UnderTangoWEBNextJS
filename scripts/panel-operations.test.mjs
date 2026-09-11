@@ -92,8 +92,9 @@ globalThis.fetch = async (endpoint, init) => {
   lastPatches = body.p_patches;
   for (const patch of lastPatches) {
     const group = { follow_ups: 'tasks', projects: 'projects', trigger_events: 'events' }[patch.table];
+    if(patch.create){patch.id='sb-'+crypto.randomUUID();db[group].push(row(patch.id,{}));}
     const record = db[group].find(r => r.id === patch.id);
-    assert.ok(record, 'This integration fixture updates existing records');
+    assert.ok(record, 'Record must exist before applying fields');
     for (const [field,value] of Object.entries(patch.fields)) {
       if(value===null)delete record.fields[field]; else record.fields[field]=value;
     }
@@ -108,7 +109,7 @@ const intent = async (kind, id, changes) => {
   const data = await server.snapshot(true);
   const group = { task: 'tasks', project: 'projects', event: 'events' }[kind];
   return { requestId: crypto.randomUUID(), snapshotRevision: data.globalRevision, kind, id,
-    revision: server.revision(data[group].find(r => r.id === id)), changes };
+    revision: id?server.revision(data[group].find(r => r.id === id)):undefined, changes };
 };
 try {
   await check('servidor expone fuente y revisión solamente desde snapshot activo', async () => {
@@ -147,6 +148,30 @@ try {
   db.projects=[row('p',{[F.projects.name]:'Proyecto A',[F.projects.status]:'Activo',[F.projects.front]:'Terciario',[F.projects.rank]:50}),row('q',{[F.projects.name]:'Proyecto B',[F.projects.status]:'Activo',[F.projects.front]:'Primario',[F.projects.rank]:1})];
   const task=(id,rank,project='p',more={})=>row(id,{[F.tasks.name]:id,[F.tasks.status]:'Pendiente',[F.tasks.gate]:'Acción inmediata',[F.tasks.projects]:[project],[F.tasks.front]:'Primario',[F.tasks.rank]:rank,...more});
   db.tasks=[task('t',1),task('u',3),task('v',2,'q'),task('w',4,'p',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera',[F.tasks.dependencies]:['t']})];
+  await check('crear proyecto conserva todas las acciones y recupera el mismo comprobante',async()=>{
+    const before=JSON.stringify(db.tasks), n=db.projects.length;
+    const input=await intent('project',undefined,{name:'  Nuevo   proyecto  ',purpose:'Resultado esperado',status:'Activo'});
+    failAfterCommit=true;await assert.rejects(server.mutate(input,'test-actor'),e=>e.status===503);
+    const calls=commitCalls,result=await server.mutate(input,'test-actor');
+    assert.equal(commitCalls,calls);assert.equal(db.projects.length,n+1);assert.equal(JSON.stringify(db.tasks),before);
+    const created=db.projects.find(p=>p.id===result.id);assert.equal(created.fields[F.projects.name],'Nuevo proyecto');
+    assert.equal(created.fields[F.projects.rank],undefined);assert.equal(created.fields[F.projects.front],undefined);
+    assert.equal(created.fields[F.projects.purpose],'Resultado esperado');
+  });
+  await check('rechaza nombre vacío, duplicado, ranking y estado terminal en nuevo proyecto',async()=>{
+    const calls=commitCalls;
+    for(const changes of [{name:'  '},{name:'NUEVO  PROYECTO'},{name:'Otro',rank:1},{name:'Otro',status:'Archivado'}]){
+      await assert.rejects(server.mutate(await intent('project',undefined,changes),'test-actor'));
+    }
+    assert.equal(commitCalls,calls);
+  });
+  await check('vincular el proyecto creado conserva ranking y vínculos anteriores',async()=>{
+    const created=db.projects.find(p=>p.fields[F.projects.name]==='Nuevo proyecto');
+    await server.mutate(await intent('task','t',{projects:['p',created.id]}),'test-actor');
+    assert.deepEqual(db.tasks.find(t=>t.id==='t').fields[F.tasks.projects],['p',created.id]);
+    assert.equal(db.tasks.find(t=>t.id==='t').fields[F.tasks.rank],1);
+    await server.mutate(await intent('task','t',{projects:['p']}),'test-actor');
+  });
   await check('v3 ordena acciones del mismo proyecto de forma independiente y salta esperas',async()=>{
     const result=server.responseBoard(await server.snapshot());
     assert.equal(result.rankingMode,'action');

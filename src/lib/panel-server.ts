@@ -191,11 +191,18 @@ async function performMutation(input: any, actor: string) {
     if(!current&&data.tasks.some(t=>!closed(t)&&String(t.fields[F.tasks.name]).trim().toLowerCase()===String(candidate.fields[F.tasks.name]).toLowerCase()))throw new PanelError("Ya existe una acción abierta con ese nombre. Buscala para continuar.",409);
   } else if(kind==="project") {
     if(data.rankingMode==="action"&&("front" in change||"rank" in change))throw new PanelError("El ranking se edita en cada acción, no en el proyecto.");
-    if(!current) throw new PanelError(operational?"Los proyectos se crean en el área operativa de Supabase; aquí podés ordenar los existentes.":"Los proyectos se crean en Airtable; aquí podés ordenar los existentes.");
-    if(Object.keys(change).some(k=>!["front","rank","status","doc"].includes(k)))throw new PanelError("Campo no editable.");
+    if(!current&&!operational) throw new PanelError("Crear proyectos requiere el sistema operativo de Supabase.");
+    if(Object.keys(change).some(k=>!(current?["front","rank","status","doc"]:["name","purpose","status","doc"]).includes(k)))throw new PanelError("Campo no editable.");
+    if(!current){
+      const name=text(change.name,250).replace(/\s+/g," ").trim();
+      if(!name)throw new PanelError("Escribí el nombre del proyecto.");
+      if(data.projects.some(p=>String(p.fields[F.projects.name]||"").replace(/\s+/g," ").trim().toLowerCase()===name.toLowerCase()))throw new PanelError("Ya existe un proyecto con ese nombre. Buscalo para vincular la acción, incluso entre los cerrados.",409);
+      if(change.status!==undefined&&!["Activo","En espera"].includes(change.status))throw new PanelError("Elegí Activo o En espera para el nuevo proyecto.");
+      fields[F.projects.name]=name;fields[F.projects.purpose]=text(change.purpose??"",1500);fields[F.projects.status]=change.status||"Activo";
+    }
     if("doc" in change)fields[F.projects.doc]=doc(change.doc);
-    const front=change.front||current.fields[F.projects.front],rank=change.rank??current.fields[F.projects.rank];
-    if("front" in change||"rank" in change) {
+    const front=change.front||current?.fields[F.projects.front],rank=change.rank??current?.fields[F.projects.rank];
+    if(current&&("front" in change||"rank" in change)) {
       if(!["Primario","Secundario","Terciario"].includes(front)||!Number.isInteger(rank)||rank<1)throw new PanelError("Elegí un frente y una posición positiva.");
       const ordered=(group:string)=>data.projects.filter(p=>p.id!==current.id&&projectOpen(p)&&p.fields[F.projects.front]===group).sort((a,b)=>(Number(a.fields[F.projects.rank])||9999)-(Number(b.fields[F.projects.rank])||9999)||a.id.localeCompare(b.id));
       const destination=ordered(front),position=Math.min(rank,destination.length+1);destination.splice(position-1,0,current);
@@ -205,7 +212,7 @@ async function performMutation(input: any, actor: string) {
     }
     if("status" in change){
       if(!["Activo","En espera","Completado","Archivado"].includes(change.status))throw new PanelError("Estado de proyecto inválido.");
-      if(["Completado","Archivado"].includes(change.status)&&data.tasks.some(t=>!closed(t)&&taskProjects(t,data).includes(current.id)))throw new PanelError("Primero resolvé o reasigná las acciones abiertas del proyecto.");
+      if(current&&["Completado","Archivado"].includes(change.status)&&data.tasks.some(t=>!closed(t)&&taskProjects(t,data).includes(current.id)))throw new PanelError("Primero resolvé o reasigná las acciones abiertas del proyecto.");
       fields[F.projects.status]=change.status;
     }
   } else {

@@ -42,3 +42,10 @@ La asignación inicial conserva una sola vez el orden anterior: frente/ranking d
 Ejecutar primero toda la migración en una transacción terminada en ROLLBACK. Insertar antes del cierre `scripts/action-ranking-db-test.sql`: verifica intercambio atómico, recibo repetido sin escritura duplicada, rechazo de colisiones y reversión de todas las pruebas. Después aplicar y confirmar la misma migración validada. No ejecutar pruebas mutantes fuera de su transacción reversible.
 
 Pruebas locales: `node scripts/panel.test.mjs`, `node scripts/panel-operations.test.mjs`, `node scripts/finance.test.mjs` y `tsc --noEmit`. Verificar build de Vercel, dominio de producción, lectura autenticada y editor de posición individual antes de anunciar el cambio activo.
+# Crear proyectos desde el panel
+
+El botón principal es **Crear proyecto**. Guarda nombre, propósito opcional, estado y documento mediante el contrato auditado de Supabase. Luego ofrece agregar la primera acción; cancelar ese segundo formulario conserva el proyecto creado.
+
+**Agregar acción** permite vincular proyectos existentes o crear y seleccionar uno sin cerrar ni perder el borrador. La creación del proyecto se confirma por separado; la acción y sus vínculos se guardan al enviar su formulario. Un proyecto sin acciones aparece para definir su próximo paso, sin ocupar cupos ni recibir ranking.
+
+Los nombres duplicados se rechazan también si el proyecto está cerrado, ignorando mayúsculas y espacios repetidos. Se conservan la revisión global, los comprobantes idempotentes y la auditoría. La migración `20260911032054_enable_panel_project_creation` habilita sólo los campos existentes necesarios, sin modificar registros ni ranking.

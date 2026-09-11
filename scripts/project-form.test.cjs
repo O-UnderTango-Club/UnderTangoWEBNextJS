@@ -1,0 +1,31 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const Module = require('node:module');
+const ts = require('typescript');
+const React = require('react');
+const { renderToStaticMarkup } = require('react-dom/server');
+function load(relative, replacements = {}) {
+  const filename = path.resolve(__dirname, relative);
+  const mod = new Module(filename, module);
+  mod.filename = filename; mod.paths = Module._nodeModulePaths(path.dirname(filename));
+  const originalRequire = mod.require.bind(mod);
+  mod.require = id => id in replacements ? replacements[id] : originalRequire(id);
+  const source = fs.readFileSync(filename, 'utf8').replace('function EditForm(', 'export function EditForm(');
+  mod._compile(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename);
+  return mod.exports;
+}
+const model = load('../src/lib/panel-model.ts');
+const { EditForm } = load('../app/panel-de-control/Panel.tsx', { '../../src/lib/panel-model': model, './panel.module.css': {default:{}} });
+const data = { rankingMode:'action',source:'supabase',projects:[],tasks:[],events:[],cases:[] };
+const render = (editor, extra = {}) => renderToStaticMarkup(React.createElement(EditForm, { editor, data, busy:false, onClose(){}, async onSave(){}, async onCreateProject(){return 'p';}, ...extra }));
+const project = render({kind:'project',initial:{name:'Proyecto nuevo',purpose:'Resultado',status:'Activo',doc:''}});
+assert.match(project, /Crear proyecto/); assert.match(project, /Nombre del proyecto/);
+assert.match(project, /Propósito/); assert.doesNotMatch(project, /Posición en el frente/);
+assert.doesNotMatch(project, /option[^>]*>Archivado/);
+const task = render({kind:'task',initial:{name:'Borrador intacto',stage:'catalog',projects:[],cases:[],dependencies:[],events:[]}});
+assert.match(task, /Borrador intacto/); assert.match(task, /Crear proyecto y seleccionarlo/);
+assert.match(task, /Proyectos vinculados/); assert.match(task, /la acción se guarda por separado/);
+const readOnly = render({kind:'project',initial:{name:'Prueba',status:'Activo'}},{data:{...data,readOnly:true}});
+assert.match(readOnly, /fieldset disabled/);
+console.log('3 project/action form rendering checks passed');

@@ -38,3 +38,37 @@ body:has(.bmc-page) iframe[src*="chat-robot"],body:has(.bmc-page) [id*="chat-rob
 @media(max-width:900px){.bmc-framework-intro,.bmc-team,.bmc-framework-signal,.bmc-horizons{grid-template-columns:1fr}.bmc-horizons article{min-height:0}}
 @media(max-width:560px){.bmc-topbar{padding:0 20px}.bmc-topbar>p{font-size:9px}.bmc-hero,.bmc-section,.bmc-actors,.bmc-economics,.bmc-diagnosis{padding:70px 20px}.bmc-page h1{font-size:48px}.bmc-lead{font-size:18px}.bmc-grid{grid-template-columns:1fr}.bmc-card-4,.bmc-card-9{grid-column:auto!important}.bmc-heading{gap:24px;margin-bottom:35px}.bmc-radar-layout figure{padding:8px}.bmc-footer{padding:25px 20px;gap:25px;flex-direction:column}}
 
+/* Screen-first reading scale; isolate heading overrides from the main site. */
+.bmc-page{--heading:#344b38}
+.bmc-page h1,.bmc-page h2{color:var(--heading)!important;text-align:left;text-shadow:none;line-height:1.08;overflow-wrap:break-word}
+.bmc-page h1::after,.bmc-page h2::after{display:none}
+.bmc-page h1{font-size:clamp(34px,4vw,60px);max-width:850px}
+.bmc-page h1 em{color:#984326}
+.bmc-page h2,.bmc-page .bmc-framework h2{font-size:clamp(28px,2.6vw,42px);color:var(--heading)!important}
+.bmc-page .bmc-actors h2,.bmc-page .bmc-team h2{color:var(--paper)!important}
+.bmc-page .bmc-fdg h2,.bmc-page .bmc-diagnosis h2{color:#302819!important}
+.bmc-page p{font-family:Arial,sans-serif}
+.bmc-hero{min-height:0;padding:54px 4vw;gap:5vw;align-items:center}
+.bmc-hero>div,.bmc-heading>div,.bmc-fdg-intro>div{min-width:0}
+.bmc-lead{font-size:18px;line-height:1.5;margin:24px 0;max-width:740px}
+.bmc-hero-note strong{font-size:24px;line-height:1.15}
+.bmc-section,.bmc-actors,.bmc-economics,.bmc-diagnosis,.bmc-framework{padding:52px 4vw}
+.bmc-heading{gap:4vw;margin-bottom:28px}.bmc-heading>p,.bmc-copy{font-size:16px}
+.bmc-card{padding:22px;min-width:0;min-height:220px}.bmc-card h3{font-size:19px;line-height:1.15}
+.bmc-actor-flow article{padding:22px}.bmc-actor-flow article>b{margin-bottom:22px}.bmc-actor-flow h3{font-size:24px;line-height:1.15}
+.bmc-fdg .bmc-numbers strong{font-size:clamp(28px,3vw,46px);white-space:normal}
+.bmc-fdg-total strong{font-size:clamp(26px,2.5vw,36px);white-space:normal}.bmc-fdg .bmc-numbers>div{min-height:0;padding:24px;gap:18px}
+.bmc-fdg-link{display:inline-block;align-self:flex-start;margin-top:6px;padding:10px 0;color:var(--acid)!important;text-decoration:underline!important;text-underline-offset:4px;font:700 15px Arial,sans-serif}
+.bmc-fdg-link:focus-visible{outline:2px solid var(--acid);outline-offset:4px}
+.bmc-page .bmc-tools-link{display:inline-block;margin-top:6px;color:#24566c;text-decoration:underline;text-underline-offset:3px;font:700 13px Arial,sans-serif}
+.bmc-tools-link:focus-visible{outline:2px solid #24566c;outline-offset:4px}
+.bmc-radar-layout{grid-template-columns:minmax(0,440px) minmax(0,520px);justify-content:center;gap:40px;align-items:center}
+.bmc-radar-layout figure{padding:12px}.bmc-radar-layout img{display:block;max-height:400px;object-fit:contain}
+.bmc-radar-layout figcaption{font-size:11px;line-height:1.4}
+.bmc-readiness article{grid-template-columns:34px minmax(0,1fr);gap:12px;padding:10px 0}.bmc-readiness>article>div{font:700 27px Arial,sans-serif;color:#24566c}.bmc-readiness h3{font-size:15px}.bmc-readiness p{font-size:13px;line-height:1.4}
+.bmc-page .bmc-readiness article>section{padding:0;margin:0;min-height:0}
+.bmc-diagnosis-copy{font-size:16px}.bmc-next strong{font-size:clamp(23px,2.5vw,36px);line-height:1.15}.bmc-next p{font-size:15px;line-height:1.5;max-width:720px}
+.bmc-framework-signal strong,.bmc-horizons h3{font-size:28px;line-height:1.1}.bmc-horizons article{min-height:0}.bmc-team li{font-size:24px}
+@media(max-width:900px){.bmc-hero{grid-template-columns:1fr;gap:30px}.bmc-hero-note{max-width:600px}.bmc-radar-layout{grid-template-columns:minmax(0,1fr);gap:24px}.bmc-radar-layout figure{width:100%;max-width:390px;justify-self:center}.bmc-radar-layout img{max-height:330px}}
+@media(max-width:560px){.bmc-hero,.bmc-section,.bmc-actors,.bmc-economics,.bmc-diagnosis,.bmc-framework{padding:34px 20px}.bmc-page h1{font-size:34px}.bmc-page h2,.bmc-page .bmc-framework h2{font-size:28px}.bmc-lead{font-size:16px}.bmc-fdg-intro{gap:20px}.bmc-framework-signal{padding:20px}.bmc-next{gap:16px}.bmc-topbar{height:64px}}
+

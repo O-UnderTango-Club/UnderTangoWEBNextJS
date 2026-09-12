@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import styles from "../rave.module.css";
+import { raveImages } from "../social";
 
-export const metadata: Metadata = { title: "Peña Rave — Estreno septiembre 2026 en Puerto Iguazú | Ø UnderTango", description: "Peña Rave está en preparación. Estreno en septiembre de 2026 en Puerto Iguazú. Música argentina y misionera con la banda de UnderTango.", alternates: { canonical: "https://rave.undertangoclub.com/pena-rave" }, openGraph: { title: "Peña Rave · Estreno septiembre 2026", description: "Puerto Iguazú. Una nueva propuesta de la banda de UnderTango, en preparación.", url: "https://rave.undertangoclub.com/pena-rave" } };
+export const metadata: Metadata = { title: "Peña Rave — Estreno septiembre 2026 en Puerto Iguazú | Ø UnderTango", description: "Peña Rave está en preparación. Estreno en septiembre de 2026 en Puerto Iguazú. Música argentina y misionera con la banda de UnderTango.", alternates: { canonical: "https://rave.undertangoclub.com/pena-rave" }, openGraph: { title: "Peña Rave · Estreno septiembre 2026", description: "Puerto Iguazú. Una nueva propuesta de la banda de UnderTango, en preparación.", url: "https://rave.undertangoclub.com/pena-rave", images: raveImages } };
 export default function PenaRavePage() {
   return <main id="contenido"><section className={`${styles.hero} ${styles.peñaHero}`}>
     <p className={styles.eyebrow}>02 / REPERTORIO ARGENTINO · BANDA EN VIVO</p><h1>Peña<br/><em>Rave.</em></h1>

@@ -21,6 +21,11 @@ export function middleware(request: NextRequest) {
   }
 
   if (hostname === "rave.undertangoclub.com") {
+    if (pathname === "/favicon.ico") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/images/rave/icon-v1.svg";
+      return NextResponse.rewrite(url);
+    }
     if (pathname === "/rave" || pathname.startsWith("/rave/")) {
       const url = request.nextUrl.clone();
       url.pathname = pathname.slice(5) || "/";

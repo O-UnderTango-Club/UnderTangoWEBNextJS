@@ -135,6 +135,18 @@
 }
 
 .financePanel { height: min(900px, calc(100svh - 32px)); }
+.tile { text-decoration: none; }
+.description { flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; overflow-y: auto; }
+.description p { margin: 0; }
+.description a, .description > strong { color: #e2c477; font: 600 16px/1.4 sans-serif; }
+.description a:focus-visible { outline: 2px solid #d1a844; outline-offset: 4px; }
+.clientGroups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; overflow-y: auto; }
+.clientGroups h4 { margin: 0 0 12px; color: #e2c477; font-size: 18px; }
+.clientGroups ul { margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.7; }
+.otherMembers .memberGrid { display: flex; justify-content: center; }
+.otherMembers .memberCard { width: min(100%, 330px); }
+.subpanelContent { overflow-y: auto; }
+@media (max-width: 720px) { .clientGroups { grid-template-columns: 1fr; gap: 16px; } }
 .financeSubpanel { margin: 0 !important; padding: 0 !important; }
 
 @media (max-width: 720px) { .financeSubpanel .subpanelHeader { padding: 40px 12px 12px; grid-template-columns: auto minmax(0, 1fr); gap: 12px; } .financeSubpanel .subpanelHeader h3 { font-size: 21px; } .financeSubpanel .subpanelHeader > span { display: none; } .financePanel .close { top: 8px; right: 12px; padding: 6px 9px; font-size: 9px; } }

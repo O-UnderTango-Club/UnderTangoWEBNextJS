@@ -86,7 +86,12 @@ export default function CentralMap() {
         </header>
         <div className={styles.mapFrame}>
           <div className={styles.grid}>
-            {matrix.map((department) => (
+            {matrix.map((department) => department.link?.direct ? (
+              <a key={department.number} className={styles.tile} data-department={department.number} href={department.link.href} aria-label={`${department.number} · ${department.link.label}`}>
+                <span className={styles.number}>{department.number}</span>
+                <span className={styles.keyword}>{department.keyword} ↗</span>
+              </a>
+            ) : (
               <button type="button" key={department.number} className={styles.tile} data-department={department.number} aria-expanded={selectedNumber === department.number} aria-haspopup="dialog" onClick={() => openDepartment(department.number)}>
                 <span className={styles.number}>{department.number}</span>
                 <span className={styles.keyword}>{department.keyword}</span>
@@ -110,15 +115,15 @@ export default function CentralMap() {
                 <span className={styles.panelNumber}>{selected.number}</span>
                 <div><p>{selected.keyword}</p><h2 id={`department-${selected.number}-title`}>{selected.title}</h2></div>
               </header>
-              <p className={styles.description}>{selected.description}</p>
+              <div className={styles.description}><p>{selected.description}</p>{selected.link && <a href={selected.link.href}>{selected.link.label} →</a>}{selected.emptyLabel && <strong>{selected.emptyLabel}</strong>}</div>
               <div className={styles.metricGrid}>
                 <button ref={membersButton} type="button" className={styles.metric} aria-expanded={activeSection === "members"} aria-controls={`department-${selected.number}-members`} onClick={() => openSection("members")}>
                   <span className={styles.metricCount}>{selected.members.length}</span>
-                  <span><strong>Integrantes</strong><small>Ver el equipo +</small></span>
+                  <span><strong>{selected.clients ? "Alianzas" : "Integrantes"}</strong><small>{selected.clients ? "Ver vínculos +" : "Ver el equipo +"}</small></span>
                 </button>
                 <button ref={projectsButton} type="button" className={styles.metric} aria-expanded={activeSection === "projects"} aria-controls={`department-${selected.number}-projects`} onClick={() => openSection("projects")}>
-                  <span className={styles.metricCount}>{selected.projects.length}</span>
-                  <span><strong>Proyectos activos</strong><small>Ver los proyectos +</small></span>
+                  <span className={styles.metricCount}>{selected.clients?.length ?? selected.projects.length}</span>
+                  <span><strong>{selected.clients ? "Clientes" : "Proyectos activos"}</strong><small>{selected.clients ? "Ver por país +" : "Ver los proyectos +"}</small></span>
                 </button>
               </div>
             </div>
@@ -129,9 +134,9 @@ export default function CentralMap() {
                   <button ref={detailBackButton} type="button" className={styles.back} onClick={closeSection}>← Volver</button>
                   <div>
                     <p>{selected.number} · {selected.keyword}</p>
-                    <h3 id={`department-${selected.number}-${activeSection}-title`}>{activeSection === "finance" ? "Informe financiero 2026" : activeSection === "members" ? "Integrantes" : "Proyectos activos"}</h3>
+                    <h3 id={`department-${selected.number}-${activeSection}-title`}>{activeSection === "finance" ? "Informe financiero 2026" : activeSection === "members" ? (selected.clients ? "Alianzas" : "Integrantes") : (selected.clients ? "Clientes" : "Proyectos activos")}</h3>
                   </div>
-                  <span>{activeSection === "finance" ? "87" : activeSection === "members" ? selected.members.length : selected.projects.length}</span>
+                  <span>{activeSection === "finance" ? "87" : activeSection === "members" ? selected.members.length : (selected.clients?.length ?? selected.projects.length)}</span>
                 </header>
                 {activeSection === "finance" ? <FinanceReconstruction /> : activeSection === "members" ? (
                   selected.memberHeading ? (
@@ -148,8 +153,8 @@ export default function CentralMap() {
                         ))}
                       </div>
                       {selected.members.some((member) => !member.country) && (
-                        <section className={styles.otherMembers} aria-label="Otros integrantes">
-                          <h4>Otros integrantes</h4>
+                        <section className={styles.otherMembers} aria-label="Producción">
+                          <h4>Producción · articulación entre países</h4>
                           <div className={styles.memberGrid}>
                             {selected.members.filter((member) => !member.country).map((member) => <MemberCard key={member.name} member={member} />)}
                           </div>
@@ -158,9 +163,16 @@ export default function CentralMap() {
                     </div>
                   ) : (
                     <div className={`${styles.subpanelContent} ${styles.memberGrid}`}>
-                      {selected.members.length ? selected.members.map((member) => <MemberCard key={member.name} member={member} />) : <p className={styles.empty}>Todavía no hay integrantes asignados a este departamento en Airtable.</p>}
+                      {selected.members.length ? selected.members.map((member) => <MemberCard key={member.name} member={member} />) : <p className={styles.empty}>{selected.emptyLabel ?? "Sin integrantes publicados por el momento."}</p>}
                     </div>
                   )
+                ) : selected.clients ? (
+                  <div className={`${styles.subpanelContent} ${styles.clientGroups}`}>
+                    {countries.map((country) => <section key={country.code} className={styles.countryGroup}>
+                      <h4>{country.name}</h4>
+                      <ul>{selected.clients?.filter((client) => client.country === country.code).map((client) => <li key={client.name}>{client.name}</li>)}</ul>
+                    </section>)}
+                  </div>
                 ) : (
                   <ol className={`${styles.subpanelContent} ${styles.projectGrid}`}>
                     {selected.projects.map((project, index) => <li key={project}><span>{String(index + 1).padStart(2, "0")}</span>{selected.number === "87" && project === "Ø87 — Tablero financiero" ? <button ref={reportButton} type="button" className={styles.projectReportButton} onClick={() => openSection("finance")}><strong>{project}</strong><small>Ver informe gráfico 2026 →</small></button> : <strong>{project}</strong>}</li>)}

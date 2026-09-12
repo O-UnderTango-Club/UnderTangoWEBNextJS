@@ -7,6 +7,9 @@ export type Department = {
   description: string;
   members: DepartmentMember[];
   memberHeading?: string;
+  link?: { href: string; label: string; direct?: boolean };
+  emptyLabel?: string;
+  clients?: { name: string; country: "AR" | "BR" | "PY" }[];
   projects: string[];
 };
 
@@ -14,12 +17,14 @@ export type Department = {
 export const departments: Department[] = [
   {
     number: "82", keyword: "Moda", title: "Moda",
+    link: { href: "https://www.instagram.com/modaundertango/", label: "Ver Moda UnderTango", direct: true },
     description: "Diseño, vestuario, indumentaria e imagen material. El departamento lleva la identidad de UnderTango al cuerpo, la escena y sus piezas comerciales.",
     members: [],
     projects: ["Video institucional Ø UnderTango — sistema de diez departamentos"],
   },
   {
     number: "83", keyword: "Academia", title: "Academia Under Tango",
+    link: { href: "/aprende", label: "Conocer el método APRENDE" },
     description: "Formación, aprendizaje y herramientas educativas: APRENDE, la Academia de Tango online y presencial y recursos gratuitos para aprender mejor.",
     members: [
       { name: "Pablo Cieslik", role: "Producción y docencia" },
@@ -34,6 +39,7 @@ export const departments: Department[] = [
   },
   {
     number: "84", keyword: "Marketing", title: "Marketing, audiovisual y medios",
+    emptyLabel: "Vacante al momento",
     description: "Comunicación, prensa, campañas, redes y producción audiovisual. Convierte la actividad real del sistema en presencia, relato, difusión y demanda.",
     members: [],
     projects: ["Video institucional Ø UnderTango — sistema de diez departamentos"],
@@ -41,7 +47,10 @@ export const departments: Department[] = [
   {
     number: "88", keyword: "Equipo central", title: "Equipo central",
     description: "Núcleo humano de dirección, gobernanza y coordinación. Define prioridades, reglas de funcionamiento y los equipos que ejecutan cada proyecto.",
-    members: [{ name: "Pablo Cieslik", role: "Dirección general" }],
+    members: [
+      { name: "Pablo Cieslik", role: "Director General" },
+      { name: "Lucila Vizcarra", role: "Secretaria General" },
+    ],
     projects: [
       "88 — Gobernanza — Manual operativo + Fondo de Decisión",
       "Video institucional Ø UnderTango — sistema de diez departamentos",
@@ -79,7 +88,7 @@ export const departments: Department[] = [
       { name: "Thaís Andrade", role: "Bailarina de tango", country: "BR" },
       { name: "Renan Araujo", role: "Bailarín de tango", country: "BR" },
       { name: "Aracely Maizares", role: "Bailarina de tango", country: "PY" },
-      { name: "Gustavo Paez", role: "Bailarín de tango", country: "PY" },
+      { name: "Gustavo Páez", role: "Bailarín de tango", country: "PY" },
       { name: "Pablo Cieslik", role: "Producción" },
     ],
     projects: [
@@ -103,7 +112,13 @@ export const departments: Department[] = [
   {
     number: "86", keyword: "Música", title: "Música, ensayos y repertorio",
     description: "Preparación musical y escénica, ensayos, repertorio, arreglos e identidad sonora para las distintas experiencias de UnderTango.",
-    members: [],
+    members: [
+      { name: "Pablo Cieslik", role: "Piano" },
+      { name: "Agustín Aguilar · Sirahsax", role: "Saxofón" },
+      { name: "Pablo Tevez", role: "Guitarra" },
+      { name: "Iván Escobar", role: "Bajo" },
+      { name: "Sergio Peralta", role: "Batería" },
+    ],
     projects: [
       "Producto estrella — saxo + dupla de tango",
       "Ø Peña Rave — Peña Los Amigos — septiembre 2026",
@@ -113,14 +128,25 @@ export const departments: Department[] = [
   },
   {
     number: "87", keyword: "Finanzas", title: "Finanzas, caja y deudas",
+    link: { href: "/elitros/funcionamiento-del-fdg", label: "Funcionamiento del FDG", direct: true },
     description: "Ordena cobros, pagos, obligaciones, saldos y movimientos para sostener el trabajo y permitir decisiones económicas con información real.",
     members: [],
     projects: ["Ø87 — Tablero financiero", "Video institucional Ø UnderTango — sistema de diez departamentos"],
   },
   {
-    number: "89", keyword: "Extensión", title: "Extensión, auditoría y acompañamiento",
-    description: "Capa transversal para diagnosticar, ordenar, auditar y acompañar proyectos externos activando las capacidades de los demás departamentos.",
-    members: [],
+    number: "89", keyword: "Vinculación", title: "Vinculación y alianzas",
+    description: "Alianzas y relaciones con clientes de Argentina, Brasil y Paraguay.",
+    members: [{ name: "Juan Pögler", role: "Not Only Wine" }],
+    clients: [
+      { name: "Shopping China", country: "PY" },
+      { name: "Itaipu Binacional", country: "PY" },
+      { name: "Hotel Grand Carimã", country: "BR" },
+      { name: "A Piacere", country: "AR" },
+      { name: "La Cabrera", country: "AR" },
+      { name: "Gran Meliá", country: "AR" },
+      { name: "Iguazú Grand", country: "AR" },
+      { name: "Patanegra Gourmet", country: "AR" },
+    ],
     projects: ["Sistema Bajo Fuego — red internacional de artistas", "Video institucional Ø UnderTango — sistema de diez departamentos"],
   },
 ];

@@ -1,0 +1,5 @@
+.fdg-page h1,.fdg-page h2,.fdg-page p{font-family:Arial,sans-serif}
+.fdg-page section{display:block;padding:0;min-height:0;opacity:1;transform:none;transition:none}
+.fdg-page section h2{display:block;color:inherit;text-align:left;margin-bottom:16px}
+.fdg-page section h2::after{display:none}
+.fdg-page p{margin-bottom:20px}

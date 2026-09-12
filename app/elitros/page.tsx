@@ -22,7 +22,8 @@ const readiness = [
   ["FRL", "Financiación", "Antecedente documentado", "Registros de aportes y repartos del fondo anterior. FDG 0.2 en desarrollo; cierre histórico y recursos actuales por conciliar."],
 ] as const;
 
-// Qualitative map: positions identify dimensions, never maturity scores.
+// Previous working estimates, not confirmed KTH levels. Null is never plotted as zero.
+const radarLevels: Record<string, number | null> = { BRL: 5, CRL: 7, TMRL: 4, TRL: 6, IPRL: null, FRL: null };
 const radarPoint = (axis: number, level: number) => {
   const angle = (-90 + axis * 60) * Math.PI / 180;
   return [230 + Math.cos(angle) * level * 15, 225 + Math.sin(angle) * level * 15];
@@ -128,35 +129,36 @@ export default function ElitrosPage() {
       </section>
 
       <section className="bmc-section" id="madurez">
-        <div className="bmc-heading"><div><p className="bmc-eyebrow">MADUREZ · SEIS DIMENSIONES KTH · 12/09/2026</p><h2>UnderTango hoy.<br/>Operación real, evolución activa.</h2></div><p>Este mapa muestra lo que ya funciona y lo que estamos consolidando. Es una lectura cualitativa con evidencia: retiramos los puntajes provisionales hasta comprobar todos los hitos de cada nivel.</p></div>
+        <div className="bmc-heading"><div><p className="bmc-eyebrow">RADAR KTH · ESCALA 1–9 · 12/09/2026</p><h2>UnderTango hoy.<br/>Operación real, evolución activa.</h2></div><p>Radar con niveles de trabajo: Negocio 5, Cliente 7, Equipo 4 y Tecnología 6. Son estimaciones provisionales, no niveles confirmados. Propiedad intelectual y Financiación conservan su evidencia y siguen pendientes de puntuación.</p></div>
         <div className="bmc-radar-layout"><figure className="bmc-current-radar">
           <svg viewBox="0 0 460 440" role="img" aria-labelledby="radar-title radar-desc">
-            <title id="radar-title">UnderTango: mapa cualitativo de seis dimensiones</title>
-            <desc id="radar-desc">Negocio en operación, clientes con ventas y recompra, equipo activo, tecnología en uso, marca documentada y financiación con antecedente documentado. Las posiciones sólo identifican dimensiones: no representan niveles KTH ni porcentajes.</desc>
+            <title id="radar-title">Radar UnderTango: niveles provisionales en escala del 1 al 9</title>
+            <desc id="radar-desc">Negocio 5, Cliente 7, Equipo 4, Tecnología 6: estimaciones de trabajo pendientes de validación completa. Propiedad intelectual y Financiación sin puntaje: no se representan como cero ni se cierra un área con datos faltantes.</desc>
             <text x="230" y="25" textAnchor="middle" fontSize="17" fontWeight="700">UNDERTANGO · HOY</text>
-            <text x="230" y="47" textAnchor="middle" fontSize="12">Mapa de evidencia · sin escala numérica</text>
-            <circle cx="230" cy="225" r="48" fill="#f2efe7"/>
-            <text x="230" y="221" textAnchor="middle" fontSize="14" fontWeight="700">OPERACIÓN</text>
-            <text x="230" y="241" textAnchor="middle" fontSize="13">+ evolución</text>
+            <text x="230" y="47" textAnchor="middle" fontSize="12">Escala 1–9 · niveles provisionales</text>
+            {Array.from({length:9},(_,i)=>i+1).map(level => <g key={level}><polygon points={readiness.map((_,axis)=>radarPoint(axis,level).join(",")).join(" ")} fill="none" stroke="#d3d7cd" strokeWidth={level === 9 ? 1.5 : 0.8}/><text x="239" y={225-level*15+4} fontSize="10" fill="#626a61">{level}</text></g>)}
+            <polyline points={readiness.flatMap(([code],axis)=>radarLevels[code] === null ? [] : [radarPoint(axis,radarLevels[code] as number).join(",")]).join(" ")} fill="none" stroke="#24566c" strokeWidth="2.5" strokeDasharray="5 3"/>
             {readiness.map(([code,title],axis) => {
               const [x,y] = radarPoint(axis,9);
               const [lx,ly] = radarPoint(axis,11);
-              const [sx,sy] = radarPoint(axis,3.5);
-              return <g key={code}><line x1={sx} y1={sy} x2={x} y2={y} stroke="#c2c9bd" strokeWidth="2"/><circle cx={x} cy={y} r="7" fill="#344b38"/><text x={lx} y={ly} textAnchor="middle" fontSize="12" fontWeight="700">{code}</text><text x={lx} y={ly+16} textAnchor="middle" fontSize="10">{title === "Propiedad intelectual" ? "Prop. intelectual" : title}</text></g>;
+              const level = radarLevels[code];
+              const point = level === null ? null : radarPoint(axis,level);
+              return <g key={code}><line x1="230" y1="225" x2={x} y2={y} stroke="#c2c9bd"/>{point && <circle cx={point[0]} cy={point[1]} r="6" fill="white" stroke="#24566c" strokeWidth="2.5"/>}<text x={lx} y={ly} textAnchor="middle" fontSize="12" fontWeight="700">{code} · {level ?? "S/P"}</text><text x={lx} y={ly+16} textAnchor="middle" fontSize="10">{title === "Propiedad intelectual" ? "Prop. intelectual" : title}</text></g>;
             })}
-            <text x="230" y="425" textAnchor="middle" fontSize="11">Las distancias no representan madurez.</text>
+            <text x="230" y="407" textAnchor="middle" fontSize="11">○ Nivel provisional · S/P: sin puntaje</text>
+            <text x="230" y="425" textAnchor="middle" fontSize="10">Pendiente no significa cero.</text>
           </svg>
           <figcaption>Elaboración propia con referencia al <a href="https://kthinnovationreadinesslevel.com/wp-content/uploads/sites/9/2021/02/KTH-Innovation-Readiness-Level_Compiled.pdf" target="_blank" rel="noreferrer">modelo KTH</a>. No es una evaluación emitida por KTH.</figcaption>
         </figure><div className="bmc-readiness">{readiness.map(([code, title, status, text]) => <article key={code}><div aria-hidden="true">•</div><section><span>{code} · {status}</span><h3>{title}</h3><p>{text}</p>{code === "TRL" && <a className="bmc-tools-link" href="/elitros/sistema-de-herramientas">Ver el sistema de herramientas →</a>}{code === "TMRL" && <a className="bmc-tools-link" href="https://www.undertangoclub.com/central">Ver equipo y departamentos →</a>}{code === "FRL" && <a className="bmc-tools-link" href="/elitros/funcionamiento-del-fdg">Funcionamiento del FDG →</a>}</section></article>)}</div></div>
         <details className="bmc-radar-evidence"><summary>Evidencia revisada y próximos hitos por dimensión</summary>
-          <p><strong>Alcance y criterio.</strong> Evaluamos el servicio gestionado y el sistema interno de UnderTango, no una aplicación futura. Usamos las seis dimensiones de la edición pública KTH de 2021 como referencia. Este mapa cualitativo no sustituye su escala: para asignar un nivel deben comprobarse todos sus hitos. «En desarrollo» indica trabajo activo; «por verificar» indica una limitación de esta revisión, no ausencia de actividad.</p>
+          <p><strong>Alcance y criterio.</strong> Evaluamos el servicio gestionado y el sistema interno de UnderTango, no una aplicación futura. Usamos la edición pública KTH de 2021 como referencia. Recuperamos los niveles anteriores como estimaciones de trabajo (BRL 5, CRL 7, TMRL 4, TRL 6), no como resultados de una validación completa. Para confirmar un nivel deben comprobarse todos sus hitos. «En desarrollo» indica trabajo activo; «por verificar» indica una limitación de esta revisión, no ausencia de actividad.</p>
           <p><strong>Cliente · evidencia.</strong> En el corte de 24 operaciones, 10 figuran realizadas y pagadas en 8 etiquetas de cliente/lugar, no necesariamente 8 entidades jurídicas. Shopping China tiene tres fechas: 15, 29 y 30/08. Las requisiciones sucesivas de Gran Meliá respaldan continuidad comercial, no cobro por sí solas. <strong>Próximo hito:</strong> contrastar decisores, proceso comercial y beneficios observados; no trasladar ventas de shows a demanda de software.</p>
           <p><strong>Negocio · evidencia.</strong> Hay servicios vendidos y repartos históricos. La política actual suma US$25 de producción/mantenimiento y US$25 al FDG sobre el caché elegido por cada artista. <strong>Próximo hito:</strong> conciliar una liquidación del esquema actual con costos completos y respuesta del comprador. Los repartos antiguos no prueban la aplicación de esta política ni su margen efectivo.</p>
           <p><strong>Equipo · evidencia.</strong> Padrón conciliado: 17 personas y 21 participaciones departamentales. Lucila Vizcarra se incorpora a Secretaría General; los compromisos comunes están en desarrollo. <strong>Próximo hito:</strong> confirmar roles, dedicación y acuerdos del núcleo responsable, distinguiéndolo de la red convocable. Una nómina no equivale a contratos firmados.</p>
           <p><strong>Tecnología · evidencia.</strong> Panel y herramientas usados en casos reales. El flujo de actualización de Equipo tiene recibo auditado y pruebas de validación, duplicados, concurrencia e idempotencia. <strong>Próximo hito:</strong> comprobar el recorrido integral y sus requisitos de rendimiento, seguridad y continuidad. Las pruebas de un flujo no equivalen a una auditoría de todo el sistema ni a un ahorro de tiempo medido.</p>
           <p><strong>Propiedad intelectual · evidencia.</strong> Se revisó el título INPI de marca mixta, clase 41, registro 3.456.539, a favor de Pablo Guillermo Cieslik, concedido en 2023. No se consultó el estado registral actual. <strong>En desarrollo:</strong> derechos sobre código, método, materiales y uso de imagen. <strong>Próximo hito:</strong> vincular cada activo con titularidad y permisos; el título de marca no acredita el control del conjunto.</p>
           <p><strong>Financiación · evidencia.</strong> La planilla histórica del FDI contiene registros de aportes, reinversiones y cálculos de repartos. Dirección informa que el fondo anterior cerró con ganancias para sus inversores; esta revisión no concilió ese cierre individualmente. El estatuto de 2025 es provisional. <strong>En desarrollo:</strong> FDG 0.2. <strong>Próximo hito:</strong> verificar el cierre histórico y separar presupuesto, compromisos y recursos disponibles del nuevo ciclo. Aportes pendientes no son caja; un estatuto no demuestra ejecución de mecanismos financieros o constitución societaria.</p>
-          <p><strong>Lectura del gráfico.</strong> Sus seis posiciones identifican dimensiones, no niveles iguales ni porcentajes. No hay escala, área de madurez ni promedio. La revisión numérica permanece abierta; la evidencia operativa ya puede comunicarse sin esperar a que termine toda la transición.</p>
+          <p><strong>Lectura del gráfico.</strong> Los anillos indican niveles del 1 al 9, no porcentajes. Los puntos huecos y la línea discontinua representan estimaciones provisionales. IPRL y FRL se identifican como S/P: no se dibujan en cero ni se cierra el área atravesando esos ejes. No se calcula un promedio. La revisión numérica permanece abierta.</p>
         </details>
       </section>
 

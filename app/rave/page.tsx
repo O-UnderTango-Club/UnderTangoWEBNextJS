@@ -7,10 +7,10 @@ import musicians from "./musicians.module.css";
 
 const members = [
   { instrument: "Piano", name: "Pablo Cieslik", image: "piano", position: "56% center" },
-  { instrument: "Saxofón", name: null, image: "saxofon", position: "center 30%" },
-  { instrument: "Guitarra", name: null, image: "guitarra", position: "center 22%" },
-  { instrument: "Bajo", name: null, image: "bajo", position: "center 22%" },
-  { instrument: "Batería", name: null, image: "bateria", position: "center 30%" },
+  { instrument: "Saxofón", name: "Agustín Aguilar · Sirahsax", image: "saxofon", position: "center 30%" },
+  { instrument: "Guitarra", name: "Pablo Tevez", image: "guitarra", position: "center 22%" },
+  { instrument: "Bajo", name: "Iván Escobar", image: "bajo", position: "center 22%" },
+  { instrument: "Batería", name: "Sergio Peralta", image: "bateria-horizonte", position: "center 30%" },
 ];
 
 const formats = [

@@ -14,12 +14,12 @@ const canvas = [
 ] as const;
 
 const readiness = [
-  ["BRL", "Negocio", "5", "Servicio vendido y modelo en ajuste. El nuevo reparto al FDG aún requiere validación."],
+  ["BRL", "Negocio", "5", "Servicio vendido. Caché libre + US$25 de producción + US$25 al FDG: política definida; liquidaciones por contrastar."],
   ["CRL", "Cliente", "7", "Ventas y recompra comprobadas: 10 operaciones pagadas en 8 clientes/lugares, como mínimo documentado."],
-  ["TMRL", "Equipo", "—", "Hay equipo y dirección activos. Falta contrastar dedicación, competencias y acuerdos con la escala."],
-  ["TRL", "Tecnología", "6", "Herramientas integradas en uso operativo. Falta medir desempeño y verificar el sistema completo."],
-  ["IPRL", "Propiedad intelectual", "—", "La marca tiene un antecedente de registro; falta revisar el conjunto de derechos, código y permisos."],
-  ["FRL", "Financiación", "—", "Existen ingresos de operación. No equivalen a financiación disponible para la transición."],
+  ["TMRL", "Equipo", "4", "17 personas, 21 participaciones departamentales y Secretaría General incorporada. Compromisos por formalizar."],
+  ["TRL", "Tecnología", "6", "Sistema coordinado en uso: panel, Supabase y herramientas conectadas. Pruebas funcionales; desempeño integral por medir."],
+  ["IPRL", "Propiedad intelectual", "—", "Marca, código y materiales identificados. Titularidad, licencias y permisos de imagen por verificar en conjunto."],
+  ["FRL", "Financiación", "—", "FDG 0.2 en preparación. Antecedente del primer fondo informado por dirección; capital actual por verificar."],
 ] as const;
 
 // One data source for both the graphic and its explanations. Unknowns are not zero.
@@ -128,11 +128,11 @@ export default function ElitrosPage() {
       </section>
 
       <section className="bmc-section" id="madurez">
-        <div className="bmc-heading"><div><p className="bmc-eyebrow">RADAR KTH · REVISIÓN 12/09/2026</p><h2>UnderTango hoy.<br/>Un sistema en transición.</h2></div><p>Evaluamos el servicio y las herramientas que ya operan. Puntajes orientativos, no certificados: no se ha auditado el cumplimiento de todos los hitos. «Sin evaluar» no significa nivel cero.</p></div>
+        <div className="bmc-heading"><div><p className="bmc-eyebrow">RADAR KTH · REVISIÓN 12/09/2026</p><h2>UnderTango hoy.<br/>Un sistema en transición.</h2></div><p>Servicio, equipo y herramientas que ya operan. Cuatro estimaciones provisionales y dos ejes con evidencia pendiente. Falta documentar no significa que no exista; tampoco permite certificar un nivel.</p></div>
         <div className="bmc-radar-layout"><figure className="bmc-current-radar">
           <svg viewBox="0 0 460 440" role="img" aria-labelledby="radar-title radar-desc">
             <title id="radar-title">UnderTango actual: evaluación provisional de madurez</title>
-            <desc id="radar-desc">Negocio 5, Cliente 7 y Tecnología 6, estimaciones de trabajo en escala de 1 a 9. Equipo, Propiedad intelectual y Financiación sin evaluar. No se dibuja un polígono porque faltan tres evaluaciones.</desc>
+            <desc id="radar-desc">Negocio 5, Cliente 7, Equipo 4 y Tecnología 6: estimaciones provisionales en escala de 1 a 9. Propiedad intelectual y Financiación revisadas sin puntaje suficiente. No se dibuja un polígono cerrado ni se convierten los datos faltantes en ceros.</desc>
             <text x="230" y="25" textAnchor="middle" fontSize="17" fontWeight="700">UNDERTANGO · HOY</text>
             <text x="230" y="47" textAnchor="middle" fontSize="12">Servicio y sistema operativo en transición</text>
             {[1,3,5,7,9].map(level => <g key={level}><polygon points={readiness.map((_, axis) => radarPoint(axis, level).join(",")).join(" ")} fill="none" stroke="#d3d7cd"/><text x="236" y={225-level*15+4} fontSize="10" fill="#626a61">{level}</text></g>)}
@@ -141,13 +141,22 @@ export default function ElitrosPage() {
               const [lx,ly] = radarPoint(axis,11);
               const scored = value !== "—";
               const [px,py] = radarPoint(axis,scored ? Number(value) : 9);
-              return <g key={code}><line x1="230" y1="225" x2={x} y2={y} stroke="#c2c9bd" strokeDasharray={scored ? undefined : "3 4"}/>{scored ? <><line x1="230" y1="225" x2={px} y2={py} stroke="#344b38" strokeWidth="3"/><circle cx={px} cy={py} r="7" fill="#344b38" stroke="white" strokeWidth="2"/></> : <circle cx={px} cy={py} r="5" fill="white" stroke="#82897f"/>}<text x={lx} y={ly} textAnchor="middle" fontSize="12" fontWeight="700">{code} · {scored ? value : "S/E"}</text><text x={lx} y={ly+16} textAnchor="middle" fontSize="10">{title === "Propiedad intelectual" ? "Prop. intelectual" : title}</text></g>;
+              return <g key={code}><line x1="230" y1="225" x2={x} y2={y} stroke="#c2c9bd" strokeDasharray={scored ? undefined : "3 4"}/>{scored && <><line x1="230" y1="225" x2={px} y2={py} stroke="#344b38" strokeWidth="3"/><circle cx={px} cy={py} r="7" fill="#344b38" stroke="white" strokeWidth="2"/></>}<text x={lx} y={ly} textAnchor="middle" fontSize="12" fontWeight="700">{code} · {scored ? value : "S/P"}</text><text x={lx} y={ly+16} textAnchor="middle" fontSize="10">{title === "Propiedad intelectual" ? "Prop. intelectual" : title}</text></g>;
             })}
-            <text x="230" y="425" textAnchor="middle" fontSize="11">● Estimación provisional · ○ S/E: sin evaluar</text>
+            <text x="230" y="425" textAnchor="middle" fontSize="11">● Estimación provisional · S/P: sin puntaje</text>
           </svg>
           <figcaption>Elaboración propia con referencia al <a href="https://kthinnovationreadinesslevel.com/wp-content/uploads/sites/9/2021/02/KTH-Innovation-Readiness-Level_Compiled.pdf" target="_blank" rel="noreferrer">modelo KTH</a>. No es una evaluación emitida por KTH.</figcaption>
-        </figure><div className="bmc-readiness">{readiness.map(([code, title, value, text]) => <article key={code}><div aria-label={value === "—" ? "Sin evaluar" : `Nivel ${value} estimado`}>{value}</div><section><span>{code} · {value === "—" ? "SIN EVALUAR" : "ESTIMADO"}</span><h3>{title}</h3><p>{text}</p>{code === "TRL" && <a className="bmc-tools-link" href="/elitros/sistema-de-herramientas">Ver el sistema de herramientas →</a>}</section></article>)}</div></div>
-        <details className="bmc-radar-evidence"><summary>Qué respalda esta evaluación y qué falta verificar</summary><p>CRL 7 es una estimación por ventas, clientes reales y recompra; falta completar la revisión del proceso comercial y de todos los hitos del nivel. BRL 5 refleja partes del modelo probadas en el mercado, no la validación del nuevo reparto ni de la rentabilidad total. TRL 6 es una referencia conservadora para la integración de herramientas en problemas reales; no afirma una plataforma terminada ni certifica rendimiento, seguridad o escalabilidad.</p><p>Fuente operativa revisada el 12/09/2026: 24 registros en Operaciones de Supabase; 10 marcados realizados y pagados en 8 etiquetas de cliente/lugar. Shopping China repite el 15, 29 y 30/08. Las requisiciones de Gran Meliá respaldan continuidad comercial, no cobro por sí solas. Es un mínimo documental, no toda la trayectoria de UnderTango.</p><p>Los tres ejes sin puntaje requieren contrastar acuerdos y competencias del equipo, derechos y permisos, y recursos comprometidos frente a las necesidades de financiación. No se dibuja un área cerrada ni un promedio con datos ausentes.</p></details>
+        </figure><div className="bmc-readiness">{readiness.map(([code, title, value, text]) => <article key={code}><div aria-label={value === "—" ? "Sin puntaje: evidencia pendiente" : `Nivel ${value} estimado`}>{value}</div><section><span>{code} · {value === "—" ? "EVIDENCIA PENDIENTE" : "ESTIMADO"}</span><h3>{title}</h3><p>{text}</p>{code === "TRL" && <a className="bmc-tools-link" href="/elitros/sistema-de-herramientas">Ver el sistema de herramientas →</a>}{code === "TMRL" && <a className="bmc-tools-link" href="https://www.undertangoclub.com/central">Ver equipo y departamentos →</a>}{code === "FRL" && <a className="bmc-tools-link" href="/elitros/funcionamiento-del-fdg">Funcionamiento del FDG →</a>}</section></article>)}</div></div>
+        <details className="bmc-radar-evidence"><summary>Evidencia revisada y próximos hitos por dimensión</summary>
+          <p><strong>Alcance.</strong> Servicio artístico gestionado y sistema interno de UnderTango al 12/09/2026. No calificamos como terminadas las futuras apps ni extrapolamos la tracción de shows a otros productos. Usamos la edición pública KTH de 2021 como referencia: los números son hipótesis de evaluación, no niveles certificados. Para confirmar un nivel hay que contrastar todos sus hitos.</p>
+          <p><strong>Cliente · 7 provisional.</strong> 24 operaciones registradas: 10 realizadas y marcadas pagadas en 8 etiquetas de cliente/lugar. Shopping China contrató los shows del 15, 29 y 30/08. La Cabrera tiene un cobro registrado, pero su operación aún figura «Confirmada»: no se suma a los 10 realizados y pagados. El siguiente hito es contrastar el proceso comercial, los decisores y la repetibilidad; no equiparar ventas existentes con crecimiento escalable.</p>
+          <p><strong>Negocio · 5 provisional.</strong> Hay precios cobrados y distribuciones reales. Pablo define para todos los shows un caché sugerido según mercado, modificable por el artista, más US$50 por artista: US$25 de producción y mantenimiento y US$25 al FDG. Los registros históricos revisados usan repartos distintos: no prueban la aplicación del nuevo esquema. Falta conciliar liquidaciones y costos completos antes de afirmar rentabilidad o subir el nivel.</p>
+          <p><strong>Equipo · 4 provisional.</strong> Padrón conciliado en Supabase y Central: 17 personas y 21 participaciones. Dirección general, perfiles artísticos y técnicos y Secretaría General identificados; Marketing figura vacante. La formalización de compromisos está en preparación. Para sostener 5 hay que confirmar dedicación, roles y acuerdos de participación del núcleo, no sólo contar integrantes. Una nómina no equivale a contratos firmados.</p>
+          <p><strong>Tecnología · 6 provisional.</strong> Herramientas utilizadas sobre casos reales. La actualización de Equipo dejó un recibo verificable y pasó pruebas de validación, duplicados, concurrencia e idempotencia. Es evidencia funcional acotada, no una auditoría de todo el sistema. Antes de sostener 7 faltan criterios de aceptación y mediciones integrales de carga, seguridad, interacción y continuidad; no damos por comprobado un ahorro porcentual de tiempo.</p>
+          <p><strong>Propiedad intelectual · sin puntaje.</strong> Se reconocen marca, código, método y materiales. Falta reunir documentos de titularidad, licencias y permisos, incluyendo el uso de imagen previsto en el contrato. La existencia de una marca no acredita control de todos los activos. Esta revisión no determina su situación jurídica.</p>
+          <p><strong>Financiación · sin puntaje.</strong> Pablo informa que el primer fondo cerró cumpliendo objetivos y con ganancias para sus inversores: antecedente declarado, no cierre documental verificado en esta revisión. FDG 0.2 es una etapa distinta. Los aportes planificados encontrados siguen pendientes; no se cuentan como capital recibido. Falta conciliar el cierre anterior y definir necesidades, plazos, fuentes y recursos efectivamente comprometidos del nuevo ciclo.</p>
+          <p>Los dos ejes sin puntaje no valen cero y no se ubican en el nivel 9. Por eso el gráfico no dibuja un área cerrada ni calcula un promedio.</p>
+        </details>
       </section>
 
       <section className="bmc-diagnosis">

@@ -14,15 +14,15 @@ const canvas = [
 ] as const;
 
 const readiness = [
-  ["BRL", "Negocio", "5", "Servicio vendido. Caché libre + US$25 de producción + US$25 al FDG: política definida; liquidaciones por contrastar."],
-  ["CRL", "Cliente", "7", "Ventas y recompra comprobadas: 10 operaciones pagadas en 8 clientes/lugares, como mínimo documentado."],
-  ["TMRL", "Equipo", "4", "17 personas, 21 participaciones departamentales y Secretaría General incorporada. Compromisos por formalizar."],
-  ["TRL", "Tecnología", "6", "Sistema coordinado en uso: panel, Supabase y herramientas conectadas. Pruebas funcionales; desempeño integral por medir."],
-  ["IPRL", "Propiedad intelectual", "—", "Marca, código y materiales identificados. Titularidad, licencias y permisos de imagen por verificar en conjunto."],
-  ["FRL", "Financiación", "—", "FDG 0.2 en preparación. Antecedente del primer fondo informado por dirección; capital actual por verificar."],
+  ["BRL", "Negocio", "En operación", "Servicio vendido. Caché sugerido según mercado y modificable por el artista, más US$25 de producción y US$25 al FDG. Liquidaciones actuales por contrastar."],
+  ["CRL", "Cliente", "Ventas y recompra", "10 operaciones realizadas y marcadas pagadas en 8 etiquetas de cliente/lugar: mínimo documentado, no cartera histórica total."],
+  ["TMRL", "Equipo", "Equipo activo", "17 personas y 21 participaciones departamentales. Secretaría General incorporada; acuerdos de compromiso en desarrollo."],
+  ["TRL", "Tecnología", "Sistema en uso", "Panel y herramientas conectadas usados sobre casos reales. Verificaciones funcionales concretas; desempeño integral por medir."],
+  ["IPRL", "Propiedad intelectual", "Marca documentada", "Título INPI de marca clase 41 a nombre de Pablo Cieslik. Derechos sobre código, materiales e imagen en desarrollo."],
+  ["FRL", "Financiación", "Antecedente documentado", "Registros de aportes y repartos del fondo anterior. FDG 0.2 en desarrollo; cierre histórico y recursos actuales por conciliar."],
 ] as const;
 
-// One data source for both the graphic and its explanations. Unknowns are not zero.
+// Qualitative map: positions identify dimensions, never maturity scores.
 const radarPoint = (axis: number, level: number) => {
   const angle = (-90 + axis * 60) * Math.PI / 180;
   return [230 + Math.cos(angle) * level * 15, 225 + Math.sin(angle) * level * 15];
@@ -128,34 +128,35 @@ export default function ElitrosPage() {
       </section>
 
       <section className="bmc-section" id="madurez">
-        <div className="bmc-heading"><div><p className="bmc-eyebrow">RADAR KTH · REVISIÓN 12/09/2026</p><h2>UnderTango hoy.<br/>Un sistema en transición.</h2></div><p>Servicio, equipo y herramientas que ya operan. Cuatro estimaciones provisionales y dos ejes con evidencia pendiente. Falta documentar no significa que no exista; tampoco permite certificar un nivel.</p></div>
+        <div className="bmc-heading"><div><p className="bmc-eyebrow">MADUREZ · SEIS DIMENSIONES KTH · 12/09/2026</p><h2>UnderTango hoy.<br/>Operación real, evolución activa.</h2></div><p>Este mapa muestra lo que ya funciona y lo que estamos consolidando. Es una lectura cualitativa con evidencia: retiramos los puntajes provisionales hasta comprobar todos los hitos de cada nivel.</p></div>
         <div className="bmc-radar-layout"><figure className="bmc-current-radar">
           <svg viewBox="0 0 460 440" role="img" aria-labelledby="radar-title radar-desc">
-            <title id="radar-title">UnderTango actual: evaluación provisional de madurez</title>
-            <desc id="radar-desc">Negocio 5, Cliente 7, Equipo 4 y Tecnología 6: estimaciones provisionales en escala de 1 a 9. Propiedad intelectual y Financiación revisadas sin puntaje suficiente. No se dibuja un polígono cerrado ni se convierten los datos faltantes en ceros.</desc>
+            <title id="radar-title">UnderTango: mapa cualitativo de seis dimensiones</title>
+            <desc id="radar-desc">Negocio en operación, clientes con ventas y recompra, equipo activo, tecnología en uso, marca documentada y financiación con antecedente documentado. Las posiciones sólo identifican dimensiones: no representan niveles KTH ni porcentajes.</desc>
             <text x="230" y="25" textAnchor="middle" fontSize="17" fontWeight="700">UNDERTANGO · HOY</text>
-            <text x="230" y="47" textAnchor="middle" fontSize="12">Servicio y sistema operativo en transición</text>
-            {[1,3,5,7,9].map(level => <g key={level}><polygon points={readiness.map((_, axis) => radarPoint(axis, level).join(",")).join(" ")} fill="none" stroke="#d3d7cd"/><text x="236" y={225-level*15+4} fontSize="10" fill="#626a61">{level}</text></g>)}
-            {readiness.map(([code,title,value],axis) => {
+            <text x="230" y="47" textAnchor="middle" fontSize="12">Mapa de evidencia · sin escala numérica</text>
+            <circle cx="230" cy="225" r="48" fill="#f2efe7"/>
+            <text x="230" y="221" textAnchor="middle" fontSize="14" fontWeight="700">OPERACIÓN</text>
+            <text x="230" y="241" textAnchor="middle" fontSize="13">+ evolución</text>
+            {readiness.map(([code,title],axis) => {
               const [x,y] = radarPoint(axis,9);
               const [lx,ly] = radarPoint(axis,11);
-              const scored = value !== "—";
-              const [px,py] = radarPoint(axis,scored ? Number(value) : 9);
-              return <g key={code}><line x1="230" y1="225" x2={x} y2={y} stroke="#c2c9bd" strokeDasharray={scored ? undefined : "3 4"}/>{scored && <><line x1="230" y1="225" x2={px} y2={py} stroke="#344b38" strokeWidth="3"/><circle cx={px} cy={py} r="7" fill="#344b38" stroke="white" strokeWidth="2"/></>}<text x={lx} y={ly} textAnchor="middle" fontSize="12" fontWeight="700">{code} · {scored ? value : "S/P"}</text><text x={lx} y={ly+16} textAnchor="middle" fontSize="10">{title === "Propiedad intelectual" ? "Prop. intelectual" : title}</text></g>;
+              const [sx,sy] = radarPoint(axis,3.5);
+              return <g key={code}><line x1={sx} y1={sy} x2={x} y2={y} stroke="#c2c9bd" strokeWidth="2"/><circle cx={x} cy={y} r="7" fill="#344b38"/><text x={lx} y={ly} textAnchor="middle" fontSize="12" fontWeight="700">{code}</text><text x={lx} y={ly+16} textAnchor="middle" fontSize="10">{title === "Propiedad intelectual" ? "Prop. intelectual" : title}</text></g>;
             })}
-            <text x="230" y="425" textAnchor="middle" fontSize="11">● Estimación provisional · S/P: sin puntaje</text>
+            <text x="230" y="425" textAnchor="middle" fontSize="11">Las distancias no representan madurez.</text>
           </svg>
           <figcaption>Elaboración propia con referencia al <a href="https://kthinnovationreadinesslevel.com/wp-content/uploads/sites/9/2021/02/KTH-Innovation-Readiness-Level_Compiled.pdf" target="_blank" rel="noreferrer">modelo KTH</a>. No es una evaluación emitida por KTH.</figcaption>
-        </figure><div className="bmc-readiness">{readiness.map(([code, title, value, text]) => <article key={code}><div aria-label={value === "—" ? "Sin puntaje: evidencia pendiente" : `Nivel ${value} estimado`}>{value}</div><section><span>{code} · {value === "—" ? "EVIDENCIA PENDIENTE" : "ESTIMADO"}</span><h3>{title}</h3><p>{text}</p>{code === "TRL" && <a className="bmc-tools-link" href="/elitros/sistema-de-herramientas">Ver el sistema de herramientas →</a>}{code === "TMRL" && <a className="bmc-tools-link" href="https://www.undertangoclub.com/central">Ver equipo y departamentos →</a>}{code === "FRL" && <a className="bmc-tools-link" href="/elitros/funcionamiento-del-fdg">Funcionamiento del FDG →</a>}</section></article>)}</div></div>
+        </figure><div className="bmc-readiness">{readiness.map(([code, title, status, text]) => <article key={code}><div aria-hidden="true">•</div><section><span>{code} · {status}</span><h3>{title}</h3><p>{text}</p>{code === "TRL" && <a className="bmc-tools-link" href="/elitros/sistema-de-herramientas">Ver el sistema de herramientas →</a>}{code === "TMRL" && <a className="bmc-tools-link" href="https://www.undertangoclub.com/central">Ver equipo y departamentos →</a>}{code === "FRL" && <a className="bmc-tools-link" href="/elitros/funcionamiento-del-fdg">Funcionamiento del FDG →</a>}</section></article>)}</div></div>
         <details className="bmc-radar-evidence"><summary>Evidencia revisada y próximos hitos por dimensión</summary>
-          <p><strong>Alcance.</strong> Servicio artístico gestionado y sistema interno de UnderTango al 12/09/2026. No calificamos como terminadas las futuras apps ni extrapolamos la tracción de shows a otros productos. Usamos la edición pública KTH de 2021 como referencia: los números son hipótesis de evaluación, no niveles certificados. Para confirmar un nivel hay que contrastar todos sus hitos.</p>
-          <p><strong>Cliente · 7 provisional.</strong> 24 operaciones registradas: 10 realizadas y marcadas pagadas en 8 etiquetas de cliente/lugar. Shopping China contrató los shows del 15, 29 y 30/08. La Cabrera tiene un cobro registrado, pero su operación aún figura «Confirmada»: no se suma a los 10 realizados y pagados. El siguiente hito es contrastar el proceso comercial, los decisores y la repetibilidad; no equiparar ventas existentes con crecimiento escalable.</p>
-          <p><strong>Negocio · 5 provisional.</strong> Hay precios cobrados y distribuciones reales. Pablo define para todos los shows un caché sugerido según mercado, modificable por el artista, más US$50 por artista: US$25 de producción y mantenimiento y US$25 al FDG. Los registros históricos revisados usan repartos distintos: no prueban la aplicación del nuevo esquema. Falta conciliar liquidaciones y costos completos antes de afirmar rentabilidad o subir el nivel.</p>
-          <p><strong>Equipo · 4 provisional.</strong> Padrón conciliado en Supabase y Central: 17 personas y 21 participaciones. Dirección general, perfiles artísticos y técnicos y Secretaría General identificados; Marketing figura vacante. La formalización de compromisos está en preparación. Para sostener 5 hay que confirmar dedicación, roles y acuerdos de participación del núcleo, no sólo contar integrantes. Una nómina no equivale a contratos firmados.</p>
-          <p><strong>Tecnología · 6 provisional.</strong> Herramientas utilizadas sobre casos reales. La actualización de Equipo dejó un recibo verificable y pasó pruebas de validación, duplicados, concurrencia e idempotencia. Es evidencia funcional acotada, no una auditoría de todo el sistema. Antes de sostener 7 faltan criterios de aceptación y mediciones integrales de carga, seguridad, interacción y continuidad; no damos por comprobado un ahorro porcentual de tiempo.</p>
-          <p><strong>Propiedad intelectual · sin puntaje.</strong> Se reconocen marca, código, método y materiales. Falta reunir documentos de titularidad, licencias y permisos, incluyendo el uso de imagen previsto en el contrato. La existencia de una marca no acredita control de todos los activos. Esta revisión no determina su situación jurídica.</p>
-          <p><strong>Financiación · sin puntaje.</strong> Pablo informa que el primer fondo cerró cumpliendo objetivos y con ganancias para sus inversores: antecedente declarado, no cierre documental verificado en esta revisión. FDG 0.2 es una etapa distinta. Los aportes planificados encontrados siguen pendientes; no se cuentan como capital recibido. Falta conciliar el cierre anterior y definir necesidades, plazos, fuentes y recursos efectivamente comprometidos del nuevo ciclo.</p>
-          <p>Los dos ejes sin puntaje no valen cero y no se ubican en el nivel 9. Por eso el gráfico no dibuja un área cerrada ni calcula un promedio.</p>
+          <p><strong>Alcance y criterio.</strong> Evaluamos el servicio gestionado y el sistema interno de UnderTango, no una aplicación futura. Usamos las seis dimensiones de la edición pública KTH de 2021 como referencia. Este mapa cualitativo no sustituye su escala: para asignar un nivel deben comprobarse todos sus hitos. «En desarrollo» indica trabajo activo; «por verificar» indica una limitación de esta revisión, no ausencia de actividad.</p>
+          <p><strong>Cliente · evidencia.</strong> En el corte de 24 operaciones, 10 figuran realizadas y pagadas en 8 etiquetas de cliente/lugar, no necesariamente 8 entidades jurídicas. Shopping China tiene tres fechas: 15, 29 y 30/08. Las requisiciones sucesivas de Gran Meliá respaldan continuidad comercial, no cobro por sí solas. <strong>Próximo hito:</strong> contrastar decisores, proceso comercial y beneficios observados; no trasladar ventas de shows a demanda de software.</p>
+          <p><strong>Negocio · evidencia.</strong> Hay servicios vendidos y repartos históricos. La política actual suma US$25 de producción/mantenimiento y US$25 al FDG sobre el caché elegido por cada artista. <strong>Próximo hito:</strong> conciliar una liquidación del esquema actual con costos completos y respuesta del comprador. Los repartos antiguos no prueban la aplicación de esta política ni su margen efectivo.</p>
+          <p><strong>Equipo · evidencia.</strong> Padrón conciliado: 17 personas y 21 participaciones departamentales. Lucila Vizcarra se incorpora a Secretaría General; los compromisos comunes están en desarrollo. <strong>Próximo hito:</strong> confirmar roles, dedicación y acuerdos del núcleo responsable, distinguiéndolo de la red convocable. Una nómina no equivale a contratos firmados.</p>
+          <p><strong>Tecnología · evidencia.</strong> Panel y herramientas usados en casos reales. El flujo de actualización de Equipo tiene recibo auditado y pruebas de validación, duplicados, concurrencia e idempotencia. <strong>Próximo hito:</strong> comprobar el recorrido integral y sus requisitos de rendimiento, seguridad y continuidad. Las pruebas de un flujo no equivalen a una auditoría de todo el sistema ni a un ahorro de tiempo medido.</p>
+          <p><strong>Propiedad intelectual · evidencia.</strong> Se revisó el título INPI de marca mixta, clase 41, registro 3.456.539, a favor de Pablo Guillermo Cieslik, concedido en 2023. No se consultó el estado registral actual. <strong>En desarrollo:</strong> derechos sobre código, método, materiales y uso de imagen. <strong>Próximo hito:</strong> vincular cada activo con titularidad y permisos; el título de marca no acredita el control del conjunto.</p>
+          <p><strong>Financiación · evidencia.</strong> La planilla histórica del FDI contiene registros de aportes, reinversiones y cálculos de repartos. Dirección informa que el fondo anterior cerró con ganancias para sus inversores; esta revisión no concilió ese cierre individualmente. El estatuto de 2025 es provisional. <strong>En desarrollo:</strong> FDG 0.2. <strong>Próximo hito:</strong> verificar el cierre histórico y separar presupuesto, compromisos y recursos disponibles del nuevo ciclo. Aportes pendientes no son caja; un estatuto no demuestra ejecución de mecanismos financieros o constitución societaria.</p>
+          <p><strong>Lectura del gráfico.</strong> Sus seis posiciones identifican dimensiones, no niveles iguales ni porcentajes. No hay escala, área de madurez ni promedio. La revisión numérica permanece abierta; la evidencia operativa ya puede comunicarse sin esperar a que termine toda la transición.</p>
         </details>
       </section>
 

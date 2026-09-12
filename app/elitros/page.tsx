@@ -14,13 +14,19 @@ const canvas = [
 ] as const;
 
 const readiness = [
-  ["BRL", "Negocio", "4", "Caché + US$50 definido; aplicación del reparto por verificar."],
-  ["CRL", "Cliente", "3", "10 operaciones realizadas y pagadas en 8 clientes/lugares; recompra en Shopping China."],
-  ["TMRL", "Equipo", "4", "Confirmar roles, dedicación y acuerdos."],
-  ["TRL", "Tecnología", "2", "Usamos un sistema coordinado de herramientas. Falta medir sus resultados."],
-  ["IPRL", "Propiedad intelectual", "2", "Revisar titularidad, permisos y protección."],
-  ["FRL", "Financiación", "2", "Cuantificar recursos disponibles y necesidad de fondos."],
+  ["BRL", "Negocio", "5", "Servicio vendido y modelo en ajuste. El nuevo reparto al FDG aún requiere validación."],
+  ["CRL", "Cliente", "7", "Ventas y recompra comprobadas: 10 operaciones pagadas en 8 clientes/lugares, como mínimo documentado."],
+  ["TMRL", "Equipo", "—", "Hay equipo y dirección activos. Falta contrastar dedicación, competencias y acuerdos con la escala."],
+  ["TRL", "Tecnología", "6", "Herramientas integradas en uso operativo. Falta medir desempeño y verificar el sistema completo."],
+  ["IPRL", "Propiedad intelectual", "—", "La marca tiene un antecedente de registro; falta revisar el conjunto de derechos, código y permisos."],
+  ["FRL", "Financiación", "—", "Existen ingresos de operación. No equivalen a financiación disponible para la transición."],
 ] as const;
+
+// One data source for both the graphic and its explanations. Unknowns are not zero.
+const radarPoint = (axis: number, level: number) => {
+  const angle = (-90 + axis * 60) * Math.PI / 180;
+  return [230 + Math.cos(angle) * level * 15, 225 + Math.sin(angle) * level * 15];
+};
 
 export default function ElitrosPage() {
   return (
@@ -62,8 +68,8 @@ export default function ElitrosPage() {
             <article className="bmc-onepager-block">
               <h3>ESTADO ACTUAL Y TRACCIÓN (TRL/CRL)</h3>
               <p>Tecnología aplicada a la coordinación de shows, con una reducción estimada del 50% en fricción y tiempos, según nuestra experiencia.</p>
-              <p>Tracción: Shopping China, tres shows realizados y cobrados por USD 1.200; Wish, BRL 1.500; Festival La Frontera, BRL 2.300; Gran Meliá Iguazú, shows recurrentes y ARS 9,47 millones facturados entre enero y junio de 2026; Ofi/Vitento, shows y registro audiovisual durante tres días por USD 3.600.</p>
-              <p>Radar de partida: TRL 2 / CRL 3, pendiente de reevaluación con evidencia de uso y contrataciones.</p>
+              <p>Tracción documentada: Shopping China, shows del 15, 29 y 30/08/2026 realizados y pagados, por USD 600 en total; Wish, BRL 1.500; Festival La Frontera, BRL 2.300. Gran Meliá tiene requisiciones sucesivas en 2026: son evidencia de continuidad comercial, no de cobro por sí solas. El conteo operativo es un mínimo documentado, no toda la trayectoria.</p>
+              <p>Evaluamos UnderTango como sistema operativo actual en transición, no como una plataforma hipotética. Estimaciones de trabajo: TRL 6 / CRL 7; sujetas a contrastar todos los hitos KTH.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>PROPIEDAD INTELECTUAL</h3>
@@ -74,7 +80,7 @@ export default function ElitrosPage() {
               <h3>MERCADO Y MODELO DE NEGOCIO (BRL)</h3>
               <p>Mercado de entrada: hoteles, espacios e instituciones turísticas de la Triple Frontera. Universo de referencia: aproximadamente 390 hoteles y otros alojamientos, pendiente de segmentar según contratación de shows y cuantificar su gasto anual.</p>
               <p>Ingresos por producción y coordinación de espectáculos, con precio por proyecto y contratación recurrente. Expansión prevista mediante equipos, proveedores y representantes en otros destinos.</p>
-              <p>Radar de partida: BRL 4. Ejes de avance: validar frecuencia de compra, costos y margen por show, repetibilidad del servicio y condiciones de contratación y representación en cada país.</p>
+              <p>BRL 5 estimado: el servicio ya se vende y el modelo evoluciona. La adopción del reparto caché + US$50, los costos completos y la sostenibilidad de la expansión aún deben comprobarse.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>EQUIPO</h3>
@@ -122,8 +128,26 @@ export default function ElitrosPage() {
       </section>
 
       <section className="bmc-section" id="madurez">
-        <div className="bmc-heading"><div><p className="bmc-eyebrow">RADAR KTH · LÍNEA DE BASE A REVISAR</p><h2>Qué sabemos.<br/>Qué falta demostrar.</h2></div><p>Puntajes iniciales, pendientes de reevaluación. Evidencia revisada al 12/09/2026: Operaciones de Supabase y requisiciones de Gran Meliá en Gmail. El conteo es un mínimo documentado, no el total histórico.</p></div>
-        <div className="bmc-radar-layout"><figure><Image src="/elitros/radar_undertango_v1.png" width={615} height={592} sizes="(max-width: 900px) 100vw, 50vw" alt="Radar KTH: BRL 4, CRL 3, TMRL 4, TRL 2, IPRL 2 y FRL 2" priority/><figcaption>Fuente: KTH Innovation Readiness Level Model Framework.</figcaption></figure><div className="bmc-readiness">{readiness.map(([code, title, value, text]) => <article key={code}><div>{value}</div><section><span>{code}</span><h3>{title}</h3><p>{text}</p>{code === "TRL" && <a className="bmc-tools-link" href="/elitros/sistema-de-herramientas">Ver el sistema de herramientas →</a>}</section></article>)}</div></div>
+        <div className="bmc-heading"><div><p className="bmc-eyebrow">RADAR KTH · REVISIÓN 12/09/2026</p><h2>UnderTango hoy.<br/>Un sistema en transición.</h2></div><p>Evaluamos el servicio y las herramientas que ya operan. Puntajes orientativos, no certificados: no se ha auditado el cumplimiento de todos los hitos. «Sin evaluar» no significa nivel cero.</p></div>
+        <div className="bmc-radar-layout"><figure className="bmc-current-radar">
+          <svg viewBox="0 0 460 440" role="img" aria-labelledby="radar-title radar-desc">
+            <title id="radar-title">UnderTango actual: evaluación provisional de madurez</title>
+            <desc id="radar-desc">Negocio 5, Cliente 7 y Tecnología 6, estimaciones de trabajo en escala de 1 a 9. Equipo, Propiedad intelectual y Financiación sin evaluar. No se dibuja un polígono porque faltan tres evaluaciones.</desc>
+            <text x="230" y="25" textAnchor="middle" fontSize="17" fontWeight="700">UNDERTANGO · HOY</text>
+            <text x="230" y="47" textAnchor="middle" fontSize="12">Servicio y sistema operativo en transición</text>
+            {[1,3,5,7,9].map(level => <g key={level}><polygon points={readiness.map((_, axis) => radarPoint(axis, level).join(",")).join(" ")} fill="none" stroke="#d3d7cd"/><text x="236" y={225-level*15+4} fontSize="10" fill="#626a61">{level}</text></g>)}
+            {readiness.map(([code,title,value],axis) => {
+              const [x,y] = radarPoint(axis,9);
+              const [lx,ly] = radarPoint(axis,11);
+              const scored = value !== "—";
+              const [px,py] = radarPoint(axis,scored ? Number(value) : 9);
+              return <g key={code}><line x1="230" y1="225" x2={x} y2={y} stroke="#c2c9bd" strokeDasharray={scored ? undefined : "3 4"}/>{scored ? <><line x1="230" y1="225" x2={px} y2={py} stroke="#344b38" strokeWidth="3"/><circle cx={px} cy={py} r="7" fill="#344b38" stroke="white" strokeWidth="2"/></> : <circle cx={px} cy={py} r="5" fill="white" stroke="#82897f"/>}<text x={lx} y={ly} textAnchor="middle" fontSize="12" fontWeight="700">{code} · {scored ? value : "S/E"}</text><text x={lx} y={ly+16} textAnchor="middle" fontSize="10">{title === "Propiedad intelectual" ? "Prop. intelectual" : title}</text></g>;
+            })}
+            <text x="230" y="425" textAnchor="middle" fontSize="11">● Estimación provisional · ○ S/E: sin evaluar</text>
+          </svg>
+          <figcaption>Elaboración propia con referencia al <a href="https://kthinnovationreadinesslevel.com/wp-content/uploads/sites/9/2021/02/KTH-Innovation-Readiness-Level_Compiled.pdf" target="_blank" rel="noreferrer">modelo KTH</a>. No es una evaluación emitida por KTH.</figcaption>
+        </figure><div className="bmc-readiness">{readiness.map(([code, title, value, text]) => <article key={code}><div aria-label={value === "—" ? "Sin evaluar" : `Nivel ${value} estimado`}>{value}</div><section><span>{code} · {value === "—" ? "SIN EVALUAR" : "ESTIMADO"}</span><h3>{title}</h3><p>{text}</p>{code === "TRL" && <a className="bmc-tools-link" href="/elitros/sistema-de-herramientas">Ver el sistema de herramientas →</a>}</section></article>)}</div></div>
+        <details className="bmc-radar-evidence"><summary>Qué respalda esta evaluación y qué falta verificar</summary><p>CRL 7 es una estimación por ventas, clientes reales y recompra; falta completar la revisión del proceso comercial y de todos los hitos del nivel. BRL 5 refleja partes del modelo probadas en el mercado, no la validación del nuevo reparto ni de la rentabilidad total. TRL 6 es una referencia conservadora para la integración de herramientas en problemas reales; no afirma una plataforma terminada ni certifica rendimiento, seguridad o escalabilidad.</p><p>Fuente operativa revisada el 12/09/2026: 24 registros en Operaciones de Supabase; 10 marcados realizados y pagados en 8 etiquetas de cliente/lugar. Shopping China repite el 15, 29 y 30/08. Las requisiciones de Gran Meliá respaldan continuidad comercial, no cobro por sí solas. Es un mínimo documental, no toda la trayectoria de UnderTango.</p><p>Los tres ejes sin puntaje requieren contrastar acuerdos y competencias del equipo, derechos y permisos, y recursos comprometidos frente a las necesidades de financiación. No se dibuja un área cerrada ni un promedio con datos ausentes.</p></details>
       </section>
 
       <section className="bmc-diagnosis">
@@ -152,7 +176,7 @@ export default function ElitrosPage() {
       <footer className="bmc-footer">
         <p><span>Ø</span> UnderTango Club · ÉLITROS 2026</p>
         <a href="/elitros/Undertango_Validation_Blueprint.pdf" download="Undertango_Validation_Blueprint.pdf">
-          Descargar el PDF ↓
+          PDF histórico · radar anterior ↓
         </a>
         <p>Modelo vivo — se actualiza con evidencia.</p>
       </footer>

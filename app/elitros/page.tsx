@@ -9,7 +9,7 @@ const canvas = [
   ["05", "Relación con clientes", "Acompañamiento consultivo, respuesta rápida, coordinación humana y seguimiento posterior para habilitar recurrencia."],
   ["06", "Canales", "Venta directa B2B, referencias, alianzas con hoteles y productoras, casos documentados y rutas de legitimación fiscal."],
   ["07", "Segmentos", "Personas, empresas e instituciones que necesitan resolver proyectos vinculados con arte, lógica o tecnología. La producción artística es el primer campo de validación."],
-  ["08", "Estructura de costos", "COGs objetivo de USD 150–160 por artista, coordinación variable, logística y una base tecnológica liviana."],
+  ["08", "Estructura de costos", "Modelo objetivo por artista y por show: US$100 para el artista y US$25 para producción y mantenimiento del sistema. Los US$25 restantes de la base de US$150 son margen, no costo."],
   ["09", "Fuentes de ingreso", "Honorarios de dirección y gestión, diseño y ejecución de soluciones, producción artística, desarrollos tecnológicos, auditoría, acompañamiento, márgenes o fees según el proyecto."],
 ] as const;
 
@@ -108,9 +108,17 @@ export default function ElitrosPage() {
         </div>
       </section>
 
-      <section className="bmc-economics">
-        <div><p className="bmc-eyebrow">DISEÑO FINANCIERO REVERSO · DDP</p><h2>El precio posible define la arquitectura operativa.</h2><p className="bmc-copy">No se construye una plataforma costosa para luego buscar margen. Se parte del límite aceptable por show y se diseña una operación de bajo CAPEX.</p></div>
-        <div className="bmc-numbers"><div><small>HIPÓTESIS · PARCHE ACTUAL</small><strong>US$ 110</strong><p>Costo operativo estimado por show con coordinación manual.</p></div><div><small>HIPÓTESIS · COGs PERMITIDOS</small><strong>US$ 150–160</strong><p>Techo objetivo por artista para preservar margen y competitividad.</p></div><div><small>INGRESO</small><strong>Proyecto</strong><p>Honorario, margen o fee definido según la solución gestionada.</p></div></div>
+      <section className="bmc-economics bmc-fdg" id="fondo-de-gobernanza" aria-labelledby="fdg-title">
+        <div className="bmc-fdg-intro">
+          <div><p className="bmc-eyebrow">NUESTRO MODELO · UNDERTANGO</p><h2 id="fdg-title">Remunerar al artista.<br/>Sostener el sistema.</h2></div>
+          <div><p className="bmc-copy">Nuestro modelo objetivo parte de una distribución por artista y por show: remuneración artística, gastos de producción y mantenimiento del sistema, y margen de la empresa destinado al Fondo de Gobernanza 87ø (FDG).</p><p className="bmc-fdg-total"><span>BASE DEL MODELO · POR ARTISTA / SHOW</span><strong>US$150</strong></p></div>
+        </div>
+        <div className="bmc-numbers">
+          <div><small>01 · REMUNERACIÓN ARTÍSTICA</small><strong>US$100</strong><p>Para el artista por su participación en el show. Producción y margen se suman por encima: no se descuentan de estos US$100.</p></div>
+          <div><small>02 · PRODUCCIÓN Y SISTEMA</small><strong>US$25</strong><p>Para gastos de producción y mantenimiento de todo el sistema de UnderTango.</p></div>
+          <div className="bmc-fdg-margin"><small>03 · MARGEN DE LA EMPRESA</small><strong>US$25</strong><p>Destinados directamente al <b>Fondo de Gobernanza 87ø (FDG)</b>. Este margen se distingue de la remuneración del artista y de los gastos de producción.</p></div>
+        </div>
+        <p className="bmc-fdg-note">US$100 + US$25 + US$25 = US$150 por artista y por show. Son importes, no porcentajes sobre el total. Es nuestro modelo objetivo; no representa cobros realizados ni saldo disponible en el FDG.</p>
       </section>
 
       <section className="bmc-section" id="madurez">

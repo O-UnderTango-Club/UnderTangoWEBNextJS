@@ -69,7 +69,7 @@ export default function ElitrosPage() {
               <h3>ESTADO ACTUAL Y TRACCIÓN (TRL/CRL)</h3>
               <p>Tecnología aplicada a la coordinación de shows, con una reducción estimada del 50% en fricción y tiempos, según nuestra experiencia.</p>
               <p>Tracción documentada: Shopping China, shows del 15, 29 y 30/08/2026 realizados y pagados, por USD 600 en total; Wish, BRL 1.500; Festival La Frontera, BRL 2.300. Gran Meliá tiene requisiciones sucesivas en 2026: son evidencia de continuidad comercial, no de cobro por sí solas. El conteo operativo es un mínimo documentado, no toda la trayectoria.</p>
-              <p>Evaluamos UnderTango como sistema operativo actual en transición, no como una plataforma hipotética. Estimaciones de trabajo: TRL 6 / CRL 7; sujetas a contrastar todos los hitos KTH.</p>
+              <p>Evaluamos UnderTango como sistema operativo actual en transición, no como una plataforma hipotética. Tecnología en uso y clientes con recompra: evidencia operativa real. La sección de madurez distingue estos avances de la puntuación KTH, aún pendiente de comprobar por hitos.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>PROPIEDAD INTELECTUAL</h3>
@@ -80,7 +80,7 @@ export default function ElitrosPage() {
               <h3>MERCADO Y MODELO DE NEGOCIO (BRL)</h3>
               <p>Mercado de entrada: hoteles, espacios e instituciones turísticas de la Triple Frontera. Universo de referencia: aproximadamente 390 hoteles y otros alojamientos, pendiente de segmentar según contratación de shows y cuantificar su gasto anual.</p>
               <p>Ingresos por producción y coordinación de espectáculos, con precio por proyecto y contratación recurrente. Expansión prevista mediante equipos, proveedores y representantes en otros destinos.</p>
-              <p>BRL 5 estimado: el servicio ya se vende y el modelo evoluciona. La adopción del reparto caché + US$50, los costos completos y la sostenibilidad de la expansión aún deben comprobarse.</p>
+              <p>El servicio ya se vende y el modelo evoluciona. La adopción del reparto caché + US$50, los costos completos y la sostenibilidad de la expansión aún deben comprobarse antes de cerrar su nivel de madurez.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>EQUIPO</h3>

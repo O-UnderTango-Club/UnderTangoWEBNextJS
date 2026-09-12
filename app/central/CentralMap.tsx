@@ -6,6 +6,14 @@ import styles from "./central.module.css";
 import FinanceReconstruction from "./FinanceReconstruction";
 
 const countries = [{ code: "AR", name: "Argentina" }, { code: "BR", name: "Brasil" }, { code: "PY", name: "Paraguay" }] as const;
+const chartColors = ["#d7b35a", "#b96365", "#71968a", "#c48750", "#9585b8", "#789bbd", "#b9be6b", "#d693b6", "#81b7b0", "#a08b73"];
+const chartDepartments = [...departments].sort((a, b) => Number(a.number) - Number(b.number));
+const participationTotal = chartDepartments.reduce((sum, department) => sum + department.members.length, 0);
+const uniqueMemberTotal = new Set(departments.flatMap((department) => department.members.map((member) => member.name))).size;
+const chartSegments = chartDepartments.map((department, index) => {
+  const start = chartDepartments.slice(0, index).reduce((sum, item) => sum + item.members.length, 0);
+  return `${chartColors[index]} ${participationTotal ? start / participationTotal * 100 : 0}% ${participationTotal ? (start + department.members.length) / participationTotal * 100 : 0}%`;
+}).join(", ");
 
 function MemberCard({ member }: { member: DepartmentMember }) {
   return (
@@ -103,7 +111,25 @@ export default function CentralMap() {
             <span className={styles.keyword}>{extension.keyword}</span>
           </button>
         </div>
-        <p className={styles.hint}>Elegí un departamento para abrirlo.</p>
+        <p className={styles.hint}>Elegí un departamento para abrirlo. Distribución del equipo ↓</p>
+      </section>
+
+      <section className={styles.distribution} aria-labelledby="distribution-title">
+        <header>
+          <h2 id="distribution-title">El equipo por departamento</h2>
+          <p>{uniqueMemberTotal} personas · {participationTotal} participaciones departamentales</p>
+        </header>
+        <div className={styles.chartLayout}>
+          <div className={styles.pieChart} role="img" aria-label="Distribución porcentual de participaciones por departamento. Detalle en la lista contigua." style={{ background: participationTotal ? `conic-gradient(${chartSegments})` : "#333" }} />
+          <ul className={styles.chartLegend}>
+            {chartDepartments.map((department, index) => <li key={department.number}>
+              <span className={styles.chartSwatch} style={{ background: chartColors[index] }} aria-hidden="true" />
+              <span>{department.number} · {department.keyword}</span>
+              <strong>{department.members.length} · {(participationTotal ? department.members.length / participationTotal * 100 : 0).toFixed(1).replace(".", ",")}%</strong>
+            </li>)}
+          </ul>
+        </div>
+        <p className={styles.chartNote}>Cada persona cuenta una vez en cada departamento que integra. Los clientes no se incluyen; Vinculación cuenta sólo a Juan Pögler. Los porcentajes están redondeados.</p>
       </section>
 
       {selected && (

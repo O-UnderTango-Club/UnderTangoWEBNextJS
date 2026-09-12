@@ -135,6 +135,16 @@
 }
 
 .financePanel { height: min(900px, calc(100svh - 32px)); }
+.distribution { box-sizing: border-box; max-width: 1180px; margin: 0 auto !important; padding: clamp(28px, 5vw, 64px) clamp(18px, 4vw, 48px) !important; border-top: 1px solid #433c32; }
+.distribution h2 { margin: 0 0 12px; color: #f4f0e8; font-size: clamp(26px, 3.5vw, 38px); line-height: 1.15; }
+.distribution header p, .chartNote { margin: 0; color: #c2bbae; font-size: 16px; line-height: 1.6; }
+.chartLayout { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); align-items: center; gap: clamp(24px, 5vw, 70px); margin: 32px 0; }
+.pieChart { width: min(100%, 300px); aspect-ratio: 1; border-radius: 50%; justify-self: center; border: 1px solid #635744; }
+.chartLegend { list-style: none; margin: 0; padding: 0; }
+.chartLegend li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #302b24; color: #ece5d9; font-size: 15px; line-height: 1.4; }
+.chartLegend strong { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 14px; }
+.chartSwatch { width: 12px; height: 12px; border-radius: 3px; }
+@media (max-width: 720px) { .chartLayout { grid-template-columns: 1fr; } .pieChart { width: min(75vw, 260px); } }
 .tile { text-decoration: none; }
 .description { flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; overflow-y: auto; }
 .description p { margin: 0; }

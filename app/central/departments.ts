@@ -28,7 +28,6 @@ export const departments: Department[] = [
     description: "Formación, aprendizaje y herramientas educativas: APRENDE, la Academia de Tango online y presencial y recursos gratuitos para aprender mejor.",
     members: [
       { name: "Pablo Cieslik", role: "Producción y docencia" },
-      { name: "Evayan Behr", role: "Práctica escénica" },
     ],
     projects: [
       "APRENDE — Metodología de aprendizaje avanzado",
@@ -64,7 +63,6 @@ export const departments: Department[] = [
       { name: "Giuliano Sohrobigarat", role: "Programador" },
       { name: "Alejandro Miguez", role: "Representante Institucional" },
       { name: "Pablo Cieslik", role: "Gerente de Proyectos" },
-      { name: "Vanesa Cabello", role: "Inversora" },
     ],
     projects: [
       "Startup Ø UnderTango — Gerencia de proyectos + arquitectura digital",
@@ -140,7 +138,9 @@ export const departments: Department[] = [
     clients: [
       { name: "Shopping China", country: "PY" },
       { name: "Itaipu Binacional", country: "PY" },
+      { name: "Howard Johnson Rooftop", country: "PY" },
       { name: "Hotel Grand Carimã", country: "BR" },
+      { name: "Tic-Tum Academia de Dança", country: "BR" },
       { name: "A Piacere", country: "AR" },
       { name: "La Cabrera", country: "AR" },
       { name: "Gran Meliá", country: "AR" },

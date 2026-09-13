@@ -3,26 +3,34 @@ import { useEffect, useRef, useState } from 'react';
 import { FRONTS, ALL_DAYS, type Board } from '../../src/lib/panel-model';
 import css from './panel.module.css';
 import WeekdayPicker from './WeekdayPicker';
-export default function GroupForm({data,id,busy,onClose,onSave}:{data:Board;id?:string;busy:boolean;onClose:()=>void;onSave:(changes:Record<string,unknown>)=>Promise<void>}) {
+export default function GroupForm({data,id,sourceTaskId,embedded=false,focusAdd=false,busy:parentBusy,onClose,onSave,onCreateTask}:{data:Board;id?:string;sourceTaskId?:string;embedded?:boolean;focusAdd?:boolean;busy:boolean;onClose:()=>void;onSave:(changes:Record<string,unknown>)=>Promise<void>;onCreateTask?:(name:string,project:string,front:string)=>Promise<string>}) {
   const group=data.tasks.find(t=>t.id===id);
-  const [name,setName]=useState(group?.name||''),[front,setFront]=useState(group?.front||'Secundario'),[rank,setRank]=useState(group?.rank||1);
-  const [weekdays,setWeekdays]=useState(group?.weekdays??ALL_DAYS);
-  const [members,setMembers]=useState<string[]>(group?.memberIds||[]),[query,setQuery]=useState(''),[error,setError]=useState('');
+  const source=data.tasks.find(t=>t.id===sourceTaskId),initial=group||source;
+  const [name,setName]=useState(initial?.name||''),[front,setFront]=useState(initial?.front||'Secundario'),[rank,setRank]=useState(initial?.rank||1);
+  const [weekdays,setWeekdays]=useState(initial?.weekdays??ALL_DAYS);
+  const [members,setMembers]=useState<string[]>(group?.memberIds||(source?[source.id]:[])),[query,setQuery]=useState(''),[error,setError]=useState('');
+  const [newName,setNewName]=useState(''),[newProject,setNewProject]=useState(initial?.projectIds?.[0]||''),[creating,setCreating]=useState(false),[message,setMessage]=useState('');
+  const [created,setCreated]=useState<{id:string;name:string}[]>([]);
+  const busy=parentBusy||creating,lock=useRef(false),addInput=useRef<HTMLInputElement>(null);
   const dialog=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{const d=dialog.current;d?.showModal();return()=>d?.close();},[]);
+  useEffect(()=>{if(embedded)return;const d=dialog.current;d?.showModal();return()=>d?.close();},[embedded]);
+  useEffect(()=>{if(focusAdd)addInput.current?.focus();},[focusAdd]);
   const available=data.tasks.filter(t=>!t.isGroup&&(!t.groupId||t.groupId===id)&&(!['done','cancelled'].includes(t.stage)||t.groupId===id));
-  const selected=members.map(member=>available.find(t=>t.id===member)!);
+  const selected=members.map(member=>available.find(t=>t.id===member)||created.find(t=>t.id===member)||{id:member,name:'Acción no disponible; retirala o actualizá'});
   function move(index:number,offset:number){const next=[...members];[next[index],next[index+offset]]=[next[index+offset],next[index]];setMembers(next);}
-  return <dialog ref={dialog} className={css.dialog} aria-labelledby="group-heading" onCancel={e=>{e.preventDefault();if(!busy)onClose();}}><h2 id="group-heading">{id?'Editar grupo':'Crear grupo de acciones'}</h2>
-    <form onSubmit={async e=>{e.preventDefault();setError('');try{await onSave({name,front,rank,members,weekdays});}catch(e){setError(e instanceof Error?e.message:'No se pudo guardar.');}}}>
-      <label htmlFor="group-name">Nombre del grupo</label><input id="group-name" maxLength={250} required value={name} disabled={busy} onChange={e=>setName(e.target.value)}/>
-      <div className={css.two}><div><label htmlFor="group-front">Frente</label><select id="group-front" value={front} disabled={busy} onChange={e=>setFront(e.target.value)}>{FRONTS.map(f=><option key={f}>{f}</option>)}</select></div><div><label htmlFor="group-rank">Posición del grupo</label><input id="group-rank" type="number" min={1} required value={rank} disabled={busy} onChange={e=>setRank(Number(e.target.value))}/></div></div>
+  const content=<><h2 id={`group-heading-${id||'new'}`}>{source?'Transformar en grupo de acciones':id?'Acciones de '+group?.name:'Crear grupo de acciones'}</h2>
+    {source&&<p className={css.rankWarning}>El grupo ocupará el lugar de «{source.name}». La acción original será su primer paso y conservará su historial, estado y condiciones. Cancelar no transforma la acción.</p>}
+    <form onSubmit={async e=>{e.preventDefault();if(busy||lock.current)return;lock.current=true;setError('');try{await onSave({name,front,rank,members,weekdays});}catch(e){setError(e instanceof Error?e.message:'No se pudo guardar.');}finally{lock.current=false;}}}>
+      <details open={!embedded}><summary>Nombre, posición y días del grupo</summary><label htmlFor={`group-name-${id||"new"}`}>Nombre del grupo</label><input id={`group-name-${id||"new"}`} maxLength={250} required value={name} disabled={busy} onChange={e=>setName(e.target.value)}/>
+      <div className={css.two}><div><label htmlFor={`group-front-${id||"new"}`}>Frente</label><select id={`group-front-${id||"new"}`} value={front} disabled={busy} onChange={e=>setFront(e.target.value)}>{FRONTS.map(f=><option key={f}>{f}</option>)}</select></div><div><label htmlFor={`group-rank-${id||"new"}`}>Posición del grupo</label><input id={`group-rank-${id||"new"}`} type="number" min={1} required value={rank} disabled={busy} onChange={e=>setRank(Number(e.target.value))}/></div></div>
       <p className={css.help}>El grupo ocupa un lugar en el ranking. Sus pasos conservan estado y dependencias. Cambiar el orden no resuelve dependencias.</p>
-      <WeekdayPicker value={weekdays} onChange={setWeekdays} disabled={busy}/>
+      <WeekdayPicker value={weekdays} onChange={setWeekdays} disabled={busy}/></details>
       <h3>Pasos, en orden</h3><ol className={css.groupSteps}>{selected.map((t,i)=><li key={t.id}><span>{t.name}</span><div className={css.actions}><button type="button" className={css.button} aria-label={`Subir ${t.name}`} disabled={busy||i===0} onClick={()=>move(i,-1)}>↑</button><button type="button" className={css.button} aria-label={`Bajar ${t.name}`} disabled={busy||i===selected.length-1} onClick={()=>move(i,1)}>↓</button><button type="button" className={css.button} disabled={busy} onClick={()=>setMembers(members.filter(x=>x!==t.id))}>Retirar</button></div></li>)}</ol>
-      <label htmlFor="group-search">Buscar acciones para agregar</label><input id="group-search" value={query} disabled={busy} onChange={e=>setQuery(e.target.value)}/>
+      {onCreateTask&&<section className={css.rankWarning} aria-label="Agregar otra acción"><h3>Agregar otra acción</h3><label htmlFor={`new-member-${id||'new'}`}>Nombre de la nueva acción</label><input ref={addInput} id={`new-member-${id||'new'}`} maxLength={250} value={newName} disabled={busy} onChange={e=>setNewName(e.target.value)}/><label htmlFor={`member-project-${id||'new'}`}>Proyecto de la nueva acción</label><select id={`member-project-${id||'new'}`} value={newProject} disabled={busy} onChange={e=>setNewProject(e.target.value)}><option value="">Elegí un proyecto</option>{data.projects.filter(p=>p.open).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><button type="button" className={css.button} disabled={busy||!newName.trim()||!newProject||members.length>=30} onClick={async()=>{if(lock.current)return;lock.current=true;setCreating(true);setError('');try{const title=newName.trim(),newId=await onCreateTask(title,newProject,front);setCreated(old=>[...old,{id:newId,name:title}]);setMembers(old=>[...old,newId]);setNewName('');setMessage('Acción creada y seleccionada. Guardá el grupo para incorporarla; si cancelás, queda como acción independiente.');}catch(e){setError(e instanceof Error?e.message:'No se pudo crear la acción.');}finally{lock.current=false;setCreating(false);}}}>{creating?'Creando…':'Crear acción y seleccionarla'}</button><p className={css.help}>Crear guarda la acción. Guardar grupo confirma su incorporación y el orden; cancelar el grupo no elimina acciones creadas.</p></section>}
+      <label htmlFor={`group-search-${id||"new"}`}>O agregar una acción existente</label><input id={`group-search-${id||"new"}`} value={query} disabled={busy} onChange={e=>setQuery(e.target.value)}/>
       <div className={css.groupChoices}>{available.filter(t=>!members.includes(t.id)&&t.name.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0,40).map(t=><button type="button" className={css.button} key={t.id} disabled={busy||members.length>=30} onClick={()=>setMembers([...members,t.id])}>+ {t.name}</button>)}</div>
       {id&&<p className={css.help}>Los pasos que retires volverán al ranking como acciones independientes, junto a la posición anterior del grupo.</p>}
-      {error&&<p className={css.error} role="alert">{error}</p>}<footer><button className={css.button} type="button" disabled={busy} onClick={onClose}>Cancelar</button><button className={css.primary} disabled={busy||!members.length}>{busy?'Guardando…':'Guardar grupo'}</button></footer>
-    </form></dialog>;
+      {message&&<p role="status">{message}</p>}{error&&<p className={css.error} role="alert">{error}</p>}<footer><button className={css.button} type="button" disabled={busy} onClick={onClose}>Cancelar</button><button className={css.primary} disabled={busy||!members.length}>{busy?'Guardando…':'Guardar grupo'}</button></footer>
+    </form></>;
+  return embedded?<section className={css.inlineGroupEditor} aria-labelledby={`group-heading-${id||'new'}`}>{content}</section>:<dialog ref={dialog} className={css.dialog} aria-labelledby={`group-heading-${id||'new'}`} onCancel={e=>{e.preventDefault();if(!busy)onClose();}}>{content}</dialog>;
 }

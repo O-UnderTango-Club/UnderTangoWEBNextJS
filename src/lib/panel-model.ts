@@ -119,7 +119,7 @@ export function board(data: Snapshot, now=Date.now()) {
     if(!tasks.some(t=>t.projectIds.includes(p.id)&&!["done","cancelled"].includes(t.stage))) reasons.push("Definir próximo paso");
     return reasons.length?[{id:p.id,reasons}]:[];
   });
-  return {rankingMode:data.rankingMode||"project",updatedAt:data.updatedAt,projects,tasks,fronts,projectIssues,events:data.events.map(e=>({id:e.id,name:s(e.fields[F.events.name]),status:s(e.fields[F.events.status]),type:s(e.fields[F.events.type]),evidence:s(e.fields[F.events.evidence]),occurred:s(e.fields[F.events.occurred])})),cases:data.cases.map(c=>({id:c.id,name:s(c.fields[F.cases.name])}))};
+  return {rankingMode:data.rankingMode||"project",updatedAt:data.updatedAt,projects,tasks,fronts,projectIssues,events:data.events.map(e=>({id:e.id,name:s(e.fields[F.events.name]),status:s(e.fields[F.events.status]),type:s(e.fields[F.events.type]),evidence:s(e.fields[F.events.evidence]),occurred:s(e.fields[F.events.occurred])})),cases:data.cases.map(c=>({id:c.id,name:s(c.fields[F.cases.name]),projectIds:links(c.fields[F.cases.projects])}))};
 }
 export type Board = ReturnType<typeof board>;
 export function projectActionSummary(projectId: string, tasks: Board["tasks"]) {

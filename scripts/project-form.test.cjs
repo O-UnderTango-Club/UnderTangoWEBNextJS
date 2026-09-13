@@ -16,7 +16,9 @@ function load(relative, replacements = {}) {
   return mod.exports;
 }
 const model = load('../src/lib/panel-model.ts');
-const { EditForm } = load('../app/panel-de-control/Panel.tsx', { '../../src/lib/panel-model': model, './panel.module.css': {default:{}} });
+const grouping = load('../src/lib/panel-dependencies.ts');
+const dependencies = load('../app/panel-de-control/Dependencies.tsx', {'../../src/lib/panel-model':model,'../../src/lib/panel-dependencies':grouping,'./panel.module.css':{default:{}}});
+const { EditForm } = load('../app/panel-de-control/Panel.tsx', { '../../src/lib/panel-model': model, './Dependencies': dependencies, './panel.module.css': {default:{}} });
 const data = { rankingMode:'action',source:'supabase',projects:[],tasks:[],events:[],cases:[] };
 const render = (editor, extra = {}) => renderToStaticMarkup(React.createElement(EditForm, { editor, data, busy:false, onClose(){}, async onSave(){}, async onCreateProject(){return 'p';}, ...extra }));
 const project = render({kind:'project',initial:{name:'Proyecto nuevo',purpose:'Resultado',status:'Activo',doc:''}});
@@ -28,4 +30,11 @@ assert.match(task, /Borrador intacto/); assert.match(task, /Crear proyecto y sel
 assert.match(task, /Proyectos vinculados/); assert.match(task, /la acción se guarda por separado/);
 const readOnly = render({kind:'project',initial:{name:'Prueba',status:'Activo'}},{data:{...data,readOnly:true}});
 assert.match(readOnly, /fieldset disabled/);
-console.log('3 project/action form rendering checks passed');
+const contextual = render({kind:'task',id:'action',initial:{name:'Pagar factura',stage:'ready',order:21,projects:['independent'],cases:['case'],dependencies:[],events:[]}}, {data:{...data,projects:[{id:'independent',name:'Tareas independientes',open:true},{id:'inherited',name:'Proyecto del caso',open:true}],cases:[{id:'case',name:'Caso',projectIds:['inherited']} ]}});
+assert.ok(contextual.indexOf('Tareas independientes') < contextual.indexOf('Acción concreta'));
+assert.ok(contextual.indexOf('Proyecto del caso') < contextual.indexOf('Acción concreta'));
+assert.doesNotMatch(contextual, /Paso en el plan|id="edit-order"/);
+assert.match(contextual, /Número registrado: 21/);
+assert.match(contextual, /<details><summary>Referencia de orden anterior/);
+assert.match(task, /Sin proyecto vinculado/);
+console.log('Project/action rendering checks passed: context, inherited links, empty state and historical order');

@@ -245,6 +245,20 @@ try {
     assert.equal(result.tasks.find(t=>t.id==='missing').stage,'catalog');
     assert.ok(!result.fronts.some(f=>f.tasks.includes('missing')));
   });
+  await check('crear proyecto con dos acciones y esperar a todas sin mover otras posiciones',async()=>{
+    const before=db.tasks.map(t=>[t.id,t.fields[F.tasks.front],t.fields[F.tasks.rank]]);
+    const project=await server.mutate(await intent('project',undefined,{name:'Proyecto dependencia',status:'Activo'}),'test-actor');
+    const create=async name=>server.mutate(await intent('task',undefined,{name,projects:[project.id],front:'Terciario',stage:'ready',owner:'Pablo Cieslik',priority:'Media'}),'test-actor');
+    const first=await create('Primer requisito'),second=await create('Segundo requisito'),target=await create('Acción bloqueada');
+    assert.deepEqual(db.tasks.filter(t=>before.some(x=>x[0]===t.id)).map(t=>[t.id,t.fields[F.tasks.front],t.fields[F.tasks.rank]]),before);
+    await server.mutate(await intent('task',target.id,{stage:'waiting',dependencies:[first.id,second.id]}),'test-actor');
+    const state=async()=>server.responseBoard(await server.snapshot()).tasks.find(t=>t.id===target.id);
+    assert.equal((await state()).stage,'waiting');
+    await server.mutate(await intent('task',first.id,{stage:'done',evidence:'Primero cumplido'}),'test-actor');
+    assert.equal((await state()).stage,'waiting');
+    await server.mutate(await intent('task',second.id,{stage:'done',evidence:'Segundo cumplido'}),'test-actor');
+    assert.equal((await state()).stage,'ready');
+  });
 } finally { globalThis.fetch = nativeFetch; delete process.env.PANEL_DATA_SOURCE; }
 await check('preview usa solo RPC limitado; staged no activa producción ni consume Airtable', async () => {
   const config = { publishableKey: 'sb_publishable_test', readToken: '1'.repeat(64), deviceSecret: '2'.repeat(64), bootstrapHash: '3'.repeat(64), expiresAt: Date.now()+3600000 };

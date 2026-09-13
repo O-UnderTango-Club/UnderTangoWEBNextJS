@@ -11,7 +11,7 @@ function load(relative, replacements = {}) {
   mod.filename = filename; mod.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalRequire = mod.require.bind(mod);
   mod.require = id => id in replacements ? replacements[id] : originalRequire(id);
-  const source = fs.readFileSync(filename, 'utf8').replace('function EditForm(', 'export function EditForm(');
+  const source = fs.readFileSync(filename, 'utf8').replace('function EditForm(', 'export function EditForm(').replace('function QuickForm(', 'export function QuickForm(');
   mod._compile(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename);
   return mod.exports;
 }
@@ -40,3 +40,39 @@ assert.match(contextual, /Número registrado: 21/);
 assert.match(contextual, /<details><summary>Referencia de orden anterior/);
 assert.match(task, /Sin proyecto vinculado/);
 console.log('Project/action rendering checks passed: context, inherited links, empty state and historical order');
+
+// Exercise the form submission without a browser or any production writes.
+let availabilityMode="now";
+const { QuickForm } = load('../app/panel-de-control/Panel.tsx', {
+  '../../src/lib/panel-model':model,'./Dependencies':dependencies,'./FrontProjects':frontProjects,'./panel.module.css':{default:{}},
+  react:{...React,useState:initial=>[initial==="now"?availabilityMode:initial,()=>{}]}
+});
+const scheduledTask={id:'scheduled',name:'Recurrente para mañana',baseStage:'recurring',stage:'scheduled',front:'Primario',rank:1,activateAt:'2099-01-01T03:00:00Z',dependencies:[],eventIds:[]};
+const quickEditor={kind:'task',id:'scheduled',mode:'status',initial:{stage:'recurring',front:'Primario',rank:1,reason:'',dependencies:[],events:[]}};
+function findElement(node,predicate){
+ if(!node||typeof node!=='object')return;
+ if(predicate(node))return node;
+ for(const child of React.Children.toArray(node.props?.children)){const found=findElement(child,predicate);if(found)return found;}
+}
+(async()=>{
+ let submitted;
+ const tree=QuickForm({editor:quickEditor,data:{...data,tasks:[scheduledTask]},busy:false,onSave:async changes=>{submitted=changes;}});
+ const button=findElement(tree,n=>n.type==='button'&&n.props.children==='Guardar estado');
+ assert.equal(button.props.disabled,false,'Same recurring state can still be reactivated');
+ assert.ok(findElement(tree,n=>n.props?.id==='quick-availability'));
+ await findElement(tree,n=>n.type==='form').props.onSubmit({preventDefault(){}});
+ assert.deepEqual(submitted,{stage:'recurring',activateAt:'',dependencies:[],events:[]});
+ availabilityMode='scheduled';
+ const kept=QuickForm({editor:{...quickEditor,initial:{...quickEditor.initial,stage:'ready'}},data:{...data,tasks:[scheduledTask]},busy:false,onSave:async changes=>{submitted=changes;}});
+ await findElement(kept,n=>n.type==='form').props.onSubmit({preventDefault(){}});
+ assert.deepEqual(submitted,{stage:'ready',dependencies:[],events:[]},'Keeping schedule must not remove activation');
+ availabilityMode='now';
+ const waiting=QuickForm({editor:{...quickEditor,initial:{...quickEditor.initial,stage:'catalog'}},data:{...data,tasks:[scheduledTask]},busy:false,onSave:async changes=>{submitted=changes;}});
+ await findElement(waiting,n=>n.type==='form').props.onSubmit({preventDefault(){}});
+ assert.equal(Object.hasOwn(submitted,'activateAt'),false,'Non-executable state must preserve schedule');
+ const readOnly=QuickForm({editor:quickEditor,data:{...data,tasks:[scheduledTask],readOnly:true},busy:false});
+ assert.equal(findElement(readOnly,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,true);
+ const unscheduled=QuickForm({editor:quickEditor,data:{...data,tasks:[{...scheduledTask,activateAt:''}]},busy:false});
+ assert.equal(findElement(unscheduled,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,true);
+ console.log('Scheduled recurring form passed: reactivate same state, preserve scheduling for other states, read-only and unchanged guards');
+})().catch(error=>{console.error(error);process.exitCode=1;});

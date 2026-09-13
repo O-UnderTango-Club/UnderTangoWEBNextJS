@@ -15,6 +15,17 @@ export type Raw = { id: string; fields: Record<string, any> };
 export type Snapshot = { projects: Raw[]; tasks: Raw[]; events: Raw[]; cases: Raw[]; updatedAt: string; rankingMode?: "project" | "action" };
 export type Stage = "ready" | "recurring" | "scheduled" | "doing" | "waiting" | "catalog" | "done" | "cancelled";
 export type EditableStage = Exclude<Stage,"scheduled">;
+export function finishTodayChanges(task: Raw, data: Snapshot, now=Date.now()) {
+  const state=classify(task,data,now);
+  if(!["ready","recurring","doing"].includes(state.stage)||state.issues.length||state.blockers.length)
+    throw new Error("Esta acción no está disponible para cerrar por hoy. Actualizá el panel.");
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Argentina/Cordoba",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(now));
+  const part=(type:string)=>Number(parts.find(p=>p.type===type)!.value);
+  // Argentine calendar day, not a rolling 24-hour delay or the browser's timezone.
+  const activateAt=new Date(Date.UTC(part("year"),part("month")-1,part("day")+1,3)).toISOString();
+  return {activateAt,stage:state.stage==="recurring"?"recurring" as const:"ready" as const,
+    evidence:"Por hoy ya estamos: avance del día registrado por el usuario. La acción sigue abierta y vuelve a estar disponible al día siguiente; conserva su posición. No equivale a finalización."};
+}
 const s = (v: unknown): string => typeof v === "string" ? v : "";
 const links = (v: unknown): string[] => Array.isArray(v) ? v.filter(x => typeof x === "string") : [];
 const unique = (v: string[]) => [...new Set(v)];

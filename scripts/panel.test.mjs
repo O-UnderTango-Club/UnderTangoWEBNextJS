@@ -12,6 +12,22 @@ const t=(id,extra={})=>row(id,{[F.tasks.name]:id,[F.tasks.projects]:['p'],[F.tas
 const d={projects:[p],tasks:[],events:[],cases:[],updatedAt:new Date().toISOString()};
 let count=0;
 function check(name,fn){fn();count++;console.log('OK',name);}
+check('cierre diario usa el próximo día argentino, incluyendo fin de mes y año',()=>{
+ for(const [now,expected] of [['2026-09-13T02:59:59Z','2026-09-13T03:00:00.000Z'],['2026-09-13T03:00:00Z','2026-09-14T03:00:00.000Z'],['2026-12-31T23:00:00Z','2027-01-01T03:00:00.000Z'],['2028-02-29T20:00:00Z','2028-03-01T03:00:00.000Z']]){
+  const a=t('día');const changes=m.finishTodayChanges(a,{...d,tasks:[a]},Date.parse(now));assert.equal(changes.activateAt,expected);
+  const scheduled={...a,fields:{...a.fields,[F.tasks.activateAt]:changes.activateAt}};
+  assert.equal(m.classify(scheduled,{...d,tasks:[scheduled]},Date.parse(expected)-1).stage,'scheduled');
+  assert.equal(m.classify(scheduled,{...d,tasks:[scheduled]},Date.parse(expected)).stage,'ready');
+ }
+});
+check('cierre diario conserva recurrencia, reanuda en curso y rechaza tareas no disponibles',()=>{
+ for(const [gate,status,expected] of [['Acción recurrente','Pendiente','recurring'],['En acción','En curso','ready']]){
+  const a=t('día',{[F.tasks.gate]:gate,[F.tasks.status]:status});assert.equal(m.finishTodayChanges(a,{...d,tasks:[a]}).stage,expected);
+ }
+ for(const extra of [{[F.tasks.status]:'Hecho'},{[F.tasks.status]:'Cancelado'},{[F.tasks.activateAt]:'2099-01-01T03:00:00Z'},{[F.tasks.gate]:'Por revisar'},{[F.tasks.dependencies]:['pendiente']}]){
+  const a=t('día',extra);assert.throws(()=>m.finishTodayChanges(a,{...d,tasks:[a,t('pendiente')]}),/no está disponible/);
+ }
+});
 check('recurrente participa en el ranking, sigue abierta y respeta dependencias',()=>{
  const a=t('recurrente',{[F.tasks.gate]:'Acción recurrente'});
  let data={...d,tasks:[a]};assert.equal(m.classify(a,data).stage,'recurring');assert.equal(m.closed(a),false);

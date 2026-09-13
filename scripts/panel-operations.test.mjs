@@ -191,6 +191,22 @@ try {
     result=server.responseBoard(await server.snapshot());
     assert.equal(result.tasks.find(task=>task.id==='t').stage,'ready');
   });
+  await check('por hoy registra avance una sola vez, conserva ranking y recupera respuesta perdida',async()=>{
+    const ranks=db.tasks.map(t=>t.fields[F.tasks.rank]);
+    const input=await intent('task','t',{doneToday:true});
+    failAfterCommit=true;await assert.rejects(server.mutate(input,'test-actor'),e=>e.status===503);
+    const calls=commitCalls;await server.mutate(input,'test-actor');assert.equal(commitCalls,calls);
+    const saved=db.tasks.find(t=>t.id==='t');assert.equal(saved.fields[F.tasks.status],'Pendiente');
+    assert.equal(saved.fields[F.tasks.result].split('Por hoy ya estamos').length,2);
+    assert.equal(lastPatches.length,1);assert.deepEqual(db.tasks.map(t=>t.fields[F.tasks.rank]),ranks);
+    const b=server.responseBoard(await server.snapshot());assert.equal(b.tasks.find(t=>t.id==='t').stage,'scheduled');
+    assert.ok(!b.fronts[0].tasks.includes('t'));
+    await assert.rejects(server.mutate(await intent('task','t',{doneToday:true}),'test-actor'),/no está disponible/);
+    await server.mutate(await intent('task','t',{activateAt:''}),'test-actor');
+    for(const change of [{doneToday:false},{doneToday:true,rank:1},{doneToday:true,stage:'done'}])
+      await assert.rejects(server.mutate(await intent('task','t',change),'test-actor'),/inválido/);
+    await assert.rejects(server.mutate(await intent('task',undefined,{doneToday:true}),'test-actor'),/inválido/);
+  });
   await check('bajar una acción reordena sólo las posiciones afectadas, no su proyecto',async()=>{
     const projectsBefore=structuredClone(db.projects);
     await server.mutate(await intent('task','t',{front:'Primario',rank:4}),'test-actor');

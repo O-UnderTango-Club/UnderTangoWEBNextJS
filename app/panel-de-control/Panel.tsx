@@ -40,6 +40,7 @@ export default function Panel(){
   const individual=data?.rankingMode==="action";
   const refreshRef=useRef(false);
   const attempts=useRef(new Map<string,string>());
+  const dailyLock=useRef(false);
   function identified(intent:Record<string,unknown>){
     const signature=JSON.stringify(intent);
     let requestId=attempts.current.get(signature);
@@ -74,6 +75,16 @@ export default function Panel(){
     setBusy(true);setError("");try{const creatingProject=editor!.kind==="project"&&!editor!.id;const result=await api("",identified({kind:editor!.kind,id:editor!.id,revision:editor!.revision,snapshotRevision:editor!.snapshotRevision,changes}));setEditor(undefined);setNotice(`Cambio guardado y confirmado en ${data?.source==="supabase"?"Supabase":"Airtable"}.`);try{await refresh(true);if(creatingProject){setNotice("Proyecto creado y confirmado. Podés agregar su primera acción; cancelar no elimina el proyecto.");newTask(result.id,result.revision);}}catch{setNotice("El cambio se guardó. Falta actualizar la vista; pulsá Actualizar.");}}finally{setBusy(false);}
   }
   async function migrate(){setBusy(true);setError("");try{const result=await api("/migrate",{});setNotice(`Migración lista: ${result.counts.tasks} acciones, ${result.counts.projects} proyectos, ${result.counts.events} disparadores y ${result.counts.cases} casos en Supabase.`);await refresh(true);}catch(e){setError(e instanceof Error?e.message:"No se pudo migrar.");}finally{setBusy(false);}}
+  async function finishToday(t:Task){
+    if(dailyLock.current||busy||refreshing||error||data?.readOnly||data?.source!=="supabase")return;
+    dailyLock.current=true;setBusy(true);setError("");
+    try{
+      await api("",identified({kind:"task",id:t.id,revision:data.revisions[t.id],snapshotRevision:data.snapshotRevision,changes:{doneToday:true}}));
+      setNotice(`Por hoy ya estamos con «${t.name}». Tu avance quedó guardado; vuelve mañana, sin finalizarse ni cambiar de posición.`);
+      try{await refresh(true);}catch{setNotice("El cierre de hoy quedó guardado. Falta actualizar la vista; pulsá Actualizar.");}
+    }catch(e){setError(e instanceof Error?e.message:"No se pudo guardar. Actualizá y volvé a intentar.");}
+    finally{dailyLock.current=false;setBusy(false);}
+  }
   async function createProjectForTask(name:string){
     const opened=editor;
     const result=await api("",identified({kind:"project",snapshotRevision:opened?.snapshotRevision??data?.snapshotRevision,changes:{name,status:"Activo"}}));
@@ -101,7 +112,7 @@ export default function Panel(){
     {!individual&&<><div className={css.actionLabel}>Acción</div><h3>{t.name}</h3></>}<div className={css.statusRow}><span className={`${css.badge} ${["scheduled","waiting","catalog"].includes(t.stage)?css.warning:""}`}>{labels[t.stage]}</span><button className={css.button} disabled={busy||!!error||refreshing} onClick={()=>editTask(t,undefined,true)}>Cambiar estado</button></div>
     {t.released&&<p className={css.muted}>Dependencias resueltas · lista para continuar</p>}{!!t.issues.length&&<ul className={css.smallList}>{t.issues.map((s,i)=><li key={i}>{s}</li>)}</ul>}{!!t.blockers.length&&<p className={css.help}>Espera: {t.blockers.join("; ")}</p>}
     {t.stage==="scheduled"&&<p className={css.help}>Se activará automáticamente el {activationLabel(t.activateAt)}. Conserva {frontPosition(t.front,t.rank)} y no ocupa un cupo ejecutable.</p>}<div className={css.meta}><span>{t.owner||"Sin responsable"}</span><span>{t.priority}</span><span>{date(t.due)}</span>{t.order>0&&<span>Paso {t.order}</span>}</div>
-    {t.stage==="recurring"&&<p className={css.help}>Recurrente: después de hacerla, bajá la posición de esta acción para dar lugar a las siguientes.</p>}<div className={css.actions}><button className={css.button} disabled={busy||!!error||refreshing} onClick={()=>editTask(t)}>Editar acción</button>{t.stage==="ready"&&<button className={css.primary} disabled={busy||!!error||refreshing} onClick={()=>editTask(t,"doing",true)}>Empezar</button>}{t.stage==="doing"&&<button className={css.primary} disabled={busy||!!error||refreshing} onClick={()=>editTask(t,"done",true)}>Finalizar</button>}{safeDoc(t.doc)&&<a href={safeDoc(t.doc)} target="_blank" rel="noreferrer">Documento ↗</a>}</div>
+    {t.stage==="recurring"&&<p className={css.help}>Recurrente: «Por hoy ya estamos» registra el avance y la deja para mañana, conservando su posición.</p>}<div className={css.actions}>{data?.source==="supabase"&&["ready","recurring","doing"].includes(t.stage)&&<button className={css.primary} disabled={busy||!!error||refreshing||data.readOnly} onClick={()=>finishToday(t)} title="Guardar el avance de hoy y volver mañana. No finaliza la acción.">Por hoy ya estamos</button>}<button className={css.button} disabled={busy||!!error||refreshing} onClick={()=>editTask(t)}>Editar acción</button>{t.stage==="ready"&&<button className={css.primary} disabled={busy||!!error||refreshing} onClick={()=>editTask(t,"doing",true)}>Empezar</button>}{t.stage==="doing"&&<button className={css.primary} disabled={busy||!!error||refreshing} onClick={()=>editTask(t,"done",true)}>Finalizar</button>}{safeDoc(t.doc)&&<a href={safeDoc(t.doc)} target="_blank" rel="noreferrer">Documento ↗</a>}</div>
   </article>;
   if(authLoading)return <main className={css.panel}><div className={css.login}>Verificando acceso…</div></main>;
   if(!sessionEmail)return <main className={css.panel}><div className={`${css.card} ${css.login}`}><span className={css.brand}>Ø UnderTango · privado</span><h1>Panel de control</h1><p>Frentes, acciones y próximos pasos en un solo lugar.</p>{error&&<p className={css.error} role="alert">{error}</p>}<button className={css.primary} disabled={refreshing} onClick={()=>refresh().catch(()=>{})}>{refreshing?"Verificando…":"Volver a intentar"}</button><p className={css.help}>El acceso queda guardado en el navegador habilitado por Pablo.</p><a href="/">Volver al sitio</a></div></main>;

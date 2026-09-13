@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { deviceActor } from "./panel-access";
 import { operationsSelected, readOperationsSnapshot, operationsReceipt, commitOperations, OperationsError, type OperationsSnapshot, type OperationsPatch } from "./panel-operations";
-import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, EditableStage, board, closed, classify, projectOpen, taskProjects, validateTask } from "./panel-model";
+import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, EditableStage, board, closed, classify, projectOpen, taskProjects, validateTask, finishTodayChanges } from "./panel-model";
 
 export class PanelError extends Error { constructor(message: string, public status=400) { super(message); } }
 export async function authorize(request: Request) {
@@ -132,8 +132,13 @@ async function performMutation(input: any, actor: string) {
   const current=input.id?rows.find(r=>r.id===input.id):undefined;
   if(input.id&&!current) throw new PanelError("El registro ya no está disponible.",404);
   if(current&&input.revision!==revision(current)) throw new PanelError("El registro cambió desde que lo abriste. Cerrá el editor, actualizá y revisá el cambio.",409);
-  const change=input.changes;
+  let change=input.changes;
   if(!change||typeof change!=="object"||Array.isArray(change)) throw new PanelError("Cambio inválido.");
+  if("doneToday" in change){
+    if(kind!=="task"||!current||!operational||change.doneToday!==true||Object.keys(change).length!==1)
+      throw new PanelError("Cierre diario inválido.");
+    change=finishTodayChanges(current,data);
+  }
   const fields: Record<string,any>={};
   const rankChanges: {id:string;fields:Record<string,any>}[]=[];
   if(kind==="task") {

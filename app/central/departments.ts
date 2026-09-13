@@ -57,6 +57,7 @@ export const departments: Department[] = [
   },
   {
     number: "80", keyword: "Programación", title: "Documentación, programación y sistema operativo",
+    link: { href: "/807", label: "807 · Protocolo maestro" },
     description: "Sistema nervioso digital de UnderTango. Construye productos, conecta información y transforma procesos de trabajo en herramientas confiables.",
     members: [
       { name: "Maximiliano Rodriguez", role: "Programador" },

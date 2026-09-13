@@ -1,0 +1,75 @@
+.main { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 110px 24px 64px !important; background: #0c0d0f; color: #eee9df; min-height: 100vh; font-family: var(--font-undertango-sans), sans-serif; }
+.document { max-width: 1120px; margin: 0 auto; }
+.main p, .main button, .main small { font-family: inherit; }
+.main a { color: inherit; text-decoration: none; }
+.main a:hover { color: #e2bc6c; }
+.main a:focus-visible, .main button:focus-visible, .main summary:focus-visible { outline: 2px solid #dfb35c; outline-offset: 5px; }
+.main h1, .main h2, .main h3, .main p { margin: 0; }
+.main h2[id] { scroll-margin-top: 110px; }
+.breadcrumb { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: #a69e92; margin-bottom: 46px; }
+.breadcrumb strong { color: #d6b374; }
+.hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 45px; align-items: center; padding-bottom: 42px; }
+.number { font-family: var(--font-undertango-editorial), Georgia, serif; font-size: clamp(80px, 11vw, 150px); color: #c5a366; letter-spacing: -.085em; line-height: 1; }
+.main .eyebrow { color: #c4a46d; font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; margin-bottom: 12px; }
+.hero h1 { font-size: clamp(30px, 4.4vw, 52px); font-weight: 400; line-height: 1.14; letter-spacing: -.04em; }
+.main .lead { margin-top: 17px; max-width: 680px; font-size: 15px; color: #bcb5aa; line-height: 1.7; }
+.main .review { margin-top: 18px; font-size: 11px; color: #938b7e; }
+.main section { width: auto; max-width: none; height: auto; min-height: 0; margin: 0; border-radius: 0; opacity: 1; transform: none; animation: none; }
+.main .start { padding: 30px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 22px 34px; align-items: center; border: 1px solid #57462e; background: linear-gradient(120deg, #271e16, #151517 80%); }
+.start h2 { font-size: 27px; font-weight: 400; }
+.start p:not(.eyebrow) { color: #beb6aa; font-size: 13px; margin-top: 10px; line-height: 1.7; }
+.copyControl { max-width: 300px; }
+.copyControl button { border: 1px solid #d0ad70; border-radius: 3px; background: #d0ad70; color: #17130e; padding: 13px 18px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.copyControl button:hover { background: #e0bd7f; }
+.copyControl span { display: block; margin-top: 8px; color: #d3c5ad; font-size: 11px; }
+.prompt { grid-column: 1 / -1; font-size: 12px; color: #ccc2b3; }
+.prompt summary { cursor: pointer; }
+.prompt pre { margin-top: 14px; padding: 20px; background: #0d0e10; border: 1px solid #3f382e; white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; line-height: 1.8; }
+.main .textLink { font-size: 12px; color: #d4b47f; grid-column: 1 / -1; width: fit-content; }
+.contents { display: flex; flex-wrap: wrap; gap: 12px 26px; padding: 25px 0; border-bottom: 1px solid #34302a; font-size: 12px; color: #b9b0a2; }
+.main .section { padding: 44px 0 0; }
+.sectionHeading { display: flex; gap: 20px; align-items: baseline; margin-bottom: 24px; }
+.sectionHeading > span { color: #b2925a; font-size: 12px; }
+.sectionHeading h2 { font-size: clamp(24px, 3vw, 32px); font-weight: 400; line-height: 1.3; }
+.sectionHeading p { margin-top: 9px; font-size: 12px; color: #a59d90; }
+.resources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.resource { padding: 24px; background: #131416; border: 1px solid #36322c; }
+.main .badge { font-size: 9px; letter-spacing: .06em; color: #ba9b64; margin-bottom: 12px; }
+.resource h3 { font-size: 19px; font-weight: 400; line-height: 1.4; }
+.resource h3 span { font-family: sans-serif; font-size: 14px; color: #b49a72; }
+.resource > p:last-child { margin-top: 12px; font-size: 12px; color: #b5aea3; line-height: 1.8; overflow-wrap: anywhere; }
+.main .access { border-left: 2px solid #80653f; padding: 2px 0 2px 18px; margin-top: 22px; color: #a9a193; font-size: 11px; line-height: 1.9; }
+.protocols { border-top: 1px solid #37322b; }
+.protocols > a { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 20px 6px; border-bottom: 1px solid #37322b; }
+.protocols h3 { font-family: inherit; font-size: 14px; font-weight: 600; }
+.protocols p { font-size: 12px; color: #a9a195; margin-top: 5px; }
+.protocols small { color: #a88e64; font-size: 10px; }
+.historical { margin-top: 22px; border: 1px dashed #4a4032; padding: 18px 20px; font-size: 12px; color: #b3a68f; }
+.historical summary { cursor: pointer; }
+.historical p { margin-top: 14px; }
+.historical a { display: inline-block; margin-top: 12px; text-decoration: underline; }
+.historical small { display: block; margin-top: 8px; color: #958b7d; }
+.rules { border-top: 1px solid #37322b; }
+.rules details { border-bottom: 1px solid #37322b; padding: 18px 6px; }
+.rules summary { font-size: 14px; font-weight: 600; cursor: pointer; }
+.rules p { font-size: 13px; line-height: 1.85; margin-top: 14px; color: #b6aea1; max-width: 920px; }
+.modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.modes h3, .handoff h3 { font-family: inherit; font-size: 14px; line-height: 1.5; }
+.modes p, .handoff p { margin-top: 12px; font-size: 12px; line-height: 1.85; color: #b6aea1; }
+.handoff { margin-top: 28px; padding: 22px; background: #191815; border-left: 2px solid #b89961; }
+.footer { margin-top: 44px; padding-top: 28px; border-top: 1px solid #37322b; color: #a59b8c; }
+.footer h2 { font-family: inherit; font-size: 13px; }
+.footer p { font-size: 11px; line-height: 1.85; margin-top: 10px; }
+.footer > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px; margin-top: 23px; font-size: 11px; color: #c0a06a; }
+@media (max-width: 720px) {
+  .main { padding: 100px 18px 45px !important; }
+  .breadcrumb { margin-bottom: 30px; font-size: 10px; }
+  .hero { grid-template-columns: 1fr; gap: 18px; padding-bottom: 28px; }
+  .number { font-size: 80px; }
+  .main .start { padding: 22px; grid-template-columns: 1fr; gap: 18px; }
+  .resources, .modes { grid-template-columns: 1fr; }
+  .sectionHeading { gap: 12px; }
+  .resource { padding: 20px; }
+  .contents { gap: 14px 20px; }
+  .main .section { padding-top: 34px; }
+}

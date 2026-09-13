@@ -28,3 +28,5 @@
 .panel .previewGrid>section {padding:0;min-width:0}.panel .previewGrid h2 {font-size:24px;text-align:left;margin:1rem 0}.panel .previewGrid h2::after{display:none}.panel .highlightGroup {background:#e6efe4;border-color:#8ea485!important}.groupRanking li{border-bottom-color:#d5ddd1}.groupRanking small{color:#476451}
 
 .quickFooter{flex-wrap:wrap}.quickFooter>p{flex-basis:100%;margin:0;text-align:left}
+
+.weekdays{border:1px solid #c5cfc5;border-radius:8px;padding:14px;margin:20px 0}.weekdays legend{font-weight:600;font-size:14px;padding:0 5px}.weekdays>div{display:flex;flex-wrap:wrap;gap:8px}.weekdays label{display:flex;align-items:center;gap:7px;margin:0;padding:8px;border:1px solid #d4ddd1;border-radius:6px;font-size:13px;min-height:44px}.weekdays input[type=checkbox]{width:18px;height:18px;padding:0;margin:0}.weekdays p{margin:8px 0 0}

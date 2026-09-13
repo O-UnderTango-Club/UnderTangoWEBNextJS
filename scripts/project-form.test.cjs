@@ -10,7 +10,7 @@ function load(relative, replacements = {}) {
   const mod = new Module(filename, module);
   mod.filename = filename; mod.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalRequire = mod.require.bind(mod);
-  mod.require = id => id in replacements ? replacements[id] : ['./ActionGroup','./GroupForm'].includes(id) ? {default:()=>null} : originalRequire(id);
+  mod.require = id => id in replacements ? replacements[id] : ['./ActionGroup','./GroupForm','./WeekdayPicker'].includes(id) ? {default:()=>null} : originalRequire(id);
   const source = fs.readFileSync(filename, 'utf8').replace('function EditForm(', 'export function EditForm(').replace('function QuickForm(', 'export function QuickForm(');
   mod._compile(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename);
   return mod.exports;
@@ -20,7 +20,7 @@ const grouping = load('../src/lib/panel-dependencies.ts');
 const dependencies = load('../app/panel-de-control/Dependencies.tsx', {'../../src/lib/panel-model':model,'../../src/lib/panel-dependencies':grouping,'./panel.module.css':{default:{}}});
 const projectGroups = load('../src/lib/panel-project-groups.ts');
 const frontProjects = load('../app/panel-de-control/FrontProjects.tsx', {'../../src/lib/panel-model':model,'../../src/lib/panel-project-groups':projectGroups,'./panel.module.css':{default:{}}});
-const { EditForm } = load('../app/panel-de-control/Panel.tsx', { '../../src/lib/panel-model': model, './Dependencies': dependencies, './FrontProjects':frontProjects, './panel.module.css': {default:{}} });
+const { EditForm } = load('../app/panel-de-control/Panel.tsx', { '../../src/lib/panel-model': model, './Dependencies': dependencies, './FrontProjects':frontProjects, './WeekdayPicker':{default:()=>null}, './panel.module.css': {default:{}} });
 const data = { rankingMode:'action',source:'supabase',projects:[],tasks:[],events:[],cases:[] };
 const front = {name:'Primario',tasks:['a']};
 const projectBoard = {...data,projects:[{id:'p',name:'Proyecto compartido'}],tasks:[{id:'a',stage:'ready',projectIds:['p','q'],front:'Primario',rank:1}]};

@@ -37,7 +37,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 export function parseOperationsSnapshot(value: unknown, allowStaged = false): OperationsSnapshot {
   const invalid = () => new OperationsError("Supabase devolvió una lectura incompleta. No se muestran datos antiguos.");
-  if (!object(value) || (value.contract!==1&&value.contract!==2&&value.contract!==3&&value.contract!==4&&value.contract!==5) || typeof value.revision !== "string" ||
+  if (!object(value) || (value.contract!==1&&value.contract!==2&&value.contract!==3&&value.contract!==4&&value.contract!==5&&value.contract!==6) || typeof value.revision !== "string" ||
       !/^(0|[1-9]\d*)$/.test(value.revision) ||
       !["staged", "validated", "active"].includes(String(value.status)) ||
       typeof value.updatedAt !== "string" || !Number.isFinite(Date.parse(value.updatedAt))) throw invalid();
@@ -46,7 +46,7 @@ export function parseOperationsSnapshot(value: unknown, allowStaged = false): Op
   }
   const fields = { projects: F.projects, tasks: F.tasks, events: F.events, cases: F.cases };
   const links = new Set<string>([F.tasks.projects, F.tasks.cases, F.tasks.events, F.tasks.dependencies, F.cases.projects]);
-  const numbers = new Set<string>([F.tasks.order, F.tasks.groupOrder, F.tasks.rank, F.projects.rank]);
+  const numbers = new Set<string>([F.tasks.weekdays, F.tasks.order, F.tasks.groupOrder, F.tasks.rank, F.projects.rank]);
   const parsed = {} as Record<keyof typeof fields, Raw[]>;
   for (const group of Object.keys(fields) as (keyof typeof fields)[]) {
     const rows = value[group];
@@ -77,6 +77,7 @@ export function parseOperationsSnapshot(value: unknown, allowStaged = false): Op
   }
   for(const task of parsed.tasks) {
     const kind=task.fields[F.tasks.kind], groupId=task.fields[F.tasks.group];
+    const days=task.fields[F.tasks.weekdays];if(days!==undefined&&(!Number.isInteger(days)||days<1||days>127))throw invalid();
     if(kind!==undefined&&!["action","group"].includes(kind)) throw invalid();
     if(groupId){
       const parent=parsed.tasks.find(t=>t.id===groupId);
@@ -97,7 +98,7 @@ export async function readOperationsSnapshot(options: {
   let response: Response;
   try {
     // Modern secret keys go in apikey, never in Authorization: Bearer.
-    response = await (options.fetcher || fetch)(`${url}/rest/v1/rpc/${preview ? "ut_panel_preview_v1" : (process.env.PANEL_ACTION_GROUPS === "1" ? "ut_panel_snapshot_v5" : "ut_panel_snapshot_v3")}`, {
+    response = await (options.fetcher || fetch)(`${url}/rest/v1/rpc/${preview ? "ut_panel_preview_v1" : (process.env.PANEL_ACTION_GROUPS === "1" ? "ut_panel_snapshot_v6" : "ut_panel_snapshot_v3")}`, {
       method: "POST", headers: { apikey: key, "Content-Type": "application/json" },
       body: preview ? JSON.stringify({ p_token: preview.readToken }) : "{}", cache: "no-store", signal: AbortSignal.timeout(20000),
       redirect: "error",

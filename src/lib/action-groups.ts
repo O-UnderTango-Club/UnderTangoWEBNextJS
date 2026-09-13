@@ -1,7 +1,7 @@
-import { F, FRONTS, closed, type Raw, type Snapshot } from './panel-model';
+import { F, FRONTS, closed, validWeekdays, type Raw, type Snapshot } from './panel-model';
 
 export const NEW_GROUP = '__new_group__';
-export type GroupChanges = { name: string; members: string[]; front: string; rank: number };
+export type GroupChanges = { name: string; members: string[]; front: string; rank: number; weekdays?: number };
 export type GroupPatch = { table: 'follow_ups'; id: string | null; create: boolean; fields: Record<string, unknown> };
 export const isGroup = (t: Raw) => t.fields[F.tasks.kind] === 'group';
 export const isMember = (t: Raw) => !!t.fields[F.tasks.group];
@@ -21,10 +21,12 @@ export function planGroup(data: Snapshot, id: string | undefined, change: GroupC
     if (closed(member) && member.fields[F.tasks.group] !== id) throw new Error('Sólo se pueden incorporar acciones abiertas.');
     return member;
   });
+  if(change.weekdays!==undefined&&!validWeekdays(change.weekdays))throw new Error("Elegí al menos un día de la semana.");
   const groupId = id || NEW_GROUP;
   const previous = data.tasks.filter(t => t.fields[F.tasks.group] === id && !!id);
   const removed = previous.filter(t => !change.members.includes(t.id));
   const patches: GroupPatch[] = [{ table: 'follow_ups', id: id || null, create: !id, fields: {
+    ...(change.weekdays===undefined?{}:{[F.tasks.weekdays]:change.weekdays}),
     [F.tasks.name]: name, [F.tasks.kind]: 'group', [F.tasks.front]: change.front,
     [F.tasks.status]: 'Pendiente', [F.tasks.gate]: 'Acción inmediata',
   } }];

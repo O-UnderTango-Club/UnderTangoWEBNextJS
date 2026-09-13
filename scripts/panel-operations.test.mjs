@@ -38,7 +38,7 @@ await check('staged y validated no activan el panel', () => {
   }
 });
 await check('rechaza lecturas incompletas o contratos incompatibles', () => {
-  for (const patch of [{ tasks: null }, { contract: 6 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
+  for (const patch of [{ tasks: null }, { contract: 7 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
     assert.throws(() => m.parseOperationsSnapshot({ ...fixture(), ...patch }), /incompleta/);
   }
 });
@@ -159,6 +159,15 @@ try {
   db.projects=[row('p',{[F.projects.name]:'Proyecto A',[F.projects.status]:'Activo',[F.projects.front]:'Terciario',[F.projects.rank]:50}),row('q',{[F.projects.name]:'Proyecto B',[F.projects.status]:'Activo',[F.projects.front]:'Primario',[F.projects.rank]:1})];
   const task=(id,rank,project='p',more={})=>row(id,{[F.tasks.name]:id,[F.tasks.status]:'Pendiente',[F.tasks.gate]:'Acción inmediata',[F.tasks.projects]:[project],[F.tasks.front]:'Primario',[F.tasks.rank]:rank,...more});
   db.tasks=[task('t',1),task('u',3),task('v',2,'q'),task('w',4,'p',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera',[F.tasks.dependencies]:['t']})];
+  await check('días semanales se guardan sin alterar estado ni ranking y rechazan valores inválidos',async()=>{
+    const before=JSON.stringify(db.tasks.map(t=>({...t,fields:{...t.fields,[F.tasks.weekdays]:undefined}})));
+    await server.mutate(await intent('task','t',{weekdays:21}),'test-actor');
+    assert.equal(db.tasks.find(t=>t.id==='t').fields[F.tasks.weekdays],21);
+    assert.equal(server.responseBoard(await server.snapshot()).tasks.find(t=>t.id==='t').weekdays,21);
+    assert.equal(JSON.stringify(db.tasks.map(t=>({...t,fields:{...t.fields,[F.tasks.weekdays]:undefined}}))),before);
+    for(const weekdays of [0,128,1.5,'21',null]) await assert.rejects(server.mutate(await intent('task','t',{weekdays}),'test-actor'));
+    await server.mutate(await intent('task','t',{weekdays:127}),'test-actor');
+  });
   await check('crear proyecto conserva todas las acciones y recupera el mismo comprobante',async()=>{
     const before=JSON.stringify(db.tasks), n=db.projects.length;
     const input=await intent('project',undefined,{name:'  Nuevo   proyecto  ',purpose:'Resultado esperado',status:'Activo'});

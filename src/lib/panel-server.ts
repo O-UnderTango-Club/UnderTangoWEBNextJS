@@ -2,7 +2,7 @@ import { planGroup, isMember, isGroup } from "./action-groups";
 import { createHash } from "node:crypto";
 import { deviceActor } from "./panel-access";
 import { operationsSelected, readOperationsSnapshot, operationsReceipt, commitOperations, OperationsError, type OperationsSnapshot, type OperationsPatch } from "./panel-operations";
-import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, EditableStage, board, closed, classify, projectOpen, taskProjects, validateTask, finishTodayChanges, nextPanelDay } from "./panel-model";
+import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, EditableStage, board, closed, classify, projectOpen, taskProjects, validateTask, finishTodayChanges, nextPanelDay, validWeekdays } from "./panel-model";
 
 export class PanelError extends Error { constructor(message: string, public status=400) { super(message); } }
 export async function authorize(request: Request) {
@@ -137,7 +137,7 @@ async function performMutation(input: any, actor: string) {
   if(!change||typeof change!=="object"||Array.isArray(change)) throw new PanelError("Cambio inválido.");
   if(kind==="group") {
     if(!operational||!("globalRevision" in data)||process.env.PANEL_ACTION_GROUPS!=="1") throw new PanelError("Los grupos todavía no están habilitados.",409);
-    if(Object.keys(change).some(k=>!["name","members","front","rank"].includes(k))) throw new PanelError("Cambio de grupo inválido.");
+    if(Object.keys(change).some(k=>!["name","members","front","rank","weekdays"].includes(k))) throw new PanelError("Cambio de grupo inválido.");
     let patches;try{patches=planGroup(data,input.id,change);}catch(e){throw new PanelError(e instanceof Error?e.message:"Grupo inválido.");}
     return operationsCall(()=>commitOperations(input.requestId,actor,input,data.globalRevision,patches));
   }
@@ -165,13 +165,14 @@ async function performMutation(input: any, actor: string) {
   const fields: Record<string,any>={};
   const rankChanges: {id:string;fields:Record<string,any>}[]=[];
   if(kind==="task") {
-    const allowed=["front","rank","activateAt","name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence","comment"];
+    const allowed=["weekdays","front","rank","activateAt","name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence","comment"];
     if(Object.keys(change).some(k=>!allowed.includes(k))) throw new PanelError("Campo no editable.");
     for(const k of ["name","owner","reason"] as const) if(k in change) fields[F.tasks[k]]=text(change[k],k==="reason"?1000:250);
     if("doc" in change) fields[F.tasks.doc]=doc(change.doc);
     if("priority" in change) {if(!["Alta","Media","Baja"].includes(change.priority)) throw new PanelError("Prioridad inválida."); fields[F.tasks.priority]=change.priority;}
     if("due" in change){const d=text(change.due,10); if(d&&(!/^\d{4}-\d{2}-\d{2}$/.test(d)||new Date(d).toISOString().slice(0,10)!==d))throw new PanelError("Fecha inválida.");fields[F.tasks.due]=d||null;}
     if("activateAt" in change) fields[F.tasks.activateAt]=activation(change.activateAt);
+    if("weekdays" in change){if(!operational||!validWeekdays(change.weekdays))throw new PanelError("Elegí al menos un día de la semana.");fields[F.tasks.weekdays]=change.weekdays;}
     if("order" in change){if(!Number.isInteger(change.order)||change.order<0||change.order>9999)throw new PanelError("El orden debe ser un entero positivo."); fields[F.tasks.order]=change.order||null;}
     for(const [key,records] of [["projects",data.projects],["cases",data.cases],["dependencies",data.tasks],["events",data.events]] as const) if(key in change)fields[F.tasks[key]]=refs(change[key],records);
     let stage:EditableStage|undefined=change.stage;

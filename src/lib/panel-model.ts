@@ -2,11 +2,26 @@ export const BASE = "appJwwHP1Wkoxo54q";
 export const TABLES = { projects: "tblf6DZBViGbvxRzS", tasks: "tblnmNNkFemgOlOlw", events: "tblQhjY5HpSlMPCpp", cases: "tblguHWSAk4wyfNjQ" };
 export const F = {
   projects: { name:"fldChULRkd1GrXY3w", status:"fldcypAILEecLnLGQ", front:"fldy1wMKKlc6TRvmf", rank:"fldGtRBM8QYXGZQPd", purpose:"fldrApFZcuzKj3Gax", doc:"fldiMnJUvRox1quBE" },
-  tasks: { comment:"panel_comment", kind:"action_kind", group:"action_group", groupOrder:"group_order", front:"action_front", rank:"action_rank", activateAt:"activate_at", name:"fldLO5zuV38eu576D", description:"fldlv5rjVOU4TLjD5", owner:"fldi6lt4W8IAlBlAm", status:"fldLXBjnEHgHDJvX0", priority:"fldkWFX5EzySkDrLi", due:"fldixmckZrFiyJ6xd", result:"fldn1XmmTwRDnzQDd", cases:"fldazeCmB0kKeC56A", projects:"fldOCm8x8sOWDNlw6", events:"fldFwHCG8zQkO2gHv", gate:"fldh7b5L9hg89tle4", reason:"fldnNMs1CYSffH0Cc", trigger:"fldcTRjO3pX2hy60N", dependencies:"fldoqev0eaVgZVt6G", order:"fldZCklniYktPL5NA", doc:"fldZfQfRxnxZD2WZI" },
+  tasks: { weekdays:"weekdays_mask", comment:"panel_comment", kind:"action_kind", group:"action_group", groupOrder:"group_order", front:"action_front", rank:"action_rank", activateAt:"activate_at", name:"fldLO5zuV38eu576D", description:"fldlv5rjVOU4TLjD5", owner:"fldi6lt4W8IAlBlAm", status:"fldLXBjnEHgHDJvX0", priority:"fldkWFX5EzySkDrLi", due:"fldixmckZrFiyJ6xd", result:"fldn1XmmTwRDnzQDd", cases:"fldazeCmB0kKeC56A", projects:"fldOCm8x8sOWDNlw6", events:"fldFwHCG8zQkO2gHv", gate:"fldh7b5L9hg89tle4", reason:"fldnNMs1CYSffH0Cc", trigger:"fldcTRjO3pX2hy60N", dependencies:"fldoqev0eaVgZVt6G", order:"fldZCklniYktPL5NA", doc:"fldZfQfRxnxZD2WZI" },
   events: { key:"fldDFsxIuKAGvzCW8", name:"fldnJbUExwp1QxEet", status:"fldYDOPJvKg4RAkSo", type:"fld03HgdmMkrXQsz9", occurred:"fldwIQR5BHirvuLLD", evidence:"fldap8xuzZwCpqouP" },
   cases: { name:"fldTyP9DE3ANVtoBN", projects:"fldCd5XSjO7ySQYoj" }
 };
 export const FRONTS = ["Primario", "Secundario", "Terciario"];
+export const WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+export const ALL_DAYS = 127;
+export function validWeekdays(value: unknown): value is number { return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= ALL_DAYS; }
+export function weekdayLabel(mask=ALL_DAYS) { return mask===ALL_DAYS?"Todos los días":WEEKDAYS.filter((_,i)=>mask & (1<<i)).join(", "); }
+export function nextAvailableDay(mask:number, from:number): number {
+  if(!validWeekdays(mask)||!Number.isFinite(from)) return NaN;
+  const weekday=new Intl.DateTimeFormat("en-US",{timeZone:"America/Argentina/Cordoba",weekday:"short"});
+  let candidate=from;
+  for(let offset=0;offset<8;offset++) {
+    const index=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(weekday.format(new Date(candidate)));
+    if(mask & (1<<index)) return candidate;
+    candidate=Date.parse(nextPanelDay(candidate));
+  }
+  return NaN;
+}
 export function frontPosition(front: string, rank: number) {
   const group = FRONTS.indexOf(front) + 1;
   return group && Number.isInteger(rank) && rank > 0 && rank !== 9999 ? `${group}.${rank}` : "Sin posición";
@@ -27,7 +42,7 @@ export function finishTodayChanges(task: Raw, data: Snapshot, now=Date.now()) {
   // Argentine calendar day, not a rolling 24-hour delay or the browser's timezone.
   const activateAt=nextPanelDay(now);
   return {activateAt,stage:state.stage==="recurring"?"recurring" as const:"ready" as const,
-    evidence:"Por hoy ya estamos: avance del día registrado por el usuario. La acción sigue abierta y vuelve a estar disponible al día siguiente; conserva su posición. No equivale a finalización."};
+    evidence:"Por hoy ya estamos: avance del día registrado por el usuario. La acción sigue abierta y vuelve a estar disponible desde mañana, en sus días habilitados; conserva su posición. No equivale a finalización."};
 }
 const s = (v: unknown): string => typeof v === "string" ? v : "";
 const links = (v: unknown): string[] => Array.isArray(v) ? v.filter(x => typeof x === "string") : [];
@@ -56,9 +71,9 @@ export function storedStage(t: Raw): EditableStage {
   if(gate==="Acción inmediata") return "ready";
   return "catalog";
 }
-export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage; issues: string[]; blockers: string[]; released: boolean } {
+export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage; issues: string[]; blockers: string[]; released: boolean; nextAvailableAt: string } {
   const f=t.fields, issues: string[]=[], blockers: string[]=[];
-  if (closed(t)) return {stage:f[F.tasks.status]==="Hecho"?"done":"cancelled",issues,blockers,released:false};
+  if (closed(t)) return {stage:f[F.tasks.status]==="Hecho"?"done":"cancelled",issues,blockers,released:false,nextAvailableAt:""};
   const gate=s(f[F.tasks.gate]), status=s(f[F.tasks.status]);
   const groupId=s(f[F.tasks.group]), parent=groupId?data.tasks.find(t=>t.id===groupId&&t.fields[F.tasks.kind]==="group"):undefined;
   const isGroup=f[F.tasks.kind]==="group";
@@ -67,6 +82,13 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
   const ownActivation=activateAt?Date.parse(activateAt):0;
   const parentActivation=parent?.fields[F.tasks.activateAt]?Date.parse(parent.fields[F.tasks.activateAt]):0;
   const activationTime=Math.max(ownActivation,parentActivation);
+  const ownDays=f[F.tasks.weekdays]??ALL_DAYS,parentDays=parent?.fields[F.tasks.weekdays]??ALL_DAYS;
+  const daysValid=validWeekdays(ownDays)&&validWeekdays(parentDays);
+  if(!daysValid) issues.push("Revisar los días de la semana");
+  const effectiveDays=daysValid?(ownDays & parentDays):0;
+  if(daysValid&&!effectiveDays) issues.push("Los días de la acción y del grupo no coinciden");
+  const availableTime=nextAvailableDay(effectiveDays,Math.max(now,activationTime));
+  const nextAvailableAt=Number.isFinite(availableTime)&&availableTime>now?new Date(availableTime).toISOString():"";
   if(activateAt&&!Number.isFinite(activationTime)) issues.push("Fecha de activación inválida");
   const deps=links(f[F.tasks.dependencies]), events=links(f[F.tasks.events]);
   const projects=taskProjects(t,data), caseIds=links(f[F.tasks.cases]);
@@ -97,10 +119,10 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
     else if (event.fields[F.events.status]==="Descartado") issues.push(`Revisar evento descartado: ${event.fields[F.events.name]}`);
     else if (event.fields[F.events.status]!=="Ocurrido" || !s(event.fields[F.events.evidence]).trim() || !event.fields[F.events.occurred]) blockers.push(s(event.fields[F.events.name]));
   }
-  const scheduled=Number.isFinite(activationTime)&&activationTime>now;
+  const scheduled=!!nextAvailableAt;
   const released=gate==="En espera" && !!(deps.length+events.length) && !blockers.length && !issues.length && !scheduled;
   const stage: Stage=issues.length?"catalog":scheduled?"scheduled":blockers.length?"waiting":gate==="En acción"?"doing":gate==="Acción recurrente"?"recurring":"ready";
-  return {stage,issues,blockers,released};
+  return {stage,issues,blockers,released,nextAvailableAt};
 }
 export function board(data: Snapshot, now=Date.now()) {
   const projects=data.projects.map(p=>({id:p.id,name:s(p.fields[F.projects.name]),status:s(p.fields[F.projects.status]),front:s(p.fields[F.projects.front]),rank:Number(p.fields[F.projects.rank])||9999,purpose:s(p.fields[F.projects.purpose]).slice(0,500),doc:s(p.fields[F.projects.doc]),open:projectOpen(p)}));
@@ -108,7 +130,7 @@ export function board(data: Snapshot, now=Date.now()) {
     const f={...t.fields};
     const history=s(f[F.tasks.result]);
     const parent=data.tasks.find(p=>p.id===f[F.tasks.group]);
-    return {history,comment:s(f[F.tasks.comment]),id:t.id,isGroup:f[F.tasks.kind]==="group",groupId:s(f[F.tasks.group]),groupOrder:Number(f[F.tasks.groupOrder])||0,memberIds:[] as string[],nextId:"",front:s(parent?.fields[F.tasks.front]??f[F.tasks.front]),rank:Number(parent?.fields[F.tasks.rank]??f[F.tasks.rank])||0,activateAt:s(f[F.tasks.activateAt]),name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),baseStage:storedStage(t),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data,now)};
+    return {history,weekdays:(f[F.tasks.weekdays]??ALL_DAYS) as number,parentWeekdays:(parent?.fields[F.tasks.weekdays]??ALL_DAYS) as number,comment:s(f[F.tasks.comment]),id:t.id,isGroup:f[F.tasks.kind]==="group",groupId:s(f[F.tasks.group]),groupOrder:Number(f[F.tasks.groupOrder])||0,memberIds:[] as string[],nextId:"",front:s(parent?.fields[F.tasks.front]??f[F.tasks.front]),rank:Number(parent?.fields[F.tasks.rank]??f[F.tasks.rank])||0,activateAt:s(f[F.tasks.activateAt]),name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),baseStage:storedStage(t),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data,now)};
   });
   for(const group of tasks.filter(t=>t.isGroup)) {
     const members=tasks.filter(t=>t.groupId===group.id).sort((a,b)=>a.groupOrder-b.groupOrder||a.id.localeCompare(b.id));
@@ -116,7 +138,10 @@ export function board(data: Snapshot, now=Date.now()) {
     group.projectIds=unique(members.flatMap(t=>t.projectIds));
     const next=members.find(t=>["ready","recurring"].includes(t.stage));
     group.nextId=next?.id||"";
-    if(!["done","cancelled","scheduled","catalog"].includes(group.stage)) group.stage=next?"ready":members.some(t=>t.stage==="doing")?"doing":"waiting";
+    if(!["done","cancelled","scheduled","catalog"].includes(group.stage)) {
+      group.stage=next?"ready":members.some(t=>t.stage==="doing")?"doing":members.some(t=>t.stage==="scheduled")?"scheduled":"waiting";
+      if(group.stage==="scheduled") group.nextAvailableAt=members.filter(t=>t.stage==="scheduled"&&t.nextAvailableAt).map(t=>t.nextAvailableAt).sort()[0]||"";
+    }
     if(group.stage==="scheduled") for(const member of members) {
       if(!["done","cancelled"].includes(member.stage)&&Date.parse(group.activateAt)>Date.parse(member.activateAt||"1970-01-01")){member.stage="scheduled";member.activateAt=group.activateAt;}
     }

@@ -10,7 +10,7 @@ function load(relative, replacements = {}) {
   const mod = new Module(filename, module);
   mod.filename = filename; mod.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalRequire = mod.require.bind(mod);
-  mod.require = id => id in replacements ? replacements[id] : originalRequire(id);
+  mod.require = id => id in replacements ? replacements[id] : ['./ActionGroup','./GroupForm'].includes(id) ? {default:()=>null} : originalRequire(id);
   const source = fs.readFileSync(filename, 'utf8').replace('function EditForm(', 'export function EditForm(').replace('function QuickForm(', 'export function QuickForm(');
   mod._compile(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename);
   return mod.exports;
@@ -50,10 +50,10 @@ assert.match(task, /Sin proyecto vinculado/);
 console.log('Project/action rendering checks passed: context, inherited links, empty state and historical order');
 
 // Exercise the form submission without a browser or any production writes.
-let availabilityMode="now";
+let availabilityMode="now", quickEvidence, stateIndex=0;
 const { QuickForm } = load('../app/panel-de-control/Panel.tsx', {
   '../../src/lib/panel-model':model,'./Dependencies':dependencies,'./FrontProjects':frontProjects,'./panel.module.css':{default:{}},
-  react:{...React,useState:initial=>[initial==="now"?availabilityMode:initial,()=>{}]}
+  react:{...React,useState:initial=>[stateIndex++===4&&quickEvidence!==undefined?quickEvidence:initial==="now"?availabilityMode:initial,()=>{}]}
 });
 const scheduledTask={id:'scheduled',name:'Recurrente para mañana',baseStage:'recurring',stage:'scheduled',front:'Primario',rank:1,activateAt:'2099-01-01T03:00:00Z',dependencies:[],eventIds:[]};
 const quickEditor={kind:'task',id:'scheduled',mode:'status',initial:{stage:'recurring',front:'Primario',rank:1,reason:'',dependencies:[],events:[]}};
@@ -83,4 +83,24 @@ function findElement(node,predicate){
  const unscheduled=QuickForm({editor:quickEditor,data:{...data,tasks:[{...scheduledTask,activateAt:''}]},busy:false});
  assert.equal(findElement(unscheduled,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,true);
  console.log('Scheduled recurring form passed: reactivate same state, preserve scheduling for other states, read-only and unchanged guards');
+ const closingEditor={...quickEditor,initial:{...quickEditor.initial,stage:'done',dependencies:['previous'],events:['confirmed']}};
+ const closingData={...data,tasks:[{...scheduledTask,activateAt:'',baseStage:'ready'}],events:[{id:'confirmed',status:'Ocurrido',occurred:'2026-09-13',evidence:'Confirmado'}]};
+ for(const stage of ['done','cancelled']) {
+  let closed;
+  const props={editor:{...closingEditor,initial:{...closingEditor.initial,stage}},data:closingData,busy:false,onSave:async changes=>{closed=changes;}};
+  quickEvidence='';stateIndex=0;
+  const empty=QuickForm(props);
+  assert.ok(findElement(empty,n=>n.props?.id==='quick-evidence'),'Closure result must be shown');
+  assert.equal(findElement(empty,n=>n.type===dependencies.default),undefined,'Closing must not show the start-condition selector');
+  assert.ok(findElement(empty,n=>n.props?.id==='quick-save-hint'),'Disabled save must explain the missing result');
+  assert.equal(findElement(empty,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,true);
+  await findElement(empty,n=>n.type==='form').props.onSubmit({preventDefault(){}});
+  assert.equal(closed,undefined,'Empty result must not submit');
+  quickEvidence='Trabajo verificado';stateIndex=0;
+  const complete=QuickForm(props);
+  assert.equal(findElement(complete,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,false);
+  await findElement(complete,n=>n.type==='form').props.onSubmit({preventDefault(){}});
+  assert.deepEqual(closed,{stage,dependencies:['previous'],events:['confirmed'],evidence:'Trabajo verificado'},'Closure must preserve linked history');
+ }
+ console.log('Closure form passed: visible result, explained validation, save enabled with evidence, preserved dependencies');
 })().catch(error=>{console.error(error);process.exitCode=1;});

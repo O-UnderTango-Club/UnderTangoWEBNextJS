@@ -259,6 +259,32 @@ try {
     await server.mutate(await intent('task',second.id,{stage:'done',evidence:'Segundo cumplido'}),'test-actor');
     assert.equal((await state()).stage,'ready');
   });
+  await check('descanso de proyecto atómico conserva estados, posiciones, historia y fechas posteriores',async()=>{
+    db.cases=[row('case',{[F.cases.name]:'Caso',[F.cases.projects]:['p']})];
+    db.tasks=[task('direct',1),task('shared',2,'p',{[F.tasks.projects]:['p','q'],[F.tasks.gate]:'Acción recurrente'}),task('inherited',1,'q',{[F.tasks.projects]:[],[F.tasks.cases]:['case'],[F.tasks.front]:'Secundario'}),task('later',3,'p',{[F.tasks.activateAt]:'2099-01-01T03:00:00.000Z'}),task('closed',4,'p',{[F.tasks.status]:'Hecho'}),task('outside',5,'q')];
+    const before=structuredClone(db.tasks),input=await intent('project','p',{doneToday:true});
+    failAfterCommit=true;
+    await assert.rejects(server.mutate(input,'test-actor'),e=>e.status===503);
+    const calls=commitCalls;await server.mutate(input,'test-actor');assert.equal(commitCalls,calls);
+    assert.deepEqual(lastPatches.map(p=>p.id),['direct','shared','inherited']);
+    for(const patch of lastPatches)assert.deepEqual(Object.keys(patch.fields),[F.tasks.activateAt]);
+    for(const saved of db.tasks){
+      const original=before.find(t=>t.id===saved.id);
+      assert.deepEqual({...saved.fields,[F.tasks.activateAt]:undefined},{...original.fields,[F.tasks.activateAt]:undefined});
+      if(['later','closed','outside'].includes(saved.id))assert.deepEqual(saved,original);
+    }
+    const board=server.responseBoard(await server.snapshot());
+    assert.ok(!board.fronts.some(f=>f.tasks.some(id=>['direct','shared','inherited'].includes(id))));
+    const {board:makeBoard,nextPanelDay}=await import(modelUrl);
+    const tomorrow=makeBoard({...db,rankingMode:'action'},Date.parse(nextPanelDay())+1);
+    assert.equal(tomorrow.tasks.find(t=>t.id==='shared').stage,'recurring');
+    assert.equal(tomorrow.tasks.find(t=>t.id==='direct').stage,'ready');
+    await assert.rejects(server.mutate(await intent('project','p',{doneToday:true}),'test-actor'),/otro día/);
+    for(const changes of [{doneToday:false},{doneToday:true,name:'No cambiar'}])await assert.rejects(server.mutate(await intent('project','p',changes),'test-actor'),/inválido/);
+    const stale=await intent('project','q',{doneToday:true});revision++;
+    await assert.rejects(server.mutate(stale,'test-actor'),e=>e.status===409);
+    assert.equal(commitCalls,calls);
+  });
 } finally { globalThis.fetch = nativeFetch; delete process.env.PANEL_DATA_SOURCE; }
 await check('preview usa solo RPC limitado; staged no activa producción ni consume Airtable', async () => {
   const config = { publishableKey: 'sb_publishable_test', readToken: '1'.repeat(64), deviceSecret: '2'.repeat(64), bootstrapHash: '3'.repeat(64), expiresAt: Date.now()+3600000 };

@@ -9,9 +9,11 @@ type Props = {
   data: Board;
   front: Board["fronts"][number];
   renderTask: (task: Board["tasks"][number], projectId?: string) => ReactNode;
+  onFinishToday: (projectId: string) => Promise<void>;
+  disabled: boolean;
 };
 
-export default function FrontProjects({ data, front, renderTask }: Props) {
+export default function FrontProjects({ data, front, renderTask, onFinishToday, disabled }: Props) {
   const [expanded, setExpanded] = useState<string[]>([]);
   const groups = frontProjectGroups(data, front);
   if (!groups.length) return <div className={css.empty}>Sin acciones disponibles por hoy en este frente.</div>;
@@ -26,6 +28,11 @@ export default function FrontProjects({ data, front, renderTask }: Props) {
         <span className={group.priority.length ? css.badge : css.muted}>{group.priority.length ? `Prioridad de hoy · ${group.priority.map(t => frontPosition(t.front, t.rank)).join(" · ")}` : "Fuera de las tres prioridades de hoy"}</span>
         <span className={css.projectOpenLabel}>{isOpen ? "Cerrar acciones" : "Abrir acciones"}</span>
       </button>
+      {group.id !== "__unlinked" && <div className={css.projectDayActions}>
+        <button className={css.button} disabled={disabled} onClick={() => void onFinishToday(group.id)} aria-label={`Por hoy está bien con ${group.name}`}>Por hoy está bien</button>
+        <p className={css.help}>Deja para mañana las acciones abiertas del proyecto, también en otros frentes. Conserva las fechas posteriores.</p>
+        {data.tasks.some(task => task.projectIds.includes(group.id) && task.projectIds.length > 1 && !["done", "cancelled"].includes(task.stage)) && <p className={css.help}>Las acciones compartidas también descansan en sus otros proyectos.</p>}
+      </div>}
       <div id={panelId} hidden={!isOpen} className={css.projectContents}>
         {isOpen && <>
           <p className={css.help}>Sólo se muestran acciones disponibles. Las programadas quedan en Programadas y vuelven al llegar su fecha. Cada acción conserva su frente y posición.</p>

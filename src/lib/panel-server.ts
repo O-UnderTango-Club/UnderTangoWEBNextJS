@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { deviceActor } from "./panel-access";
 import { operationsSelected, readOperationsSnapshot, operationsReceipt, commitOperations, OperationsError, type OperationsSnapshot, type OperationsPatch } from "./panel-operations";
-import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, EditableStage, board, closed, classify, projectOpen, taskProjects, validateTask, finishTodayChanges } from "./panel-model";
+import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, EditableStage, board, closed, classify, projectOpen, taskProjects, validateTask, finishTodayChanges, nextPanelDay } from "./panel-model";
 
 export class PanelError extends Error { constructor(message: string, public status=400) { super(message); } }
 export async function authorize(request: Request) {
@@ -134,6 +134,22 @@ async function performMutation(input: any, actor: string) {
   if(current&&input.revision!==revision(current)) throw new PanelError("El registro cambió desde que lo abriste. Cerrá el editor, actualizá y revisá el cambio.",409);
   let change=input.changes;
   if(!change||typeof change!=="object"||Array.isArray(change)) throw new PanelError("Cambio inválido.");
+  if(kind==="project"&&"doneToday" in change){
+    if(!current||!operational||!("globalRevision" in data)||change.doneToday!==true||Object.keys(change).length!==1)
+      throw new PanelError("Descanso de proyecto inválido.");
+    if(!projectOpen(current))throw new PanelError("El proyecto está cerrado.",409);
+    const activateAt=nextPanelDay();
+    // One atomic commit covers direct and case-inherited links across all fronts.
+    // Preserve states, dependencies, rankings, evidence and any later activation.
+    const tasks=data.tasks.filter(t=>!closed(t)&&taskProjects(t,data).includes(current.id));
+    const patches:OperationsPatch[]=tasks.flatMap(t=>{
+      const existing=t.fields[F.tasks.activateAt];
+      if(existing&&!Number.isFinite(Date.parse(existing)))throw new PanelError("Revisá la fecha de activación de las acciones del proyecto.",409);
+      return existing&&Date.parse(existing)>=Date.parse(activateAt)?[]:[{table:"follow_ups" as const,id:t.id,create:false,fields:{[F.tasks.activateAt]:activateAt}}];
+    });
+    if(!patches.length)throw new PanelError("El proyecto ya está para otro día o no tiene acciones abiertas.",409);
+    return operationsCall(()=>commitOperations(input.requestId,actor,input,data.globalRevision as string,patches));
+  }
   if("doneToday" in change){
     if(kind!=="task"||!current||!operational||change.doneToday!==true||Object.keys(change).length!==1)
       throw new PanelError("Cierre diario inválido.");

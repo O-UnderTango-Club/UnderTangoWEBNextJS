@@ -1,4 +1,10 @@
 import "./desktop.css";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Proyectos | Ø UnderTango Club",
+  alternates: { canonical: "https://www.undertangoclub.com/proyectos" },
+};
 
 export default function ProjectsLayout({ children }: { children: React.ReactNode }) {
   return (

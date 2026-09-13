@@ -52,20 +52,25 @@ export default function FAQPage() {
     },
     {
       category: "clases",
-      question: "¿Dan clases grupales?",
+      question: "¿Puedo incluir una clase de tango en un paquete turístico?",
       answer: (
         <p>
-          Sí, los sábados de 9 a 10hs principiantes, de 10 a 11 avanzados y de
-          11 a 11:30 práctica danzante. Presencial en Iguazú, retransmitida por
-          TikTok Live.
+          Sí. Ofrecemos clases de tango como experiencia para viajeros y grupos,
+          que podés sumar a un paquete turístico. Consultanos para coordinar
+          una propuesta según la cantidad de participantes, el lugar y la fecha.
         </p>
       ),
     },
     {
       category: "clases",
-      question: "¿Tienen otro horario además de los sábados?",
+      question: "¿Cómo consulto por una clase?",
       answer: (
-        <p>Estamos viendo de armar un nuevo grupo los lunes de 19 a 20hs.</p>
+        <p>
+          Escribinos por{" "}
+          <a href="https://wa.me/5493757618270" className="contact-link">WhatsApp</a>
+          {" "}y contanos para cuántas personas, en qué lugar y para qué fecha
+          buscás la experiencia. Te ayudamos a coordinarla.
+        </p>
       ),
     },
     {
@@ -103,8 +108,8 @@ export default function FAQPage() {
       question: "¿Hay milongas en Iguazú?",
       answer: (
         <p>
-          Sí, todos los domingos de 22 a 00:00 hacemos una práctica danzante con
-          reserva previa.
+          Consultanos por propuestas de milonga y práctica de tango en Iguazú
+          para la fecha de tu visita.
         </p>
       ),
     },
@@ -119,9 +124,9 @@ export default function FAQPage() {
       answer: (
         <>
           <p>
-            Ø UnderTango ofrece shows recurrentes de tango en Pata Negra, en
-            Puerto Iguazú. Las funciones se coordinan según disponibilidad del
-            espacio y del elenco.
+            Consultanos por shows de tango en Puerto Iguazú para la fecha de tu
+            visita. También podés contratar una experiencia para tu grupo o
+            incluirla en un paquete turístico.
           </p>
           <p>
             Para consultar disponibilidad y la próxima fecha, contacta al{" "}

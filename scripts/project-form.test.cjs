@@ -18,7 +18,9 @@ function load(relative, replacements = {}) {
 const model = load('../src/lib/panel-model.ts');
 const grouping = load('../src/lib/panel-dependencies.ts');
 const dependencies = load('../app/panel-de-control/Dependencies.tsx', {'../../src/lib/panel-model':model,'../../src/lib/panel-dependencies':grouping,'./panel.module.css':{default:{}}});
-const { EditForm } = load('../app/panel-de-control/Panel.tsx', { '../../src/lib/panel-model': model, './Dependencies': dependencies, './panel.module.css': {default:{}} });
+const projectGroups = load('../src/lib/panel-project-groups.ts');
+const frontProjects = load('../app/panel-de-control/FrontProjects.tsx', {'../../src/lib/panel-model':model,'../../src/lib/panel-project-groups':projectGroups,'./panel.module.css':{default:{}}});
+const { EditForm } = load('../app/panel-de-control/Panel.tsx', { '../../src/lib/panel-model': model, './Dependencies': dependencies, './FrontProjects':frontProjects, './panel.module.css': {default:{}} });
 const data = { rankingMode:'action',source:'supabase',projects:[],tasks:[],events:[],cases:[] };
 const render = (editor, extra = {}) => renderToStaticMarkup(React.createElement(EditForm, { editor, data, busy:false, onClose(){}, async onSave(){}, async onCreateProject(){return 'p';}, ...extra }));
 const project = render({kind:'project',initial:{name:'Proyecto nuevo',purpose:'Resultado',status:'Activo',doc:''}});

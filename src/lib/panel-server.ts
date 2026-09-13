@@ -1,3 +1,4 @@
+import { planGroup, isMember, isGroup } from "./action-groups";
 import { createHash } from "node:crypto";
 import { deviceActor } from "./panel-access";
 import { operationsSelected, readOperationsSnapshot, operationsReceipt, commitOperations, OperationsError, type OperationsSnapshot, type OperationsPatch } from "./panel-operations";
@@ -85,7 +86,7 @@ export function revision(record: Raw) {
   return createHash("sha256").update(JSON.stringify(Object.entries(record.fields).sort(([a],[b])=>a.localeCompare(b)))).digest("hex");
 }
 export function responseBoard(data: ServerSnapshot) {
-  return {...board(data),readOnly:process.env.VERCEL_ENV==="preview",source:"source" in data?data.source:"airtable",snapshotRevision:"globalRevision" in data?data.globalRevision:undefined,migrationAvailable:false,revisions:Object.fromEntries([...data.projects,...data.tasks,...data.events].map(r=>[r.id,revision(r)]))};
+  return {...board(data),readOnly:process.env.VERCEL_ENV==="preview",source:"source" in data?data.source:"airtable",snapshotRevision:"globalRevision" in data?data.globalRevision:undefined,actionGroups:process.env.PANEL_ACTION_GROUPS==="1",migrationAvailable:false,revisions:Object.fromEntries([...data.projects,...data.tasks,...data.events].map(r=>[r.id,revision(r)]))};
 }
 export async function migratePanelToSupabase(){
   throw new PanelError("La importación se valida fuera del panel. Airtable sigue operativo; no se cambió la fuente de datos.",409);
@@ -115,7 +116,7 @@ export function mutate(input: any, actor: string) {
   const result=writeQueue.then(work,work); writeQueue=result.catch(()=>{}); return result;
 }
 async function performMutation(input: any, actor: string) {
-  if(!input||!["task","project","event"].includes(input.kind)) throw new PanelError("Operación desconocida.");
+  if(!input||!["task","project","event","group"].includes(input.kind)) throw new PanelError("Operación desconocida.");
   const operational=usesOperations();
   if(operational){
     if(typeof input.requestId!=="string"||! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId)
@@ -125,15 +126,21 @@ async function performMutation(input: any, actor: string) {
     const receipt=await operationsCall(()=>operationsReceipt(input.requestId,actor,input));
     if(receipt) return receipt;
   }
-  const data=await snapshot(true), kind=input.kind as "task"|"project"|"event";
+  const data=await snapshot(true), kind=input.kind as "task"|"project"|"event"|"group";
   if(operational&&(!("globalRevision" in data)||input.snapshotRevision!==data.globalRevision)) throw new PanelError("El panel cambió desde que abriste el editor. Actualizá y revisá antes de guardar.",409);
-  const rows=kind==="task"?data.tasks:kind==="project"?data.projects:data.events;
+  const rows=(kind==="task"||kind==="group")?data.tasks:kind==="project"?data.projects:data.events;
   const table=kind==="task"?TABLES.tasks:kind==="project"?TABLES.projects:TABLES.events;
   const current=input.id?rows.find(r=>r.id===input.id):undefined;
   if(input.id&&!current) throw new PanelError("El registro ya no está disponible.",404);
   if(current&&input.revision!==revision(current)) throw new PanelError("El registro cambió desde que lo abriste. Cerrá el editor, actualizá y revisá el cambio.",409);
   let change=input.changes;
   if(!change||typeof change!=="object"||Array.isArray(change)) throw new PanelError("Cambio inválido.");
+  if(kind==="group") {
+    if(!operational||!("globalRevision" in data)||process.env.PANEL_ACTION_GROUPS!=="1") throw new PanelError("Los grupos todavía no están habilitados.",409);
+    if(Object.keys(change).some(k=>!["name","members","front","rank"].includes(k))) throw new PanelError("Cambio de grupo inválido.");
+    let patches;try{patches=planGroup(data,input.id,change);}catch(e){throw new PanelError(e instanceof Error?e.message:"Grupo inválido.");}
+    return operationsCall(()=>commitOperations(input.requestId,actor,input,data.globalRevision,patches));
+  }
   if(kind==="project"&&"doneToday" in change){
     if(!current||!operational||!("globalRevision" in data)||change.doneToday!==true||Object.keys(change).length!==1)
       throw new PanelError("Descanso de proyecto inválido.");
@@ -153,7 +160,7 @@ async function performMutation(input: any, actor: string) {
   if("doneToday" in change){
     if(kind!=="task"||!current||!operational||change.doneToday!==true||Object.keys(change).length!==1)
       throw new PanelError("Cierre diario inválido.");
-    change=finishTodayChanges(current,data);
+    change=isGroup(current)?{activateAt:nextPanelDay()}:finishTodayChanges(current,data);
   }
   const fields: Record<string,any>={};
   const rankChanges: {id:string;fields:Record<string,any>}[]=[];
@@ -174,6 +181,8 @@ async function performMutation(input: any, actor: string) {
     const actionRanking=operational&&data.rankingMode==="action";
     if(("front" in change||"rank" in change)&&!actionRanking)throw new PanelError("El ranking individual todavía no está habilitado.",409);
     const candidate={id:current?.id||"new",fields:{...current?.fields,...fields}};
+    if(current&&isMember(current)&&("front" in change||"rank" in change))throw new PanelError("La posición se cambia en el grupo. Para mover este paso por separado, retiralo del grupo.");
+    if(current&&isGroup(current)&&stage&&["done","cancelled"].includes(stage)&&data.tasks.some(t=>t.fields[F.tasks.group]===current.id&&!closed(t)))throw new PanelError("Primero resolvé o retirá las acciones abiertas del grupo.");
     if(actionRanking){
       const wasClosed=current?closed(current):false, isClosed=closed(candidate);
       if(isClosed&&("front" in change||"rank" in change))throw new PanelError("Reabrí la acción antes de cambiar su posición.");
@@ -181,7 +190,7 @@ async function performMutation(input: any, actor: string) {
       const moving=("front" in change||"rank" in change||(wasClosed&&!!front))&&!isClosed;
       if(moving){
         if(!FRONTS.includes(front))throw new PanelError("Elegí el frente de la acción.");
-        const ordered=(group:string)=>data.tasks.filter(t=>t.id!==candidate.id&&!closed(t)&&t.fields[F.tasks.front]===group).sort((a,b)=>(Number(a.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)-(Number(b.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)||a.id.localeCompare(b.id));
+        const ordered=(group:string)=>data.tasks.filter(t=>t.id!==candidate.id&&!closed(t)&&!isMember(t)&&t.fields[F.tasks.front]===group).sort((a,b)=>(Number(a.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)-(Number(b.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)||a.id.localeCompare(b.id));
         const destination=ordered(front);
         const rank=change.rank??(change.front!==undefined||wasClosed?destination.length+1:candidate.fields[F.tasks.rank]);
         if(!Number.isInteger(rank)||rank<1)throw new PanelError("Elegí una posición entera positiva.");
@@ -195,7 +204,7 @@ async function performMutation(input: any, actor: string) {
         if(FRONTS.includes(oldFront)&&oldFront!==front)recordRanks(ordered(oldFront));
       }
       if(isClosed&&!wasClosed&&current&&FRONTS.includes(current.fields[F.tasks.front])){
-        data.tasks.filter(t=>t.id!==current.id&&!closed(t)&&t.fields[F.tasks.front]===current.fields[F.tasks.front])
+        data.tasks.filter(t=>t.id!==current.id&&!closed(t)&&!isMember(t)&&t.fields[F.tasks.front]===current.fields[F.tasks.front])
           .sort((a,b)=>(Number(a.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)-(Number(b.fields[F.tasks.rank])||Number.MAX_SAFE_INTEGER)||a.id.localeCompare(b.id))
           .forEach((t,i)=>{if(t.fields[F.tasks.rank]!==i+1)rankChanges.push({id:t.id,fields:{[F.tasks.rank]:i+1}});});
       }

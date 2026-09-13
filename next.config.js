@@ -2,6 +2,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  env: { PANEL_ACTION_GROUPS: process.env.PANEL_ACTION_GROUPS || "1" },
   async redirects() {
     return ["www.undertangoclub.com", "undertangoclub.com"].map((host) => ({
       source: "/index.html",

@@ -37,7 +37,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 export function parseOperationsSnapshot(value: unknown, allowStaged = false): OperationsSnapshot {
   const invalid = () => new OperationsError("Supabase devolvió una lectura incompleta. No se muestran datos antiguos.");
-  if (!object(value) || (value.contract!==1&&value.contract!==2&&value.contract!==3) || typeof value.revision !== "string" ||
+  if (!object(value) || (value.contract!==1&&value.contract!==2&&value.contract!==3&&value.contract!==4) || typeof value.revision !== "string" ||
       !/^(0|[1-9]\d*)$/.test(value.revision) ||
       !["staged", "validated", "active"].includes(String(value.status)) ||
       typeof value.updatedAt !== "string" || !Number.isFinite(Date.parse(value.updatedAt))) throw invalid();
@@ -46,7 +46,7 @@ export function parseOperationsSnapshot(value: unknown, allowStaged = false): Op
   }
   const fields = { projects: F.projects, tasks: F.tasks, events: F.events, cases: F.cases };
   const links = new Set<string>([F.tasks.projects, F.tasks.cases, F.tasks.events, F.tasks.dependencies, F.cases.projects]);
-  const numbers = new Set<string>([F.tasks.order, F.tasks.rank, F.projects.rank]);
+  const numbers = new Set<string>([F.tasks.order, F.tasks.groupOrder, F.tasks.rank, F.projects.rank]);
   const parsed = {} as Record<keyof typeof fields, Raw[]>;
   for (const group of Object.keys(fields) as (keyof typeof fields)[]) {
     const rows = value[group];
@@ -75,6 +75,14 @@ export function parseOperationsSnapshot(value: unknown, allowStaged = false): Op
     const targetIds = new Set(parsed[target].map(row => row.id));
     if (parsed[group].some(row => (row.fields[field] || []).some((id: string) => !targetIds.has(id)))) throw invalid();
   }
+  for(const task of parsed.tasks) {
+    const kind=task.fields[F.tasks.kind], groupId=task.fields[F.tasks.group];
+    if(kind!==undefined&&!["action","group"].includes(kind)) throw invalid();
+    if(groupId){
+      const parent=parsed.tasks.find(t=>t.id===groupId);
+      if(!parent||parent.fields[F.tasks.kind]!=="group"||parent.fields[F.tasks.group]||kind==="group"||task.fields[F.tasks.front]||task.fields[F.tasks.rank]||!Number.isInteger(task.fields[F.tasks.groupOrder])||task.fields[F.tasks.groupOrder]<1) throw invalid();
+    }
+  }
   return { ...parsed, rankingMode:value.contract===1?"project":"action", source: "supabase", globalRevision: value.revision,
     migrationStatus: value.status as OperationsSnapshot["migrationStatus"], updatedAt: value.updatedAt };
 }
@@ -89,7 +97,7 @@ export async function readOperationsSnapshot(options: {
   let response: Response;
   try {
     // Modern secret keys go in apikey, never in Authorization: Bearer.
-    response = await (options.fetcher || fetch)(`${url}/rest/v1/rpc/${preview ? "ut_panel_preview_v1" : "ut_panel_snapshot_v3"}`, {
+    response = await (options.fetcher || fetch)(`${url}/rest/v1/rpc/${preview ? "ut_panel_preview_v1" : (process.env.PANEL_ACTION_GROUPS === "1" ? "ut_panel_snapshot_v4" : "ut_panel_snapshot_v3")}`, {
       method: "POST", headers: { apikey: key, "Content-Type": "application/json" },
       body: preview ? JSON.stringify({ p_token: preview.readToken }) : "{}", cache: "no-store", signal: AbortSignal.timeout(20000),
       redirect: "error",
@@ -114,7 +122,7 @@ function parseReceipt(value: unknown): OperationsReceipt {
   return value as OperationsReceipt;
 }
 
-async function changeRpc(name: "ut_panel_receipt_v1" | "ut_panel_commit_v1", body: Record<string, unknown>) {
+async function changeRpc(name: "ut_panel_receipt_v1" | "ut_panel_commit_v1" | "ut_panel_commit_v2", body: Record<string, unknown>) {
   const { url, key } = operationsConfig();
   let response: Response;
   try {
@@ -141,7 +149,7 @@ export async function operationsReceipt(requestId: string, actor: string, intent
   return receipt;
 }
 export async function commitOperations(requestId: string, actor: string, intent: Record<string, unknown>, expectedRevision: string, patches: OperationsPatch[]) {
-  const receipt = parseReceipt(await changeRpc("ut_panel_commit_v1", { p_request_id: requestId, p_actor: actor,
+  const receipt = parseReceipt(await changeRpc(process.env.PANEL_ACTION_GROUPS === "1" ? "ut_panel_commit_v2" : "ut_panel_commit_v1", { p_request_id: requestId, p_actor: actor,
     p_intent: intent, p_expected_revision: expectedRevision, p_patches: patches }));
   if (receipt.requestId !== requestId) throw new OperationsError("El comprobante no corresponde a este intento.");
   return receipt;

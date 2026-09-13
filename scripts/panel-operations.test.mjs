@@ -28,7 +28,7 @@ await check('staged y validated no activan el panel', () => {
   }
 });
 await check('rechaza lecturas incompletas o contratos incompatibles', () => {
-  for (const patch of [{ tasks: null }, { contract: 4 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
+  for (const patch of [{ tasks: null }, { contract: 5 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
     assert.throws(() => m.parseOperationsSnapshot({ ...fixture(), ...patch }), /incompleta/);
   }
 });
@@ -72,7 +72,8 @@ await check('selección explícita: credenciales no activan Supabase; valores de
 });
 const accessUrl = url(compile('../src/lib/panel-access.ts'));
 const opsUrl = url(compile('../src/lib/panel-operations.ts').replace('"./panel-model"', JSON.stringify(modelUrl)));
-const server = await import(url(compile('../src/lib/panel-server.ts').replace('"./panel-model"', JSON.stringify(modelUrl))
+const groupsUrl=url(compile('../src/lib/action-groups.ts').replace("'./panel-model'",JSON.stringify(modelUrl)));
+const server = await import(url(compile('../src/lib/panel-server.ts').replace('"./action-groups"',JSON.stringify(groupsUrl)).replace('"./panel-model"', JSON.stringify(modelUrl))
   .replace('"./panel-access"', JSON.stringify(accessUrl)).replace('"./panel-operations"', JSON.stringify(opsUrl))));
 Object.assign(process.env, env, { PANEL_DATA_SOURCE: 'supabase' });
 let db = fixture(), revision = 0, commitCalls = 0, readCalls = 0, failAfterCommit = false, race = false, lastPatches = [];

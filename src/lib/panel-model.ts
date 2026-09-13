@@ -2,7 +2,7 @@ export const BASE = "appJwwHP1Wkoxo54q";
 export const TABLES = { projects: "tblf6DZBViGbvxRzS", tasks: "tblnmNNkFemgOlOlw", events: "tblQhjY5HpSlMPCpp", cases: "tblguHWSAk4wyfNjQ" };
 export const F = {
   projects: { name:"fldChULRkd1GrXY3w", status:"fldcypAILEecLnLGQ", front:"fldy1wMKKlc6TRvmf", rank:"fldGtRBM8QYXGZQPd", purpose:"fldrApFZcuzKj3Gax", doc:"fldiMnJUvRox1quBE" },
-  tasks: { front:"action_front", rank:"action_rank", activateAt:"activate_at", name:"fldLO5zuV38eu576D", description:"fldlv5rjVOU4TLjD5", owner:"fldi6lt4W8IAlBlAm", status:"fldLXBjnEHgHDJvX0", priority:"fldkWFX5EzySkDrLi", due:"fldixmckZrFiyJ6xd", result:"fldn1XmmTwRDnzQDd", cases:"fldazeCmB0kKeC56A", projects:"fldOCm8x8sOWDNlw6", events:"fldFwHCG8zQkO2gHv", gate:"fldh7b5L9hg89tle4", reason:"fldnNMs1CYSffH0Cc", trigger:"fldcTRjO3pX2hy60N", dependencies:"fldoqev0eaVgZVt6G", order:"fldZCklniYktPL5NA", doc:"fldZfQfRxnxZD2WZI" },
+  tasks: { kind:"action_kind", group:"action_group", groupOrder:"group_order", front:"action_front", rank:"action_rank", activateAt:"activate_at", name:"fldLO5zuV38eu576D", description:"fldlv5rjVOU4TLjD5", owner:"fldi6lt4W8IAlBlAm", status:"fldLXBjnEHgHDJvX0", priority:"fldkWFX5EzySkDrLi", due:"fldixmckZrFiyJ6xd", result:"fldn1XmmTwRDnzQDd", cases:"fldazeCmB0kKeC56A", projects:"fldOCm8x8sOWDNlw6", events:"fldFwHCG8zQkO2gHv", gate:"fldh7b5L9hg89tle4", reason:"fldnNMs1CYSffH0Cc", trigger:"fldcTRjO3pX2hy60N", dependencies:"fldoqev0eaVgZVt6G", order:"fldZCklniYktPL5NA", doc:"fldZfQfRxnxZD2WZI" },
   events: { key:"fldDFsxIuKAGvzCW8", name:"fldnJbUExwp1QxEet", status:"fldYDOPJvKg4RAkSo", type:"fld03HgdmMkrXQsz9", occurred:"fldwIQR5BHirvuLLD", evidence:"fldap8xuzZwCpqouP" },
   cases: { name:"fldTyP9DE3ANVtoBN", projects:"fldCd5XSjO7ySQYoj" }
 };
@@ -60,16 +60,21 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
   const f=t.fields, issues: string[]=[], blockers: string[]=[];
   if (closed(t)) return {stage:f[F.tasks.status]==="Hecho"?"done":"cancelled",issues,blockers,released:false};
   const gate=s(f[F.tasks.gate]), status=s(f[F.tasks.status]);
+  const groupId=s(f[F.tasks.group]), parent=groupId?data.tasks.find(t=>t.id===groupId&&t.fields[F.tasks.kind]==="group"):undefined;
+  const isGroup=f[F.tasks.kind]==="group";
+  if(groupId&&(!parent||closed(parent))) issues.push("Grupo no disponible");
   const activateAt=s(f[F.tasks.activateAt]);
-  const activationTime=activateAt?Date.parse(activateAt):NaN;
+  const ownActivation=activateAt?Date.parse(activateAt):0;
+  const parentActivation=parent?.fields[F.tasks.activateAt]?Date.parse(parent.fields[F.tasks.activateAt]):0;
+  const activationTime=Math.max(ownActivation,parentActivation);
   if(activateAt&&!Number.isFinite(activationTime)) issues.push("Fecha de activación inválida");
   const deps=links(f[F.tasks.dependencies]), events=links(f[F.tasks.events]);
   const projects=taskProjects(t,data), caseIds=links(f[F.tasks.cases]);
   if (!s(f[F.tasks.name]).trim()) issues.push("Falta el nombre de la acción");
-  if (!projects.length && !caseIds.length) issues.push("Vincular a un proyecto o caso");
+  if (!isGroup && !projects.length && !caseIds.length) issues.push("Vincular a un proyecto o caso");
   if (caseIds.some(id=>!data.cases.some(c=>c.id===id))) issues.push("Caso vinculado no encontrado");
   if (projects.length && !data.projects.some(p=>projects.includes(p.id)&&projectOpen(p))) issues.push("Sólo vinculada a proyectos cerrados");
-  if (data.rankingMode==="action") {
+  if (data.rankingMode==="action" && !groupId) {
     if(!FRONTS.includes(s(f[F.tasks.front]))) issues.push("Asignar frente a la acción");
     if(!Number.isInteger(f[F.tasks.rank]) || f[F.tasks.rank]<1) issues.push("Asignar posición a la acción");
     if(data.tasks.some(other=>other.id!==t.id&&!closed(other)&&other.fields[F.tasks.front]===f[F.tasks.front]&&other.fields[F.tasks.rank]===f[F.tasks.rank]&&!!f[F.tasks.rank])) issues.push("Posición repetida entre acciones");
@@ -78,6 +83,7 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
   const expected: Record<string,string>={"Acción inmediata":"Pendiente","Acción recurrente":"Pendiente","En acción":"En curso","En espera":"En espera"};
   if (gate && gate!=="Por revisar" && expected[gate]!==status) issues.push("Estados incompatibles en Seguimientos");
   if (gate==="En espera" && !deps.length && !events.length) issues.push("Espera sin dependencia vinculada");
+  if(groupId&&(!Number.isInteger(f[F.tasks.groupOrder])||f[F.tasks.groupOrder]<1)) issues.push("Orden de paso inválido");
   if (cycleFrom(t.id,data.tasks)) issues.push("Dependencias circulares");
   for (const id of deps) {
     const dep=data.tasks.find(x=>x.id===id);
@@ -101,8 +107,20 @@ export function board(data: Snapshot, now=Date.now()) {
   const tasks=data.tasks.map(t=>{
     const f={...t.fields};
     const history=s(f[F.tasks.result]);
-    return {history,id:t.id,front:s(f[F.tasks.front]),rank:Number(f[F.tasks.rank])||0,activateAt:s(f[F.tasks.activateAt]),name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),baseStage:storedStage(t),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data,now)};
+    const parent=data.tasks.find(p=>p.id===f[F.tasks.group]);
+    return {history,id:t.id,isGroup:f[F.tasks.kind]==="group",groupId:s(f[F.tasks.group]),groupOrder:Number(f[F.tasks.groupOrder])||0,memberIds:[] as string[],nextId:"",front:s(parent?.fields[F.tasks.front]??f[F.tasks.front]),rank:Number(parent?.fields[F.tasks.rank]??f[F.tasks.rank])||0,activateAt:s(f[F.tasks.activateAt]),name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),baseStage:storedStage(t),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data,now)};
   });
+  for(const group of tasks.filter(t=>t.isGroup)) {
+    const members=tasks.filter(t=>t.groupId===group.id).sort((a,b)=>a.groupOrder-b.groupOrder||a.id.localeCompare(b.id));
+    group.memberIds=members.map(t=>t.id);
+    group.projectIds=unique(members.flatMap(t=>t.projectIds));
+    const next=members.find(t=>["ready","recurring"].includes(t.stage));
+    group.nextId=next?.id||"";
+    if(!["done","cancelled","scheduled","catalog"].includes(group.stage)) group.stage=next?"ready":members.some(t=>t.stage==="doing")?"doing":"waiting";
+    if(group.stage==="scheduled") for(const member of members) {
+      if(!["done","cancelled"].includes(member.stage)&&Date.parse(group.activateAt)>Date.parse(member.activateAt||"1970-01-01")){member.stage="scheduled";member.activateAt=group.activateAt;}
+    }
+  }
   const priorityProject=(ids:string[])=>projects.filter(p=>ids.includes(p.id)&&p.open&&FRONTS.includes(p.front)).sort((a,b)=>FRONTS.indexOf(a.front)-FRONTS.indexOf(b.front)||a.rank-b.rank||a.id.localeCompare(b.id))[0];
   tasks.sort((a,b)=>{
     if(data.rankingMode==="action") return (FRONTS.includes(a.front)?FRONTS.indexOf(a.front):9)-(FRONTS.includes(b.front)?FRONTS.indexOf(b.front):9)||(a.rank||Number.MAX_SAFE_INTEGER)-(b.rank||Number.MAX_SAFE_INTEGER)||a.name.localeCompare(b.name,"es")||a.id.localeCompare(b.id);
@@ -110,7 +128,7 @@ export function board(data: Snapshot, now=Date.now()) {
     return (pa?FRONTS.indexOf(pa.front):9)-(pb?FRONTS.indexOf(pb.front):9)||(pa?.rank||9999)-(pb?.rank||9999)||(a.order||9999)-(b.order||9999)||a.name.localeCompare(b.name,"es")||a.id.localeCompare(b.id);
   });
   const fronts=FRONTS.map(name=>({name,tasks:tasks.filter(t=>{
-    if(data.rankingMode==="action") return ["ready","recurring"].includes(t.stage)&&t.front===name&&Number.isInteger(t.rank)&&t.rank>0;
+    if(data.rankingMode==="action") return !t.groupId&&["ready","recurring"].includes(t.stage)&&t.front===name&&Number.isInteger(t.rank)&&t.rank>0;
     const p=priorityProject(t.projectIds);
     return ["ready","recurring"].includes(t.stage)&&p?.front===name&&Number.isInteger(p.rank)&&p.rank>=1&&p.rank!==9999;
   }).slice(0,3).map(t=>t.id)}));

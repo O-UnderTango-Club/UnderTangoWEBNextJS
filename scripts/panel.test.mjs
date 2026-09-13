@@ -107,7 +107,8 @@ check('ninguna acción desaparece por filtros; plazas limitadas y próximos paso
 const accessUrl=moduleUrl(compile('../src/lib/panel-access.ts'));
 const access=await import(accessUrl);
 const operationsUrl=moduleUrl(compile('../src/lib/panel-operations.ts').replace('"./panel-model"',JSON.stringify(modelUrl)));
-const server=await import(moduleUrl(compile('../src/lib/panel-server.ts').replace('"./panel-model"',JSON.stringify(modelUrl)).replace('"./panel-access"',JSON.stringify(accessUrl)).replace('"./panel-operations"',JSON.stringify(operationsUrl))));
+const groupsUrl=moduleUrl(compile('../src/lib/action-groups.ts').replace("'./panel-model'",JSON.stringify(modelUrl)));
+const server=await import(moduleUrl(compile('../src/lib/panel-server.ts').replace('"./action-groups"',JSON.stringify(groupsUrl)).replace('"./panel-model"',JSON.stringify(modelUrl)).replace('"./panel-access"',JSON.stringify(accessUrl)).replace('"./panel-operations"',JSON.stringify(operationsUrl))));
 process.env.NEXT_PUBLIC_SUPABASE_URL='https://auth.example.test';process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY='test';process.env.AIRTABLE_PANEL_TOKEN='test';
 const originalFetch=globalThis.fetch;
 const records={[TABLES.projects]:[p],[TABLES.tasks]:[t('a')],[TABLES.events]:[],[TABLES.cases]:[]};let writes=0;

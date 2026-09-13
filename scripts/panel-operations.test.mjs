@@ -16,6 +16,16 @@ const fixture = () => ({ contract: 1, status: 'active', revision: '9007199254740
 });
 let count = 0;
 async function check(name, fn) { await fn(); count++; console.log('OK', name); }
+await check('comentario explícito separado del historial; sin comentario no se usa el resultado', async () => {
+  const {board}=await import(modelUrl);
+  const data=fixture(); data.contract=5;
+  data.tasks[0].fields[F.tasks.comment]='Primera nota\n\nSegunda nota';
+  const task=board(m.parseOperationsSnapshot(data)).tasks[0];
+  assert.equal(task.comment,'Primera nota\n\nSegunda nota');
+  assert.equal(task.history,'Historia conservada');
+  delete data.tasks[0].fields[F.tasks.comment];
+  assert.equal(board(m.parseOperationsSnapshot(data)).tasks[0].comment,'');
+});
 await check('lectura tipada conserva historial y revisión bigint sin redondear', () => {
   const s = m.parseOperationsSnapshot(fixture());
   assert.equal(s.globalRevision, '9007199254740993');
@@ -28,7 +38,7 @@ await check('staged y validated no activan el panel', () => {
   }
 });
 await check('rechaza lecturas incompletas o contratos incompatibles', () => {
-  for (const patch of [{ tasks: null }, { contract: 5 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
+  for (const patch of [{ tasks: null }, { contract: 6 }, { revision: 5 }, { revision: '-1' }, { updatedAt: 'bad' }, { status: 'unknown' }]) {
     assert.throws(() => m.parseOperationsSnapshot({ ...fixture(), ...patch }), /incompleta/);
   }
 });

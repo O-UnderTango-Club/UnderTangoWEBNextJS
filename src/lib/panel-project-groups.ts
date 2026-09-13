@@ -2,13 +2,13 @@ import type { Board } from "./panel-model";
 
 /** Presentation only: the board remains the source of action positions and daily slots. */
 export function frontProjectGroups(data: Board, front: Board["fronts"][number]) {
-  const open = data.tasks.filter(t => !["done", "cancelled"].includes(t.stage));
+  const open = data.tasks.filter(t => ["ready", "recurring"].includes(t.stage));
   const inFront = open.filter(t => t.front === front.name);
   const priorityIds = new Set(front.tasks);
   const groups = data.projects.filter(p => inFront.some(t => t.projectIds.includes(p.id))).map(project => {
     const tasks = open.filter(t => t.projectIds.includes(project.id));
     const local = inFront.filter(t => t.projectIds.includes(project.id));
-    return { id: project.id, name: project.name, tasks, local, priority: local.filter(t => priorityIds.has(t.id)), history: data.tasks.filter(t => t.projectIds.includes(project.id) && ["done", "cancelled"].includes(t.stage)) };
+    return { id: project.id, name: project.name, tasks, local, priority: local.filter(t => priorityIds.has(t.id)) };
   });
   const unlinked = inFront.filter(t => !data.projects.some(p => t.projectIds.includes(p.id)));
   if (unlinked.length) groups.push({ id: "__unlinked", name: "Acciones sin proyecto", tasks: unlinked, local: unlinked, priority: unlinked.filter(t => priorityIds.has(t.id)), history: [] });

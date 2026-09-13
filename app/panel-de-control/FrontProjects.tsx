@@ -14,7 +14,7 @@ type Props = {
 export default function FrontProjects({ data, front, renderTask }: Props) {
   const [expanded, setExpanded] = useState<string[]>([]);
   const groups = frontProjectGroups(data, front);
-  if (!groups.length) return <div className={css.empty}>Sin acciones abiertas en este frente.</div>;
+  if (!groups.length) return <div className={css.empty}>Sin acciones disponibles por hoy en este frente.</div>;
   return <div className={css.frontProjectList}>{groups.map(group => {
     const isOpen = expanded.includes(group.id);
     const panelId = `project-${front.name}-${group.id}`;
@@ -28,13 +28,12 @@ export default function FrontProjects({ data, front, renderTask }: Props) {
       </button>
       <div id={panelId} hidden={!isOpen} className={css.projectContents}>
         {isOpen && <>
-          <p className={css.help}>Cada acción conserva su frente y posición. Tocá su número para cambiarla.</p>
+          <p className={css.help}>Sólo se muestran acciones disponibles. Las programadas quedan en Programadas y vuelven al llegar su fecha. Cada acción conserva su frente y posición.</p>
           {group.tasks.map(task => <div key={task.id}>
             {front.tasks.includes(task.id) && <span className={css.badge}>Entre las tres prioridades de este frente</span>}
             {task.projectIds.length > 1 && <p className={css.help}>Acción compartida entre proyectos: los cambios se reflejan en todos.</p>}
             {renderTask(task, group.id)}
           </div>)}
-          {!!group.history.length && <details className={css.projectHistory}><summary>Historial · {group.history.length} acciones cerradas</summary>{group.history.map(task => renderTask(task, group.id))}</details>}
         </>}
       </div>
     </section>;

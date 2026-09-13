@@ -11,7 +11,7 @@ export function frontProjectGroups(data: Board, front: Board["fronts"][number]) 
     return { id: project.id, name: project.name, tasks, local, priority: local.filter(t => priorityIds.has(t.id)) };
   });
   const unlinked = inFront.filter(t => !data.projects.some(p => t.projectIds.includes(p.id)));
-  if (unlinked.length) groups.push({ id: "__unlinked", name: "Acciones sin proyecto", tasks: unlinked, local: unlinked, priority: unlinked.filter(t => priorityIds.has(t.id)), history: [] });
+  if (unlinked.length) groups.push({ id: "__unlinked", name: "Acciones sin proyecto", tasks: unlinked, local: unlinked, priority: unlinked.filter(t => priorityIds.has(t.id)) });
   const rank = (tasks: typeof open) => Math.min(...tasks.map(t => t.rank > 0 ? t.rank : Number.MAX_SAFE_INTEGER));
   return groups.sort((a, b) => Number(!!b.priority.length) - Number(!!a.priority.length) || rank(a.priority.length ? a.priority : a.local) - rank(b.priority.length ? b.priority : b.local) || a.name.localeCompare(b.name, "es"));
 }

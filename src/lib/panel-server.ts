@@ -74,7 +74,7 @@ export async function snapshot(fresh=false): Promise<ServerSnapshot> {
   if(!fresh&&loading) return loading;
   const read=async()=>{
     const projects=await list(TABLES.projects,Object.values(F.projects));
-    const tasks=await list(TABLES.tasks,Object.values(F.tasks).filter(x=>![F.tasks.result,F.tasks.front,F.tasks.rank].includes(x)));
+    const tasks=await list(TABLES.tasks,Object.values(F.tasks).filter(x=>![F.tasks.front,F.tasks.rank].includes(x)));
     const events=await list(TABLES.events,Object.values(F.events));
     const cases=await list(TABLES.cases,Object.values(F.cases));
     cached={projects,tasks,events,cases,updatedAt:new Date().toISOString()}; return cached;
@@ -142,7 +142,7 @@ async function performMutation(input: any, actor: string) {
   const fields: Record<string,any>={};
   const rankChanges: {id:string;fields:Record<string,any>}[]=[];
   if(kind==="task") {
-    const allowed=["front","rank","activateAt","name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence"];
+    const allowed=["front","rank","activateAt","name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence","comment"];
     if(Object.keys(change).some(k=>!allowed.includes(k))) throw new PanelError("Campo no editable.");
     for(const k of ["name","owner","reason"] as const) if(k in change) fields[F.tasks[k]]=text(change[k],k==="reason"?1000:250);
     if("doc" in change) fields[F.tasks.doc]=doc(change.doc);
@@ -189,9 +189,12 @@ async function performMutation(input: any, actor: string) {
     validateTask(candidate,validationData,target);
     const evidence="evidence" in change?text(change.evidence,1500):"";
     if((stage==="done"||stage==="cancelled")&&!evidence)throw new PanelError(stage==="done"?"Registrá brevemente el resultado para finalizar.":"Registrá por qué se descarta.");
-    if(evidence){
+    const comment="comment" in change?text(change.comment,10000):"";
+    if(evidence||comment){
       const original=current?(operational?current:await airtable(table,`/${current.id}?returnFieldsByFieldId=true`)):undefined;
-      fields[F.tasks.result]=[original?.fields[F.tasks.result],`${new Date().toISOString()} · ${actor}\n${evidence}`].filter(Boolean).join("\n\n");
+      fields[F.tasks.result]=[original?.fields[F.tasks.result],...[
+        evidence,comment?`Comentario (no implica cierre ni pago):\n${comment}`:""
+      ].filter(Boolean).map(entry=>`${new Date().toISOString()} · ${actor}\n${entry}`)].filter(Boolean).join("\n\n");
     }
     if(!current&&data.tasks.some(t=>!closed(t)&&String(t.fields[F.tasks.name]).trim().toLowerCase()===String(candidate.fields[F.tasks.name]).toLowerCase()))throw new PanelError("Ya existe una acción abierta con ese nombre. Buscala para continuar.",409);
   } else if(kind==="project") {

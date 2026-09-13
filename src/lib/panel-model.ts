@@ -96,8 +96,9 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
 export function board(data: Snapshot, now=Date.now()) {
   const projects=data.projects.map(p=>({id:p.id,name:s(p.fields[F.projects.name]),status:s(p.fields[F.projects.status]),front:s(p.fields[F.projects.front]),rank:Number(p.fields[F.projects.rank])||9999,purpose:s(p.fields[F.projects.purpose]).slice(0,500),doc:s(p.fields[F.projects.doc]),open:projectOpen(p)}));
   const tasks=data.tasks.map(t=>{
-    const f=t.fields;
-    return {id:t.id,front:s(f[F.tasks.front]),rank:Number(f[F.tasks.rank])||0,activateAt:s(f[F.tasks.activateAt]),name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),baseStage:storedStage(t),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data,now)};
+    const f={...t.fields};
+    const history=s(f[F.tasks.result]);
+    return {history,id:t.id,front:s(f[F.tasks.front]),rank:Number(f[F.tasks.rank])||0,activateAt:s(f[F.tasks.activateAt]),name:s(f[F.tasks.name]),description:s(f[F.tasks.description]).slice(0,1200),owner:s(f[F.tasks.owner]),priority:s(f[F.tasks.priority]),due:s(f[F.tasks.due]),reason:s(f[F.tasks.reason]).slice(0,1000),trigger:s(f[F.tasks.trigger]).slice(0,600),doc:s(f[F.tasks.doc]),order:Number(f[F.tasks.order])||0,status:s(f[F.tasks.status]),gate:s(f[F.tasks.gate]),baseStage:storedStage(t),projectIds:taskProjects(t,data),directProjectIds:links(f[F.tasks.projects]),caseIds:links(f[F.tasks.cases]),dependencies:links(f[F.tasks.dependencies]),eventIds:links(f[F.tasks.events]),...classify(t,data,now)};
   });
   const priorityProject=(ids:string[])=>projects.filter(p=>ids.includes(p.id)&&p.open&&FRONTS.includes(p.front)).sort((a,b)=>FRONTS.indexOf(a.front)-FRONTS.indexOf(b.front)||a.rank-b.rank||a.id.localeCompare(b.id))[0];
   tasks.sort((a,b)=>{

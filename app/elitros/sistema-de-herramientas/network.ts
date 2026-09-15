@@ -1,0 +1,55 @@
+export const groups = {
+  criterio: { name: "Dirección y criterio", color: "#f4c47b", rgb: [0.96, 0.77, 0.48] },
+  inteligencia: { name: "Inteligencia y soporte", color: "#b5a1ff", rgb: [0.71, 0.63, 1] },
+  memoria: { name: "Datos y materiales", color: "#65dcc0", rgb: [0.4, 0.86, 0.75] },
+  accion: { name: "Comunicación y ejecución", color: "#77bfff", rgb: [0.47, 0.75, 1] },
+} as const;
+export type Group = keyof typeof groups;
+export type Tool = { id: string; name: string; short: string; group: Group; position: [number, number, number]; role: string; detail: string };
+export const nodes: Tool[] = [
+  { id: "direccion", name: "Dirección humana", short: "Pablo · equipo", group: "criterio", position: [0, 2.1, 0.3], role: "Define el propósito y toma las decisiones.", detail: "Pablo y el equipo aportan contexto, prioridades y criterio. La autorización humana marca los límites de lo que se registra, se comunica y se publica." },
+  { id: "protocolos", name: "Protocolos", short: "Reglas compartidas", group: "criterio", position: [-1.65, 0.8, 0.15], role: "Dan continuidad al trabajo entre personas y herramientas.", detail: "Establecen dónde guardar cada cosa, cómo verificar una acción y cuándo pedir autorización. Distinguen oportunidad, contratación y cobro; preparado, enviado y publicado." },
+  { id: "chatgpt", name: "ChatGPT / Codex", short: "Coordinación asistida", group: "inteligencia", position: [-0.5, 0.15, 0.8], role: "Conecta el contexto con los pasos de trabajo.", detail: "Ayuda a comprender pedidos, consultar información, preparar materiales y ejecutar acciones autorizadas mediante las herramientas disponibles. Los resultados requieren comprobación." },
+  { id: "gemini", name: "Gemini", short: "Soporte", group: "inteligencia", position: [-2.1, -0.6, -0.75], role: "Aporta una instancia de apoyo y contraste.", detail: "Asiste en consultas, exploración y revisión de ideas. Su aporte se incorpora al trabajo con criterio humano; esta representación no implica una conexión automática con el resto del sistema." },
+  { id: "supabase", name: "Supabase", short: "Memoria operativa", group: "memoria", position: [0.95, 0.2, 0.1], role: "Conserva el estado canónico de la operación.", detail: "Reúne proyectos, seguimientos, negociaciones, obligaciones y movimientos. Las escrituras pasan por mecanismos de validación, auditoría y control de cambios simultáneos." },
+  { id: "panel", name: "Panel UnderTango", short: "Interfaz operativa", group: "accion", position: [2.25, 1, 0.45], role: "Hace visible qué sigue y en qué estado está cada acción.", detail: "Presenta los registros de Supabase para consultar y gestionar el trabajo. Los frentes y las posiciones pertenecen a cada acción; los proyectos aportan su contexto." },
+  { id: "github", name: "GitHub", short: "Código e historial", group: "memoria", position: [0.25, -1.35, -0.7], role: "Conserva las versiones de los proyectos digitales.", detail: "El código, los cambios y la documentación técnica permiten revisar qué se modificó. Los protocolos documentados orientan ese trabajo y la verificación de cada entrega." },
+  { id: "vercel", name: "Vercel", short: "Publicación web", group: "accion", position: [1.6, -1.3, 0.5], role: "Convierte una versión del código en una web disponible.", detail: "Construye y despliega los sitios desde GitHub. Una publicación se comprueba en su dirección pública: que termine la construcción no basta para demostrar que el recorrido funciona." },
+  { id: "drive", name: "Google Drive", short: "Archivo compartido", group: "memoria", position: [-0.55, 0.85, -1.6], role: "Reúne documentos y materiales de trabajo.", detail: "Organiza presentaciones, presupuestos, imágenes y archivos compartidos. Los materiales acompañan la operación; el estado de una tarea se conserva en Supabase." },
+  { id: "docs", name: "Google Docs", short: "Documentos", group: "memoria", position: [-1.75, 1.75, -1.45], role: "Da forma a textos y documentos compartidos.", detail: "Sirve para propuestas, protocolos y documentación colaborativa. Los documentos se conservan y organizan en Drive." },
+  { id: "sheets", name: "Google Sheets", short: "Cálculo y análisis", group: "memoria", position: [0.85, 1.75, -1.35], role: "Permite trabajar con tablas, presupuestos y análisis.", detail: "Las hojas apoyan cálculos y reconstrucciones documentales. Una estimación o una cuenta por cobrar no se convierte por sí sola en dinero disponible." },
+  { id: "gmail", name: "Gmail", short: "Correspondencia", group: "accion", position: [-1.05, -1.65, 1.25], role: "Conecta las propuestas con sus destinatarios.", detail: "Recibe consultas y conserva comunicaciones y adjuntos. Preparar un mensaje y enviarlo son estados distintos; el envío se realiza con autorización y se comprueba." },
+  { id: "calendar", name: "Google Calendar", short: "Compromisos", group: "accion", position: [1.05, -0.35, -1.75], role: "Sitúa los compromisos en el tiempo.", detail: "Reúne reuniones, ensayos, shows y eventos con fecha y horario. Las tareas y los seguimientos permanecen en el sistema operativo, no se sustituyen por eventos de calendario." },
+];
+export const edges: { from: string; to: string; label: string }[] = [
+  { from: "direccion", to: "protocolos", label: "Define reglas y prioridades" },
+  { from: "direccion", to: "chatgpt", label: "Aporta contexto y autoriza acciones" },
+  { from: "direccion", to: "gemini", label: "Consulta y contrasta ideas" },
+  { from: "protocolos", to: "chatgpt", label: "Orienta la ejecución y la verificación" },
+  { from: "protocolos", to: "supabase", label: "Establece criterios de registro" },
+  { from: "protocolos", to: "github", label: "Documenta reglas y cambios" },
+  { from: "gemini", to: "chatgpt", label: "Aporta apoyo mediante el trabajo humano" },
+  { from: "chatgpt", to: "supabase", label: "Consulta y registra acciones autorizadas" },
+  { from: "supabase", to: "panel", label: "Presenta el estado operativo" },
+  { from: "direccion", to: "panel", label: "Revisa y prioriza el trabajo" },
+  { from: "chatgpt", to: "github", label: "Prepara y revisa cambios de código" },
+  { from: "github", to: "vercel", label: "Entrega versiones para desplegar" },
+  { from: "vercel", to: "panel", label: "Publica la interfaz web" },
+  { from: "chatgpt", to: "drive", label: "Consulta y prepara materiales" },
+  { from: "drive", to: "docs", label: "Organiza documentos" },
+  { from: "drive", to: "sheets", label: "Organiza hojas de trabajo" },
+  { from: "chatgpt", to: "gmail", label: "Prepara y envía con autorización" },
+  { from: "drive", to: "gmail", label: "Aporta materiales a la comunicación" },
+  { from: "chatgpt", to: "calendar", label: "Consulta y agenda compromisos" },
+  { from: "supabase", to: "calendar", label: "Relaciona la operación con sus fechas" },
+];
+export const journey = [
+  { id: "direccion", title: "1. Una necesidad", text: "Una persona plantea un proyecto. La dirección aporta contexto y define qué se busca resolver." },
+  { id: "protocolos", title: "2. Un criterio compartido", text: "Los protocolos ordenan el alcance, los permisos y la forma de comprobar el resultado." },
+  { id: "chatgpt", title: "3. Un plan de trabajo", text: "La asistencia de IA ayuda a preparar los pasos y consultar las herramientas; Gemini puede aportar soporte." },
+  { id: "supabase", title: "4. Un registro", text: "El seguimiento queda ligado al proyecto, con responsable y estado. Así el contexto no se pierde al terminar una conversación." },
+  { id: "drive", title: "5. Los materiales", text: "Documentos y hojas permiten elaborar la propuesta, sus archivos y sus cálculos." },
+  { id: "github", title: "6. La construcción", text: "Si hay desarrollo web, el código y sus cambios se conservan en GitHub para poder revisarlos." },
+  { id: "vercel", title: "7. La entrega", text: "La versión autorizada se publica y se verifica. Gmail y Calendar acompañan la comunicación y los compromisos del proyecto." },
+  { id: "panel", title: "8. El retorno", text: "El resultado comprobado vuelve al registro operativo. El panel muestra el estado y permite decidir el próximo paso." },
+];

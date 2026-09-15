@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import ToolNetwork from "./ToolNetwork";
 
 export const metadata: Metadata = {
   title: "Sistema de herramientas | UnderTango",
-  robots: { index: false, follow: false },
+  description: "Explorá en 3D cómo UnderTango conecta personas, protocolos, inteligencia artificial, datos y herramientas de trabajo.",
+  alternates: { canonical: "https://elitros.undertangoclub.com/elitros/sistema-de-herramientas" },
 };
 
 export default function HerramientasPage() {
-  return <main aria-label="Sistema de herramientas" style={{ minHeight: "100vh", background: "#f2efe7" }} />;
+  return <ToolNetwork />;
 }

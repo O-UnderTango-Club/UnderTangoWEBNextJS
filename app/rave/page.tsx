@@ -48,7 +48,7 @@ export default function RavePage() {
     </section>
     <section className={`${page.section} ${page.liveSection}`} aria-labelledby="live-title">
       <div className={page.sectionHeading}><div><p className={page.eyebrow}>MATERIAL PARA CONOCERNOS</p><h2 id="live-title">Así suena el encuentro.</h2></div><p>Dos muestras de UnderTango Rave en vivo.</p></div>
-      <div className={page.twoVideos}><VideoSample id="sdWzQDMeiYY" title="Un shock de energía · UnderTango Rave" portrait /><VideoSample id="Rv-paFARbME" title="Banda musical · UnderTango" portrait /></div>
+      <div className={page.twoVideos}><VideoSample id="Rv-paFARbME" title="Banda musical · UnderTango" portrait /><VideoSample id="sdWzQDMeiYY" title="Un shock de energía · UnderTango Rave" portrait /></div>
     </section>
     <section className={`${page.section} ${page.production}`} aria-labelledby="production-title">
       <div><p className={page.eyebrow}>PARA TU ESCENARIO</p><h2 id="production-title">Del clima íntimo<br />a la fiesta compartida.</h2><p>Una propuesta para teatros, festivales, hoteles y eventos institucionales o privados. Conversamos sobre el público, el espacio y el momento del evento para elegir el repertorio y el recorrido musical.</p><p>La formación musical es de cinco instrumentistas. La participación de bailarines y los recursos de puesta escénica se coordinan según la propuesta de cada evento.</p></div>

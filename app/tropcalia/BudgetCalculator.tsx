@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { artistFee, brl, calculateScenario, capacity, defaultReserveRate, formats, type FormatId } from "./finance";
+import { artistFee, brl, calculateScenario, capacity, commissionRate, defaultReserveRate, formats, type FormatId } from "./finance";
 import styles from "./tropcalia.module.css";
 
 const bounded = (value: string, minimum: number, maximum: number) => Math.min(maximum, Math.max(minimum, Number(value) || 0));
@@ -37,7 +37,7 @@ export default function BudgetCalculator() {
         <summary>Ajustar estimativas de custos</summary>
         <div className={styles.inputHeading}><label htmlFor="production-cost">Produção por sessão (R$)</label><input id="production-cost" type="number" min="0" max="100000" step="50" value={production} onChange={(event) => setProduction(bounded(event.target.value, 0, 100000))} /></div>
         <div className={styles.inputHeading}><label htmlFor="fees-reserve">Reserva para taxas e tributos (%)</label><input id="fees-reserve" type="number" min="0" max="50" step="0.5" value={reserveRate} onChange={(event) => setReserveRate(bounded(event.target.value, 0, 50))} /></div>
-        <p className={styles.note}>Os 5% iniciais são uma provisão de planejamento, não uma alíquota tributária confirmada. Substituir pelos custos reais antes de contratar ou vender. O piso de R$300 por artista e a comissão de 12% de Carlos permanecem preservados.</p>
+        <p className={styles.note}>Os 5% iniciais são uma provisão de planejamento, não uma alíquota tributária confirmada. Substituir pelos custos reais antes de contratar ou vender. O piso de R$300 por artista e a comissão de {commissionRate}% de Carlos permanecem preservados.</p>
       </details>
       <button type="button" className={styles.resetButton} onClick={reset}>Restaurar cenário inicial</button>
     </div>
@@ -46,10 +46,10 @@ export default function BudgetCalculator() {
       <p className={styles.totalRevenue}>{brl(result.gross)}<span>Receita bruta de ingressos</span></p>
       <dl className={styles.ledger}>
         <div><dt>Artistas · {format.artists} × {brl(artistFee)}</dt><dd>{brl(result.artists)}</dd></div>
-        <div><dt>Carlos · 12% da bilheteria</dt><dd>{brl(result.commission)}</dd></div>
+        <div><dt>Carlos · {commissionRate}% da bilheteria</dt><dd>{brl(result.commission)}</dd></div>
         <div><dt>Produção e logística</dt><dd>{brl(result.production)}</dd></div>
         <div><dt>Reserva para taxas · {reserveRate}%</dt><dd>{brl(result.reserve)}</dd></div>
-        <div className={styles.balance}><dt>Saldo para UnderTango</dt><dd>{brl(result.company)}</dd></div>
+        <div className={styles.balance}><dt>Resultado líquido estimado</dt><dd>{brl(result.company)}</dd></div>
       </dl>
       <div className={result.viable ? styles.viable : styles.shortfall} role="status">
         <strong>{result.viable ? "O cenário cobre a meta proposta." : "A bilheteria ainda não sustenta este formato."}</strong>

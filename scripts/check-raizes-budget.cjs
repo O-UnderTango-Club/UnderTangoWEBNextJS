@@ -14,31 +14,33 @@ const { calculateScenario: calculate, formats } = loaded.exports;
 const cents = (value) => Math.round(value * 100);
 
 assert.equal(formats.length, 2);
-assert.equal(calculate('pocket', 50, 50).company, -625);
-assert.equal(calculate('pocket', 50, 50).supportNeeded, 775);
-assert.equal(calculate('pocket', 50, 50).minimumTickets, 69);
-assert.equal(calculate('pocket', 68, 50).viable, false);
-assert.equal(calculate('pocket', 69, 50).viable, true);
-assert.equal(calculate('pocket', 70, 50).company, 205);
-assert.equal(calculate('premium', 80, 50).company, -1480);
-assert.equal(calculate('premium', 80, 50).supportNeeded, 1780);
+assert.equal(calculate('pocket', 50, 50).commission, 250);
+assert.equal(calculate('pocket', 50, 50).company, -575);
+assert.equal(calculate('pocket', 50, 50).supportNeeded, 725);
+assert.equal(calculate('pocket', 50, 50).minimumTickets, 68);
+assert.equal(calculate('pocket', 67, 50).viable, false);
+assert.equal(calculate('pocket', 68, 50).viable, true);
+assert.equal(calculate('pocket', 70, 50).company, 275);
+assert.equal(calculate('premium', 80, 50).company, -1400);
+assert.equal(calculate('premium', 80, 50).supportNeeded, 1700);
 assert.equal(calculate('premium', 40, 100).gross, calculate('premium', 80, 50).gross);
 assert.equal(calculate('premium', 40, 100).company, calculate('premium', 80, 50).company);
-assert.equal(calculate('premium', 122, 50).viable, false);
-assert.equal(calculate('premium', 123, 50).viable, true);
-assert.equal(calculate('premium', 125, 50).company, 387.5);
-assert.equal(calculate('premium', 150, 50).company, 1425);
+assert.equal(calculate('premium', 119, 50).viable, false);
+assert.equal(calculate('premium', 120, 50).viable, true);
+assert.equal(calculate('premium', 120, 50).company, 300);
+assert.equal(calculate('premium', 125, 50).company, 512.5);
+assert.equal(calculate('premium', 150, 50).company, 1575);
 assert.equal(calculate('premium', 50, 10).withinCapacity, false);
 assert.equal(calculate('premium', 0, 50).minimumPrice, null);
 assert.equal(calculate('premium', 0, 50).supportNeeded, 5100);
-assert.equal(calculate('pocket', 50, 50, 0).company, -500);
-assert.equal(calculate('pocket', 50, 50, 5, 0).supportNeeded, 175);
+assert.equal(calculate('pocket', 50, 50, 0).company, -450);
+assert.equal(calculate('pocket', 50, 50, 5, 0).supportNeeded, 125);
 
 let reconciled = 0;
 for (const format of formats) {
   for (const price of [25, 49.99, 50, 100, 153.62]) {
     for (const fees of [0, 5, 8.5, 15]) {
-      for (const people of [0, 1, 40, 50, 68, 69, 70, 80, 122, 123, 125, 150]) {
+      for (const people of [0, 1, 40, 50, 67, 68, 70, 80, 119, 120, 125, 150]) {
         const result = calculate(format.id, people, price, fees);
         assert.equal(cents(result.gross), [result.commission, result.reserve, result.artists, result.production, result.company].reduce((total, amount) => total + cents(amount), 0));
         assert.equal(result.artists, format.artists * 300);
@@ -55,7 +57,7 @@ for (const format of formats) {
     }
   }
 }
-for (const args of [['pocket', -1, 50], ['premium', 151, 50], ['pocket', 50.5, 50], ['pocket', 50, 0], ['pocket', 50, NaN], ['pocket', 50, 50, 88], ['pocket', 50, 50, 5, -1]]) {
+for (const args of [['pocket', -1, 50], ['premium', 151, 50], ['pocket', 50.5, 50], ['pocket', 50, 0], ['pocket', 50, NaN], ['pocket', 50, 50, 90], ['pocket', 50, 50, 5, -1]]) {
   assert.throws(() => calculate(...args));
 }
 console.log(`Raízes budget verified: ${reconciled} reconciled scenarios, exact activation thresholds, fee floors and input limits.`);

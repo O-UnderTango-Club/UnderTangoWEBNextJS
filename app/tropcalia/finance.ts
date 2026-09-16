@@ -1,13 +1,13 @@
 export type FormatId = "pocket" | "premium";
 export const artistFee = 300;
-export const commissionRate = 12;
+export const commissionRate = 10;
 export const defaultReserveRate = 5;
 export const capacity = 150;
 export const formats = [
   { id: "pocket", name: "Pocket", artists: 7, production: 600, companyFloor: 150, recommended: 70,
     addition: "6 bailarinos + 1 harpista",
     description: "O núcleo completo do espetáculo: dança, harpa ao vivo e bases gravadas nos demais quadros." },
-  { id: "premium", name: "Premium Deluxe", artists: 12, production: 1200, companyFloor: 300, recommended: 125,
+  { id: "premium", name: "Premium Deluxe", artists: 12, production: 1200, companyFloor: 300, recommended: 120,
     addition: "Pocket + 5 músicos",
     description: "O núcleo de sete artistas recebe cinco músicos adicionais. Mais música ao vivo, com produção e logística ampliadas." },
 ] as const;

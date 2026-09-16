@@ -48,6 +48,9 @@ export default function Footer() {
           <h3>Shows</h3>
           <ul>
             <li>
+              <a href="/mapa">Mapa de proyectos</a>
+            </li>
+            <li>
               <a href="/galeria">Galería de presentaciones</a>
             </li>
             <li>

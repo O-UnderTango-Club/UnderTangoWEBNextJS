@@ -107,8 +107,8 @@ export default function TropCaliaPage() {
         <h3>Substituições e artistas de apoio</h3>
         <div className={styles.supportGrid}>
           <article><p className={styles.eyebrow}>PARAGUAI</p><ul><li>Juan Acosta</li><li>Sielia Burgos</li><li>Gustavo Paez</li><li>Igor Lopez</li></ul></article>
-          <article><p className={styles.eyebrow}>ARGENTINA</p><ul><li>Evayan Behr</li><li>Luján Rojas</li></ul></article>
-          <article><p className={styles.eyebrow}>BRASIL</p><ul><li>Daiane Oliveira</li><li>André da Silva (MK)</li></ul></article>
+          <article><p className={styles.eyebrow}>ARGENTINA</p><ul><li>Aline Neves</li><li>Evayan Behr</li><li>Luján Rojas</li></ul></article>
+          <article><p className={styles.eyebrow}>BRASIL</p><ul><li>Aline Neves</li><li>Daiane Oliveira</li><li>André da Silva (MK)</li></ul></article>
         </div>
       </div>
       <div className={styles.castPolicy}><h3>Continuidade sem sobrecarregar ninguém.</h3><p>Cada bailarino poderá contar com substituições pertinentes. A direção artística organizará a ordem de convocação e a preparação de cada função, respeitando a disponibilidade dos artistas de apoio.</p><p>A lista de apoio organiza as substituições do elenco. Participações adicionais serão combinadas e incluídas nos cachês e na produção da sessão. No samba no pé, as bailarinas de todo o elenco se encontram.</p></div>

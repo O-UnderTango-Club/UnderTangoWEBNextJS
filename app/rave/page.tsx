@@ -36,10 +36,6 @@ export default function RavePage() {
       </div>
     </section>
     <div className={page.identityStrip} aria-label="Nuestra propuesta"><span>05 instrumentistas</span><span>03 formatos</span><span>Argentina · Brasil · Paraguay</span><span>Una identidad propia</span></div>
-    <section className={`${page.section} ${page.liveSection}`} aria-labelledby="live-title">
-      <div className={page.sectionHeading}><div><p className={page.eyebrow}>MATERIAL PARA CONOCERNOS</p><h2 id="live-title">Así suena el encuentro.</h2></div><p>Dos muestras de UnderTango Rave en vivo.</p></div>
-      <div className={page.twoVideos}><VideoSample id="sdWzQDMeiYY" title="Un shock de energía · UnderTango Rave" portrait /><VideoSample id="Rv-paFARbME" title="Banda musical · UnderTango" portrait /></div>
-    </section>
     <section id="musicos" className={page.section} aria-labelledby="musicians-title">
       <div className={page.sectionHeading}><div><p className={page.eyebrow}>LA BANDA</p><h2 id="musicians-title">Cinco músicos.<br /><em>Una conversación.</em></h2></div><p>Cada instrumento aporta su voz. Los arreglos, la escucha y el encuentro entre los músicos construyen el sonido de la banda.</p></div>
       <div className={musicians.grid}>{members.map(member => <article key={member.image} className={musicians.card}>
@@ -49,6 +45,10 @@ export default function RavePage() {
         <div className={musicians.copy}>{member.name ? <><p className={page.eyebrow}>{member.instrument}</p><h3>{member.name}</h3></> : <h3>{member.instrument}</h3>}</div>
       </article>)}</div>
       <a className={styles.textLink} href="https://youtu.be/bwUnN7k22bE" target="_blank" rel="noopener noreferrer">Ver el spot oficial de la banda en YouTube ↗</a>
+    </section>
+    <section className={`${page.section} ${page.liveSection}`} aria-labelledby="live-title">
+      <div className={page.sectionHeading}><div><p className={page.eyebrow}>MATERIAL PARA CONOCERNOS</p><h2 id="live-title">Así suena el encuentro.</h2></div><p>Dos muestras de UnderTango Rave en vivo.</p></div>
+      <div className={page.twoVideos}><VideoSample id="sdWzQDMeiYY" title="Un shock de energía · UnderTango Rave" portrait /><VideoSample id="Rv-paFARbME" title="Banda musical · UnderTango" portrait /></div>
     </section>
     <section className={`${page.section} ${page.production}`} aria-labelledby="production-title">
       <div><p className={page.eyebrow}>PARA TU ESCENARIO</p><h2 id="production-title">Del clima íntimo<br />a la fiesta compartida.</h2><p>Una propuesta para teatros, festivales, hoteles y eventos institucionales o privados. Conversamos sobre el público, el espacio y el momento del evento para elegir el repertorio y el recorrido musical.</p><p>La formación musical es de cinco instrumentistas. La participación de bailarines y los recursos de puesta escénica se coordinan según la propuesta de cada evento.</p></div>

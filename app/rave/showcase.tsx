@@ -9,6 +9,6 @@ export function MissingMedia({ kind, label, detail }: { kind: "vertical" | "phot
   return <div className={`${styles.missingMedia} ${styles[kind]}`} role="group" aria-label={label}><span className={styles.pendingTag}>POR COMPLETAR</span><div><p className={styles.missingLabel}>{label}</p><p className={styles.missingDetail}>{detail}</p></div></div>;
 }
 
-export function VideoSample({ id, title, portrait = false }: { id: string; title: string; portrait?: boolean }) {
-  return <figure className={styles.videoSample}><VideoPlayer id={id} title={title} portrait={portrait} /><figcaption><strong>{title}</strong><a href={`https://www.youtube.com/watch?v=${id}`} target="_blank" rel="noopener noreferrer">Ver en YouTube ↗</a></figcaption></figure>;
+export function VideoSample({ id, title, portrait = false, poster }: { id: string; title: string; portrait?: boolean; poster?: string }) {
+  return <figure className={styles.videoSample}><VideoPlayer id={id} title={title} portrait={portrait} poster={poster} /><figcaption><strong>{title}</strong><a href={`https://www.youtube.com/watch?v=${id}`} target="_blank" rel="noopener noreferrer">Ver en YouTube ↗</a></figcaption></figure>;
 }

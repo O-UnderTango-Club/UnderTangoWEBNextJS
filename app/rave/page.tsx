@@ -31,7 +31,7 @@ export default function RavePage() {
       </div>
       <div className={page.heroMedia}>
         <span className={page.mediaKicker}>LA BANDA, EN UN REEL</span>
-        <VideoSample id="bwUnN7k22bE" title="Spot oficial · UnderTango Rave" portrait />
+        <VideoSample id="bwUnN7k22bE" title="Spot oficial · UnderTango Rave" portrait poster="/images/band/rave-spot-cover-2026-09.png" />
         <p className={page.caption}>Música en vivo · identidad de frontera · energía de fiesta</p>
       </div>
     </section>

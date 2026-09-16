@@ -38,7 +38,7 @@ export default function RavePage() {
     <div className={page.identityStrip} aria-label="Nuestra propuesta"><span>05 instrumentistas</span><span>03 formatos</span><span>Argentina · Brasil · Paraguay</span><span>Una identidad propia</span></div>
     <section className={`${page.section} ${page.liveSection}`} aria-labelledby="live-title">
       <div className={page.sectionHeading}><div><p className={page.eyebrow}>MATERIAL PARA CONOCERNOS</p><h2 id="live-title">Así suena el encuentro.</h2></div><p>Dos muestras de UnderTango Rave en vivo.</p></div>
-      <div className={page.twoVideos}><VideoSample id="7yVf96vjurQ" title="Tango Rave en vivo" portrait /><VideoSample id="sdWzQDMeiYY" title="Un shock de energía · UnderTango Rave" portrait /></div>
+      <div className={page.twoVideos}><VideoSample id="sdWzQDMeiYY" title="Un shock de energía · UnderTango Rave" portrait /><VideoSample id="Rv-paFARbME" title="Banda musical · UnderTango" portrait /></div>
     </section>
     <section id="musicos" className={page.section} aria-labelledby="musicians-title">
       <div className={page.sectionHeading}><div><p className={page.eyebrow}>LA BANDA</p><h2 id="musicians-title">Cinco músicos.<br /><em>Una conversación.</em></h2></div><p>Cada instrumento aporta su voz. Los arreglos, la escucha y el encuentro entre los músicos construyen el sonido de la banda.</p></div>

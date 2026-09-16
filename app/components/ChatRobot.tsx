@@ -22,6 +22,7 @@ export default function ChatRobot() {
       !pathname?.startsWith('/panel-de-control') &&
       !pathname?.startsWith('/rave/') &&
       !pathname?.startsWith('/la-cava') &&
+      !pathname?.startsWith('/tropcalia') &&
       !pathname?.startsWith('/mapa') &&
       !isAprendeHost &&
       !isAprendePath &&

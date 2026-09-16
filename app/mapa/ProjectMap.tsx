@@ -3,22 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Script from "next/script";
+import TeamMap from "./TeamMap";
 import { activities, artistNames, cities, updatedLabel, type Activity, type CityId } from "./data";
 import styles from "./mapa.module.css";
 import "../../public/vendor/leaflet-1.9.4/leaflet.css";
 
-type Point = [number, number];
-type MapInstance = {
+export type Point = [number, number];
+export type MapInstance = {
   fitBounds: (bounds: Point[], options?: Record<string, unknown>) => MapInstance;
   setView: (point: Point, zoom: number, options?: Record<string, unknown>) => MapInstance;
   getZoom: () => number; on: (event: string, callback: () => void) => MapInstance;
   remove: () => void; invalidateSize: () => void;
 };
-type MarkerInstance = {
+export type MarkerInstance = {
   addTo: (map: MapInstance) => MarkerInstance; remove: () => void;
   on: (event: string, callback: () => void) => MarkerInstance;
 };
-type Leaflet = {
+export type Leaflet = {
   map: (element: HTMLElement, options: Record<string, unknown>) => MapInstance;
   tileLayer: (url: string, options: Record<string, unknown>) => { addTo: (map: MapInstance) => void; on: (event: string, cb: () => void) => void };
   divIcon: (options: Record<string, unknown>) => unknown;
@@ -32,6 +33,7 @@ export default function ProjectMap() {
   const [artistFilter, setArtistFilter] = useState("all");
   const [selected, setSelected] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [scriptError, setScriptError] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [copied, setCopied] = useState(false);
   const mapNode = useRef<HTMLDivElement>(null);
@@ -123,7 +125,7 @@ export default function ProjectMap() {
   };
 
   return <main className={styles.page}>
-    <Script src="/vendor/leaflet-1.9.4/leaflet.js" strategy="afterInteractive" onReady={() => setReady(true)} onError={() => setMapError(true)} />
+    <Script src="/vendor/leaflet-1.9.4/leaflet.js" strategy="afterInteractive" onReady={() => setReady(true)} onError={() => { setMapError(true); setScriptError(true); }} />
     <header className={styles.header}>
       <Link href="/" className={styles.brand} aria-label="UnderTango, inicio"><span>Ø</span> UNDERTANGO</Link>
       <span className={styles.headerCaption}>UN TERRITORIO. MUCHOS ENCUENTROS.</span>
@@ -181,6 +183,7 @@ export default function ProjectMap() {
       </div>
     </div>
 
+    <TeamMap ready={ready} scriptError={scriptError} />
     <footer className={styles.footer}><span>Proyectos, fechas y equipos en construcción. Los horarios no informados están por definir.</span><Link href="/">UnderTango Club ↗</Link></footer>
   </main>;
 }

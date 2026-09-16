@@ -29,3 +29,17 @@ Place coordinates were queried from Nominatim on 2026-09-16:
 
 September 18, October 2 and November 28 are 2026 dates. No performance times,
 ticket sales, final contract status or attendance promises are inferred.
+
+## Equipo 80
+
+The second map uses `team-data.ts`. Pablo requested these three public city
+references on 2026-09-16: Ale Míguez in CABA, Maximiliano Rodríguez in Córdoba,
+and Vanesa Cabello in Posadas. Roles for Ale (Representante institucional) and
+Maximiliano (Programador) match `app/central/departments.ts`, department 80;
+Maximiliano's programming role was also checked in Supabase. Vanesa's role,
+Inversora, was explicitly supplied by Pablo; it does not state an amount or a
+received payment. Map points identify cities, not personal addresses.
+
+Nominatim city coordinates checked on 2026-09-16: Buenos Aires relation 1224652,
+Córdoba relation 5167559, and Posadas relation 3195717. The two maps have
+independent selection and viewport state, sharing one Leaflet script.

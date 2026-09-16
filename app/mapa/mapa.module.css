@@ -78,6 +78,22 @@
 .footer { display: flex; justify-content: space-between; gap: 25px; max-width: 1800px; margin: 0 auto; padding: 24px 40px; background: var(--paper); color: #68715f; font-size: 10px; border-top: 1px solid var(--line); }
 .footer::before { content: none; }
 .footer a { color: var(--ink); text-decoration: none; flex-shrink: 0; }
+.page .teamSection { margin: 38px 0 0; padding: 0; opacity: 1; transform: none; scroll-margin-top: 18px; background: var(--paper); }
+.teamIntro { padding-top: 34px; padding-bottom: 30px; border-top: 1px solid var(--line); }
+.page .teamIntro h2 { position: static; display: block; color: var(--ink); text-align: left; font-size: clamp(38px, 3.8vw, 58px); font-weight: 500; line-height: 1.07; letter-spacing: -.05em; margin: 0 0 16px; }
+.page .teamIntro h2::after { content: none; }
+.teamIntro h2 em { font-family: var(--font-undertango-editorial), Georgia, serif; font-weight: 400; color: #64793c; }
+.teamCount { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.teamCard { padding: 23px 7px 23px 0; align-items: center; }
+.teamCard .cardArrow { padding-top: 0; }
+.personInitials { display: grid; place-items: center; flex-shrink: 0; height: 38px; width: 38px; border: 1px solid #c3cdb5; border-radius: 50%; font-size: 11px; color: #506341; background: #e8ecde; }
+.personRole { color: #52604d; font-size: 12px; line-height: 1.5; }
+.teamNote { font-size: 11px; line-height: 1.7; color: var(--muted); margin: 20px 0 !important; max-width: 260px; }
+.teamMapFrame { height: 560px; }
+.teamDot { font-size: 12px; }
+.selectedTeamDot { background: #dae989; color: #243b32; border-color: #243b32; }
+.teamDetail h3 { color: var(--ink); text-align: left; font-size: 24px; line-height: 1.2; letter-spacing: -.035em; font-weight: 550; margin: 0 0 10px; }
+.teamDetailRole { font-size: 14px; color: #506341; margin: 0 !important; }
 @media (min-width: 1600px) { .mapFrame { height: 700px; } .activityList { height: 540px; } }
 @media (max-width: 1000px) { .header { padding: 0 24px; } .headerCaption { display: none; } .intro { padding: 28px 24px 24px; } .workspace { padding: 0 24px; grid-template-columns: 280px minmax(0, 1fr); } .sidebar { padding-right: 16px; } .mapColumn { padding-left: 16px; } .edition { max-width: 200px; } .footer { padding: 22px 24px; } .mapCaption span:last-child { display: none; } }
 @media (max-width: 760px) {
@@ -89,6 +105,8 @@
   .detail { bottom: 26px; left: 10px; width: calc(100% - 20px); max-height: 325px; padding: 18px; } .detail h2 { font-size: 22px; } .description { margin: 10px 0 !important; } .people { padding-top: 9px; } .location { margin-top: 10px !important; padding-top: 9px; }
   .cityLabel { font-size: 10px; max-width: 125px; } .cityDot { width: 39px; height: 39px; } .cityLabel { left: 46px; } .mapHint { font-size: 10px; } .mapWarning { left: 10px; right: 10px; top: 65px; }
   .labelLeft { left: auto; right: 50px; }
+  .teamIntro { padding-top: 28px; } .page .teamIntro h2 { font-size: 42px; } .teamCount { display: block; margin-top: 17px; font-size: 10px; }
+  .teamMapFrame { height: 500px; } .teamCard { padding: 21px 5px; } .teamNote { max-width: none; } .teamDetail h3 { font-size: 22px; }
   .footer { margin-top: 16px; padding: 21px 18px; display: block; font-size: 10px; } .footer a { display: inline-block; margin-top: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .page *, .page *::before, .page *::after { scroll-behavior: auto !important; transition: none !important; } }

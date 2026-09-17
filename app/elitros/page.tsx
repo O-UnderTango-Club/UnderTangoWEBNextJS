@@ -17,7 +17,7 @@ const canvas = [
 const readiness = [
   ["BRL", "Negocio", "En operación", "Servicio vendido. Caché sugerido según mercado y modificable por el artista, más US$25 de producción y US$25 al FDG. Liquidaciones actuales por contrastar."],
   ["CRL", "Cliente", "Ventas y recompra", "10 operaciones realizadas y marcadas pagadas en 8 etiquetas de cliente/lugar: mínimo documentado, no cartera histórica total."],
-  ["TMRL", "Equipo", "Equipo activo", "17 personas y 21 participaciones departamentales. Secretaría General incorporada; acuerdos de compromiso en desarrollo."],
+  ["TMRL", "Equipo", "Equipo activo", "20 personas articuladas en 10 departamentos, según la actualización de dirección del 17/09/2026. Roles, dedicación y acuerdos de compromiso por documentar."],
   ["TRL", "Tecnología", "Sistema en uso", "Panel y herramientas conectadas usados sobre casos reales. Verificaciones funcionales concretas; desempeño integral por medir."],
   ["IPRL", "Propiedad intelectual", "Marca documentada", "Título INPI de marca clase 41 a nombre de Pablo Cieslik. Derechos sobre código, materiales e imagen en desarrollo."],
   ["FRL", "Financiación", "Antecedente documentado", "Registros de aportes y repartos del fondo anterior. FDG 0.2 en desarrollo; cierre histórico y recursos actuales por conciliar."],
@@ -35,7 +35,7 @@ export default function ElitrosPage() {
     <main className="elitros-page bmc-page">
       <header className="bmc-topbar">
         <a className="bmc-brand" href="#inicio" aria-label="UnderTango ÉLITROS — inicio"><span>Ø</span> UNDERTANGO</a>
-        <nav aria-label="Navegación principal"><a href="#one-pager">One-pager</a><a href="#pitch">Pitch</a><a href="#canvas">Canvas</a><a href="#actores">Actores</a><a href="#madurez">Madurez</a><a href="#marco">Marco</a></nav>
+        <nav aria-label="Navegación principal"><a href="#pitch">Pitch</a><a href="#one-pager">One-pager</a><a href="#canvas">Canvas</a><a href="#actores">Actores</a><a href="#madurez">Madurez</a><a href="#marco">Marco</a></nav>
         <p>ÉLITROS · 2026</p>
       </header>
 
@@ -44,12 +44,14 @@ export default function ElitrosPage() {
           <p className="bmc-eyebrow">MÓDULO 2 · MODELO VIVO · 28 AGOSTO 2026</p>
           <h1>Un estudio de <em>arte, tecnología y gestión de proyectos.</em></h1>
           <p className="bmc-lead">UnderTango comprende una necesidad, diseña la solución, conforma el equipo adecuado y dirige su ejecución combinando arte, lógica y tecnología. La producción artística aporta el primer campo de evidencia de este modelo.</p>
-          <a className="bmc-cta" href="#canvas">Explorar el modelo <span>↓</span></a>
+          <a className="bmc-cta" href="#pitch">Ver el pitch <span>↓</span></a>
           <a className="bmc-onepager-link" href="#one-pager">Ver one-pager · Septiembre 2026 ↓</a>
-          <a className="bmc-onepager-link" href="#pitch">Ver el plan de pitch y el guion ↓</a>
+          <a className="bmc-onepager-link" href="#canvas">Explorar el modelo ↓</a>
         </div>
-        <aside className="bmc-hero-note"><span>TESIS CENTRAL</span><strong>Delegar la complejidad sin convertir la red en costo fijo.</strong><p>El cliente compra una solución y un resultado; la red conserva autonomía; UnderTango captura valor por diseñar, dirigir y coordinar el sistema.</p></aside>
+        <aside className="bmc-hero-note"><span>TESIS CENTRAL</span><strong>No existen sistemas sin humanos.</strong><p>El 81 es nuestro corazón: produce y coordina shows. Desde el 80 convertimos esa experiencia en gerencia de proyectos, documentación y herramientas para que los equipos avancen.</p></aside>
       </section>
+
+      <Pitch />
 
       <section className="bmc-onepager" id="one-pager" aria-labelledby="onepager-title">
         <div className="bmc-onepager-sheet">
@@ -103,8 +105,6 @@ export default function ElitrosPage() {
         </div>
       </section>
 
-      <Pitch />
-
       <section className="bmc-section" id="canvas">
         <div className="bmc-heading"><div><p className="bmc-eyebrow">BUSINESS MODEL CANVAS</p><h2>Nueve bloques, una sola lógica de valor</h2></div><p>Versión de trabajo: cada bloque expresa una hipótesis que debe ganar evidencia en operaciones reales.</p></div>
         <div className="bmc-grid">{canvas.map(([number, title, text], index) => <article key={number} className={`bmc-card bmc-card-${index + 1}`}><span>{number}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
@@ -157,7 +157,7 @@ export default function ElitrosPage() {
           <p><strong>Alcance y criterio.</strong> Evaluamos el servicio gestionado y el sistema interno de UnderTango, no una aplicación futura. Usamos la edición pública KTH de 2021 como referencia. Recuperamos los niveles anteriores como estimaciones de trabajo (BRL 5, CRL 7, TMRL 4, TRL 6), no como resultados de una validación completa. Para confirmar un nivel deben comprobarse todos sus hitos. «En desarrollo» indica trabajo activo; «por verificar» indica una limitación de esta revisión, no ausencia de actividad.</p>
           <p><strong>Cliente · evidencia.</strong> En el corte de 24 operaciones, 10 figuran realizadas y pagadas en 8 etiquetas de cliente/lugar, no necesariamente 8 entidades jurídicas. Shopping China tiene tres fechas: 15, 29 y 30/08. Las requisiciones sucesivas de Gran Meliá respaldan continuidad comercial, no cobro por sí solas. <strong>Próximo hito:</strong> contrastar decisores, proceso comercial y beneficios observados; no trasladar ventas de shows a demanda de software.</p>
           <p><strong>Negocio · evidencia.</strong> Hay servicios vendidos y repartos históricos. La política actual suma US$25 de producción/mantenimiento y US$25 al FDG sobre el caché elegido por cada artista. <strong>Próximo hito:</strong> conciliar una liquidación del esquema actual con costos completos y respuesta del comprador. Los repartos antiguos no prueban la aplicación de esta política ni su margen efectivo.</p>
-          <p><strong>Equipo · evidencia.</strong> Padrón conciliado: 17 personas y 21 participaciones departamentales. Lucila Vizcarra se incorpora a Secretaría General; los compromisos comunes están en desarrollo. <strong>Próximo hito:</strong> confirmar roles, dedicación y acuerdos del núcleo responsable, distinguiéndolo de la red convocable. Una nómina no equivale a contratos firmados.</p>
+          <p><strong>Equipo · evidencia.</strong> La dirección informa 20 personas articuladas en 10 departamentos al 17/09/2026. Los compromisos comunes están en desarrollo. <strong>Próximo hito:</strong> actualizar el padrón y confirmar roles, dedicación y acuerdos del núcleo responsable, distinguiéndolo de la red convocable. Una nómina no equivale a contratos firmados.</p>
           <p><strong>Tecnología · evidencia.</strong> Panel y herramientas usados en casos reales. El flujo de actualización de Equipo tiene recibo auditado y pruebas de validación, duplicados, concurrencia e idempotencia. <strong>Próximo hito:</strong> comprobar el recorrido integral y sus requisitos de rendimiento, seguridad y continuidad. Las pruebas de un flujo no equivalen a una auditoría de todo el sistema ni a un ahorro de tiempo medido.</p>
           <p><strong>Propiedad intelectual · evidencia.</strong> Se revisó el título INPI de marca mixta, clase 41, registro 3.456.539, a favor de Pablo Guillermo Cieslik, concedido en 2023. No se consultó el estado registral actual. <strong>En desarrollo:</strong> derechos sobre código, método, materiales y uso de imagen. <strong>Próximo hito:</strong> vincular cada activo con titularidad y permisos; el título de marca no acredita el control del conjunto.</p>
           <p><strong>Financiación · evidencia.</strong> La planilla histórica del FDI contiene registros de aportes, reinversiones y cálculos de repartos. Dirección informa que el fondo anterior cerró con ganancias para sus inversores; esta revisión no concilió ese cierre individualmente. El estatuto de 2025 es provisional. <strong>En desarrollo:</strong> FDG 0.2. <strong>Próximo hito:</strong> verificar el cierre histórico y separar presupuesto, compromisos y recursos disponibles del nuevo ciclo. Aportes pendientes no son caja; un estatuto no demuestra ejecución de mecanismos financieros o constitución societaria.</p>

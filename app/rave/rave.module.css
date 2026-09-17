@@ -2,3 +2,5 @@
 .site section{opacity:1;transform:none;animation:none}.site .footer{background:transparent}.site .footer::before{display:none}
 .site h2{text-align:left;display:block;color:inherit}.site h2::after{display:none}
 
+
+.header{flex-wrap:wrap}.header nav{margin-left:auto}.footer{padding-bottom:80px}@media(max-width:700px){.header{gap:14px}.header>div:last-child{width:100%;justify-content:flex-end}}

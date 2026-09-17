@@ -1,3 +1,5 @@
+"use client";
+import { T, useTranslation } from "./language";
 import styles from "./showcase.module.css";
 import VideoPlayer from "./video-player";
 
@@ -10,5 +12,7 @@ export function MissingMedia({ kind, label, detail }: { kind: "vertical" | "phot
 }
 
 export function VideoSample({ id, title, portrait = false, poster }: { id: string; title: string; portrait?: boolean; poster?: string }) {
-  return <figure className={styles.videoSample}><VideoPlayer id={id} title={title} portrait={portrait} poster={poster} /><figcaption><strong>{title}</strong><a href={`https://www.youtube.com/watch?v=${id}`} target="_blank" rel="noopener noreferrer">Ver en YouTube ↗</a></figcaption></figure>;
+  const { t } = useTranslation();
+  title = t(title);
+  return <figure className={styles.videoSample}><VideoPlayer id={id} title={title} portrait={portrait} poster={poster} /><figcaption><strong>{title}</strong><a href={`https://www.youtube.com/watch?v=${id}`} target="_blank" rel="noopener noreferrer"><T>Ver en YouTube ↗</T></a></figcaption></figure>;
 }

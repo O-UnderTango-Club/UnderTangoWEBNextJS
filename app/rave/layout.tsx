@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LanguageProvider, LanguagePicker, EnglishShortcut, RaveLink, T, BandNavigation } from "./language";
 import styles from "./rave.module.css";
 import { ravePartyImages } from "./social";
 
@@ -29,13 +29,14 @@ export const metadata: Metadata = {
 };
 
 export default function RaveLayout({ children }: { children: React.ReactNode }) {
-  return <div className={styles.site}>
-    <a className={styles.skip} href="#contenido">Saltar al contenido</a>
+  return <LanguageProvider><div className={styles.site}>
+    <a className={styles.skip} href="#contenido"><T>Saltar al contenido</T></a>
     <header className={styles.header}>
-      <Link href="/rave" className={styles.brand} aria-label="Ø Rave — Inicio">Ø <span>RAVE</span></Link>
-      <nav aria-label="Productos de la banda"><Link href="/rave/tango-rave">Tango Rave</Link></nav>
+      <RaveLink href="/rave" className={styles.brand} aria-label="Ø Rave — Inicio">Ø <span>RAVE</span></RaveLink>
+      <BandNavigation><RaveLink href="/rave/tango-rave">Tango Rave</RaveLink></BandNavigation><LanguagePicker />
     </header>
     {children}
     <footer className={styles.footer}><span>Ø UnderTango · Puerto Iguazú · Argentina</span><a href="https://www.undertangoclub.com">UnderTango Club ↗</a></footer>
-  </div>;
+    <EnglishShortcut />
+  </div></LanguageProvider>;
 }

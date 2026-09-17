@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Pitch from "./Pitch";
 import "./elitros.css";
 
 const canvas = [
@@ -34,7 +35,7 @@ export default function ElitrosPage() {
     <main className="elitros-page bmc-page">
       <header className="bmc-topbar">
         <a className="bmc-brand" href="#inicio" aria-label="UnderTango ÉLITROS — inicio"><span>Ø</span> UNDERTANGO</a>
-        <nav aria-label="Navegación principal"><a href="#one-pager">One-pager</a><a href="#canvas">Canvas</a><a href="#actores">Actores</a><a href="#madurez">Madurez</a><a href="#marco">Marco</a></nav>
+        <nav aria-label="Navegación principal"><a href="#one-pager">One-pager</a><a href="#pitch">Pitch</a><a href="#canvas">Canvas</a><a href="#actores">Actores</a><a href="#madurez">Madurez</a><a href="#marco">Marco</a></nav>
         <p>ÉLITROS · 2026</p>
       </header>
 
@@ -45,6 +46,7 @@ export default function ElitrosPage() {
           <p className="bmc-lead">UnderTango comprende una necesidad, diseña la solución, conforma el equipo adecuado y dirige su ejecución combinando arte, lógica y tecnología. La producción artística aporta el primer campo de evidencia de este modelo.</p>
           <a className="bmc-cta" href="#canvas">Explorar el modelo <span>↓</span></a>
           <a className="bmc-onepager-link" href="#one-pager">Ver one-pager · Septiembre 2026 ↓</a>
+          <a className="bmc-onepager-link" href="#pitch">Ver el plan de pitch y el guion ↓</a>
         </div>
         <aside className="bmc-hero-note"><span>TESIS CENTRAL</span><strong>Delegar la complejidad sin convertir la red en costo fijo.</strong><p>El cliente compra una solución y un resultado; la red conserva autonomía; UnderTango captura valor por diseñar, dirigir y coordinar el sistema.</p></aside>
       </section>
@@ -100,6 +102,8 @@ export default function ElitrosPage() {
           </div>
         </div>
       </section>
+
+      <Pitch />
 
       <section className="bmc-section" id="canvas">
         <div className="bmc-heading"><div><p className="bmc-eyebrow">BUSINESS MODEL CANVAS</p><h2>Nueve bloques, una sola lógica de valor</h2></div><p>Versión de trabajo: cada bloque expresa una hipótesis que debe ganar evidencia en operaciones reales.</p></div>

@@ -3,22 +3,22 @@ import Pitch from "./Pitch";
 import "./elitros.css";
 
 const canvas = [
-  ["01", "Socios clave", "Artistas validados, proveedores técnicos, estudios contables y fiscales, espacios culturales y aliados territoriales."],
-  ["02", "Actividades clave", "Comprensión del problema, diseño de la solución, dirección de proyectos, conformación de equipos, coordinación, ejecución y registro de evidencia."],
-  ["03", "Recursos clave", "Marca UnderTango, red global de confianza, criterio de selección, capacidad de gerencia, memoria operativa y herramientas tecnológicas."],
-  ["04", "Propuesta de valor", "Una solución gestionada de punta a punta: el equipo adecuado, menos fricción, trazabilidad y un único responsable frente al cliente."],
-  ["05", "Relación con clientes", "Acompañamiento consultivo, respuesta rápida, coordinación humana y seguimiento posterior para habilitar recurrencia."],
-  ["06", "Canales", "Venta directa B2B, referencias, alianzas con hoteles y productoras, casos documentados y rutas de legitimación fiscal."],
-  ["07", "Segmentos", "Personas, empresas e instituciones que necesitan resolver proyectos vinculados con arte, lógica o tecnología. La producción artística es el primer campo de validación."],
-  ["08", "Estructura de costos", "Cada artista del equipo UnderTango elige su caché. Por artista y por show sumamos US$50: US$25 para producción y mantenimiento del sistema y US$25 de margen para el Fondo de Gobernanza 87ø."],
-  ["09", "Fuentes de ingreso", "Honorarios de dirección y gestión, diseño y ejecución de soluciones, producción artística, desarrollos tecnológicos, auditoría, acompañamiento, márgenes o fees según el proyecto."],
+  ["01", "Socios clave", "Artistas, diseñadores, comunicadores, proveedores técnicos, espacios y aliados territoriales. Especialistas del proyecto para acordar contenidos y responsabilidades."],
+  ["02", "Actividades clave", "Comprender el objetivo y el público; diseñar eventos, experiencias y comunicación; conformar equipos, coordinar personas y herramientas, producir, ensayar y verificar entregas."],
+  ["03", "Recursos clave", "Experiencia en eventos, capacidades artísticas y de diseño, equipos humanos, relaciones de confianza, memoria operativa y herramientas de coordinación."],
+  ["04", "Propuesta de valor", "La coordinación humana, artística y comunicacional necesaria para una entrega acordada. Un sistema de trabajo usado en eventos, con responsables, ensayos, seguimiento y registro."],
+  ["05", "Relación con clientes", "Escucha del objetivo, definición compartida del alcance, comunicación directa, puntos de revisión y evaluación de la entrega y de su llegada al público."],
+  ["06", "Canales", "Relaciones directas, referencias de trabajos realizados, eventos, muestras de comunicación y diseño, vínculos con instituciones, equipos de Élitros y aliados."],
+  ["07", "Segmentos", "Equipos, empresas e instituciones que necesitan realizar un evento, presentar una idea, comunicar su trabajo o coordinar personas y herramientas para una entrega artística o comunicacional."],
+  ["08", "Estructura de costos", "Honorarios del equipo, diseño, ensayos, producción, recursos técnicos y logística según el alcance. Para shows, el modelo suma al caché de cada artista US$25 de producción y US$25 al Fondo de Gobernanza 87ø."],
+  ["09", "Fuentes de ingreso", "Honorarios por producción y gerencia de eventos, coordinación humana, comunicación, imagen y diseño. Presupuesto por alcance y entregables, con recursos y plazos acordados."],
 ] as const;
 
 const readiness = [
-  ["BRL", "Negocio", "En operación", "Servicio vendido. Caché sugerido según mercado y modificable por el artista, más US$25 de producción y US$25 al FDG. Liquidaciones actuales por contrastar."],
+  ["BRL", "Negocio", "En operación", "Producción de shows vendida y sistema de coordinación en uso. El esquema caché + US$50 corresponde a shows; la oferta de comunicación y diseño se acuerda por alcance."],
   ["CRL", "Cliente", "Ventas y recompra", "10 operaciones realizadas y marcadas pagadas en 8 etiquetas de cliente/lugar: mínimo documentado, no cartera histórica total."],
   ["TMRL", "Equipo", "Equipo activo", "20 personas articuladas en 10 departamentos, según la actualización de dirección del 17/09/2026. Roles, dedicación y acuerdos de compromiso por documentar."],
-  ["TRL", "Tecnología", "Sistema en uso", "Panel y herramientas conectadas usados sobre casos reales. Verificaciones funcionales concretas; desempeño integral por medir."],
+  ["TRL", "Tecnología", "Sistema en uso", "Herramientas digitales al servicio de la coordinación humana en casos reales. Desempeño integral y transferencia a otros equipos por medir."],
   ["IPRL", "Propiedad intelectual", "Marca documentada", "Título INPI de marca clase 41 a nombre de Pablo Cieslik. Derechos sobre código, materiales e imagen en desarrollo."],
   ["FRL", "Financiación", "Antecedente documentado", "Registros de aportes y repartos del fondo anterior. FDG 0.2 en desarrollo; cierre histórico y recursos actuales por conciliar."],
 ] as const;
@@ -41,14 +41,14 @@ export default function ElitrosPage() {
 
       <section className="bmc-hero" id="inicio">
         <div>
-          <p className="bmc-eyebrow">MÓDULO 2 · MODELO VIVO · 28 AGOSTO 2026</p>
-          <h1>Un estudio de <em>arte, tecnología y gestión de proyectos.</em></h1>
-          <p className="bmc-lead">UnderTango comprende una necesidad, diseña la solución, conforma el equipo adecuado y dirige su ejecución combinando arte, lógica y tecnología. La producción artística aporta el primer campo de evidencia de este modelo.</p>
+          <p className="bmc-eyebrow">ÉLITROS · MODELO VIVO · 17 SEPTIEMBRE 2026</p>
+          <h1>Arte, eventos y comunicación <em>para concretar objetivos.</em></h1>
+          <p className="bmc-lead">UnderTango organiza equipos humanos y sus herramientas para realizar eventos, comunicar ideas y construir experiencias. Ponemos el arte, la imagen y el diseño al servicio de una entrega concreta y de las personas a las que debe llegar.</p>
           <a className="bmc-cta" href="#pitch">Ver el pitch <span>↓</span></a>
           <a className="bmc-onepager-link" href="#one-pager">Ver one-pager · Septiembre 2026 ↓</a>
           <a className="bmc-onepager-link" href="#canvas">Explorar el modelo ↓</a>
         </div>
-        <aside className="bmc-hero-note"><span>TESIS CENTRAL</span><strong>No existen sistemas sin humanos.</strong><p>El 81 es nuestro corazón: produce y coordina shows. Desde el 80 convertimos esa experiencia en gerencia de proyectos, documentación y herramientas para que los equipos avancen.</p></aside>
+        <aside className="bmc-hero-note"><span>TESIS CENTRAL</span><strong>No existen sistemas sin humanos.</strong><p>El 81 es nuestro corazón: produce y coordina shows. El 80 organiza el sistema de trabajo. Nuestra contribución es humana, artística y comunicacional, en articulación con los especialistas de cada proyecto.</p></aside>
       </section>
 
       <Pitch />
@@ -58,48 +58,48 @@ export default function ElitrosPage() {
           <header className="bmc-onepager-header">
             <p className="bmc-onepager-kicker">ONE-PAGER · PROGRAMA ÉLITROS</p>
             <h2 id="onepager-title">UNDERTANGO</h2>
-            <p className="bmc-onepager-summary">Gestionamos proyectos de arte y tecnología, coordinando equipos, recursos y entregas.</p>
+            <p className="bmc-onepager-summary">Coordinamos personas y herramientas para realizar eventos, comunicar ideas y dar forma a su imagen y diseño.</p>
             <p className="bmc-onepager-meta">Puerto Iguazú, Misiones, Argentina · PROGRAMA ÉLITROS · Septiembre de 2026</p>
           </header>
           <div className="bmc-onepager-grid">
             <article className="bmc-onepager-block">
               <h3>PROBLEMA</h3>
-              <p>Según nuestra experiencia, el 70% del esfuerzo de organizar un evento se destina a coordinar personas y recursos técnicos. La falta de experiencia en producción de shows y las fallas de coordinación generan imprevistos y sobrecostos que encarecen el espectáculo y ponen en riesgo su realización. UnderTango combina experiencia de producción y tecnología para anticipar esas fallas y controlar la ejecución transformando los sobrecostos en incremento de calidad.</p>
+              <p>Una idea valiosa necesita un equipo que se entienda y una forma de encontrarse con su público. Acuerdos dispersos, responsabilidades poco claras o una comunicación que no conecta pueden dificultar ese encuentro. En eventos, presentaciones y acciones de comunicación, esa dimensión humana requiere tanto trabajo como la realización material.</p>
             </article>
             <article className="bmc-onepager-block">
-              <h3>TESIS TECNOLÓGICA Y POR QUÉ AHORA</h3>
-              <p>El avance de la IA basada en agentes permite automatizar tareas que antes requerían tiempo y recursos, conectando las necesidades del cliente con las capacidades para resolverlas. UnderTango integra esta tecnología con su experiencia de producción para reducir tiempos de coordinación, anticipar imprevistos y disminuir costos.</p>
+              <h3>TESIS HUMANA Y TECNOLÓGICA</h3>
+              <p>No existen sistemas sin humanos. Combinamos escucha, criterio artístico, diseño y producción con herramientas digitales que conservan acuerdos, responsables y avances. La automatización y la IA acompañan tareas de organización; el equipo define el sentido, toma decisiones y se hace cargo de la entrega.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>ESTADO ACTUAL Y TRACCIÓN (TRL/CRL)</h3>
-              <p>Tecnología aplicada a la coordinación de shows, con una reducción estimada del 50% en fricción y tiempos, según nuestra experiencia.</p>
+              <p>Nuestro campo de mayor experiencia es la producción y gerencia de eventos. El sistema de coordinación se usa y se pone a prueba allí: equipos, recursos técnicos, cambios, ensayos y entregas frente a un público.</p>
               <p>Tracción documentada: Shopping China, shows del 15, 29 y 30/08/2026 realizados y pagados, por USD 600 en total; Wish, BRL 1.500; Festival La Frontera, BRL 2.300. Gran Meliá tiene requisiciones sucesivas en 2026: son evidencia de continuidad comercial, no de cobro por sí solas. El conteo operativo es un mínimo documentado, no toda la trayectoria.</p>
-              <p>Evaluamos UnderTango como sistema operativo actual en transición, no como una plataforma hipotética. Tecnología en uso y clientes con recompra: evidencia operativa real. La sección de madurez distingue estos avances de la puntuación KTH, aún pendiente de comprobar por hitos.</p>
+              <p>Estos casos sostienen nuestra experiencia de ejecución y coordinación. La eficacia de una nueva intervención de comunicación, diseño o trabajo con otro equipo debe evaluarse según su objetivo y su público. El ahorro de tiempo y el impacto no se presentan como porcentajes comprobados.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>PROPIEDAD INTELECTUAL</h3>
               <p>Marca Ø UnderTango Club registrada ante el INPI, clase 41. Nº 3.456.539</p>
-              <p>Producción de Shows, espectáculos y producciones artística.</p>
+              <p>Producción de shows, espectáculos y producciones artísticas.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>MERCADO Y MODELO DE NEGOCIO (BRL)</h3>
-              <p>Mercado de entrada: hoteles, espacios e instituciones turísticas de la Triple Frontera. Universo de referencia: aproximadamente 390 hoteles y otros alojamientos, pendiente de segmentar según contratación de shows y cuantificar su gasto anual.</p>
-              <p>Ingresos por producción y coordinación de espectáculos, con precio por proyecto y contratación recurrente. Expansión prevista mediante equipos, proveedores y representantes en otros destinos.</p>
-              <p>El servicio ya se vende y el modelo evoluciona. La adopción del reparto caché + US$50, los costos completos y la sostenibilidad de la expansión aún deben comprobarse antes de cerrar su nivel de madurez.</p>
+              <p>Base de actividad: producción de shows y eventos en la Triple Frontera. La oferta se dirige a equipos e instituciones que requieren coordinación humana, comunicación, imagen o diseño para una entrega concreta: un evento, una presentación, una experiencia de divulgación o materiales para llegar a un público.</p>
+              <p>Ingresos por producción y gerencia de eventos y por servicios de comunicación, imagen, diseño y coordinación, con presupuesto según alcance, equipo, recursos y entregables. La dirección y validación científica o técnica permanecen en los especialistas del proyecto.</p>
+              <p>La producción artística tiene ventas y recompra. La demanda y las condiciones de trabajo con otros equipos se validan caso a caso. El modelo económico de shows se detalla por separado; cada servicio necesita costos completos y criterios propios.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>EQUIPO</h3>
-              <p>Pablo Cieslik, fundador y director: producción de espectáculos, gerencia de proyectos y desarrollo de herramientas de gestión.</p>
+              <p>Pablo Cieslik, fundador y director: producción de espectáculos, gerencia de eventos y coordinación humana, artística y comunicacional.</p>
               <p>Alejandro Miguez, representación institucional: exdirector de Ingeniería en Informática y de la Licenciatura en Inteligencia Artificial y Ciencia de Datos de UADE. Trayectoria en tecnología, educación superior y liderazgo de proyectos de I+D.</p>
-              <p>Maximiliano Rodríguez: programación y desarrollo tecnológico.</p>
+              <p>Maximiliano Rodríguez: programación y desarrollo de herramientas. El departamento 80 articula estas capacidades con la experiencia de producción del 81.</p>
             </article>
             <article className="bmc-onepager-block bmc-onepager-ask">
               <h3>PRÓXIMOS HITOS + ASK</h3>
-              <p>Medición: documentar el uso de la tecnología en shows, contrastar la reducción estimada del 50% en tiempos y reevaluar TRL/CRL.</p>
-              <p>1. Modelo de negocio: segmentar compradores, medir frecuencia de contratación, costos y margen por show, y probar la repetibilidad con un cliente aliado para revisar BRL.</p>
-              <p>2. Marco legal y expansión: resolver titularidad y permisos, responsabilidades, coberturas y cláusulas de no repetición; definir contratos, comisiones y límites de actuación de representantes en otros países.</p>
-              <p>3. Etapa posterior: evaluar mecanismos cripto para cobros, pagos y distribución entre participantes, sujetos a utilidad demostrable y revisión legal, fiscal y de riesgos.</p>
-              <p>Buscamos hoteles, productoras y organizadores para pilotos; aliados para representación y asesoramiento legal, de seguros y financiero. Financiamiento requerido, costos, plazos y niveles objetivo del radar pendientes de definición.</p>
+              <p>1. Acordar una intervención: objetivo, público, entrega, responsables, recursos, plazos y criterios de aceptación. Puede ser un evento, una presentación o un trabajo de comunicación, imagen y diseño.</p>
+              <p>2. Evaluar la ejecución y la comunicación: cumplimiento de lo acordado, incidencias, participación, comprensión del mensaje y devolución del público o del equipo, según lo que corresponda al caso.</p>
+              <p>3. Sostener el modelo: contrastar costos y margen, documentar permisos y responsabilidades y acordar las condiciones con artistas, proveedores y aliados. Los aspectos legales, de cobertura y de representación internacional siguen en desarrollo.</p>
+              <p>Línea económica posterior: evaluar mecanismos cripto para cobros, pagos y distribución, sujetos a utilidad demostrable y revisión legal, fiscal y de riesgos.</p>
+              <p>Buscamos equipos con una necesidad concreta de coordinación humana, eventos o comunicación, y aliados que nos acerquen a ellos. En Élitros queremos conectar estos recursos artísticos con proyectos científicos y tecnológicos. Financiamiento y metas de expansión pendientes de definición.</p>
             </article>
           </div>
         </div>
@@ -111,18 +111,18 @@ export default function ElitrosPage() {
       </section>
 
       <section className="bmc-actors" id="actores">
-        <div className="bmc-heading bmc-inverted"><div><p className="bmc-eyebrow">UNIDAD DE TOMA DE DECISIONES</p><h2>El usuario no siempre es quien compra.</h2></div><p>La adopción depende de leer incentivos opuestos y convertir al coordinador en aliado del sistema.</p></div>
+        <div className="bmc-heading bmc-inverted"><div><p className="bmc-eyebrow">RESPONSABILIDADES Y DESTINATARIOS</p><h2>Cada parte aporta su conocimiento.</h2></div><p>Acordamos cómo se relacionan quienes conocen el proyecto, quienes coordinan la entrega y las personas a las que debe llegar.</p></div>
         <div className="bmc-actor-flow">
-          <article><b>◎</b><span>USUARIO + POSIBLE SABOTAJE</span><h3>Coordinador operativo</h3><p>Sufre WhatsApp, Excel y la coordinación manual, pero puede temer que la solución reemplace su rol. La promesa debe aumentar su control y reconocimiento.</p></article><i>→</i>
-          <article><b>$</b><span>AUTORIDAD ECONÓMICA</span><h3>Dueño de la productora</h3><p>Compra por racionalidad financiera: menor costo oculto, menos errores, trazabilidad y capacidad de repetir una operación confiable.</p></article><i>→</i>
-          <article><b>↗</b><span>RUTA DE ADOPCIÓN</span><h3>Legitimación técnica y fiscal</h3><p>El canal no es sólo captación: referencias, procesos visibles y documentación convierten confianza en decisión.</p></article>
+          <article><b>◎</b><span>OBJETIVO Y CONOCIMIENTO</span><h3>Equipo impulsor</h3><p>Define el objetivo, aporta el conocimiento del proyecto y valida sus contenidos. Sus especialistas conservan las decisiones científicas y técnicas; su responsable acuerda alcance y recursos.</p></article><i>→</i>
+          <article><b>Ø</b><span>COORDINACIÓN Y REALIZACIÓN</span><h3>UnderTango</h3><p>Diseña y coordina la dimensión humana, artística y comunicacional acordada: personas, herramientas, mensajes, imagen, ensayos y realización. Da seguimiento hasta verificar la entrega.</p></article><i>→</i>
+          <article><b>↗</b><span>ENCUENTRO E IMPACTO</span><h3>Público y participantes</h3><p>Sus necesidades orientan el lenguaje, los formatos y la experiencia. Su participación y sus devoluciones ayudan a evaluar si lo realizado fue comprensible, útil y significativo.</p></article>
         </div>
       </section>
 
       <section className="bmc-economics bmc-fdg" id="fondo-de-gobernanza" aria-labelledby="fdg-title">
         <div className="bmc-fdg-intro">
-          <div><p className="bmc-eyebrow">NUESTRO MODELO · UNDERTANGO</p><h2 id="fdg-title">Remunerar al artista.<br/>Sostener el sistema.</h2></div>
-          <div><p className="bmc-copy">El artista pertenece al equipo UnderTango y tiene libertad para elegir el caché que considere pertinente. Primero le consultamos cuánto pretende cobrar; a ese importe le sumamos US$50 por artista y por show.</p><p className="bmc-fdg-total"><span>MODELO · POR ARTISTA / SHOW</span><strong>Caché + US$50</strong></p></div>
+          <div><p className="bmc-eyebrow">MODELO ECONÓMICO PARA SHOWS</p><h2 id="fdg-title">Remunerar al artista.<br/>Sostener el sistema.</h2></div>
+          <div><p className="bmc-copy">En la producción de shows, cada artista del equipo UnderTango elige el caché que considere pertinente. A ese importe le sumamos US$50 por artista y por show. Para comunicación, diseño u otras entregas acordamos un presupuesto específico.</p><p className="bmc-fdg-total"><span>MODELO · POR ARTISTA / SHOW</span><strong>Caché + US$50</strong></p></div>
         </div>
         <div className="bmc-numbers">
           <div><small>01 · REMUNERACIÓN ARTÍSTICA</small><strong>Caché libre</strong><p>Lo define el artista del equipo UnderTango. Producción y margen se suman por encima: no se descuentan de su remuneración.</p></div>
@@ -154,8 +154,8 @@ export default function ElitrosPage() {
           <figcaption>Elaboración propia con referencia al <a href="https://kthinnovationreadinesslevel.com/wp-content/uploads/sites/9/2021/02/KTH-Innovation-Readiness-Level_Compiled.pdf" target="_blank" rel="noreferrer">modelo KTH</a>. No es una evaluación emitida por KTH.</figcaption>
         </figure><div className="bmc-readiness">{readiness.map(([code, title, status, text]) => <article key={code}><div aria-hidden="true">•</div><section><span>{code} · {status}</span><h3>{title}</h3><p>{text}</p>{code === "TRL" && <a className="bmc-tools-link" href="/elitros/sistema-de-herramientas">Ver el sistema de herramientas →</a>}{code === "TMRL" && <a className="bmc-tools-link" href="https://www.undertangoclub.com/central">Ver equipo y departamentos →</a>}{code === "FRL" && <a className="bmc-tools-link" href="/elitros/funcionamiento-del-fdg">Funcionamiento del FDG →</a>}</section></article>)}</div></div>
         <details className="bmc-radar-evidence"><summary>Evidencia revisada y próximos hitos por dimensión</summary>
-          <p><strong>Alcance y criterio.</strong> Evaluamos el servicio gestionado y el sistema interno de UnderTango, no una aplicación futura. Usamos la edición pública KTH de 2021 como referencia. Recuperamos los niveles anteriores como estimaciones de trabajo (BRL 5, CRL 7, TMRL 4, TRL 6), no como resultados de una validación completa. Para confirmar un nivel deben comprobarse todos sus hitos. «En desarrollo» indica trabajo activo; «por verificar» indica una limitación de esta revisión, no ausencia de actividad.</p>
-          <p><strong>Cliente · evidencia.</strong> En el corte de 24 operaciones, 10 figuran realizadas y pagadas en 8 etiquetas de cliente/lugar, no necesariamente 8 entidades jurídicas. Shopping China tiene tres fechas: 15, 29 y 30/08. Las requisiciones sucesivas de Gran Meliá respaldan continuidad comercial, no cobro por sí solas. <strong>Próximo hito:</strong> contrastar decisores, proceso comercial y beneficios observados; no trasladar ventas de shows a demanda de software.</p>
+          <p><strong>Alcance y criterio.</strong> Evaluamos la producción de eventos y el sistema interno de coordinación humana de UnderTango. Los resultados en ese campo no acreditan capacidad científica ni la eficacia de cualquier intervención externa. Usamos la edición pública KTH de 2021 como referencia. Recuperamos los niveles anteriores como estimaciones de trabajo (BRL 5, CRL 7, TMRL 4, TRL 6), no como resultados de una validación completa. Para confirmar un nivel deben comprobarse todos sus hitos. «En desarrollo» indica trabajo activo; «por verificar» indica una limitación de esta revisión, no ausencia de actividad.</p>
+          <p><strong>Cliente · evidencia.</strong> En el corte de 24 operaciones, 10 figuran realizadas y pagadas en 8 etiquetas de cliente/lugar, no necesariamente 8 entidades jurídicas. Shopping China tiene tres fechas: 15, 29 y 30/08. Las requisiciones sucesivas de Gran Meliá respaldan continuidad comercial, no cobro por sí solas. <strong>Próximo hito:</strong> contrastar decisores, proceso comercial y beneficios observados; distinguir la demanda comprobada de shows de la demanda por nuevas intervenciones de comunicación, imagen y diseño.</p>
           <p><strong>Negocio · evidencia.</strong> Hay servicios vendidos y repartos históricos. La política actual suma US$25 de producción/mantenimiento y US$25 al FDG sobre el caché elegido por cada artista. <strong>Próximo hito:</strong> conciliar una liquidación del esquema actual con costos completos y respuesta del comprador. Los repartos antiguos no prueban la aplicación de esta política ni su margen efectivo.</p>
           <p><strong>Equipo · evidencia.</strong> La dirección informa 20 personas articuladas en 10 departamentos al 17/09/2026. Los compromisos comunes están en desarrollo. <strong>Próximo hito:</strong> actualizar el padrón y confirmar roles, dedicación y acuerdos del núcleo responsable, distinguiéndolo de la red convocable. Una nómina no equivale a contratos firmados.</p>
           <p><strong>Tecnología · evidencia.</strong> Panel y herramientas usados en casos reales. El flujo de actualización de Equipo tiene recibo auditado y pruebas de validación, duplicados, concurrencia e idempotencia. <strong>Próximo hito:</strong> comprobar el recorrido integral y sus requisitos de rendimiento, seguridad y continuidad. Las pruebas de un flujo no equivalen a una auditoría de todo el sistema ni a un ahorro de tiempo medido.</p>
@@ -169,24 +169,28 @@ export default function ElitrosPage() {
 
       <section className="bmc-diagnosis">
         <div><p className="bmc-eyebrow">PRÓXIMA VALIDACIÓN</p><h2>Medir lo que ya hacemos.</h2></div>
-        <div className="bmc-diagnosis-copy"><p>Ya hay servicios realizados, cobros y clientes que vuelven. Shopping China tiene shows pagados el 15, 29 y 30 de agosto; Gran Meliá tiene requisiciones sucesivas. Esa tracción no demuestra todavía la aplicación del nuevo reparto ni cuánto tiempo ahorra el sistema.</p><ul><li><b>✓</b> Separar contratación, facturación y cobro.</li><li><b>✓</b> Medir tiempos, costos y reparto por artista.</li><li><b>✓</b> Revisar cada nivel KTH con evidencia específica.</li></ul></div>
-        <div className="bmc-next"><span>PRUEBA PROPUESTA · MVT</span><div><strong>Probar el servicio con un cliente real.</strong><p>MVT significa <i>Minimum Viable Test</i>: una prueba mínima viable. En nuestro caso, coordinar un show, registrar el caché elegido, los gastos, el margen y la respuesta del cliente. Sirve para contrastar el modelo sin construir primero una plataforma nueva.</p></div></div>
+        <div className="bmc-diagnosis-copy"><p>Los eventos realizados y las nuevas contrataciones sostienen nuestra experiencia. El próximo paso es registrar también cómo funcionan la comunicación y el trabajo humano: si los acuerdos se entienden, la entrega se cumple y la experiencia llega a su público.</p><ul><li><b>✓</b> Acordar objetivo, público y entrega.</li><li><b>✓</b> Registrar plazos, costos, cambios y responsabilidades.</li><li><b>✓</b> Evaluar comprensión, participación y devolución.</li></ul></div>
+        <div className="bmc-next"><span>PRUEBA PROPUESTA · MVT</span><div><strong>Una entrega concreta, un público definido.</strong><p>MVT significa <i>Minimum Viable Test</i>: una prueba mínima viable. Proponemos acordar un evento, una presentación o una acción de comunicación; documentar la organización y evaluar lo realizado con el equipo y su público. Se eligen los indicadores antes de empezar y se registra lo aprendido.</p></div></div>
       </section>
       <section className="bmc-framework" id="marco" aria-labelledby="framework-title">
-        <div className="bmc-framework-intro"><p className="bmc-eyebrow">MARCO DE TRABAJO · VISIÓN → ESTRATEGIA → PRODUCTO</p><h2 id="framework-title">Élitros se prueba a sí mismo.</h2><p>La dirección que UnderTango ya viene construyendo se hace transparente: Élitros no es sólo el caso inicial, sino el entorno donde se valida la primera versión del método.</p></div>
+        <div className="bmc-framework-intro"><p className="bmc-eyebrow">MARCO DE TRABAJO · VISIÓN → ESTRATEGIA → PRODUCTO</p><h2 id="framework-title">Aplicar, observar y ajustar.</h2><p>Nuestra propia participación en Élitros permite ensayar cómo nos organizamos, presentamos lo que hacemos y recogemos devoluciones. Esa experiencia orienta el trabajo; cada nueva colaboración necesita sus propios acuerdos y evaluación.</p></div>
         <figure className="bmc-framework-reference">
           <Image src="/elitros/vision-estrategia-producto-elitros.png" width={1052} height={566} sizes="(max-width: 560px) 100vw, 92vw" alt="Diapositiva ÉLITROS: Visión en la base de la pirámide, historia del modelo de negocio y modelo de tracción a 3 años; Estrategia, identificar lo más riesgoso y formular planes de validación a 3 meses; Producto, construir, medir y aprender en sprints Lean de 3 semanas. Fuente: Ash Maurya." />
           <figcaption>Guía de ÉLITROS · Fuente indicada en la diapositiva: Ash Maurya. Horizontes orientativos; se ajustan al aprendizaje del proyecto.</figcaption>
         </figure>
+        <details className="bmc-framework-archive">
+          <summary>Antecedente del proceso · plan anterior de la app de validación</summary>
+          <p>Esta lámina conserva una etapa previa de trabajo. El enfoque actual se desarrolla en el pitch y en los horizontes que siguen: coordinación humana, eventos y comunicación, con herramientas al servicio de cada entrega.</p>
         <figure className="bmc-framework-reference" id="plan-undertango">
           <Image src="/elitros/plan-startup-undertango.png" width={1672} height={941} sizes="(max-width: 560px) 100vw, 92vw" alt="Plan de Startup Ø UnderTango. Producto, 3 semanas: construir una app mínima de hipótesis, experimentos, evidencia y decisiones; medir tiempo de registro, ciclos completados y decisiones con evidencia; aprender si mejora la validación. Estrategia, 3 meses: probar el propio proceso en Élitros, comparar con el registro actual y contrastar con otros participantes. Riesgos: confundir utilidad interna con demanda externa y construir funciones antes de probar su valor. Visión, 3 años: un estudio escalable que resuelve proyectos con arte, lógica y tecnología; validar casos resueltos, recurrencia y margen. Autorreferencialidad como guía y norte. Hipótesis y métricas propuestas, todavía sin resultados validados." />
           <figcaption>Aplicación a Startup Ø UnderTango · Plan de validación propuesto a partir del modelo y del experimento propio en Élitros. <a href="/elitros/plan-startup-undertango.png" target="_blank" rel="noopener noreferrer">Abrir lámina completa ↗</a></figcaption>
         </figure>
-        <aside className="bmc-framework-signal"><span>SEÑAL DE RUMBO</span><strong>Autorreferencialidad</strong><p>Startup Ø UnderTango usará su propio proceso en Élitros como primer experimento de la app de validación primaria que viene tomando forma. La evidencia de ese uso orientará las siguientes decisiones; la validación con otros usuarios seguirá siendo necesaria.</p></aside>
+        </details>
+        <aside className="bmc-framework-signal"><span>SEÑAL DE RUMBO</span><strong>Autorreferencialidad</strong><p>Aplicamos el sistema a nuestra propia organización: prepararnos, coordinarnos, comunicar y registrar lo aprendido. Las herramientas se ajustan a ese trabajo. Lo observado internamente sirve para mejorar y formular nuevas pruebas con otros equipos.</p></aside>
         <div className="bmc-horizons">
-          <article><span>HORIZONTE ORIENTATIVO · 3 AÑOS</span><h3>Visión</h3><p>Convertir la experiencia operativa de UnderTango en una plataforma de producción gestionada que permita a redes culturales coordinar talento, operaciones y evidencia con autonomía, trazabilidad y menor fricción.</p></article>
-          <article><span>HORIZONTE ORIENTATIVO · 3 MESES</span><h3>Estrategia</h3><p>Usar Élitros como laboratorio real: consolidar un flujo de validación primaria, observar dónde se pierde tiempo o control y convertir las decisiones repetidas en hipótesis medibles antes de escalar desarrollo.</p></article>
-          <article><span>HORIZONTE ORIENTATIVO · 3 SEMANAS</span><h3>Producto</h3><p>Probar una app mínima de validación primaria dentro de Élitros. Debe registrar una operación, sus supuestos, la evidencia obtenida y el próximo experimento; el resultado buscado es aprendizaje verificable, no automatización completa.</p></article>
+          <article><span>HORIZONTE ORIENTATIVO · 3 AÑOS</span><h3>Visión</h3><p>Consolidar una forma de coordinar personas y herramientas desde el arte, los eventos, la comunicación, la imagen y el diseño, para que más proyectos puedan encontrarse con las personas y realizar el aporte que buscan.</p></article>
+          <article><span>HORIZONTE ORIENTATIVO · 3 MESES</span><h3>Estrategia</h3><p>Documentar el sistema probado en eventos y acordar intervenciones de comunicación o coordinación con otros equipos. Observar qué se puede transferir, qué debe adaptarse y cómo se verifica la entrega y su llegada al público.</p></article>
+          <article><span>HORIZONTE ORIENTATIVO · 3 SEMANAS</span><h3>Producto</h3><p>Preparar y realizar una entrega acotada: un encuentro, una presentación o una pieza de comunicación. Definir objetivo, público, responsables y herramientas; ensayar, recoger devoluciones y dejar un registro para la próxima intervención.</p></article>
         </div>
       </section>
       <section className="bmc-team" aria-labelledby="team-title"><div><p className="bmc-eyebrow">EQUIPO</p><h2 id="team-title">Integrantes de Startup Ø UnderTango</h2></div><ul><li>Alejandro Míguez</li><li>Maxi Rodríguez</li><li>Pablo Cieslik</li></ul></section>

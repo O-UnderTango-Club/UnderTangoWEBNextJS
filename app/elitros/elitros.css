@@ -86,3 +86,11 @@ body:has(.bmc-page) iframe[src*="chat-robot"],body:has(.bmc-page) [id*="chat-rob
 .bmc-page .bmc-brand{font-family:var(--font-undertango-sans),Arial,sans-serif;font-weight:700;letter-spacing:.015em}
 .bmc-page .bmc-topbar{font-weight:600;letter-spacing:.025em}
 .bmc-page .bmc-eyebrow{font-weight:600;font-size:11px;letter-spacing:.08em;line-height:1.5}
+.bmc-framework-archive{margin-top:30px;border:1px solid #a8b5a4;padding:20px 24px;background:#fff}
+.bmc-framework-archive summary{cursor:pointer;font-size:15px;line-height:1.5;font-weight:650;color:#344b38}
+.bmc-framework-archive summary:focus-visible{outline:2px solid #24566c;outline-offset:5px}
+.bmc-framework-archive>p{max-width:900px;font-size:14px;line-height:1.6;margin:16px 0}
+.bmc-framework-archive .bmc-framework-reference{margin-top:20px}
+@media(max-width:560px){.bmc-framework-archive{padding:18px}}
+
+.bmc-page>section[id]{scroll-margin-top:88px}

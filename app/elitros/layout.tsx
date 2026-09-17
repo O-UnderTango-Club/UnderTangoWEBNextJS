@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import "./route-fix.css";
 
 export const metadata: Metadata = {
-  title: "UnderTango · Business Model Canvas | ÉLITROS 2026",
+  title: "UnderTango · Arte, eventos y comunicación | ÉLITROS 2026",
   description:
-    "El modelo de negocio, la arquitectura económica y el diagnóstico de madurez KTH de UnderTango.",
+    "Coordinación humana, eventos, comunicación, imagen y diseño para concretar objetivos. El sistema de trabajo de UnderTango en Élitros.",
   alternates: {
     canonical: "https://elitros.undertangoclub.com",
   },
   openGraph: {
-    title: "UnderTango · Business Model Canvas",
+    title: "UnderTango · Arte, eventos y comunicación",
     description:
-      "ÉLITROS 2026 · Modelo vivo de negocio y madurez KTH.",
+      "No existen sistemas sin humanos. Arte, eventos y comunicación para conectar proyectos con las personas.",
     url: "https://elitros.undertangoclub.com",
     siteName: "Ø UnderTango · ÉLITROS 2026",
     locale: "es_AR",
@@ -20,8 +20,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "UnderTango · Business Model Canvas",
-    description: "ÉLITROS 2026 · Modelo vivo de negocio y madurez KTH.",
+    title: "UnderTango · Arte, eventos y comunicación",
+    description: "No existen sistemas sin humanos. Arte, eventos y comunicación para conectar proyectos con las personas.",
     images: ["/elitros/og.png"],
   },
 };

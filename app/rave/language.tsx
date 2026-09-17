@@ -14,9 +14,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const restore = () => {
       const query = new URL(window.location.href).searchParams.get("lang");
-      let saved: string | null = null;
-      try { saved = localStorage.getItem("rave-language"); } catch { /* Storage may be disabled. */ }
-      setLanguage(valid(query) ? query : valid(saved) ? saved : "es");
+      setLanguage(valid(query) ? query : "es");
     };
     restore();
     window.addEventListener("popstate", restore);
@@ -35,7 +33,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [language, pathname]);
   const change = (next: Language) => {
     setLanguage(next);
-    try { localStorage.setItem("rave-language", next); } catch { /* The switch still works without storage. */ }
     const url = new URL(window.location.href);
     url.searchParams.set("lang", next);
     window.history.pushState(null, "", url);
@@ -59,7 +56,7 @@ export function Flag({ country }: { country: Language }) {
 }
 export function LanguagePicker() {
   const { language, change } = useContext(LanguageContext);
-  return <div className={styles.picker} role="group" aria-label="Language / Idioma">{([['en', 'English'], ['pt', 'Português'], ['es', 'Español']] as const).map(([code, label]) => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => change(code)}><Flag country={code}/><span>{label}</span></button>)}</div>;
+  return <div className={styles.picker} role="group" aria-label="Language / Idioma">{([['es', 'Español'], ['pt', 'Português'], ['en', 'English']] as const).map(([code, label]) => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => change(code)}><Flag country={code}/><span>{label}</span></button>)}</div>;
 }
 export function EnglishShortcut() {
   const { language, change } = useContext(LanguageContext);

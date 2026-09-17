@@ -60,7 +60,7 @@ export default function RavePage() {
     <section id="formatos" className={page.section} aria-labelledby="formats-title">
       <div className={page.sectionHeading}><div><p className={page.eyebrow}><T>{"EL MISMO ADN, DISTINTOS ENCUENTROS"}</T></p><h2 id="formats-title"><T>{"Elegí cómo vivirlo."}</T></h2></div><p><T>{"Una banda versátil con tres propuestas reconocibles, atravesadas por la música en vivo y el pulso electrónico."}</T></p></div>
       <div className={page.formatGrid}>{formats.map(format => <article key={format.number} className={`${page.formatCard} ${page[format.tone] || ""}`}>
-        <span className={page.number}>{format.number}</span><p className={page.eyebrow}>{t(format.root)}</p><h3>{format.title}</h3><p>{t(format.text)}</p>{format.number === "03" ? <WhatsAppLink className={styles.textLink} message={"Hola, me interesa Rave Triple Frontera"}><T>{"Consultar por la propuesta ↗"}</T></WhatsAppLink> : <RaveLink className={styles.textLink} href={format.href}><T>{"Conocer la propuesta ↗"}</T></RaveLink>}
+        <span className={page.number}>{format.number}</span><p className={page.eyebrow}>{t(format.root)}</p><h3>{t(format.title)}</h3><p>{t(format.text)}</p>{format.number === "03" ? <WhatsAppLink className={styles.textLink} message={"Hola, me interesa Rave Triple Frontera"}><T>{"Consultar por la propuesta ↗"}</T></WhatsAppLink> : <RaveLink className={styles.textLink} href={format.href}><T>{"Conocer la propuesta ↗"}</T></RaveLink>}
       </article>)}</div>
     </section>
   </main>;

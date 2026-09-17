@@ -1,5 +1,6 @@
 export type Language = "es" | "en" | "pt";
 export const translations: Record<string, [string, string]> = {
+  "Peña": ["Folk", "Peña"], "Peña Rave": ["Folk Rave", "Peña Rave"], "Rave Triple Frontera": ["Triple Frontier Rave", "Rave Tríplice Fronteira"],
   "Ø UNDERTANGO · BANDA EN VIVO": ["Ø UNDERTANGO · LIVE BAND", "Ø UNDERTANGO · BANDA AO VIVO"],
   "La raíz.": ["The roots.", "A raiz."], "El pulso.": ["The pulse.", "O pulso."], "La fiesta.": ["The party.", "A festa."],
   "Cinco instrumentistas.": ["Five instrumentalists.", "Cinco instrumentistas."],
@@ -29,11 +30,11 @@ export const translations: Record<string, [string, string]> = {
   "TANGO · ELECTRÓNICA · ROCK": ["TANGO · ELECTRONIC MUSIC · ROCK", "TANGO · ELETRÔNICA · ROCK"],
   "El tango entra en otra frecuencia. Instrumentos en vivo, bases electrónicas y energía de rock en un recorrido que va de la intensidad del tango a la fiesta.": ["Tango moves to a new frequency. Live instruments, electronic backing and rock energy take you from the intensity of tango to the dance floor.", "O tango entra em outra frequência. Instrumentos ao vivo, bases eletrônicas e energia do rock em um percurso que vai da intensidade do tango à festa."],
   "RAÍZ ARGENTINA · SONIDO CONTEMPORÁNEO": ["ARGENTINE ROOTS · CONTEMPORARY SOUND", "RAIZ ARGENTINA · SOM CONTEMPORÂNEO"],
-  "El repertorio argentino y misionero se transforma con arreglos propios, instrumentos en vivo y pulso electrónico. Una peña que invita a encontrarse y bailar.": ["Music from Argentina and Misiones takes a new shape through our own arrangements, live instruments and an electronic pulse. A peña that brings people together to dance.", "O repertório argentino e de Misiones se transforma com arranjos próprios, instrumentos ao vivo e pulso eletrônico. Uma peña que convida ao encontro e à dança."],
+  "El repertorio argentino y misionero se transforma con arreglos propios, instrumentos en vivo y pulso electrónico. Una peña que invita a encontrarse y bailar.": ["Music from Argentina and Misiones takes a new shape through our own arrangements, live instruments and an electronic pulse. A folk gathering that brings people together to dance.", "O repertório argentino e de Misiones se transforma com arranjos próprios, instrumentos ao vivo e pulso eletrônico. Uma peña que convida ao encontro e à dança."],
   "ARGENTINA · BRASIL · PARAGUAY": ["ARGENTINA · BRAZIL · PARAGUAY", "ARGENTINA · BRASIL · PARAGUAI"],
   "Músicas de los tres países se encuentran en un mismo lenguaje. La identidad de la frontera atraviesa el rock, el saxofón y la electrónica para construir una fiesta compartida.": ["Music from all three countries comes together in a shared language. The border region's identity runs through rock, saxophone and electronic music to create a celebration together.", "Músicas dos três países se encontram em uma mesma linguagem. A identidade da fronteira atravessa o rock, o saxofone e a música eletrônica para construir uma festa compartilhada."],
   "Consultar por la propuesta ↗": ["Enquire about this format ↗", "Consultar sobre a proposta ↗"], "Conocer la propuesta ↗": ["Explore this format ↗", "Conheça a proposta ↗"],
-  "Hola, me interesa Rave Triple Frontera": ["Hello, I am interested in Rave Triple Frontera", "Olá, tenho interesse no Rave Triple Frontera"],
+  "Hola, me interesa Rave Triple Frontera": ["Hello, I am interested in Triple Frontier Rave", "Olá, tenho interesse no Rave Triple Frontera"],
   "Ver en YouTube ↗": ["Watch on YouTube ↗", "Ver no YouTube ↗"], "Ver el video": ["Watch the video", "Ver o vídeo"], "Reproducir": ["Play", "Reproduzir"],
   "Saltar al contenido": ["Skip to content", "Pular para o conteúdo"], "Ø Rave — Inicio": ["Ø Rave — Home", "Ø Rave — Início"], "Productos de la banda": ["Band formats", "Formatos da banda"],
   "01 / MÚSICA EN VIVO · ELECTRÓNICA · DANZA": ["01 / LIVE MUSIC · ELECTRONIC MUSIC · DANCE", "01 / MÚSICA AO VIVO · ELETRÔNICA · DANÇA"],
@@ -46,8 +47,8 @@ export const translations: Record<string, [string, string]> = {
   "02 / REPERTORIO ARGENTINO · BANDA EN VIVO": ["02 / ARGENTINE REPERTOIRE · LIVE BAND", "02 / REPERTÓRIO ARGENTINO · BANDA AO VIVO"], "La raíz se vuelve fiesta.": ["Roots become a celebration.", "A raiz se transforma em festa."],
   "Música argentina y misionera, encuentro y banda en vivo. Estamos preparando una nueva experiencia de UnderTango.": ["Music from Argentina and Misiones, a live band and a place to come together. We are preparing a new UnderTango experience.", "Música argentina e de Misiones, encontro e banda ao vivo. Estamos preparando uma nova experiência de UnderTango."],
   "ESTRENO": ["PREMIERE", "ESTREIA"], "Septiembre 2026": ["September 2026", "Setembro de 2026"], "En preparación.": ["In preparation.", "Em preparação."],
-  "Consultar por Peña Rave ↗": ["Enquire about Peña Rave ↗", "Consultar sobre Peña Rave ↗"],
-  "Hola, quiero conocer más sobre Peña Rave y su estreno en septiembre en Puerto Iguazú.": ["Hello, I would like to know more about Peña Rave and its September premiere in Puerto Iguazú.", "Olá, gostaria de saber mais sobre Peña Rave e sua estreia em setembro em Puerto Iguazú."],
+  "Consultar por Peña Rave ↗": ["Enquire about Folk Rave ↗", "Consultar sobre Peña Rave ↗"],
+  "Hola, quiero conocer más sobre Peña Rave y su estreno en septiembre en Puerto Iguazú.": ["Hello, I would like to know more about Folk Rave and its September premiere in Puerto Iguazú.", "Olá, gostaria de saber mais sobre Peña Rave e sua estreia em setembro em Puerto Iguazú."],
 };
 export function translate(text: string, language: Language) {
   return language === "es" ? text : translations[text]?.[language === "en" ? 0 : 1] ?? text;

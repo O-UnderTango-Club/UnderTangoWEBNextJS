@@ -29,7 +29,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [language]);
   useEffect(() => {
     const previous = document.title;
-    const name = pathname?.includes("pena-rave") ? "Peña Rave" : pathname?.includes("tango-rave") ? "Tango Rave" : "UnderTango Rave";
+    const name = pathname?.includes("pena-rave") ? (language === "en" ? "Folk Rave" : "Peña Rave") : pathname?.includes("tango-rave") ? "Tango Rave" : "UnderTango Rave";
     document.title = `${name} | ${language === "en" ? "Live band from Puerto Iguazú" : language === "pt" ? "Banda ao vivo de Puerto Iguazú" : "Banda en vivo desde Puerto Iguazú"}`;
     return () => { document.title = previous; };
   }, [language, pathname]);

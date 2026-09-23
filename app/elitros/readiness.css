@@ -1,0 +1,21 @@
+.bmc-radar-help,.bmc-radar-method{max-width:1000px;margin:18px auto;font-size:14px;line-height:1.5;color:#405943}
+.bmc-radar-interactive .bmc-radar-layout{align-items:start}
+.bmc-radar-chart-column{min-width:0}
+.bmc-radar-point{cursor:pointer;outline:none}
+.bmc-radar-point:focus-visible .bmc-radar-hit{stroke:#a54228;stroke-width:3;fill:#d9ff4340}
+.bmc-radar-point:hover .bmc-radar-dot{fill:#24566c}
+.bmc-radar-next-step{border:1px solid #a8b5a4;border-top:4px solid #24566c;background:#f6f5ed;padding:20px;margin-top:18px;min-height:300px}
+.bmc-radar-next-step h3{font-size:19px;line-height:1.3;margin:10px 0;color:#344b38}
+.bmc-radar-next-step p,.bmc-radar-next-step li{font-size:14px;line-height:1.55}
+.bmc-radar-next-step ol{padding-left:21px;margin:14px 0}
+.bmc-radar-next-step li+li{margin-top:8px}
+.bmc-radar-next-step .bmc-radar-step-label{font-size:11px;font-weight:700;letter-spacing:.04em;color:#24566c}
+.bmc-radar-close{float:right;border:1px solid #a8b5a4;background:white;padding:8px;color:#344b38;cursor:pointer;font:inherit;font-size:12px}
+.bmc-radar-close:focus-visible{outline:2px solid #24566c;outline-offset:3px}
+.bmc-readiness-select{display:block;width:100%;min-height:48px;border:0;padding:4px 0;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit}
+.bmc-readiness-select span{display:block;font-size:12px;line-height:1.45;color:#496052}
+.bmc-readiness-select strong{display:block;font-size:16px;line-height:1.4;color:#344b38;margin:3px 0}
+.bmc-readiness-select:focus-visible{outline:2px solid #24566c;outline-offset:4px}
+.bmc-readiness article[data-selected="true"]{background:#e9eee7;box-shadow:-4px 0 #24566c}
+.bmc-radar-interactive .bmc-readiness article{padding:12px 10px;transition:background .15s}
+@media(max-width:900px){.bmc-radar-interactive .bmc-radar-layout{grid-template-columns:minmax(0,1fr)}.bmc-radar-chart-column{display:contents}.bmc-radar-interactive .bmc-current-radar{order:0}.bmc-radar-interactive .bmc-readiness{order:1}.bmc-radar-next-step{order:2;min-height:0}.bmc-radar-next-step[data-active="true"]{position:fixed;bottom:12px;left:12px;right:12px;max-height:42vh;overflow:auto;z-index:30;box-shadow:0 -4px 16px #00000025}.bmc-radar-next-step h3{font-size:17px}}

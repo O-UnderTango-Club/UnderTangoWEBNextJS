@@ -21,7 +21,7 @@ export default function Pitch() {
         <article>
           <span className="bmc-pitch-label">01 · AUDIENCIA</span>
           <h3>Quienes nos escuchan</h3>
-          <p>Equipos científicos y tecnológicos de Élitros, mentores, aceleradoras y fondos de inversión. Nos dirigimos a quienes necesitan una coordinación humana, artística o comunicacional para realizar un evento, presentar su trabajo o conectar con las personas a las que buscan llegar.</p>
+          <p>Equipos científicos y tecnológicos de Élitros, Silicon Misiones, mentores, aceleradoras y fondos de inversión. Nos dirigimos a quienes necesitan una coordinación humana, artística o comunicacional para realizar un evento, presentar su trabajo o conectar con las personas a las que buscan llegar.</p>
         </article>
         <article>
           <span className="bmc-pitch-label">02 · OBJETIVO</span>
@@ -37,8 +37,8 @@ export default function Pitch() {
       </div>
 
       <div className="bmc-pitch-organism" aria-label="La organización que sostiene la propuesta">
-        <article><span>81</span><h3>El corazón</h3><p>Producción y coordinación de shows. Personas, recursos e imprevistos que hay que resolver para salir a escena.</p></article>
-        <article><span>80</span><h3>El sistema de coordinación</h3><p>Documentación, programación y seguimiento al servicio del equipo. Organiza acuerdos, responsabilidades y herramientas a partir de la experiencia del 81.</p></article>
+        <article><span>81-Shows</span><h3>El corazón</h3><p>Producción y coordinación de shows. Personas, recursos e imprevistos que hay que resolver para salir a escena.</p></article>
+        <article><span>80-Startup</span><h3>El sistema de coordinación</h3><p>Documentación, programación y seguimiento al servicio del equipo. Organiza acuerdos, responsabilidades y herramientas a partir de la experiencia de Shows.</p></article>
         <article><span>10 / 20</span><h3>Departamentos / personas</h3><p>Una organización en actividad que conecta producción, música, formación, comunicación, finanzas y otras capacidades.</p><a href="https://www.undertangoclub.com/central">Conocer los departamentos ↗</a></article>
       </div>
 
@@ -54,8 +54,8 @@ export default function Pitch() {
           </article>
           <article>
             <div className="bmc-pitch-step"><h4>Una organización viva</h4><span>0:25–1:20 · Identidad y evidencia</span></div>
-            <p>Soy Pablo Cieslik. Somos 20 personas articuladas en 10 departamentos. Nuestro corazón es el 81: produce y coordina shows constantemente en la Triple Frontera. Hay equipos, recursos, emociones y una hora de salida a escena. En Wish resolvimos un cambio de elenco y la coordinación técnica y logística; el show se realizó. En Shopping China realizamos tres shows durante agosto, con nuevas contrataciones del mismo cliente.</p>
-            <p>Hoy hablamos desde el departamento 80, que organiza la documentación, las herramientas y el seguimiento de ese trabajo. Partimos de un sistema que usamos y ponemos a prueba en nuestra propia actividad. Nuestra fortaleza es hacer que las personas puedan coordinarse, comunicarse y concretar una entrega.</p>
+            <p>Soy Pablo Cieslik. Somos 20 personas articuladas en 10 departamentos. Shows reúne nuestra experiencia de producción en la Triple Frontera: conectamos artistas, espacios y públicos de Argentina, Brasil y Paraguay. Los vínculos estratégicos con Not Only Wine y La Cava del Hotel Carimã acercan el arte al vino, la gastronomía y el turismo. Esa red de confianza permite construir propuestas compartidas y dar continuidad a cada encuentro.</p>
+            <p>Hoy hablamos desde el departamento 80-Startup, que organiza la documentación, las herramientas y el seguimiento de ese trabajo. Partimos de un sistema que usamos y ponemos a prueba en nuestra propia actividad. Nuestra fortaleza es hacer que las personas puedan coordinarse, comunicarse y concretar una entrega.</p>
           </article>
           <article>
             <div className="bmc-pitch-step"><h4>Dónde aportamos y cómo trabajamos</h4><span>1:20–2:05 · Alcance y método</span></div>
@@ -72,14 +72,15 @@ export default function Pitch() {
         <aside className="bmc-pitch-support" aria-label="Material que sostiene el pitch">
           <article>
             <h3>Nuestra identidad</h3>
-            <p>UnderTango está vivo: produce eventos, reúne personas y comunica a través del arte. Desde el departamento 80 organizamos esa experiencia en un sistema de coordinación que adaptamos a entregas humanas, artísticas y comunicacionales.</p>
-            <a href="https://www.undertangoclub.com/80-startup-undertango">Conocer el departamento 80 ↗</a>
+            <p>UnderTango está vivo: produce eventos, reúne personas y comunica a través del arte. Desde 80-Startup organizamos esa experiencia en un sistema de coordinación que adaptamos a entregas humanas, artísticas y comunicacionales.</p>
+            <a href="https://www.undertangoclub.com/80-startup-undertango">Conocer 80-Startup ↗</a>
           </article>
           <article>
             <h3>Hechos que sostienen el relato</h3>
-            <p><strong>Resolver un imprevisto.</strong> Wish, 23/08/2026: cambio de elenco, coordinación técnica y logística; show realizado.</p>
-            <p><strong>Sostener entregas.</strong> Shopping China, 15, 29 y 30/08/2026: tres shows realizados y pagados. Una relación que se sostiene con nuevas contrataciones.</p>
-            <p><strong>Conservar acuerdos y decisiones.</strong> Panel operativo y herramientas conectadas en uso para organizar tareas, responsables, estados y evidencia.</p>
+            <p><strong>Selección provincial.</strong> UnderTango fue seleccionado para la instancia provincial de Emprendimiento Argentino 2026, categoría Emprendimientos Tradicionales — Crecimiento y expansión. La presentación será en Silicon Misiones el 5 de octubre.</p>
+            <p><strong>Vínculos estratégicos.</strong> Not Only Wine y La Cava del Hotel Carimã forman parte de nuestra red de colaboración entre arte, vino, gastronomía y turismo en la Triple Frontera.</p>
+            <p><strong>Organización visible.</strong> En septiembre publicamos el mapa de proyectos y equipos y la visualización del sistema de herramientas. Se apoyan en un panel operativo en uso para coordinar tareas, responsables, acuerdos y entregas.</p>
+            <a href="https://www.undertangoclub.com/mapa">Ver proyectos y equipos ↗</a>
             <a href="/elitros/sistema-de-herramientas">Ver cómo se organiza el sistema ↗</a>
           </article>
           <article>
@@ -102,7 +103,7 @@ export default function Pitch() {
 
       <footer className="bmc-pitch-footer">
         <p><strong>Para conversar:</strong> traé un evento por realizar, una idea que necesite comunicarse o una entrega de imagen y diseño que requiera organizar al equipo. Definimos juntos el objetivo y el primer paso.</p>
-        <p className="bmc-pitch-note">Guion de 362 palabras para ensayar. Los tiempos son orientativos. La experiencia del 81 respalda el sistema en eventos; su adaptación a otra entrega se acuerda y evalúa con el equipo y su público.</p>
+        <p className="bmc-pitch-note">Guion para ensayar en tres minutos. Los tiempos son orientativos. La experiencia de 81-Shows respalda el sistema en eventos; su adaptación a otra entrega se acuerda y evalúa con el equipo y su público.</p>
         <a href="https://www.argentina.gob.ar/sites/default/files/elitros_2026_-_bases_y_condiciones.pdf" target="_blank" rel="noopener noreferrer">Contexto de la audiencia: bases oficiales de Élitros 2026 ↗</a>
       </footer>
     </section>

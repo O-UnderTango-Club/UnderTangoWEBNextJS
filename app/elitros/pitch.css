@@ -15,7 +15,7 @@
 .bmc-pitch-organism{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:28px;border:1px solid #a8b5a4;background:#f6f5ed}
 .bmc-pitch-organism>article{min-width:0;padding:26px}
 .bmc-pitch-organism>article+article{border-left:1px solid #a8b5a4}
-.bmc-pitch-organism>article>span{font:600 clamp(32px,3.5vw,48px)/1.1 var(--font-undertango-sans),Arial,sans-serif;color:#344b38;letter-spacing:-.035em}
+.bmc-pitch-organism>article>span{font:600 clamp(24px,2.6vw,36px)/1.1 var(--font-undertango-sans),Arial,sans-serif;color:#344b38;letter-spacing:-.035em;overflow-wrap:anywhere}
 .bmc-pitch-organism h3{font-size:18px;margin:14px 0 10px}
 .bmc-pitch-organism p{font-size:14px;margin:0}
 .bmc-pitch-body{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(240px,.8fr);gap:32px;margin-top:32px;align-items:start}

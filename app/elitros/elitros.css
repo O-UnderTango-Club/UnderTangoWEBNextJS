@@ -1,5 +1,6 @@
 .bmc-page .bmc-onepager-link{display:block;width:fit-content;margin-top:20px;font-size:14px;font-weight:700;text-decoration:underline;text-underline-offset:5px}
-.bmc-onepager{padding:72px 4vw;border-bottom:1px solid var(--ink);scroll-margin-top:72px}
+.bmc-onepager{position:relative;padding:72px 4vw;border-bottom:1px solid var(--ink);scroll-margin-top:72px}
+.bmc-onepager-anchor{position:absolute;top:0;left:0;width:1px;height:1px;scroll-margin-top:88px;pointer-events:none}
 .bmc-onepager-sheet{max-width:1180px;margin-inline:auto;border:1px solid var(--ink);background:#fff}
 .bmc-onepager-header{padding:30px 32px;background:var(--paper);border-top:6px solid var(--orange);border-bottom:1px solid var(--ink)}
 .bmc-onepager-header .bmc-onepager-kicker{margin:0 0 14px;font-size:11px;font-weight:800;letter-spacing:.12em}

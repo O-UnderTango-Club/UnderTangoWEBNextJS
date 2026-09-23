@@ -14,7 +14,7 @@ export default function Pitch() {
       <dl className="bmc-pitch-meta">
         <div><dt>Emprendimiento</dt><dd>Startup Ø UnderTango</dd></div>
         <div><dt>Duración propuesta</dt><dd>3 minutos · con pausas</dd></div>
-        <div><dt>Versión del plan</dt><dd><time dateTime="2026-09-17">17 de septiembre de 2026</time></dd></div>
+        <div><dt>Versión del plan</dt><dd><time dateTime="2026-09-23">23 de septiembre de 2026</time></dd></div>
       </dl>
 
       <div className="bmc-pitch-plan">
@@ -64,7 +64,7 @@ export default function Pitch() {
           </article>
           <article className="bmc-pitch-close">
             <div className="bmc-pitch-step"><h4>El cuidado y la invitación</h4><span>2:05–3:00 · El encuentro con las personas</span></div>
-            <p>El arte está en cómo escuchamos, en la imagen que construimos, en el ritmo de un encuentro y en cómo respondemos a lo inesperado. El humor rompe el hielo. La comunicación clara permite decidir. Las emociones, el cariño y el cuidado ayudan a sostener el trabajo compartido.</p>
+            <p>Cuidamos qué queremos que el público sienta y qué transmite el equipo. Escuchamos, acompañamos las tensiones y equilibramos el clima del encuentro. Con el arte y la organización buscamos emociones positivas, recuerdos compartidos y lazos humanos más fuertes. La IA nos ayuda a organizar para dedicar más atención a las personas, hoy.</p>
             <p>Si su equipo necesita organizar un evento, comunicar lo que hace o coordinar personas y herramientas para una entrega de este tipo, conversemos. Acordamos el alcance y cómo evaluar lo realizado y su llegada al público. UnderTango es una forma de pensar: dar vida a los proyectos para que puedan encontrarse con las personas. No existen sistemas sin humanos.</p>
           </article>
         </div>

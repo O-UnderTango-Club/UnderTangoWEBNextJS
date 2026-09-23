@@ -6,7 +6,7 @@ const canvas = [
   ["01", "Socios clave", "Artistas, diseñadores, comunicadores, proveedores técnicos, espacios y aliados territoriales. Especialistas del proyecto para acordar contenidos y responsabilidades."],
   ["02", "Actividades clave", "Comprender el objetivo y el público; diseñar eventos, experiencias y comunicación; conformar equipos, coordinar personas y herramientas, producir, ensayar y verificar entregas."],
   ["03", "Recursos clave", "Experiencia en eventos, capacidades artísticas y de diseño, equipos humanos, relaciones de confianza, memoria operativa y herramientas de coordinación."],
-  ["04", "Propuesta de valor", "La coordinación humana, artística y comunicacional necesaria para una entrega acordada. Un sistema de trabajo usado en eventos, con responsables, ensayos, seguimiento y registro."],
+  ["04", "Propuesta de valor", "Coordinación humana, artística y comunicacional que cuida la experiencia emocional de una entrega acordada. Buscamos generar emociones positivas y fortalecer los vínculos entre las personas."],
   ["05", "Relación con clientes", "Escucha del objetivo, definición compartida del alcance, comunicación directa, puntos de revisión y evaluación de la entrega y de su llegada al público."],
   ["06", "Canales", "Relaciones directas, referencias de trabajos realizados, eventos, muestras de comunicación y diseño, vínculos con instituciones, equipos de Élitros y aliados."],
   ["07", "Segmentos", "Equipos, empresas e instituciones que necesitan realizar un evento, presentar una idea, comunicar su trabajo o coordinar personas y herramientas para una entrega artística o comunicacional."],
@@ -41,9 +41,9 @@ export default function ElitrosPage() {
 
       <section className="bmc-hero" id="inicio">
         <div>
-          <p className="bmc-eyebrow">ÉLITROS · MODELO VIVO · 17 SEPTIEMBRE 2026</p>
+          <p className="bmc-eyebrow">ÉLITROS · MODELO VIVO · 23 SEPTIEMBRE 2026</p>
           <h1>Arte, eventos y comunicación <em>para concretar objetivos.</em></h1>
-          <p className="bmc-lead">UnderTango organiza equipos humanos y sus herramientas para realizar eventos, comunicar ideas y construir experiencias. Ponemos el arte, la imagen y el diseño al servicio de una entrega concreta y de las personas a las que debe llegar.</p>
+          <p className="bmc-lead">UnderTango organiza equipos humanos y sus herramientas para realizar eventos, comunicar ideas y construir experiencias. Cuidamos lo que el equipo transmite y lo que el público vive: ponemos el arte, la imagen y el diseño al servicio de emociones positivas, recuerdos compartidos y vínculos humanos.</p>
           <a className="bmc-cta" href="#pitch">Ver el pitch <span>↓</span></a>
           <a className="bmc-onepager-link" href="#one-pager">Ver one-pager · Septiembre 2026 ↓</a>
           <a className="bmc-onepager-link" href="#canvas">Explorar el modelo ↓</a>
@@ -64,11 +64,11 @@ export default function ElitrosPage() {
           <div className="bmc-onepager-grid">
             <article className="bmc-onepager-block">
               <h3>PROBLEMA</h3>
-              <p>Una idea valiosa necesita un equipo que se entienda y una forma de encontrarse con su público. Acuerdos dispersos, responsabilidades poco claras o una comunicación que no conecta pueden dificultar ese encuentro. En eventos, presentaciones y acciones de comunicación, esa dimensión humana requiere tanto trabajo como la realización material.</p>
+              <p>Una idea valiosa necesita un equipo que se entienda y una forma de encontrarse con su público. Las tensiones, los desencuentros o una comunicación que no conecta también forman parte de esa experiencia. En eventos, presentaciones y acciones de comunicación, cuidar qué queremos transmitir y qué buscamos que el público sienta requiere tanto trabajo como la realización material.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>TESIS HUMANA Y TECNOLÓGICA</h3>
-              <p>No existen sistemas sin humanos. Combinamos escucha, criterio artístico, diseño y producción con herramientas digitales que conservan acuerdos, responsables y avances. La automatización y la IA acompañan tareas de organización; el equipo define el sentido, toma decisiones y se hace cargo de la entrega.</p>
+              <p>No existen sistemas sin humanos. Combinamos escucha, criterio artístico, diseño y producción para acompañar y equilibrar el clima emocional dentro de nuestro alcance. La automatización y la IA apoyan la organización para dedicar más atención a las personas: escuchar, cuidar y crear experiencias positivas que fortalezcan sus vínculos. El equipo define el sentido y asume la entrega.</p>
             </article>
             <article className="bmc-onepager-block">
               <h3>ESTADO ACTUAL Y TRACCIÓN (TRL/CRL)</h3>
@@ -96,7 +96,7 @@ export default function ElitrosPage() {
             <article className="bmc-onepager-block bmc-onepager-ask">
               <h3>PRÓXIMOS HITOS + ASK</h3>
               <p>1. Acordar una intervención: objetivo, público, entrega, responsables, recursos, plazos y criterios de aceptación. Puede ser un evento, una presentación o un trabajo de comunicación, imagen y diseño.</p>
-              <p>2. Evaluar la ejecución y la comunicación: cumplimiento de lo acordado, incidencias, participación, comprensión del mensaje y devolución del público o del equipo, según lo que corresponda al caso.</p>
+              <p>2. Evaluar la ejecución y la experiencia: cumplimiento de lo acordado, incidencias, comprensión del mensaje y devolución del público y del equipo sobre cómo vivieron el encuentro y qué recuerdan, según lo que corresponda al caso.</p>
               <p>3. Sostener el modelo: contrastar costos y margen, documentar permisos y responsabilidades y acordar las condiciones con artistas, proveedores y aliados. Los aspectos legales, de cobertura y de representación internacional siguen en desarrollo.</p>
               <p>Línea económica posterior: evaluar mecanismos cripto para cobros, pagos y distribución, sujetos a utilidad demostrable y revisión legal, fiscal y de riesgos.</p>
               <p>Buscamos equipos con una necesidad concreta de coordinación humana, eventos o comunicación, y aliados que nos acerquen a ellos. En Élitros queremos conectar estos recursos artísticos con proyectos científicos y tecnológicos. Financiamiento y metas de expansión pendientes de definición.</p>

@@ -47,7 +47,6 @@ export default function ElitrosPage() {
             <h2 id="onepager-title">UNDERTANGO</h2>
             <p className="bmc-onepager-summary">Coordinamos personas y herramientas para realizar eventos, comunicar ideas y dar forma a su imagen y diseño.</p>
             <p className="bmc-onepager-meta">Puerto Iguazú, Misiones, Argentina · PROGRAMA ÉLITROS · Septiembre de 2026</p>
-            <a className="bmc-onepager-link" href="https://elitros.undertangoclub.com/#onepager">Enlace directo al one pager ↗</a>
           </header>
           <div className="bmc-onepager-grid">
             <article className="bmc-onepager-block">

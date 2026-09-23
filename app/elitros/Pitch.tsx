@@ -102,7 +102,7 @@ export default function Pitch() {
 
       <footer className="bmc-pitch-footer">
         <p><strong>Para conversar:</strong> traé un evento por realizar, una idea que necesite comunicarse o una entrega de imagen y diseño que requiera organizar al equipo. Definimos juntos el objetivo y el primer paso.</p>
-        <p className="bmc-pitch-note">Guion de 357 palabras para ensayar. Los tiempos son orientativos. La experiencia del 81 respalda el sistema en eventos; su adaptación a otra entrega se acuerda y evalúa con el equipo y su público.</p>
+        <p className="bmc-pitch-note">Guion de 362 palabras para ensayar. Los tiempos son orientativos. La experiencia del 81 respalda el sistema en eventos; su adaptación a otra entrega se acuerda y evalúa con el equipo y su público.</p>
         <a href="https://www.argentina.gob.ar/sites/default/files/elitros_2026_-_bases_y_condiciones.pdf" target="_blank" rel="noopener noreferrer">Contexto de la audiencia: bases oficiales de Élitros 2026 ↗</a>
       </footer>
     </section>

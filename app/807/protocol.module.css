@@ -73,3 +73,5 @@
   .contents { gap: 14px 20px; }
   .main .section { padding-top: 34px; }
 }
+
+.networkPreview{max-width:680px;margin:36px auto 0}.networkPreview>h3{font-size:20px}.networkPreview>a{display:inline-block;margin-top:18px}

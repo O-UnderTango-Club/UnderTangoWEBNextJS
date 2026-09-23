@@ -4,3 +4,16 @@
 @media(max-width:1000px){.workspace{grid-template-columns:1fr}.details{border-left:0;border-top:1px solid #294047}.details ul{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}.scene{height:530px}}
 @media(max-width:600px){.page{padding:0 16px}.header{padding:22px 0}.header span{display:none}.header>a:last-child{font-size:11px}.intro{padding:38px 0 30px}.intro h1{font-size:39px;letter-spacing:-1.8px}.intro>p:last-child{font-size:13px}.toolbar{gap:5px;padding:10px}.toolbar>span{width:100%;margin-bottom:5px}.toolbar button{font-size:10px;padding:6px 8px}.scene{height:430px}.node{padding:5px 6px;border-radius:5px}.node strong{font-size:8px}.node span{display:none}.sceneHint{font-size:7px;letter-spacing:.6px;left:10px}.dimension{font-size:7px;right:10px}.filters{padding:10px;gap:3px}.filters button{font-size:9px;padding:5px 7px}.details{padding:24px 20px}.details ul{grid-template-columns:1fr}.page .journey{grid-template-columns:1fr;gap:25px;padding:40px 0}.step{padding:20px}.step button{font-size:10px}.directory>div{grid-template-columns:1fr}.footer{flex-direction:column;gap:12px}}
 @media(prefers-reduced-motion:reduce){.node{transition:none}}
+
+/* Embedded overview: shares the full atlas, with fewer controls and explanations. */
+.page.compact{min-height:0;padding:0;border-radius:16px;overflow:hidden;margin-top:28px}
+.compact .workspace{display:block}
+.compact .scene{height:auto;aspect-ratio:1;max-height:none}
+.compact .node{padding:5px 7px}
+.compact .node strong{font-size:10px}
+.compact .node span,.compact .dimension{display:none}
+.compact .selection{padding:16px 20px;font-size:13px;min-height:72px;color:var(--muted)}
+.compact .selection strong{color:var(--ink)}
+.compact .directory{padding:0 20px 20px;border:0}
+.compact .directory>div{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:600px){.compact .node{padding:4px}.compact .node strong{font-size:8px}.compact .directory>div{grid-template-columns:1fr}.compact .sceneHint{font-size:7px}}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Header from "../components/header";
 import CopyPrompt from "./CopyPrompt";
+import ToolNetwork from "../elitros/sistema-de-herramientas/ToolNetwork";
 import { accessNote, handoff, historicalDoc, introduction, maintenance, protocols, protocolTitle, resources, reviewedAt, rules, startPrompt, workingModes } from "./protocol";
 import styles from "./protocol.module.css";
 
@@ -35,6 +36,11 @@ export default function ProtocolPage() {
           <div className={styles.sectionHeading}><span>01</span><div><h2 id="fuentes">Dónde está cada cosa</h2><p>Ir a la fuente original. Consultar sólo lo que requiere la tarea.</p></div></div>
           <div className={styles.resources}>{resources.map(resource => <article className={styles.resource} key={resource.href}><p className={styles.badge}>{resource.access}</p><h3><a href={resource.href} target="_blank" rel="noopener noreferrer">{resource.name} <span aria-hidden="true">↗</span></a></h3><p>{resource.purpose}</p></article>)}</div>
           <p className={styles.access}>{accessNote}</p>
+          <div className={styles.networkPreview}>
+            <h3>Cómo se conectan las herramientas</h3>
+            <ToolNetwork compact />
+            <a className={styles.textLink} href="/elitros/sistema-de-herramientas">Abrir el diagrama 3D interactivo completo ↗</a>
+          </div>
         </section>
 
         <section className={styles.section} aria-labelledby="protocolos">

@@ -178,7 +178,7 @@ export default function CentralMap() {
             </div>
 
             {activeSection && (
-              <section className={`${styles.subpanel} ${activeSection === "finance" ? styles.financeSubpanel : ""}`} id={`department-${selected.number}-${activeSection}`} aria-labelledby={`department-${selected.number}-${activeSection}-title`}>
+              <section className={`${styles.subpanel} ${activeSection === "finance" ? styles.financeSubpanel : ""} ${activeSection === "multiversos" ? styles.milestoneSubpanel : ""}`} id={`department-${selected.number}-${activeSection}`} aria-labelledby={`department-${selected.number}-${activeSection}-title`}>
                 <header className={styles.subpanelHeader}>
                   <button ref={detailBackButton} type="button" className={styles.back} onClick={closeSection}>← Volver</button>
                   <div>

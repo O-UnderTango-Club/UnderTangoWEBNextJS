@@ -160,6 +160,7 @@
 .financeSubpanel { margin: 0 !important; padding: 0 !important; }
 
 .milestoneLink { padding: 0; border: 0; background: none; color: #e2c477; font: 600 16px/1.4 sans-serif; text-align: left; cursor: pointer; }
+.milestoneSubpanel { margin: 0 !important; padding: 0 !important; }
 .milestoneLink:focus-visible, .milestoneContent a:focus-visible { outline: 2px solid #d1a844; outline-offset: 4px; }
 .milestoneContent { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1fr); align-items: center; gap: clamp(20px, 4vw, 48px); padding: clamp(18px, 3vw, 32px); }
 .milestonePoster { display: block; width: min(100%, 360px); justify-self: center; }
@@ -170,6 +171,8 @@
 .milestoneText h4 span { display: block; margin-top: 10px; color: #b59649; font-size: .65em; }
 .milestoneText a { display: inline-block; margin-top: 12px; color: #e2c477; }
 @media (max-width: 720px) {
+  .milestoneSubpanel .subpanelHeader { padding-top: 50px; }
+  .milestoneSubpanel .subpanelHeader > span { display: none; }
   .milestoneContent { grid-template-columns: 1fr; align-content: start; }
   .milestonePoster { width: min(100%, 280px); }
   .milestoneText h4 { font-size: 30px; }

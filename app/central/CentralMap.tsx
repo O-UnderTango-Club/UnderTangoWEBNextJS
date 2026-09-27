@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { departments, type DepartmentMember } from "./departments";
 import styles from "./central.module.css";
 import FinanceReconstruction from "./FinanceReconstruction";
+import Image from "next/image";
 
 const countries = [{ code: "AR", name: "Argentina" }, { code: "BR", name: "Brasil" }, { code: "PY", name: "Paraguay" }] as const;
 const chartColors = ["#d7b35a", "#b96365", "#71968a", "#c48750", "#9585b8", "#789bbd", "#b9be6b", "#d693b6", "#81b7b0", "#a08b73"];
@@ -26,12 +27,13 @@ function MemberCard({ member }: { member: DepartmentMember }) {
 
 export default function CentralMap() {
   const [selectedNumber, setSelectedNumber] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<"members" | "projects" | "finance" | null>(null);
+  const [activeSection, setActiveSection] = useState<"members" | "projects" | "finance" | "multiversos" | null>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const detailBackButton = useRef<HTMLButtonElement>(null);
   const membersButton = useRef<HTMLButtonElement>(null);
   const projectsButton = useRef<HTMLButtonElement>(null);
   const reportButton = useRef<HTMLButtonElement>(null);
+  const milestoneButton = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const selected = departments.find((department) => department.number === selectedNumber);
   const matrix = departments.slice(0, 9);
@@ -49,7 +51,7 @@ export default function CentralMap() {
     requestAnimationFrame(() => returnFocus.current?.focus());
   }, []);
 
-  const openSection = (section: "members" | "projects" | "finance") => {
+  const openSection = (section: "members" | "projects" | "finance" | "multiversos") => {
     setActiveSection(section);
     requestAnimationFrame(() => detailBackButton.current?.focus());
   };
@@ -61,8 +63,24 @@ export default function CentralMap() {
       if (previousSection === "finance") reportButton.current?.focus();
       if (previousSection === "members") membersButton.current?.focus();
       if (previousSection === "projects") projectsButton.current?.focus();
+      if (previousSection === "multiversos") milestoneButton.current?.focus();
     });
   }, [activeSection]);
+
+  useEffect(() => {
+    const openLinkedMilestone = () => {
+      if (window.location.hash === "#84-multiversos") {
+        setSelectedNumber("84");
+        setActiveSection("multiversos");
+      }
+    };
+    const frame = requestAnimationFrame(openLinkedMilestone);
+    window.addEventListener("hashchange", openLinkedMilestone);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", openLinkedMilestone);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selected) return;
@@ -141,7 +159,12 @@ export default function CentralMap() {
                 <span className={styles.panelNumber}>{selected.number}</span>
                 <div><p>{selected.keyword}</p><h2 id={`department-${selected.number}-title`}>{selected.title}</h2></div>
               </header>
-              <div className={styles.description}><p>{selected.description}</p>{selected.link && <a href={selected.link.href}>{selected.link.label} →</a>}{selected.emptyLabel && <strong>{selected.emptyLabel}</strong>}</div>
+              <div className={styles.description}>
+                <p>{selected.description}</p>
+                {selected.link && <a href={selected.link.href}>{selected.link.label} →</a>}
+                {selected.emptyLabel && <strong>{selected.emptyLabel}</strong>}
+                {selected.number === "84" && <button ref={milestoneButton} type="button" className={styles.milestoneLink} onClick={() => openSection("multiversos")} aria-expanded={activeSection === "multiversos"} aria-controls="department-84-multiversos">Hito · Selección oficial en Multiversos →</button>}
+              </div>
               <div className={styles.metricGrid}>
                 <button ref={membersButton} type="button" className={styles.metric} aria-expanded={activeSection === "members"} aria-controls={`department-${selected.number}-members`} onClick={() => openSection("members")}>
                   <span className={styles.metricCount}>{selected.members.length}</span>
@@ -160,11 +183,24 @@ export default function CentralMap() {
                   <button ref={detailBackButton} type="button" className={styles.back} onClick={closeSection}>← Volver</button>
                   <div>
                     <p>{selected.number} · {selected.keyword}</p>
-                    <h3 id={`department-${selected.number}-${activeSection}-title`}>{activeSection === "finance" ? "Informe financiero 2026" : activeSection === "members" ? (selected.clients ? "Alianzas" : "Integrantes") : (selected.clients ? "Clientes" : "Proyectos activos")}</h3>
+                    <h3 id={`department-${selected.number}-${activeSection}-title`}>{activeSection === "multiversos" ? "Hito audiovisual" : activeSection === "finance" ? "Informe financiero 2026" : activeSection === "members" ? (selected.clients ? "Alianzas" : "Integrantes") : (selected.clients ? "Clientes" : "Proyectos activos")}</h3>
                   </div>
-                  <span>{activeSection === "finance" ? "87" : activeSection === "members" ? selected.members.length : (selected.clients?.length ?? selected.projects.length)}</span>
+                  <span>{activeSection === "multiversos" ? "84" : activeSection === "finance" ? "87" : activeSection === "members" ? selected.members.length : (selected.clients?.length ?? selected.projects.length)}</span>
                 </header>
-                {activeSection === "finance" ? <FinanceReconstruction /> : activeSection === "members" ? (
+                {activeSection === "multiversos" ? (
+                  <article className={`${styles.subpanelContent} ${styles.milestoneContent}`}>
+                    <a className={styles.milestonePoster} href="/images/multiversos/justicia-de-frente.png" target="_blank" rel="noopener noreferrer" aria-label="Ver flyer completo de Justicia de frente">
+                      <Image src="/images/multiversos/justicia-de-frente.png" alt="Justicia de frente — Øid Mortales. Videoclip de ciencia ficción. Selección oficial Multiversos. CIESLIK." width={1122} height={1402} sizes="(max-width: 720px) 80vw, 400px" />
+                    </a>
+                    <div className={styles.milestoneText}>
+                      <p className={styles.milestoneDate}>Septiembre 2026 · Selección oficial</p>
+                      <h4>Justicia de frente <span>Øid Mortales</span></h4>
+                      <p>El videoclip de ciencia ficción «Justicia de frente — Øid Mortales» integra la selección oficial de <strong>Multiversos — Festival de Arte y Tecnología</strong>.</p>
+                      <p>Un hito del trabajo audiovisual de Pablo Cieslik en Ø UnderTango Club.</p>
+                      <a href="/images/multiversos/justicia-de-frente.png" target="_blank" rel="noopener noreferrer">Ver flyer completo ↗</a>
+                    </div>
+                  </article>
+                ) : activeSection === "finance" ? <FinanceReconstruction /> : activeSection === "members" ? (
                   selected.memberHeading ? (
                     <div className={`${styles.subpanelContent} ${styles.groupedMembers}`}>
                       <h4 className={styles.groupHeading}>{selected.memberHeading}</h4>

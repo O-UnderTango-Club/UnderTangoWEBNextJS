@@ -5,9 +5,28 @@ import { blockContent, getReviewDocument, plainText, reviewDocument, safeUrl, ty
 import styles from "./review.module.css";
 
 export const dynamic = "force-dynamic";
+const shareTitle = "UnderTango App | Red productiva";
+const shareDescription = "Cinco diapositivas y un discurso sobre el desarrollo de una app para hacer visible, conectar y reactivar la cadena productiva cultural.";
+const reviewPath = "/80/diapositivas-y-discurso";
+
 export const metadata: Metadata = {
-  title: "Revisión de diapositivas y discurso | UnderTango",
-  description: "Las cinco diapositivas, el discurso y los puntos para revisar juntos.",
+  title: shareTitle,
+  description: shareDescription,
+  alternates: { canonical: reviewPath },
+  openGraph: {
+    title: shareTitle,
+    description: shareDescription,
+    url: reviewPath,
+    siteName: "Ø UnderTango Club",
+    locale: "es_AR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: shareTitle,
+    description: shareDescription,
+    images: [`${reviewPath}/opengraph-image`],
+  },
   robots: { index: false, follow: false },
 };
 

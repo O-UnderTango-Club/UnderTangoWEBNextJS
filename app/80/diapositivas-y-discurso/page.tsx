@@ -96,8 +96,15 @@ export default async function ReviewPage() {
       <h1>{document?.title || reviewDocument.title}</h1>
       <p className={styles.source}><a href={reviewDocument.url} target="_blank" rel="noopener noreferrer">Abrir documento en Notion ↗</a></p>
       {document ? <>
-        <nav className={styles.contents} aria-label="Ir a una diapositiva">
-          {headings.map(block => <a key={block.id} href={`#${block.id}`}>{plainText(blockContent(block).rich_text)}</a>)}
+        <nav className={styles.contents} aria-label="Índice de diapositivas">
+          {headings.map(block => {
+            const heading = plainText(blockContent(block).rich_text);
+            const slide = heading.match(/^(?:\d{1,2}:\d{2}\s*·\s*)?(?:(?:CAMBIAR A )?DIAPOSITIVA\s*)?(\d+)\s*·\s*(.+)$/i);
+            return <a key={block.id} href={`#${block.id}`}>
+              {slide && <span className={styles.contentsNumber} aria-hidden="true">{slide[1].padStart(2, "0")}</span>}
+              <span className={styles.contentsTitle}>{slide?.[2] || heading}</span>
+            </a>;
+          })}
         </nav>
         <Blocks blocks={document.blocks} />
       </> : <p role="status">El documento está disponible en Notion. En este momento no se puede mostrar aquí; podés abrir el original desde el enlace de arriba.</p>}

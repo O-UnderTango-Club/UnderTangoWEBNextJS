@@ -2,7 +2,7 @@
   min-height: 100vh;
   background: #faf9f6;
   color: #182c39;
-  padding: 0 clamp(20px, 5vw, 80px);
+  padding: 0 clamp(16px, 3vw, 64px);
   font-family: var(--font-undertango-sans), Arial, sans-serif;
   font-size: 17px;
   line-height: 1.8;
@@ -26,7 +26,7 @@
 .page a { color: inherit; text-underline-offset: 4px; }
 .page a:hover { color: #a34321; }
 .page a:focus-visible { outline: 3px solid #a34321; outline-offset: 6px; }
-.header, .document, .footer { max-width: 1120px; margin: 0 auto; }
+.header, .document, .footer { max-width: 1440px; margin: 0 auto; }
 .header { padding: 25px 0; border-bottom: 1px solid #d6dcd8; }
 .header nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 14px; }
 .header a { text-decoration: none; }
@@ -35,13 +35,15 @@
 .document h1 { font-size: clamp(30px, 4.2vw, 50px); line-height: 1.17; letter-spacing: -.035em; max-width: 880px; margin: 0 0 35px; }
 .introduction, .copy { max-width: 820px; }
 .page p { margin: 0 0 20px; }
-.contents { display: flex; flex-wrap: wrap; gap: 12px 25px; margin: 20px 0 35px; padding: 22px 0; border-top: 1px solid #d6dcd8; border-bottom: 1px solid #d6dcd8; font-size: 14px; }
-.contents a { text-decoration: none; }
-.contents span { color: #965231; font-size: 12px; margin-right: 5px; }
+.contents { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0 24px; margin: 20px 0 42px; padding: 24px 0; border-top: 1px solid #d6dcd8; border-bottom: 1px solid #d6dcd8; }
+.contents a { display: flex; align-items: baseline; gap: 12px; padding: 12px 0; text-decoration: none; line-height: 1.4; min-width: 0; }
+.contentsNumber { flex-shrink: 0; color: #965231; font-size: 14px; font-variant-numeric: tabular-nums; }
+.contentsTitle { font-size: 17px; font-weight: 650; overflow-wrap: normal; }
 .page .slide { opacity: 1; transform: none; transition: none; padding: 58px 0 18px; scroll-margin-top: 20px; }
 .page .slide + .slide { border-top: 1px solid #d6dcd8; margin-top: 38px; }
 .page h2 { font-size: clamp(21px, 2.6vw, 30px); line-height: 1.4; text-align: left; letter-spacing: -.02em; color: inherit; margin: 0 0 26px; display: block; }
 .page h2::after { content: none; }
+.page .block h2 { margin-top: 56px; padding-top: 28px; }
 .slide figure { margin: 0 0 34px; }
 .slide figure img { display: block; width: 100%; height: auto; border: 1px solid #d6dcd8; }
 .slide figcaption { margin-top: 9px; font-size: 12px; color: #5b6a70; }
@@ -50,10 +52,14 @@
 .note h3 { font-size: 19px; margin-bottom: 13px; }
 .note p { font-size: 16px; color: #3d4e58; margin-bottom: 8px; }
 .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; border-top: 1px solid #d6dcd8; padding: 27px 0 40px; margin-top: 50px; font-size: 14px; }
+@media (max-width: 1000px) {
+  .contents { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+}
 @media (max-width: 600px) {
   .page { font-size: 16px; line-height: 1.75; }
   .document { padding-top: 35px; }
-  .contents { gap: 12px 18px; }
+  .contents { grid-template-columns: 1fr; gap: 0; padding: 12px 0; }
+  .contents a + a { border-top: 1px solid #e5e8e3; }
   .page .slide { padding-top: 38px; }
   .page h2 { font-size: 21px; }
   .note { padding-left: 16px; }

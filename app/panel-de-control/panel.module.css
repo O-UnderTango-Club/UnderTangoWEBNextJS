@@ -34,3 +34,29 @@
 .inlineGroupEditor{margin-top:16px;padding:16px;border:1px solid #b8c8bf;border-radius:8px;background:#fff;min-width:0}.inlineGroupEditor input,.inlineGroupEditor select{max-width:100%}.inlineGroupEditor footer{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}.inlineGroupEditor .groupSteps>li{overflow-wrap:anywhere}
 
 .inlineGroupEditor label{display:block;font-size:14px;font-weight:600;margin:14px 0 6px}.inlineGroupEditor input,.inlineGroupEditor select{display:block;width:100%;padding:10px 12px;background:white;border:1px solid #bfcabe;border-radius:6px;color:#202b2a}.inlineGroupEditor details{margin:14px 0}.inlineGroupEditor summary{cursor:pointer;font-weight:600}
+
+
+/* Agenda has its own chronology; action ranking and the three fronts are unchanged. */
+.dashboard{display:grid;grid-template-columns:minmax(0,1fr) 320px;align-items:start;gap:28px;margin-top:26px}
+.workspace{min-width:0}.workspace>.tabs{margin-top:0}
+.panel .deadlines{padding:22px;background:#fffefb;border:1px solid #d5d9d3;border-top:4px solid #365d4b;border-radius:10px;position:sticky;top:20px;max-height:calc(100vh - 40px);overflow:auto;min-width:0}
+.panel .deadlinesHeader h2{font-size:24px;line-height:1.25;text-align:left;margin:8px 0}
+.panel .deadlinesHeader h2::after{display:none}.deadlinesHeader p{font-size:13px;color:#60716b;margin:0 0 18px}
+.deadlineFilters{display:grid;gap:10px}.deadlineFilters label{font-size:13px;font-weight:600}
+.deadlineFilters select{display:block;width:100%;border:1px solid #bac6be;border-radius:6px;padding:9px;color:#25453d;background:white;min-height:44px;margin-top:4px}
+.deadlineCheckbox{display:flex;align-items:center;gap:8px;min-height:32px}.deadlineCheckbox input{width:17px;height:17px}
+.deadlineList{list-style:none;padding:0;margin:0}.deadlineItem{padding:18px 0;border-top:1px solid #dce2d9}
+.deadlineDate{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;font-weight:700;color:#365d4b}
+.panel .deadlineItem h3{font-size:16px;line-height:1.45;margin:8px 0;overflow-wrap:anywhere}
+.deadlineTime{font-size:13px;color:#55665b;margin:6px 0}.deadlineMeta{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:12px;color:#60716b;align-items:center}
+.deadlineKind{font-weight:700;padding:3px 6px;border-radius:4px;background:#eee9de;color:#77552e}
+.deadlineKind[data-kind=confirmed]{background:#e4eee7;color:#315c43}.deadlineKind[data-kind=tentative]{background:#faf0dc;color:#815d20}
+.deadlineKind[data-kind=conditional]{background:#ececf5;color:#585779}.deadlinePriority{color:#8c432c;font-weight:700}
+.deadlineDetail{margin-top:10px;font-size:13px}.deadlineDetail summary{cursor:pointer;color:#315c4b;padding:6px 0}
+.deadlineDetail p{white-space:pre-line;overflow-wrap:anywhere;color:#56655c}.deadlineDetail a{overflow-wrap:anywhere}
+.deadlineFootnote{font-size:12px;color:#687267;margin-top:18px}
+.overdue{background:#fff3e8;border:1px solid #e7cdb6;border-radius:7px;padding:12px;margin:12px 0 18px;font-size:13px}
+.overdue>summary{cursor:pointer;font-weight:600;color:#824b29;min-height:24px}
+@media(min-width:1600px){.dashboard{grid-template-columns:minmax(0,1fr) 360px}}
+@media(max-width:1150px){.dashboard{grid-template-columns:1fr}.panel .deadlines{position:static;max-height:none;grid-row:1}.deadlines>.deadlineList{max-height:460px;overflow:auto;padding-right:6px}.workspace .fronts{grid-template-columns:1fr}.deadlineFilters{grid-template-columns:1fr 1fr;align-items:end}}
+@media(max-width:600px){.panel .deadlines{padding:16px}.deadlineFilters{grid-template-columns:1fr}.dashboard{gap:22px}.deadlines>.deadlineList{max-height:360px}}

@@ -53,6 +53,14 @@ await check('private RPC has no cache, redirects or browser bearer',async()=>{
  }});
  assert.equal(result.items.length,6);
 });
+await check('historical priority labels do not hide other live deadlines',async()=>{
+ const payload=fixture();payload.items[0].priority='Normal';
+ const result=await server.readDeadlines({env,fetcher:async()=>Response.json(payload)});
+ assert.equal(result.items.length,payload.items.length);
+ assert.equal(result.items.find(i=>i.id==='later').priority,'Normal');
+ assert.deepEqual(result.items.map(i=>i.id),['past','today','waiting','show','later','far']);
+ payload.items[0].priority=5;assert.throws(()=>m.parseDeadlines(payload));
+});
 await check('connection and malformed response errors do not leak private details',async()=>{
  for(const fetcher of [async()=>{throw new Error('SECRET_DATABASE_DETAIL');},async()=>new Response('SECRET_DATABASE_DETAIL',{status:500}),async()=>Response.json({})])
   await assert.rejects(server.readDeadlines({env,fetcher}),e=>!e.message.includes('SECRET_DATABASE_DETAIL'));
@@ -82,4 +90,3 @@ try {
  });
 } finally { globalThis.fetch=originalFetch; }
 console.log(count+' deadline and API checks passed');
-

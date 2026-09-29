@@ -38,8 +38,8 @@ export function parseDeadlines(value: unknown): DeadlineSnapshot {
     if (!item.id || !item.title || ids.has(item.id as string) || !validDay(item.date) ||
       !Object.hasOwn(DEADLINE_KINDS, item.kind as string) ||
       !["agenda","task","operation","case","project"].includes(item.source as string) ||
-      !["","Alta","Media","Baja","Crítica"].includes(item.priority as string) ||
       (item.taskId !== null && typeof item.taskId !== "string")) throw invalid();
+    // Historical priorities remain display text; only known values affect tie-breaking.
     ids.add(item.id as string);
     return { ...item } as DeadlineItem;
   });

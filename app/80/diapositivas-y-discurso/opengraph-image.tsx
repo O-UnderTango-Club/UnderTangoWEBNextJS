@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "UnderTango App — una red productiva que conecta cultura y trabajo. Diapositivas y discurso de la propuesta de desarrollo.";
+export const alt = "UnderTango App — una red productiva que conecta y exporta identidad argentina. Diapositivas y discurso de la propuesta de desarrollo.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const dynamic = "force-static";
@@ -15,8 +15,8 @@ export default function PitchOpenGraphImage() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", marginTop: 40, fontSize: 64, lineHeight: 1.1, fontWeight: 700 }}>
           <div>Una red productiva</div>
-          <div>que conecta</div>
-          <div style={{ color: "#ffa56d" }}>cultura y trabajo.</div>
+          <div>que conecta y exporta</div>
+          <div style={{ color: "#ffa56d" }}>identidad argentina.</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", marginTop: 32 }}>
           {["Personas", "Oficios", "Producciones"].map((label, index) => (

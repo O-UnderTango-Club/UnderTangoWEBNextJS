@@ -36,6 +36,7 @@ export default function ElitrosPage() {
           <a className="bmc-cta" href="#pitch">Ver el pitch <span>↓</span></a>
           <a className="bmc-onepager-link" href="#onepager">Ver one-pager · Septiembre 2026 ↓</a>
           <a className="bmc-onepager-link" href="#canvas">Explorar el modelo ↓</a>
+          <a className="bmc-onepager-link" href="/80/vigilancia-tecnologica">Trabajo de vigilancia tecnológica ↗</a>
         </div>
         <aside className="bmc-hero-note"><span>TESIS CENTRAL</span><strong>No existen sistemas sin humanos.</strong><p>La producción de shows es nuestro corazón. Un equipo de desarrollo organiza las herramientas y el sistema de trabajo que la sostienen. Nuestra contribución es humana, artística y comunicacional, en articulación con los especialistas de cada proyecto.</p></aside>
       </section>

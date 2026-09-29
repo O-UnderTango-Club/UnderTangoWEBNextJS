@@ -15,7 +15,15 @@ El texto se edita en Notion. Este repositorio conserva el lector y la asociació
 - El encabezado y los siete apartados se leen de Notion: los títulos de nivel 3 abren tarjetas; un separador después de las tarjetas abre el pie. Se conserva el orden y los bloques adicionales. El formato visual está en `app/elitros/onepager.module.css`.
 - La descarga `UnderTango-One-Pager-2026-09-29.pdf` es una instantánea fechada del documento aprobado el 29/09/2026. No es la fuente editable ni se regenera con cada cambio de Notion.
 
-## Conexión
+## Trabajo VTeIE
+
+- Fuente: [UnderTango · VTeIE — app y red productiva](https://app.notion.com/p/3eae2fde62f8817e979cc36efb716648).
+- Ruta: `/80/vigilancia-tecnologica`, enlazada desde `/elitros` y `/80-startup-undertango`.
+- Usa el lector existente y una asociación explícita de página. El contenido completo y el índice se obtienen de Notion; no hay copia editorial en el repositorio.
+- La ruta es pública y tiene `noindex`. Las ediciones aparecen al recargar, una vez que la API de Notion refleja los cambios. No se envía el trabajo al programa ni a Padlet al publicarlo aquí.
+- La conexión de lectura del servidor necesita acceso a esta página además de los documentos anteriores.
+
+## Conexión de lectura
 
 Crear una conexión interna de Notion con capacidad **Read content**, sin escritura, comentarios ni información de usuarios. Darle acceso sólo al documento publicado. Guardar su credencial como `NOTION_API_KEY` en el entorno del servidor de Vercel (producción y preview si corresponde). Para desarrollo usar `.env.local`, que no se versiona. Nunca usar `NEXT_PUBLIC_` ni exponer el secreto en logs o respuestas.
 

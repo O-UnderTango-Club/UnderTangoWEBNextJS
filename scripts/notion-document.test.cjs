@@ -43,13 +43,15 @@ function loadComponent(file, api) {
   return exports;
 }
 
-test('one-pager uses its own explicitly configured source', async () => {
-  const { api, calls } = load([page, { results: [paragraph('a', 'One-pager')], has_more: false }]);
-  const doc = await api.getOnePagerDocument();
-  assert.equal(doc.blocks.length, 1);
-  assert.ok(calls[0].url.endsWith(api.onePagerDocument.pageId));
-  assert.ok(calls[1].url.includes(api.onePagerDocument.pageId));
-  assert.notEqual(api.onePagerDocument.pageId, api.reviewDocument.pageId);
+test('published documents read only their explicitly configured source', async () => {
+  for (const [reader, config] of [['getOnePagerDocument', 'onePagerDocument'], ['getVigilanceDocument', 'vigilanceDocument']]) {
+    const { api, calls } = load([page, { results: [paragraph('a', 'Source text')], has_more: false }]);
+    const doc = await api[reader]();
+    assert.equal(doc.blocks.length, 1);
+    assert.ok(calls[0].url.endsWith(api[config].pageId));
+    assert.ok(calls[1].url.includes(api[config].pageId));
+    assert.notEqual(api[config].pageId, api.reviewDocument.pageId);
+  }
 });
 
 test('paginates, preserves nested content and never follows child pages', async () => {

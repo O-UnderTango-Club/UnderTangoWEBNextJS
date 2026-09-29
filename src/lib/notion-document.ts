@@ -10,6 +10,11 @@ export const onePagerDocument = {
   url: "https://app.notion.com/p/3eae2fde62f88169acd5ed407396432d",
   title: "UnderTango · One-pager ÉLITROS",
 };
+export const vigilanceDocument = {
+  pageId: "3eae2fde-62f8-817e-979c-c36efb716648",
+  url: "https://app.notion.com/p/3eae2fde62f8817e979cc36efb716648",
+  title: "UnderTango · VTeIE — app y red productiva",
+};
 export type RichText = {
   plain_text?: string;
   text?: { content: string; link?: { url: string } | null };
@@ -46,6 +51,7 @@ export function safeUrl(value: string | undefined | null, image = false): string
 // There is no public route accepting a user-supplied page ID.
 export const getReviewDocument = () => getDocument(reviewDocument);
 export const getOnePagerDocument = () => getDocument(onePagerDocument);
+export const getVigilanceDocument = () => getDocument(vigilanceDocument);
 
 async function getDocument(document: { pageId: string; title: string }) {
   const token = process.env.NOTION_API_KEY;

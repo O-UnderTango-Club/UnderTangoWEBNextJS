@@ -66,6 +66,14 @@ export default function StartupUnderTango() {
         </div>
       </section>
 
+      <section className={styles.section} aria-labelledby="vigilancia-title">
+        <div><p className={styles.eyebrow}>DOCUMENTOS DE TRABAJO · ÉLITROS</p><h2 id="vigilancia-title">Vigilancia tecnológica.</h2></div>
+        <div className={styles.copy}>
+          <p>UnderTango App y digitalización de la cadena productiva: fuentes, hallazgos y decisiones para el primer prototipo.</p>
+          <p><a href="/80/vigilancia-tecnologica"><strong>Abrir el documento de trabajo <span aria-hidden="true">↗</span></strong></a></p>
+        </div>
+      </section>
+
       <section id="herramientas" className={styles.tools} aria-labelledby="tools-title">
         <div className={styles.toolsIntro}>
           <p className={styles.eyebrow}>04 / LAS HERRAMIENTAS CON LAS QUE TRABAJAMOS</p>

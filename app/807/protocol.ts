@@ -1,11 +1,11 @@
 export const protocolTitle = "807 · Protocolo maestro";
 export const protocolUrl = "https://www.undertangoclub.com/807";
-export const reviewedAt = "13 de septiembre de 2026";
+export const reviewedAt = "28 de septiembre de 2026";
 export const introduction = "El punto de entrada al trabajo de UnderTango. Fuentes oficiales, protocolos y contexto mínimo para que una persona o una IA pueda continuar una tarea.";
 export const accessNote = "Este directorio es público. Los documentos, repositorios privados y datos operativos conservan sus permisos. Tener un enlace no concede acceso: cada asistente necesita su conexión autorizada. Si una fuente no abre, indicar cuál falta y continuar sólo con lo que se pueda comprobar. Nunca compartir contraseñas, claves ni sesiones en un chat o documento.";
 
 export const startPrompt = `Trabajás con Pablo Cieslik, director de UnderTango Club. Leé el protocolo maestro: ${protocolUrl}/protocolo.md
-Para esta tarea, consultá sólo la fuente y el protocolo necesarios. Supabase contiene el estado operativo; Drive y Docs, los documentos; GitHub, el código y los protocolos. Airtable es histórico.
+Para esta tarea, consultá sólo la fuente y el protocolo necesarios. Supabase contiene el estado operativo; Notion, los documentos editables destinados a la web; Drive y Docs, el archivo y los documentos con flujo propio; GitHub, el código y los protocolos. Airtable es histórico.
 Buscá antes de crear y respetá la autorización y el alcance del pedido. No inventes datos ni accesos. Si una fuente privada no está disponible, indicá la conexión que falta; no des por realizada una acción.
 Respondé en español. Al terminar, distinguí preparado, registrado, enviado, publicado y verificado, y dejá el siguiente paso real. Si necesitás otro asistente, entregá un traspaso breve con fuentes, resultado, pendiente y autorización.
 Mi tarea concreta es: [describir el resultado que necesito].`;
@@ -14,6 +14,7 @@ export type Resource = { name: string; href: string; purpose: string; access: st
 export const resources: Resource[] = [
   { name: "Panel de control", href: "https://www.undertangoclub.com/panel-de-control", purpose: "Interfaz diaria: acciones, grupos, frentes, proyectos y seguimientos. Consultar aquí el trabajo disponible.", access: "Acceso operativo" },
   { name: "Supabase · Sistema Operativo", href: "https://supabase.com/dashboard/project/lqsnrqnmmeyzcnurfpos", purpose: "Fuente canónica de tareas, negociaciones, operaciones y finanzas. Proyecto: UnderTango — Sistema Operativo. Referencia: lqsnrqnmmeyzcnurfpos.", access: "Conexión o cuenta autorizada" },
+  { name: "80 · Documentos en Notion", href: "https://app.notion.com/p/3eae2fde62f880e8a370e7e0657c7654", purpose: "Fuente editable de revisiones, guiones, propuestas y guías destinadas a la web. Editar en Notion; la web muestra los documentos conectados.", access: "Permisos de Notion" },
   { name: "80 · Drive de Undertango", href: "https://drive.google.com/drive/folders/1f7SeSgRDiCUNCDMXEfvqaeoCmOP-lkVX", purpose: "Carpeta de entrada a materiales, documentos y archivos de la empresa. Usar el documento original y conservar sus enlaces.", access: "Permisos de Google Drive" },
   { name: "00 · UnderTango — Sistema Operativo", href: "https://drive.google.com/drive/folders/1ftfhCpxw8kXLwxrGvgmIHN5BnY3vEsdm", purpose: "Carpeta documental del sistema operativo. Es una ubicación separada de la carpeta 80; revisar la vigencia de cada documento.", access: "Privado · Google Drive" },
   { name: "GitHub · Sistema operativo", href: "https://github.com/O-UnderTango-Club/undertango-operating-system", purpose: "Repositorio de protocolos, reglas y decisiones duraderas. Empezar por README.md y abrir sólo el protocolo aplicable. Los resúmenes de estado pueden estar desactualizados: contrastarlos con Supabase.", access: "Repositorio privado" },
@@ -24,6 +25,7 @@ export const resources: Resource[] = [
 
 const repository = "https://github.com/O-UnderTango-Club/undertango-operating-system/blob/main/";
 export const protocols: Resource[] = [
+  { name: "Documentos Notion → web", href: `${repository}PROTOCOLO_DOCUMENTOS_NOTION_WEB.md`, purpose: "Fuente editable única, publicación, permisos y verificación de la actualización automática.", access: "GitHub privado" },
   { name: "Operar en Supabase", href: `${repository}PROTOCOLO_SUPABASE.md`, purpose: "Antes de crear o modificar registros: fuentes, validaciones, auditoría y estados.", access: "GitHub privado" },
   { name: "Sistema nervioso operativo", href: `${repository}PROTOCOLO_SISTEMA_NERVIOSO.md`, purpose: "Distribución del trabajo y la información entre las herramientas.", access: "GitHub privado" },
   { name: "Frentes y prioridades", href: `${repository}PROTOCOLO_FRENTES.md`, purpose: "Planificación y orden de ejecución. Complementar con las reglas de grupos y descanso diario indicadas abajo, incorporadas el 13/09/2026.", access: "GitHub privado" },
@@ -39,7 +41,8 @@ export const historicalDoc: Resource = {
 };
 
 export const rules = [
-  { title: "Una fuente para cada cosa", text: "Supabase conserva el estado; Drive y Docs, los documentos y la memoria; GitHub, el código y las reglas; Calendar, los eventos con horario. Airtable queda sólo como histórico, sin escrituras ni alternativa cuando Supabase no está disponible." },
+  { title: "Una fuente para cada cosa", text: "Supabase conserva el estado; Notion, los documentos de trabajo destinados a la web; la web presenta esa fuente; Drive y Docs conservan archivo, masters y documentos con flujo propio; GitHub, el código y las reglas; Calendar, los eventos con horario. Airtable queda sólo como histórico, sin escrituras ni alternativa cuando Supabase no está disponible." },
+  { title: "Editar documentos en Notion", text: "La mayoría de revisiones, guiones, propuestas y guías para la web se escriben en Notion. El sitio muestra el original mediante una conexión de lectura; no mantener otra versión editable del texto en el código. Publicar sólo los documentos autorizados y comprobar que sus cambios se reflejen con el intervalo configurado. Los protocolos siguen en GitHub." },
   { title: "Registrar sin duplicar", text: "Buscar primero. Acciones en operativo.follow_ups; iniciativas en operativo.projects; deudas y compromisos en operativo.obligations; movimientos efectivamente realizados en operativo.movements. Para negociaciones, verificar la estructura y los vínculos vigentes. Usar el panel o los mecanismos auditados existentes; validar campos, relaciones y revisión antes de escribir y recargar después." },
   { title: "Ordenar acciones y grupos", text: "Los proyectos aportan contexto. Una acción independiente tiene su posición; un grupo de acciones puede ocupar una posición propia en el frente y ordenar sus pasos dentro del grupo, como Brasil / Pix. No duplicar sus miembros como acciones independientes al interpretar el ranking ni mover todo un proyecto por cambiar una acción. Usar los controles de grupos del panel y conservar los estados y dependencias de cada paso." },
   { title: "Mostrar trabajo que se puede hacer", text: "Respetar el orden y mostrar hasta tres unidades ejecutables por frente: acciones independientes o grupos con un paso disponible. Las unidades en espera conservan su posición y dejan pasar a las siguientes disponibles. No inventar trabajo para llenar espacios. Cada acción o grupo puede elegir sus días de aparición en Frentes, según America/Argentina/Cordoba. Los demás días queda en Programadas y conserva posición y estado; las dependencias siguen vigentes. Por defecto aparece todos los días. Esta disponibilidad no convierte una tarea en recurrente ni reabre tareas finalizadas. «Por hoy está bien» descansa hasta el próximo día habilitado desde mañana; conservar posición y asuntos abiertos." },

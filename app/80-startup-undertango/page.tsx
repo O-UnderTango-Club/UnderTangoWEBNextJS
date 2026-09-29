@@ -56,6 +56,14 @@ export default function StartupUnderTango() {
         </div>
       </section>
 
+      <section className={styles.section} aria-labelledby="revision-pitch">
+        <div><p className={styles.eyebrow}>DOCUMENTOS DE TRABAJO</p><h2 id="revision-pitch">Diapositivas<br />y discurso.</h2></div>
+        <div className={styles.copy}>
+          <p>La presentación de UnderTango para Emprendimiento Argentino 2026: cinco diapositivas con su discurso, tiempos de referencia y puntos para alinear.</p>
+          <p><a href="/80/diapositivas-y-discurso"><strong>Revisar diapositivas y discurso <span aria-hidden="true">↗</span></strong></a></p>
+        </div>
+      </section>
+
       <section className={styles.more} aria-labelledby="seguir">
         <div><p className={styles.eyebrow}>NUESTRO PRIMER CLIENTE TECNOLÓGICO</p><h2 id="seguir">KinesioLabs.<br />El recorrido, en la práctica.</h2><p>Es nuestro caso de referencia para documentar el trabajo del Departamento 80 y presentar en ÉLITROS el trayecto realizado. Conocé el proyecto y en qué etapa estamos.</p></div>
         <a href="/kinesiolabs">Conocer KinesioLabs <span aria-hidden="true">↗</span></a>

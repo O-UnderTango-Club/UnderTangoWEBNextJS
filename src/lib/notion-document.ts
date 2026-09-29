@@ -5,6 +5,11 @@ export const reviewDocument = {
   url: "https://app.notion.com/p/3eae2fde62f881c09602e7e2b7c2636a",
   title: "UnderTango · Revisión de diapositivas y discurso",
 };
+export const onePagerDocument = {
+  pageId: "3eae2fde-62f8-8169-acd5-ed407396432d",
+  url: "https://app.notion.com/p/3eae2fde62f88169acd5ed407396432d",
+  title: "UnderTango · One-pager ÉLITROS",
+};
 export type RichText = {
   plain_text?: string;
   text?: { content: string; link?: { url: string } | null };
@@ -37,8 +42,12 @@ export function safeUrl(value: string | undefined | null, image = false): string
   } catch { return undefined; }
 }
 
-// Only this explicitly published page is exposed. No user-supplied page IDs.
-export async function getReviewDocument() {
+// Only explicitly published documents are exposed through these fixed readers.
+// There is no public route accepting a user-supplied page ID.
+export const getReviewDocument = () => getDocument(reviewDocument);
+export const getOnePagerDocument = () => getDocument(onePagerDocument);
+
+async function getDocument(document: { pageId: string; title: string }) {
   const token = process.env.NOTION_API_KEY;
   if (!token) return null;
   const headers = { Authorization: `Bearer ${token}`, "Notion-Version": "2022-06-28" };
@@ -50,7 +59,7 @@ export async function getReviewDocument() {
     if (!response.ok) throw new Error(`Notion document unavailable (${response.status})`);
     return response.json() as Promise<T>;
   }
-  const page = await request<Page>(`pages/${reviewDocument.pageId}`);
+  const page = await request<Page>(`pages/${document.pageId}`);
   if (page.archived || page.in_trash) throw new Error("Notion document unavailable");
   let count = 0;
   const nestedTypes = new Set(["paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item", "numbered_list_item", "to_do", "toggle", "quote", "callout", "column_list", "column", "table"]);
@@ -75,5 +84,5 @@ export async function getReviewDocument() {
     return blocks;
   }
   const title = Object.values(page.properties || {}).find(property => property.type === "title");
-  return { title: plainText(title?.title) || reviewDocument.title, blocks: await children(reviewDocument.pageId) };
+  return { title: plainText(title?.title) || document.title, blocks: await children(document.pageId) };
 }

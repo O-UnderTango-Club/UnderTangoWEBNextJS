@@ -29,6 +29,29 @@ const text = value => [{ plain_text: value }];
 const page = { properties: { title: { type: 'title', title: text('Documento de prueba') } } };
 const paragraph = (id, value) => ({ id, type: 'paragraph', paragraph: { rich_text: text(value) } });
 
+function loadComponent(file, api) {
+  const exports = {};
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions }).outputText, {
+    exports,
+    require: name => {
+      if (name === '@/src/lib/notion-document') return api;
+      if (name === '@/src/components/NotionBlocks') return loadComponent('src/components/NotionBlocks.tsx', api);
+      if (name.endsWith('.css')) return {};
+      return require(name);
+    },
+  });
+  return exports;
+}
+
+test('one-pager uses its own explicitly configured source', async () => {
+  const { api, calls } = load([page, { results: [paragraph('a', 'One-pager')], has_more: false }]);
+  const doc = await api.getOnePagerDocument();
+  assert.equal(doc.blocks.length, 1);
+  assert.ok(calls[0].url.endsWith(api.onePagerDocument.pageId));
+  assert.ok(calls[1].url.includes(api.onePagerDocument.pageId));
+  assert.notEqual(api.onePagerDocument.pageId, api.reviewDocument.pageId);
+});
+
 test('paginates, preserves nested content and never follows child pages', async () => {
   const { api, calls } = load([page,
     { results: [{ ...paragraph('parent', 'Original'), has_children: true }, { id: 'private', type: 'child_page', has_children: true }], has_more: true, next_cursor: 'next cursor' },
@@ -82,6 +105,7 @@ test('renders source text safely, complete image and grouped lists; fallback has
         ] };
       } };
       if (name === 'next/link') return ({ children, ...props }) => React.createElement('a', props, children);
+      if (name === '@/src/components/NotionBlocks') return loadComponent('src/components/NotionBlocks.tsx', api);
       if (name.endsWith('.css')) return {};
       return require(name);
     },
@@ -95,5 +119,34 @@ test('renders source text safely, complete image and grouped lists; fallback has
   fail = true;
   const fallback = renderToStaticMarkup(await exports.default());
   assert.ok(fallback.includes('no se puede mostrar'));
+  assert.ok(!fallback.includes('test-secret'));
+});
+
+test('one-pager preserves source order and extra blocks; unavailable source is explicit', async () => {
+  const { api } = load([]);
+  const heading = (id, value) => ({ id, type: 'heading_3', heading_3: { rich_text: text(value) } });
+  const blocks = [paragraph('intro', 'Intro'), heading('one', 'First card'), paragraph('first', 'First text'),
+    heading('two', 'Second card'), { id: 'unknown', type: 'unsupported' },
+    { id: 'divider', type: 'divider' }, paragraph('footer', 'Signature')];
+  let fail = false;
+  const component = loadComponent('app/elitros/OnePager.tsx', { ...api, getOnePagerDocument: async () => {
+    if (fail) throw Error('test-secret');
+    return { title: 'One-pager', blocks };
+  } });
+  const grouped = component.groupOnePager(blocks);
+  assert.equal(grouped.header.length, 1);
+  assert.equal(grouped.sections.length, 2);
+  assert.equal(grouped.footer.length, 2);
+  assert.equal(JSON.stringify([...grouped.header, ...grouped.sections.flat(), ...grouped.footer]), JSON.stringify(blocks));
+  const html = renderToStaticMarkup(await component.default());
+  assert.ok(html.includes('First text'));
+  assert.ok(html.includes('Signature'));
+  assert.ok(html.includes('Este bloque se puede consultar'));
+  assert.ok(html.includes(api.onePagerDocument.url));
+  assert.ok(!html.includes(api.reviewDocument.url));
+  fail = true;
+  const fallback = renderToStaticMarkup(await component.default());
+  assert.ok(fallback.includes('no se puede mostrar'));
+  assert.ok(!fallback.includes('First text'));
   assert.ok(!fallback.includes('test-secret'));
 });

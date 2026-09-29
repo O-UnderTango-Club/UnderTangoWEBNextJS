@@ -5,3 +5,11 @@
 .page section{opacity:1;transform:none;transition:none}
 .page h2{color:inherit;text-align:left;display:block;font-family:inherit}
 .page h2::after{content:none}
+.tools{max-width:1240px;margin:auto;border-top:1px solid #c7cdc2;padding:65px 0;display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr);gap:48px;align-items:center}
+.toolsIntro>p:not(:first-child){margin-top:24px;color:#455a51;max-width:420px}
+.toolsIntro .toolsHint{font-size:13px;color:#657262}
+.toolsMap{min-width:0}
+.atlasLink{display:flex;justify-content:space-between;gap:24px;padding:18px 0 8px;border-bottom:1px solid #a6b399;font-size:14px;font-weight:600}
+.atlasLink:hover{text-decoration:underline}
+@media(max-width:900px){.tools{grid-template-columns:1fr;gap:28px}.toolsIntro>p:not(:first-child){max-width:640px}.toolsMap{width:100%;max-width:740px;margin:auto}}
+@media(max-width:650px){.tools{padding:44px 0;gap:20px}.toolsIntro>p:not(:first-child){margin-top:20px}.atlasLink{font-size:13px}}

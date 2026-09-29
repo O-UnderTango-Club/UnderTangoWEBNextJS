@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import ToolNetwork from "../elitros/sistema-de-herramientas/ToolNetwork";
 import styles from "./startup.module.css";
 
 export const metadata: Metadata = {
@@ -17,7 +19,7 @@ export default function StartupUnderTango() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <a href="/" aria-label="Inicio de UnderTango">Ø UnderTango</a>
+        <Link href="/" aria-label="Inicio de UnderTango">Ø UnderTango</Link>
         <a href="/central">Conocer el equipo <span aria-hidden="true">↗</span></a>
       </header>
 
@@ -64,9 +66,23 @@ export default function StartupUnderTango() {
         </div>
       </section>
 
+      <section id="herramientas" className={styles.tools} aria-labelledby="tools-title">
+        <div className={styles.toolsIntro}>
+          <p className={styles.eyebrow}>04 / LAS HERRAMIENTAS CON LAS QUE TRABAJAMOS</p>
+          <h2 id="tools-title">Un sistema.<br />Muchas herramientas.</h2>
+          <p>Personas, inteligencia artificial, documentos, datos y desarrollo conectados por una forma de trabajar.</p>
+          <p>Notion conserva los documentos que mostramos en la web. Supabase reúne la operación. GitHub y Vercel sostienen el desarrollo y la publicación.</p>
+          <p className={styles.toolsHint}>Elegí una herramienta para conocer su función. Podés girar el mapa y explorar sus conexiones.</p>
+        </div>
+        <div className={styles.toolsMap}>
+          <ToolNetwork compact />
+          <a className={styles.atlasLink} href="/elitros/sistema-de-herramientas">Explorar el sistema de herramientas <span aria-hidden="true">↗</span></a>
+        </div>
+      </section>
+
       <section className={styles.more} aria-labelledby="seguir">
-        <div><p className={styles.eyebrow}>NUESTRO PRIMER CLIENTE TECNOLÓGICO</p><h2 id="seguir">KinesioLabs.<br />El recorrido, en la práctica.</h2><p>Es nuestro caso de referencia para documentar el trabajo del Departamento 80 y presentar en ÉLITROS el trayecto realizado. Conocé el proyecto y en qué etapa estamos.</p></div>
-        <a href="/kinesiolabs">Conocer KinesioLabs <span aria-hidden="true">↗</span></a>
+        <div><p className={styles.eyebrow}>DEL TRABAJO COTIDIANO AL MODELO</p><h2 id="seguir">Élitros.<br />La visión que nos conecta.</h2><p>Conocé cómo articulamos personas, tecnología y cultura para dar continuidad a los proyectos de UnderTango.</p></div>
+        <a href="/elitros">Conocer Élitros <span aria-hidden="true">↗</span></a>
       </section>
       <footer className={styles.footer}><span>Ø UnderTango · Departamento 80</span><span>Puerto Iguazú · Triple Frontera</span></footer>
     </main>

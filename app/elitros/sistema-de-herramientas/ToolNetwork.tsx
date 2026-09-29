@@ -6,7 +6,8 @@ import styles from "./network.module.css";
 
 const initialView = { yaw: -0.2, pitch: 0.13, zoom: 1 };
 
-export default function ToolNetwork() {
+export default function ToolNetwork({ compact = false }: { compact?: boolean }) {
+  const Container = compact ? "div" : "main";
   const canvas = useRef<HTMLCanvasElement>(null);
   const labels = useRef<(HTMLButtonElement | null)[]>([]);
   const view = useRef({ ...initialView });
@@ -132,9 +133,11 @@ export default function ToolNetwork() {
   const choose = (id: string) => { setSelected(id); setStep(null); };
   const walk = (value: number) => { setStep(value); setSelected(journey[value].id); setFilter("all"); };
 
-  return <main className={styles.page}>
+  return <Container className={`${styles.page} ${compact ? styles.compact : ""}`}>
+    {!compact && <>
     <header className={styles.header}><a href="https://elitros.undertangoclub.com/">Ø UnderTango <span>/ ÉLITROS</span></a><a href="https://elitros.undertangoclub.com/#madurez">Volver al modelo ↗</a></header>
     <div className={styles.intro}><p className={styles.eyebrow}>DEPARTAMENTO 80 / ATLAS OPERATIVO</p><h1>Un sistema nervioso.<br /><span>Muchas herramientas.</span></h1><p>La dirección da sentido. Los protocolos conectan. La información se convierte en acciones, y cada resultado vuelve a la memoria del sistema.</p></div>
+    </>}
     <div className={styles.workspace}>
       <div className={styles.mapColumn}>
         <div className={styles.toolbar}><span>EXPLORAR LA RED</span><button onClick={() => { view.current = { ...initialView }; }}>Centrar vista</button><button aria-label="Alejar mapa" onClick={() => { view.current.zoom = Math.max(0.6, view.current.zoom - 0.15); }}>−</button><button aria-label="Acercar mapa" onClick={() => { view.current.zoom = Math.min(1.6, view.current.zoom + 0.15); }}>+</button><button aria-pressed={motion} onClick={() => setMotion(!motion)}>{motion ? "Pausar movimiento" : "Activar movimiento"}</button></div>
@@ -144,16 +147,17 @@ export default function ToolNetwork() {
           onPointerMove={e => { if (!drag.current) return; view.current.yaw += (e.clientX - drag.current.x) * 0.006; view.current.pitch = Math.max(-0.8, Math.min(0.8, view.current.pitch + (e.clientY - drag.current.y) * 0.006)); drag.current = { x: e.clientX, y: e.clientY }; }}
           onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}>
           <canvas ref={canvas} aria-hidden="true" />
-          {supported ? nodes.map((node, i) => <button key={node.id} ref={element => { labels.current[i] = element; }} className={`${styles.node} ${selected === node.id ? styles.selected : ""}`} style={{ "--node-color": groups[node.group].color } as React.CSSProperties} aria-pressed={selected === node.id} onClick={() => choose(node.id)}><strong>{node.name}</strong><span>{node.short}</span></button>) : <p className={styles.fallback}>La vista 3D no está disponible en este navegador. Podés explorar todas las herramientas y conexiones con la lista de abajo.</p>}
+          {supported ? nodes.map((node, i) => <button key={node.id} ref={element => { labels.current[i] = element; }} className={`${styles.node} ${selected === node.id ? styles.selected : ""}`} style={{ "--node-color": groups[node.group].color } as React.CSSProperties} aria-pressed={selected === node.id} onClick={() => choose(node.id)}><strong>{node.name}</strong><span>{node.short}</span></button>) : <p className={styles.fallback}>La vista 3D no está disponible en este navegador. {compact ? "Abrí el diagrama completo con el enlace de abajo para explorar las herramientas en lista." : "Podés explorar todas las herramientas y conexiones con la lista de abajo."}</p>}
           <span className={styles.sceneHint}>ARRASTRÁ PARA GIRAR · ELEGÍ UN NODO</span><span className={styles.dimension}>3D / WEBGL</span>
         </div>
-        <div className={styles.filters} aria-label="Capas del mapa"><button aria-pressed={filter === "all"} onClick={() => setFilter("all")}>Todas</button>{Object.entries(groups).map(([id, group]) => <button key={id} aria-pressed={filter === id} onClick={() => setFilter(id as Group)}><i style={{ background: group.color }} />{group.name}</button>)}</div>
+        {!compact && <div className={styles.filters} aria-label="Capas del mapa"><button aria-pressed={filter === "all"} onClick={() => setFilter("all")}>Todas</button>{Object.entries(groups).map(([id, group]) => <button key={id} aria-pressed={filter === id} onClick={() => setFilter(id as Group)}><i style={{ background: group.color }} />{group.name}</button>)}</div>}
         <p className={styles.caption}>Mapa conceptual del trabajo de UnderTango. Las líneas representan relaciones de trabajo; no todas son integraciones automáticas. El movimiento ilustra un intercambio, no actividad en tiempo real.</p>
       </div>
-      <aside className={styles.details} aria-label="Herramienta seleccionada" aria-live="polite"><p className={styles.eyebrow} style={{ color: groups[active.group].color }}>{groups[active.group].name}</p><h2>{active.name}</h2><p className={styles.role}>{active.role}</p><p>{active.detail}</p><h3>Cómo se entrelaza</h3><ul>{connections.map(edge => { const other = nodes.find(node => node.id === (edge.from === selected ? edge.to : edge.from))!; return <li key={`${edge.from}-${edge.to}`}><button onClick={() => choose(other.id)}>{other.name}<span>↗</span></button><p>{edge.label}</p></li>; })}</ul></aside>
+      {!compact && <aside className={styles.details} aria-label="Herramienta seleccionada" aria-live="polite"><p className={styles.eyebrow} style={{ color: groups[active.group].color }}>{groups[active.group].name}</p><h2>{active.name}</h2><p className={styles.role}>{active.role}</p><p>{active.detail}</p><h3>Cómo se entrelaza</h3><ul>{connections.map(edge => { const other = nodes.find(node => node.id === (edge.from === selected ? edge.to : edge.from))!; return <li key={`${edge.from}-${edge.to}`}><button onClick={() => choose(other.id)}>{other.name}<span>↗</span></button><p>{edge.label}</p></li>; })}</ul></aside>}
     </div>
-    <section className={styles.journey} aria-labelledby="journey-title"><div><p className={styles.eyebrow}>UN RECORRIDO POSIBLE</p><h2 id="journey-title">De una solicitud<br />a un resultado comprobado.</h2><p>Un ejemplo de proyecto digital para recorrer la red paso a paso.</p></div><div className={styles.step}><p className={styles.eyebrow}>{step === null ? "EJEMPLO GUIADO" : `PASO ${step + 1} DE ${journey.length}`}</p><h3>{step === null ? "Seguí el hilo de la información." : journey[step].title}</h3><p>{step === null ? "Cada paso selecciona una herramienta en el mapa y explica su aporte al proyecto." : journey[step].text}</p><div><button disabled={step === null || step === 0} onClick={() => walk((step ?? 1) - 1)}>← Anterior</button><button onClick={() => walk(step === null || step === journey.length - 1 ? 0 : step + 1)}>{step === null ? "Comenzar recorrido" : step === journey.length - 1 ? "Volver a empezar" : "Siguiente paso"} →</button></div></div></section>
-    <details className={styles.directory}><summary>Explorar herramientas en lista · {nodes.length} nodos</summary><div>{nodes.map(node => <button key={node.id} onClick={() => { choose(node.id); canvas.current?.scrollIntoView({ block: "center" }); }} aria-pressed={selected === node.id}><strong>{node.name}</strong><span>{node.role}</span></button>)}</div></details>
-    <footer className={styles.footer}><span>Ø UnderTango · Tecnología, criterio y continuidad.</span><a href="https://www.undertangoclub.com/80-startup-undertango">Conocer la startup ↗</a></footer>
-  </main>;
+    {compact && <p className={styles.selection} aria-live="polite"><strong>{active.name}</strong> · {active.role}</p>}
+    {!compact && <section className={styles.journey} aria-labelledby="journey-title"><div><p className={styles.eyebrow}>UN RECORRIDO POSIBLE</p><h2 id="journey-title">De una solicitud<br />a un resultado comprobado.</h2><p>Un ejemplo de proyecto digital para recorrer la red paso a paso.</p></div><div className={styles.step}><p className={styles.eyebrow}>{step === null ? "EJEMPLO GUIADO" : `PASO ${step + 1} DE ${journey.length}`}</p><h3>{step === null ? "Seguí el hilo de la información." : journey[step].title}</h3><p>{step === null ? "Cada paso selecciona una herramienta en el mapa y explica su aporte al proyecto." : journey[step].text}</p><div><button disabled={step === null || step === 0} onClick={() => walk((step ?? 1) - 1)}>← Anterior</button><button onClick={() => walk(step === null || step === journey.length - 1 ? 0 : step + 1)}>{step === null ? "Comenzar recorrido" : step === journey.length - 1 ? "Volver a empezar" : "Siguiente paso"} →</button></div></div></section>}
+    {!compact && <details className={styles.directory}><summary>Explorar herramientas en lista · {nodes.length} nodos</summary><div>{nodes.map(node => <button key={node.id} onClick={() => { choose(node.id); canvas.current?.scrollIntoView({ block: "center" }); }} aria-pressed={selected === node.id}><strong>{node.name}</strong><span>{node.role}</span></button>)}</div></details>}
+    {!compact && <footer className={styles.footer}><span>Ø UnderTango · Tecnología, criterio y continuidad.</span><a href="https://www.undertangoclub.com/80-startup-undertango">Conocer la startup ↗</a></footer>}
+  </Container>;
 }

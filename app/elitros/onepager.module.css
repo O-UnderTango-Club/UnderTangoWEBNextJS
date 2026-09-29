@@ -1,0 +1,37 @@
+.section { color: #163042; }
+.sheet { max-width: 1180px; margin-inline: auto; background: #f7f4eb; border: 1px solid #b7c7cd; }
+.header { padding: 32px 38px 26px; border-bottom: 1px solid #b7c7cd; }
+.header > .block:first-child { margin-bottom: 22px; padding-bottom: 16px; border-bottom: 1px solid #b7c7cd; }
+.header > .block:first-child p { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .025em; }
+.section .header h2 { color: #163042 !important; font-size: clamp(36px, 4.2vw, 60px); line-height: 1.04; letter-spacing: -.025em; text-transform: none; margin: 0 0 18px; }
+.section .header h2 em { display: block; color: #893c4f; font-family: Georgia, serif !important; font-style: italic; font-weight: 400; letter-spacing: -.02em; }
+.header p { font-size: 16px; line-height: 1.55; margin: 12px 0 0; max-width: 1040px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.card { min-width: 0; padding: 26px 38px; border-bottom: 1px solid #b7c7cd; }
+.card:nth-child(odd):not(:last-child) { border-right: 1px solid #b7c7cd; }
+.card:last-child:nth-child(odd) { grid-column: 1 / -1; background: #eef1ed; }
+.section .card h3 { font-family: var(--font-undertango-sans), Arial, sans-serif; color: #24566c; font-size: 17px; line-height: 1.3; margin: 0 0 12px; text-transform: none; }
+.card p, .card li { font-size: 15px; line-height: 1.65; margin: 0 0 12px; }
+.card p:last-child { margin-bottom: 0; }
+.block { overflow-wrap: anywhere; }
+.block img { display: block; width: 100%; height: auto; }
+.block figure { margin: 20px 0; }
+.block figcaption, .notice { font-size: 13px; line-height: 1.5; }
+.block pre { overflow-x: auto; }
+.block a, .links a { text-decoration: underline !important; text-underline-offset: 4px; }
+.table { overflow-x: auto; }
+.table table { border-collapse: collapse; }
+.table td { padding: 8px; border: 1px solid #b7c7cd; }
+.footer { padding: 22px 38px 10px; }
+.footer hr { display: none; }
+.footer p { margin: 0 0 7px; font-size: 13px; line-height: 1.4; }
+.links { display: flex; flex-wrap: wrap; gap: 14px 30px; padding: 22px 38px; font-size: 13px; font-weight: 700; }
+.links a:focus-visible { outline: 2px solid currentColor; outline-offset: 6px; }
+.unavailable { padding: 32px 38px; }
+@media (max-width: 700px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .header, .card, .footer, .links, .unavailable { padding: 22px 20px; }
+  .card:nth-child(odd):not(:last-child) { border-right: 0; }
+  .section .header h2 { font-size: clamp(32px, 8vw, 44px); }
+  .header p { font-size: 15px; }
+}

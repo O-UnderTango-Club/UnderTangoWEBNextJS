@@ -4,11 +4,16 @@ Regla canónica: [Documentos Notion → web](https://github.com/O-UnderTango-Clu
 
 El texto se edita en Notion. Este repositorio conserva el lector y la asociación explícita entre página y ruta, sin copias de los textos o imágenes como contenido editable.
 
-## Documento inicial
+## Documentos publicados
 
 - Fuente: [Revisión de diapositivas y discurso](https://app.notion.com/p/3eae2fde62f881c09602e7e2b7c2636a).
 - Ruta: `/80/diapositivas-y-discurso`, enlazada desde `/80-startup-undertango`; `/80` redirige al departamento.
 - Configuración: `src/lib/notion-document.ts`. No se acepta un ID de página desde parámetros públicos.
+
+- Fuente: [One-pager ÉLITROS](https://app.notion.com/p/3eae2fde62f88169acd5ed407396432d).
+- Sección: `/elitros#onepager` (también `#one-pager`), dentro de la página existente.
+- El encabezado y los siete apartados se leen de Notion: los títulos de nivel 3 abren tarjetas; un separador después de las tarjetas abre el pie. Se conserva el orden y los bloques adicionales. El formato visual está en `app/elitros/onepager.module.css`.
+- La descarga `UnderTango-One-Pager-2026-09-29.pdf` es una instantánea fechada del documento aprobado el 29/09/2026. No es la fuente editable ni se regenera con cada cambio de Notion.
 
 ## Conexión
 

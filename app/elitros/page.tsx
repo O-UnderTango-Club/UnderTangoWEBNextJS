@@ -1,8 +1,11 @@
 import Image from "next/image";
 import Pitch from "./Pitch";
+import OnePager from "./OnePager";
 import ReadinessRadar from "./ReadinessRadar";
 import { readiness } from "./readiness";
 import "./elitros.css";
+
+export const dynamic = "force-dynamic";
 
 const canvas = [
   ["01", "Socios clave", "Artistas, diseñadores, comunicadores, proveedores técnicos, espacios y aliados territoriales. Especialistas del proyecto para acordar contenidos y responsabilidades."],
@@ -39,58 +42,7 @@ export default function ElitrosPage() {
 
       <Pitch />
 
-      <section className="bmc-onepager" id="onepager" aria-labelledby="onepager-title">
-        <span id="one-pager" className="bmc-onepager-anchor" aria-hidden="true" />
-        <div className="bmc-onepager-sheet">
-          <header className="bmc-onepager-header">
-            <p className="bmc-onepager-kicker">ONE-PAGER · PROGRAMA ÉLITROS</p>
-            <h2 id="onepager-title">UNDERTANGO</h2>
-            <p className="bmc-onepager-summary">Coordinamos personas y herramientas para realizar eventos, comunicar ideas y dar forma a su imagen y diseño.</p>
-            <p className="bmc-onepager-meta">Puerto Iguazú, Misiones, Argentina · PROGRAMA ÉLITROS · Septiembre de 2026</p>
-          </header>
-          <div className="bmc-onepager-grid">
-            <article className="bmc-onepager-block">
-              <h3>PROBLEMA</h3>
-              <p>Una idea valiosa necesita un equipo que se entienda y una forma de encontrarse con su público. Las tensiones, los desencuentros o una comunicación que no conecta también forman parte de esa experiencia. En eventos, presentaciones y acciones de comunicación, cuidar qué queremos transmitir y qué buscamos que el público sienta requiere tanto trabajo como la realización material.</p>
-            </article>
-            <article className="bmc-onepager-block">
-              <h3>TESIS HUMANA Y TECNOLÓGICA</h3>
-              <p>No existen sistemas sin humanos. Combinamos escucha, criterio artístico, diseño y producción para acompañar y equilibrar el clima emocional dentro de nuestro alcance. La automatización y la IA apoyan la organización para dedicar más atención a las personas: escuchar, cuidar y crear experiencias positivas que fortalezcan sus vínculos. El equipo define el sentido y asume la entrega.</p>
-            </article>
-            <article className="bmc-onepager-block">
-              <h3>ESTADO ACTUAL Y TRACCIÓN (TRL/CRL)</h3>
-              <p>Producción de eventos en la Triple Frontera, con clientes como Gran Meliá, Hotel Wish y La Cabrera. Nuestra red de sponsors y vínculos estratégicos incluye Shopping China e Itaipú Binacional (Paraguay); Hotel Carimã, Not Only Wine, La Cava y TropCalia (Brasil); A Piacere y Patanegra Gourmet (Argentina).</p>
-              <p><strong>Escala económica 2026:</strong> cerca de ARS 9,8 millones y USD 3.400 en servicios facturados documentados.</p>
-              <p><strong>Cobros identificados en 2026:</strong> aproximadamente ARS 1,25 millones · BRL 6.200 · USD 600 · PYG 3,4 millones. Corte documental parcial al 23/09/2026; facturación y cobros se presentan por separado y no se suman.</p>
-            </article>
-            <article className="bmc-onepager-block">
-              <h3>PROPIEDAD INTELECTUAL</h3>
-              <p>Marca Ø UnderTango Club registrada ante el INPI, clase 41. Nº 3.456.539</p>
-              <p>Producción de shows, espectáculos y producciones artísticas.</p>
-            </article>
-            <article className="bmc-onepager-block">
-              <h3>MERCADO Y MODELO DE NEGOCIO (BRL)</h3>
-              <p>Base de actividad: producción de shows y eventos en la Triple Frontera. La oferta se dirige a equipos e instituciones que requieren coordinación humana, comunicación, imagen o diseño para una entrega concreta: un evento, una presentación, una experiencia de divulgación o materiales para llegar a un público.</p>
-              <p>Ingresos por producción y gerencia de eventos y por servicios de comunicación, imagen, diseño y coordinación, con presupuesto según alcance, equipo, recursos y entregables. La dirección y validación científica o técnica permanecen en los especialistas del proyecto.</p>
-              <p>La producción artística tiene ventas y recompra. La demanda y las condiciones de trabajo con otros equipos se validan caso a caso. El modelo económico de shows se detalla por separado; cada servicio necesita costos completos y criterios propios.</p>
-            </article>
-            <article className="bmc-onepager-block">
-              <h3>EQUIPO</h3>
-              <p>Pablo Cieslik, fundador y director: producción de espectáculos, gerencia de eventos y coordinación humana, artística y comunicacional.</p>
-              <p>Alejandro Miguez, representación institucional: exdirector de Ingeniería en Informática y de la Licenciatura en Inteligencia Artificial y Ciencia de Datos de UADE. Trayectoria en liderazgo de proyectos de I+D.</p>
-              <p>Maximiliano Rodríguez: programación y desarrollo de herramientas. El departamento 80-Startup articula estas capacidades con la experiencia de producción de 81-Shows.</p>
-            </article>
-            <article className="bmc-onepager-block bmc-onepager-ask">
-              <h3>PRÓXIMOS HITOS + ASK</h3>
-              <p>1. Profundizar los servicios para los clientes actuales y sumar otros más enfocados en lo comunicacional e institucional.</p>
-              <p>2. Desarrollar una red social personalizada bajo el concepto de «red operativa»: una app móvil y de escritorio adaptada a las funciones, roles y vínculos de cada usuario con el universo UnderTango, estructurado en 10 departamentos cohesionados.</p>
-              <p>3. Validar la red operativa con clientes y equipos en proyectos reales: conectar los departamentos, dar continuidad a los vínculos y ampliar los servicios a partir de lo aprendido en cada experiencia.</p>
-              <p>Línea económica posterior: evaluar mecanismos cripto para cobros, pagos y distribución, sujetos a utilidad demostrable y revisión legal, fiscal y de riesgos.</p>
-              <p>Buscamos instituciones, empresas y equipos científicos y tecnológicos con quienes desarrollar experiencias de comunicación y encuentro. Invitamos a aliados comerciales y tecnológicos a conectar nuevos clientes y acompañar el desarrollo de la red operativa, con el arte y el cuidado de los vínculos humanos como punto de partida.</p>
-            </article>
-          </div>
-        </div>
-      </section>
+      <OnePager />
 
       <section className="bmc-section" id="canvas">
         <div className="bmc-heading"><div><p className="bmc-eyebrow">BUSINESS MODEL CANVAS</p><h2>Nueve bloques, una sola lógica de valor</h2></div><p>Versión de trabajo: cada bloque expresa una hipótesis que debe ganar evidencia en operaciones reales.</p></div>

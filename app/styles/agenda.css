@@ -254,6 +254,22 @@
   background: #fff6f6;
 }
 
+.agenda-reset-filters {
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  color: #141414;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.agenda-reset-filters:focus-visible {
+  outline: 2px solid #141414;
+  outline-offset: 2px;
+}
+
 .calendar-wrap {
   display: block !important;
   overflow: hidden;
@@ -337,11 +353,31 @@
 }
 
 .event-card {
+  display: block;
   border-left: 3px solid #171717;
   border-radius: 6px;
   padding: 5px 6px 5px 7px;
   background: #f1efe9;
   color: #141414 !important;
+  text-decoration: none;
+}
+
+.event-card:hover {
+  background: #e7eee7;
+}
+
+.event-card:focus-visible {
+  outline: 2px solid #146b3a;
+  outline-offset: 2px;
+}
+
+.event-contact {
+  display: block;
+  margin-top: 5px;
+  color: #146b3a;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .event-card.clases {

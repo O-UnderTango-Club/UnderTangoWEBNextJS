@@ -62,9 +62,18 @@ function eventTimeLabel(event: PublicEvent) {
   return event.time;
 }
 
+function eventWhatsAppUrl(event: PublicEvent) {
+  const date = event.date.split("-").reverse().join("/");
+  const time = event.allDay ? "" : ` (${eventTimeLabel(event)})`;
+  const place = event.place ? ` en ${event.place}` : "";
+  const message = `Hola, quisiera consultar por «${event.title}» del ${date}${time}${place}.`;
+
+  return `https://wa.me/5493757618270?text=${encodeURIComponent(message)}`;
+}
+
 export default function UsersCalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
-  const [activeCategories, setActiveCategories] = useState<Category[]>(["shows"]);
+  const [activeCategories, setActiveCategories] = useState<Category[]>(CATEGORIES);
   const [shareMode, setShareMode] = useState(false);
   const [payload, setPayload] = useState<CalendarPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,8 +84,6 @@ export default function UsersCalendarPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
 
     fetch(`/api/calendario?year=${year}&month=${month + 1}`, {
       cache: "no-store",
@@ -122,7 +129,8 @@ export default function UsersCalendarPage() {
   }, [month, year]);
 
   const weekCount = monthCells.length / 7;
-  const events = payload?.events ?? [];
+  const currentPayload = payload?.year === year && payload.month === month + 1 ? payload : null;
+  const events = useMemo(() => currentPayload?.events ?? [], [currentPayload]);
 
   const visibleEvents = useMemo(
     () => events.filter((event) => activeCategories.includes(event.category)),
@@ -140,6 +148,8 @@ export default function UsersCalendarPage() {
   }, [visibleEvents]);
 
   function moveMonth(delta: number) {
+    setLoading(true);
+    setError("");
     setCurrentMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   }
 
@@ -218,6 +228,7 @@ export default function UsersCalendarPage() {
               <button
                 type="button"
                 className={allActive ? "all-filter active" : "all-filter"}
+                aria-pressed={allActive}
                 onClick={showAll}
               >
                 Todo
@@ -227,6 +238,21 @@ export default function UsersCalendarPage() {
 
           {loading && <p className="agenda-message">Leyendo el calendario UnderTango Club…</p>}
           {error && <p className="agenda-message error">{error}</p>}
+          {!loading && !error && currentPayload && visibleEvents.length === 0 && (
+            <div className="agenda-message" role="status">
+              {events.length === 0 ? (
+                "No hay eventos publicados en este calendario para este mes."
+              ) : (
+                <>
+                  No hay eventos visibles con los filtros seleccionados. Hay {events.length}{" "}
+                  {events.length === 1 ? "evento publicado" : "eventos publicados"} este mes.{" "}
+                  <button type="button" className="agenda-reset-filters" onClick={showAll}>
+                    Mostrar todos
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="calendar-wrap">
             <div className="calendar-grid weekday-row" aria-hidden="true">
@@ -251,11 +277,19 @@ export default function UsersCalendarPage() {
 
                     <div className="day-events">
                       {eventsForDay.map((event) => (
-                        <div className={`event-card ${event.category}`} key={event.id}>
+                        <a
+                          className={`event-card ${event.category}`}
+                          key={event.id}
+                          href={eventWhatsAppUrl(event)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Consultar por WhatsApp: ${event.title}, ${event.date.split("-").reverse().join("/")} (abre en una nueva pestaña)`}
+                        >
                           <div className="event-time">{eventTimeLabel(event)}</div>
                           <div className="event-title">{event.title}</div>
                           {event.place && <div className="event-place">{event.place}</div>}
-                        </div>
+                          <span className="event-contact">Consultar por WhatsApp <span aria-hidden="true">↗</span></span>
+                        </a>
                       ))}
                     </div>
                   </article>
@@ -267,7 +301,12 @@ export default function UsersCalendarPage() {
           <footer className="agenda-public-footer">
             <span>undertangoclub.com</span>
             <span>
-              Fuente: Google Calendar · UnderTango Club{payload ? ` · ${payload.events.length} eventos este mes` : ""}
+              Fuente: Google Calendar · UnderTango Club
+              {!loading && !error && currentPayload && (
+                allActive
+                  ? ` · ${events.length} ${events.length === 1 ? "evento" : "eventos"} este mes`
+                  : ` · Mostrando ${visibleEvents.length} de ${events.length} eventos este mes`
+              )}
             </span>
           </footer>
         </div>

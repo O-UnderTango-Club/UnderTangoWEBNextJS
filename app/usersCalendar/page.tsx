@@ -71,6 +71,33 @@ function eventWhatsAppUrl(event: PublicEvent) {
   return `https://wa.me/5493757618270?text=${encodeURIComponent(message)}`;
 }
 
+function EventCard({ event }: { event: PublicEvent }) {
+  const details = (
+    <>
+      <div className="event-time">{eventTimeLabel(event)}</div>
+      <div className="event-title">{event.title}</div>
+      {event.place && <div className="event-place">{event.place}</div>}
+    </>
+  );
+
+  if (event.category !== "shows" && event.category !== "clases") {
+    return <div className={`event-card ${event.category}`}>{details}</div>;
+  }
+
+  return (
+    <a
+      className={`event-card ${event.category}`}
+      href={eventWhatsAppUrl(event)}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Consultar por WhatsApp: ${event.title}, ${event.date.split("-").reverse().join("/")} (abre en una nueva pestaña)`}
+    >
+      {details}
+      <span className="event-contact">Consultar por WhatsApp <span aria-hidden="true">↗</span></span>
+    </a>
+  );
+}
+
 export default function UsersCalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [activeCategories, setActiveCategories] = useState<Category[]>(CATEGORIES);
@@ -277,19 +304,7 @@ export default function UsersCalendarPage() {
 
                     <div className="day-events">
                       {eventsForDay.map((event) => (
-                        <a
-                          className={`event-card ${event.category}`}
-                          key={event.id}
-                          href={eventWhatsAppUrl(event)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Consultar por WhatsApp: ${event.title}, ${event.date.split("-").reverse().join("/")} (abre en una nueva pestaña)`}
-                        >
-                          <div className="event-time">{eventTimeLabel(event)}</div>
-                          <div className="event-title">{event.title}</div>
-                          {event.place && <div className="event-place">{event.place}</div>}
-                          <span className="event-contact">Consultar por WhatsApp <span aria-hidden="true">↗</span></span>
-                        </a>
+                        <EventCard key={event.id} event={event} />
                       ))}
                     </div>
                   </article>

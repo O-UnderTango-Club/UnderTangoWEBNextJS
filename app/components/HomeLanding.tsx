@@ -52,7 +52,7 @@ export default function HomeLanding() {
           <a href="#descubrir">Descubrir</a><a href="/agenda">Eventos</a><a href="/artistas">Artistas</a><a href="/produccion-artistica">Negocios</a><a href="/la-cava">Experiencias</a>
         </nav>
         <button className={styles.searchToggle} type="button" onClick={openSearch} aria-label="Buscar en UnderTango" aria-controls="home-search"><Icon name="search" /></button>
-        <a className={styles.contactLink} href="/reservas">Conectemos <Icon name="arrow" /></a>
+        <a className={styles.contactLink} href="https://wa.me/5493757618270" target="_blank" rel="noopener noreferrer">Conectemos <Icon name="arrow" /></a>
       </header>
 
       <div className={styles.hero}>

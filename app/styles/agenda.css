@@ -362,11 +362,11 @@
   text-decoration: none;
 }
 
-.event-card:hover {
+a.event-card:hover {
   background: #e7eee7;
 }
 
-.event-card:focus-visible {
+a.event-card:focus-visible {
   outline: 2px solid #146b3a;
   outline-offset: 2px;
 }

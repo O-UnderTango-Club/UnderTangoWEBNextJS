@@ -380,6 +380,10 @@ a.event-card:focus-visible {
   line-height: 1.2;
 }
 
+.event-card.milongas {
+  border-left-color: #875080;
+}
+
 .event-card.clases {
   border-left-color: #9f7728;
 }

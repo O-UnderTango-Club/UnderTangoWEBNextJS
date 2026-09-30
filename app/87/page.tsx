@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import "./fdg.css";
 
+const WHATSAPP_NUMBER = "5493757618270";
+
+function whatsappUrl(message: string) {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
+
 export const metadata: Metadata = {
   title: "Funcionamiento del FDG | UnderTango",
   description:
@@ -41,9 +47,31 @@ export default function FondoPage() {
           <p>UnderTango incentiva la participación de los integrantes de todos sus departamentos en el fondo. La intención es que la discusión sea colectiva y que la capacidad de modificar el sistema esté acompañada por la responsabilidad sobre las decisiones y sus consecuencias.</p>
         </section>
 
-        <section aria-labelledby="formacion">
+        <section aria-labelledby="formacion" style={{ marginBottom: 36 }}>
           <h2 id="formacion" style={{ fontSize: 25, lineHeight: 1.3 }}>Formación y responsabilidad compartida</h2>
           <p>Para los artistas que se incorporan, esta participación requiere aprendizaje, formación y maduración en la toma de decisiones colectivas. Integrarse implica comprender el funcionamiento del conjunto y asumir responsabilidad por él.</p>
+        </section>
+
+        <section className="fdg-participation" aria-labelledby="fondos-distintos">
+          <h2 id="fondos-distintos" style={{ fontSize: 25, lineHeight: 1.3 }}>Dos fondos, decisiones diferentes</h2>
+          <p>El Fondo de Inversión es distinto del Fondo de Gobernanza. El Fondo de Inversión financia los proyectos de UnderTango y toma decisiones sobre qué proyectos apoyar y cómo asignar sus recursos.</p>
+          <p>El Fondo de Gobernanza toma decisiones sobre la estructura de UnderTango y sobre las leyes del código y sus protocolos. Cada fondo decide sobre asuntos diferentes y aplica criterios propios de acuerdo con su función.</p>
+          <div className="fdg-actions" aria-label="Opciones para participar">
+            <a
+              href={whatsappUrl("Hola, quiero formar parte del Fondo de Gobernanza de UnderTango.")}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Quiero formar parte del Fondo de Gobernanza
+            </a>
+            <a
+              href={whatsappUrl("Hola, quiero formar parte del Fondo de Inversión de UnderTango.")}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Quiero formar parte del Fondo de Inversión
+            </a>
+          </div>
         </section>
       </article>
     </main>

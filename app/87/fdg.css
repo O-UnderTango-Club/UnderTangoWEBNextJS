@@ -3,3 +3,9 @@
 .fdg-page section h2{display:block;color:inherit;text-align:left;margin-bottom:16px}
 .fdg-page section h2::after{display:none}
 .fdg-page p{margin-bottom:20px}
+.fdg-page .fdg-participation{border-top:1px solid #87907c;padding-top:36px}
+.fdg-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:28px}
+.fdg-actions a{display:flex;align-items:center;justify-content:center;min-height:58px;padding:14px 18px;border:1px solid #222820;border-radius:8px;background:#222820;color:#f2efe7;font-weight:700;line-height:1.35;text-align:center;text-decoration:none;transition:background-color .2s ease,color .2s ease}
+.fdg-actions a:hover,.fdg-actions a:focus-visible{background:transparent;color:#222820}
+.fdg-actions a:focus-visible{outline:3px solid #87907c;outline-offset:3px}
+@media (max-width:640px){.fdg-actions{grid-template-columns:1fr}}

@@ -1,7 +1,7 @@
 'use client';
 
 import Script from 'next/script';
-import Header from './components/header';
+import HomeLanding from './components/HomeLanding';
 import Footer from './components/footer';
 import TangoRaveVideo from './components/TangoRaveVideo';
 import { useHomeEffects } from './hooks/useHomeEffects';
@@ -65,20 +65,13 @@ export default function HomePage() {
         `}
       </Script>
 
-      <Header />
-
       <main>
-        <header id="video-slider">
-          <video autoPlay muted loop id="video-background" playsInline>
-            <source src="https://under-tango-web.vercel.app/assets/images/welcome.mp4" type="video/mp4" />
-            Tu navegador no soporta videos HTML5.
-          </video>
-        </header>
+        <HomeLanding />
 
-        <section id="intentions" className="intent-gateway section-animate" aria-labelledby="intentions-title">
+        <section id="intentions" className="intent-gateway section-animate visible" aria-labelledby="intentions-title">
           <div className="intent-shell">
             <p className="intent-eyebrow">Ø UNDERTANGO CLUB · PUERTO IGUAZÚ · TRIPLE FRONTERA</p>
-            <h1 id="intentions-title">¿Qué estás buscando?</h1>
+            <h2 id="intentions-title">¿Qué estás buscando?</h2>
             <p className="intent-lede">
               Mirá cómo se vive cada experiencia y elegí la que mejor encaja con lo que necesitás.
             </p>
@@ -401,8 +394,6 @@ export default function HomePage() {
       </main>
 
       <Footer />
-      <Script src="/assets/js/index.js" />
-      <Script src="/assets/js/burguer.js" />
     </>
   );
 }

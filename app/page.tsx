@@ -68,7 +68,7 @@ export default function HomePage() {
       <main>
         <HomeLanding />
 
-        <section id="intentions" className="intent-gateway section-animate" aria-labelledby="intentions-title">
+        <section id="intentions" className="intent-gateway section-animate visible" aria-labelledby="intentions-title">
           <div className="intent-shell">
             <p className="intent-eyebrow">Ø UNDERTANGO CLUB · PUERTO IGUAZÚ · TRIPLE FRONTERA</p>
             <h2 id="intentions-title">¿Qué estás buscando?</h2>

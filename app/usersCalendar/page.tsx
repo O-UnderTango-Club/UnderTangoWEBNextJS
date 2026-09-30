@@ -7,7 +7,7 @@ import Header from "../components/header";
 import Footer from "../components/footer";
 import "../styles/agenda.css";
 
-type Category = "shows" | "clases" | "ensayos" | "otros";
+type Category = "shows" | "milongas" | "clases" | "ensayos" | "otros";
 
 type PublicEvent = {
   id: string;
@@ -31,9 +31,10 @@ type CalendarPayload = {
 };
 
 const WEEKDAYS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
-const CATEGORIES: Category[] = ["shows", "clases", "ensayos", "otros"];
+const CATEGORIES: Category[] = ["shows", "milongas", "clases", "ensayos", "otros"];
 const CATEGORY_LABELS: Record<Category, string> = {
   shows: "Shows",
+  milongas: "Milongas",
   clases: "Clases",
   ensayos: "Ensayos",
   otros: "Otros",

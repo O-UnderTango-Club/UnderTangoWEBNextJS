@@ -6,7 +6,7 @@ const CALENDAR_ID = "undertangoclub@gmail.com";
 const TIME_ZONE = "America/Argentina/Buenos_Aires";
 const ICS_URL = `https://calendar.google.com/calendar/ical/${encodeURIComponent(CALENDAR_ID)}/public/basic.ics`;
 
-type Category = "shows" | "clases" | "ensayos" | "otros";
+type Category = "shows" | "milongas" | "clases" | "ensayos" | "otros";
 
 type DateParts = {
   year: number;
@@ -220,6 +220,7 @@ function categoryFor(summary: string): Category {
 
   if (normalized.includes("ensayo")) return "ensayos";
   if (normalized.includes("clase")) return "clases";
+  if (normalized.includes("milonga")) return "milongas";
   if (
     normalized.includes("show") ||
     normalized.includes("espectac") ||
@@ -243,7 +244,9 @@ function toPublic(event: RawEvent, start: DateParts, end?: DateParts): PublicEve
   return {
     id: `${event.uid}-${dateTimeKey(start)}`,
     date: dateKey(start),
-    time: displayTime(start, end),
+    time: !start.allDay && event.summary.toLowerCase().includes("cierre a confirmar")
+      ? `Desde las ${pad(start.hour)}:${pad(start.minute)}`
+      : displayTime(start, end),
     title: event.summary,
     place: event.location || "Lugar a confirmar",
     category: categoryFor(event.summary),

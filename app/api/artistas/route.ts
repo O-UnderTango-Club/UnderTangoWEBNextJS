@@ -6,6 +6,12 @@ const BASE_ID = process.env.AIRTABLE_BASE_ID || "appJwwHP1Wkoxo54q";
 const TEAM_TABLE_ID = process.env.AIRTABLE_TEAM_TABLE_ID || "tbluFrYO90nEQl7Vg";
 const OPERATIONS_TABLE_ID = process.env.AIRTABLE_OPERATIONS_TABLE_ID || "tblQFmoJzid2gHXye";
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
+const HIDDEN_TEAM_MEMBER_IDS = new Set([
+  "recMUp57DK1Y4HGux", // Eva Janberg
+  "recij7H725y9wBOdr", // Paloma Apostolaqui
+  "recmhrbJ2HyYqb1mb", // Morena Servián
+]);
+const HIDDEN_TEAM_MEMBER_NAMES = new Set(["Eva Janberg", "Paloma Apostolaqui", "Morena Servián", "Morena Servian"]);
 
 const F = {
   name: "fldDBIrQUVnfvsFdj",
@@ -50,8 +56,7 @@ const snapshot: Artist[] = [
     { id: "recXH429Zk7rKAXhS", name: "Festa das Nações", date: "2026-08-15", time: "17:00", place: "Foz do Iguaçu", status: "Confirmada" },
     { id: "rec0zwOt6bhJUUeY4", name: "Show Bernardo de Irigoyen", date: "2026-08-29", place: "Bernardo de Irigoyen", status: "Confirmada" },
   ] },
-  { id: "recMUp57DK1Y4HGux", name: "Eva Janberg", role: "Bailarín/a", skills: ["Tango escenario", "Tango salón"], availability: "No disponible del 22/08/2026 al 25/08/2026 inclusive.", commitments: [] },
-  { id: "recFMitnpLxghJdvs", name: "Araceli Maizal", role: "Bailarín/a", skills: ["Tango escenario", "Tango salón"], commitments: [] },
+  { id: "recFMitnpLxghJdvs", name: "Aracely Maizares", role: "Bailarín/a", skills: ["Tango escenario", "Tango salón"], commitments: [] },
   { id: "recHugYuGxhUvu5TY", name: "Evayan Behr", role: "Bailarín/a", locality: "Foz do Iguaçu", skills: ["Tango escenario", "Tango salón"], availability: "No disponible del 22/08/2026 al 25/08/2026 inclusive.", commitments: [
     { id: "recXH429Zk7rKAXhS", name: "Festa das Nações", date: "2026-08-15", time: "17:00", place: "Foz do Iguaçu", status: "Confirmada" },
   ] },
@@ -59,9 +64,7 @@ const snapshot: Artist[] = [
     { id: "recvVtYz1UedtkUhD", name: "Hotel Wish", date: "2026-08-23", time: "13:30–14:00", place: "Foz do Iguaçu", status: "Confirmada" },
     { id: "rec0zwOt6bhJUUeY4", name: "Show Bernardo de Irigoyen", date: "2026-08-29", place: "Bernardo de Irigoyen", status: "Confirmada" },
   ] },
-  { id: "recij7H725y9wBOdr", name: "Paloma Apostolaqui", role: "Bailarín/a", skills: ["Tango escenario", "Tango salón"], availability: "Pausada para nuevas fechas hasta nuevo aviso.", commitments: [] },
   { id: "recksFCaUypAhUhrS", name: "Luján Rojas", role: "Docente", skills: ["Tango escenario", "Tango salón", "Docencia"], availability: "No disponible del 17/08/2026 al 31/08/2026 inclusive.", commitments: [] },
-  { id: "recmhrbJ2HyYqb1mb", name: "Morena Servián", role: "Bailarín/a", skills: ["Tango escenario"], commitments: [] },
 ];
 
 function cleanSelect(value: any): string {
@@ -130,7 +133,7 @@ async function readAirtable(): Promise<Artist[]> {
 
       return {
         id: record.id,
-        name: f[F.name] || "Integrante",
+        name: record.id === "recFMitnpLxghJdvs" ? "Aracely Maizares" : f[F.name] || "Integrante",
         role: cleanSelect(f[F.role]) || "Artista",
         locality: f[F.locality] || "",
         skills: cleanMultiSelect(f[F.skills]),
@@ -138,7 +141,7 @@ async function readAirtable(): Promise<Artist[]> {
         commitments,
       };
     })
-    .filter((person: Artist) => person.role !== "Programación")
+    .filter((person: Artist) => person.role !== "Programación" && !HIDDEN_TEAM_MEMBER_IDS.has(person.id) && !HIDDEN_TEAM_MEMBER_NAMES.has(person.name))
     .sort((a: Artist, b: Artist) => {
       const aPablo = a.name === "Pablo Cieslik" ? -1 : 0;
       const bPablo = b.name === "Pablo Cieslik" ? -1 : 0;

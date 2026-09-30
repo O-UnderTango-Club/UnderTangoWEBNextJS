@@ -129,7 +129,7 @@ export const departments: Department[] = [
     number: "87", keyword: "Finanzas", title: "Finanzas, caja y deudas",
     link: { href: "/elitros/funcionamiento-del-fdg", label: "Funcionamiento del FDG", direct: true },
     description: "Ordena cobros, pagos, obligaciones, saldos y movimientos para sostener el trabajo y permitir decisiones económicas con información real.",
-    members: [],
+    members: [{ name: "Pablo Cieslik", role: "Dirección y administración financiera" }],
     projects: ["Ø87 — Tablero financiero", "Video institucional Ø UnderTango — sistema de diez departamentos"],
   },
   {

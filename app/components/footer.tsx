@@ -60,7 +60,7 @@ export default function Footer() {
               <a href="/reservas">Reservas</a>
             </li>
             <li>
-              <a href="/artistas">Artistas</a>
+              <a href="/central">Equipo</a>
             </li>
           </ul>
         </div>

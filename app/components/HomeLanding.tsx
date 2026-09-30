@@ -24,7 +24,7 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
 const categories: { title: string; description: string; href: string; icon: IconName; image: string; position?: string; keywords: string; mobileOnly?: boolean }[] = [
   { title: 'Eventos', description: 'Milongas, shows y encuentros', href: '/agenda', icon: 'calendar', image: '/assets/images/grupal1.png', position: 'center 20%', keywords: 'agenda calendario milonga show festival rave bailar' },
   { title: 'Clases', description: 'Aprendé y compartí el tango', href: '#classes', icon: 'learn', image: '/assets/images/la-cava-registro-01.webp', position: 'center 14%', keywords: 'aprender escuela curso baile grupales privadas academia' },
-  { title: 'Artistas', description: 'Conocé a nuestro equipo', href: '/artistas', icon: 'music', image: '/assets/images/tango-rave-elenco.jpg', keywords: 'personas profesionales musicos bailarines equipo', mobileOnly: true },
+  { title: 'Equipo', description: 'Conocé a quienes hacen UnderTango', href: '/central', icon: 'music', image: '/assets/images/tango-rave-elenco.jpg', keywords: 'personas profesionales musicos bailarines artistas equipo', mobileOnly: true },
   { title: 'Experiencias', description: 'Viví el tango en Iguazú', href: '/la-cava', icon: 'compass', image: '/images/home/cultura-conecta-iguazu.webp', position: '70% 45%', keywords: 'turismo cultura cataratas iguazu cena la cava' },
   { title: 'Negocios', description: 'Llevá cultura a tu proyecto', href: '/produccion-artistica', icon: 'business', image: '/assets/images/tango-rave-elenco.jpg', position: 'center 15%', keywords: 'contratar produccion empresas hoteles eventos corporativos oportunidades' },
 ];
@@ -49,7 +49,7 @@ export default function HomeLanding() {
       <header className={styles.header}>
         <a className={styles.brand} href="#inicio" aria-label="UnderTango, inicio"><span className={styles.symbol} aria-hidden="true">Ø</span><span>UnderTango</span></a>
         <nav className={styles.desktopNav} aria-label="Navegación principal">
-          <a href="#descubrir">Descubrir</a><a href="/agenda">Eventos</a><a href="/artistas">Artistas</a><a href="/produccion-artistica">Negocios</a><a href="/la-cava">Experiencias</a>
+          <a href="#descubrir">Descubrir</a><a href="/agenda">Eventos</a><a href="/central">Equipo</a><a href="/produccion-artistica">Negocios</a><a href="/la-cava">Experiencias</a>
         </nav>
         <button className={styles.searchToggle} type="button" onClick={openSearch} aria-label="Buscar en UnderTango" aria-controls="home-search"><Icon name="search" /></button>
         <a className={styles.contactLink} href="https://wa.me/5493757618270" target="_blank" rel="noopener noreferrer">Conectemos <Icon name="arrow" /></a>

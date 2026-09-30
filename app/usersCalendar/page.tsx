@@ -62,6 +62,15 @@ function eventTimeLabel(event: PublicEvent) {
   return event.time;
 }
 
+function eventWhatsAppUrl(event: PublicEvent) {
+  const date = event.date.split("-").reverse().join("/");
+  const time = event.allDay ? "" : ` (${eventTimeLabel(event)})`;
+  const place = event.place ? ` en ${event.place}` : "";
+  const message = `Hola, quisiera consultar por «${event.title}» del ${date}${time}${place}.`;
+
+  return `https://wa.me/5493757618270?text=${encodeURIComponent(message)}`;
+}
+
 export default function UsersCalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [activeCategories, setActiveCategories] = useState<Category[]>(CATEGORIES);
@@ -268,11 +277,19 @@ export default function UsersCalendarPage() {
 
                     <div className="day-events">
                       {eventsForDay.map((event) => (
-                        <div className={`event-card ${event.category}`} key={event.id}>
+                        <a
+                          className={`event-card ${event.category}`}
+                          key={event.id}
+                          href={eventWhatsAppUrl(event)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Consultar por WhatsApp: ${event.title}, ${event.date.split("-").reverse().join("/")} (abre en una nueva pestaña)`}
+                        >
                           <div className="event-time">{eventTimeLabel(event)}</div>
                           <div className="event-title">{event.title}</div>
                           {event.place && <div className="event-place">{event.place}</div>}
-                        </div>
+                          <span className="event-contact">Consultar por WhatsApp <span aria-hidden="true">↗</span></span>
+                        </a>
                       ))}
                     </div>
                   </article>

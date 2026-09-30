@@ -54,6 +54,7 @@
 .discoveryFooter i { width: 3px; height: 3px; border-radius: 50%; background: var(--copper); }
 .discoveryFooter a { font-size: 11px; color: #bacad6; }
 .discoveryFooter a span { padding-left: 16px; color: var(--copper); }
+.footerLinks { display: flex; gap: 28px; }
 .searchStatus { color: #c0d1de; font-size: 13px; margin: 16px 0; }
 .searchStatus button { background: none; border: none; text-decoration: underline; color: var(--ivory); cursor: pointer; padding: 4px 8px; }
 .mobileNav { display: none; }

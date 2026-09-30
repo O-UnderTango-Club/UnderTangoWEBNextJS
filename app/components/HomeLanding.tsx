@@ -22,11 +22,11 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
 }
 
 const categories: { title: string; description: string; href: string; icon: IconName; image: string; position?: string; keywords: string; mobileOnly?: boolean }[] = [
-  { title: 'Eventos', description: 'Milongas, shows y encuentros', href: '/agenda', icon: 'calendar', image: '/assets/images/showsImage1.png', position: 'center 32%', keywords: 'agenda calendario milonga show festival rave bailar' },
-  { title: 'Clases', description: 'Aprendé y compartí el tango', href: '#classes', icon: 'learn', image: '/assets/images/la-cava-registro-01.webp', position: 'center 42%', keywords: 'aprender escuela curso baile grupales privadas academia' },
+  { title: 'Eventos', description: 'Milongas, shows y encuentros', href: '/agenda', icon: 'calendar', image: '/assets/images/grupal1.png', position: 'center 20%', keywords: 'agenda calendario milonga show festival rave bailar' },
+  { title: 'Clases', description: 'Aprendé y compartí el tango', href: '#classes', icon: 'learn', image: '/assets/images/la-cava-registro-01.webp', position: 'center 14%', keywords: 'aprender escuela curso baile grupales privadas academia' },
   { title: 'Artistas', description: 'Conocé a nuestro equipo', href: '/artistas', icon: 'music', image: '/assets/images/tango-rave-elenco.jpg', keywords: 'personas profesionales musicos bailarines equipo', mobileOnly: true },
   { title: 'Experiencias', description: 'Viví el tango en Iguazú', href: '/la-cava', icon: 'compass', image: '/images/home/cultura-conecta-iguazu.webp', position: '70% 45%', keywords: 'turismo cultura cataratas iguazu cena la cava' },
-  { title: 'Negocios', description: 'Llevá cultura a tu proyecto', href: '/produccion-artistica', icon: 'business', image: '/assets/images/tango-rave-elenco.jpg', position: 'center 40%', keywords: 'contratar produccion empresas hoteles eventos corporativos oportunidades' },
+  { title: 'Negocios', description: 'Llevá cultura a tu proyecto', href: '/produccion-artistica', icon: 'business', image: '/assets/images/tango-rave-elenco.jpg', position: 'center 15%', keywords: 'contratar produccion empresas hoteles eventos corporativos oportunidades' },
 ];
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -83,13 +83,13 @@ export default function HomeLanding() {
           </a>)}
         </div>
         {terms.length > 0 && <p className={styles.searchStatus} role="status">{matches.length ? `${matches.length} ${matches.length === 1 ? 'sección encontrada' : 'secciones encontradas'}` : 'No encontramos una sección con ese nombre. Probá con tango, clases o shows.'} <button type="button" onClick={() => { setQuery(''); searchRef.current?.focus(); }}>Ver todas</button></p>}
-        <div className={styles.discoveryFooter}><span>PUERTO IGUAZÚ <i /> TRIPLE FRONTERA</span><a href="#intentions">Conocé UnderTango <span aria-hidden="true">↓</span></a></div>
+        <div className={styles.discoveryFooter}><span>PUERTO IGUAZÚ <i /> TRIPLE FRONTERA</span><div className={styles.footerLinks}><a href="/central">Ø Central</a><a href="#intentions">Conocé UnderTango <span aria-hidden="true">↓</span></a></div></div>
       </div>
 
       <nav className={styles.mobileNav} aria-label="Accesos rápidos">
         <a href="#inicio" aria-label="Ir al inicio"><Icon name="home" /><span>Inicio</span></a>
         <a href="#descubrir"><Icon name="compass" /><span>Explorar</span></a>
-        <a href="/artistas"><Icon name="music" /><span>Artistas</span></a>
+        <a href="/central"><Icon name="business" /><span>Ø Central</span></a>
         <a href="/reservas"><Icon name="contact" /><span>Contacto</span></a>
       </nav>
     </div>

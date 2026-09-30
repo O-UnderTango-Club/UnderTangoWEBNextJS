@@ -115,13 +115,19 @@
   text-transform: uppercase;
 }
 
-.intent-gateway h1 {
+.intent-gateway #intentions-title {
   color: #ffffff;
   font-size: clamp(2.5rem, 5vw, 4.6rem);
   font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 1.08;
   margin: 0;
+  display: block;
+  padding-bottom: 0;
+}
+
+.intent-gateway #intentions-title::after {
+  display: none;
 }
 
 .intent-lede {
@@ -288,7 +294,7 @@
     padding: 56px 18px 64px;
   }
 
-  .intent-gateway h1 {
+  .intent-gateway #intentions-title {
     font-size: clamp(2.35rem, 11vw, 3.35rem);
     line-height: 1.1;
   }

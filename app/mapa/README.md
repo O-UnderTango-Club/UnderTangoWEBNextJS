@@ -1,7 +1,7 @@
 # Public project map
 
 The editorial snapshot in `data.ts` was supplied and authorized by Pablo on
-2026-09-16. Publish only explicitly approved public activity, participation and
+2026-09-16. Pablo authorized the La Cava date correction on 2026-10-03. Publish only explicitly approved public activity, participation and
 date information. The page does not read private operational tables and is not
 a live artist-location tracker. Refresh the visible edition date when updating
 the snapshot. Supabase remains the canonical operational record.
@@ -27,7 +27,7 @@ Place coordinates were queried from Nominatim on 2026-09-16:
 - Boleros + Tango: city reference, OSM relation 297730; no unconfirmed venue
   or performer is published.
 
-September 18, October 2 and November 28 are 2026 dates. No performance times,
+September 18, October 9 and November 28 are 2026 dates. No performance times,
 ticket sales, final contract status or attendance promises are inferred.
 
 ## Equipo 80

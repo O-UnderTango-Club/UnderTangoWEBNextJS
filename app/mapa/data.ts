@@ -17,7 +17,7 @@ export type Activity = {
   link?: string;
 };
 
-export const updatedLabel = "16 de septiembre de 2026";
+export const updatedLabel = "3 de octubre de 2026";
 export const cities: { id: CityId; name: string; country: string; code: string; coordinates: [number, number] }[] = [
   { id: "iguazu", name: "Puerto Iguazú", country: "Argentina", code: "AR", coordinates: [-25.6107508, -54.5764199] },
   { id: "foz", name: "Foz do Iguaçu", country: "Brasil", code: "BR", coordinates: [-25.5447203, -54.5844872] },
@@ -26,6 +26,7 @@ export const cities: { id: CityId; name: string; country: string; code: string; 
 ];
 
 // Public editorial snapshot authorized by Pablo, 2026-09-16.
+// La Cava date corrected with Pablo's authorization, 2026-10-03.
 // These are public participation details, not private operational records.
 export const activities: Activity[] = [
   {
@@ -50,7 +51,7 @@ export const activities: Activity[] = [
   {
     id: "la-cava", number: "04", city: "foz", venue: "La Cava · Grand Carimã", title: "Milonga Triple Fronteriza",
     status: "Con fecha", description: "Una milonga para encontrarnos desde los tres lados de la frontera. Horario por definir.",
-    artists: [], date: "2026-10-02", dateLabel: "Viernes 2 de octubre", coordinates: [-25.5768507, -54.5485245],
+    artists: [], date: "2026-10-09", dateLabel: "Viernes 9 de octubre", coordinates: [-25.5768507, -54.5485245],
     location: "Grand Carimã · Av. das Cataratas 4790",
   },
   {

@@ -47,7 +47,7 @@ export function finishTodayChanges(task: Raw, data: Snapshot, now=Date.now()) {
 const s = (v: unknown): string => typeof v === "string" ? v : "";
 const links = (v: unknown): string[] => Array.isArray(v) ? v.filter(x => typeof x === "string") : [];
 const unique = (v: string[]) => [...new Set(v)];
-export function projectOpen(p: Raw) { return !["Completado", "Archivado"].includes(p.fields[F.projects.status]); }
+export function projectOpen(p: Raw) { return !["Completado", "Archivado", "Descartado"].includes(p.fields[F.projects.status]); }
 export function closed(t: Raw) { return ["Hecho", "Cancelado"].includes(t.fields[F.tasks.status]); }
 export function cycleFrom(id: string, tasks: Raw[]): boolean {
   const map = new Map(tasks.map(t => [t.id, links(t.fields[F.tasks.dependencies])]));
@@ -93,7 +93,7 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
   const deps=links(f[F.tasks.dependencies]), events=links(f[F.tasks.events]);
   const projects=taskProjects(t,data), caseIds=links(f[F.tasks.cases]);
   if (!s(f[F.tasks.name]).trim()) issues.push("Falta el nombre de la acción");
-  if (!isGroup && !projects.length && !caseIds.length) issues.push("Vincular a un proyecto o caso");
+  // La vinculación a proyectos/casos aporta contexto, no determina si una acción es válida.
   if (caseIds.some(id=>!data.cases.some(c=>c.id===id))) issues.push("Caso vinculado no encontrado");
   if (projects.length && !data.projects.some(p=>projects.includes(p.id)&&projectOpen(p))) issues.push("Sólo vinculada a proyectos cerrados");
   if (data.rankingMode==="action" && !groupId) {
@@ -162,7 +162,7 @@ export function board(data: Snapshot, now=Date.now()) {
     if(data.rankingMode!=="action"&&!FRONTS.includes(p.front)) reasons.push("Asignar frente");
     if(data.rankingMode!=="action"&&(p.rank===9999||p.rank<1||!Number.isInteger(p.rank))) reasons.push("Asignar posición");
     if(data.rankingMode!=="action"&&projects.some(q=>q.open&&q.id!==p.id&&q.front===p.front&&q.rank===p.rank)) reasons.push("Posición repetida en el frente");
-    if(!tasks.some(t=>t.projectIds.includes(p.id)&&!["done","cancelled"].includes(t.stage))) reasons.push("Definir próximo paso");
+    // Un proyecto activo puede existir sin acciones asignadas; eso no es un error de catálogo.
     return reasons.length?[{id:p.id,reasons}]:[];
   });
   return {rankingMode:data.rankingMode||"project",updatedAt:data.updatedAt,projects,tasks,fronts,projectIssues,events:data.events.map(e=>({id:e.id,name:s(e.fields[F.events.name]),status:s(e.fields[F.events.status]),type:s(e.fields[F.events.type]),evidence:s(e.fields[F.events.evidence]),occurred:s(e.fields[F.events.occurred])})),cases:data.cases.map(c=>({id:c.id,name:s(c.fields[F.cases.name]),projectIds:links(c.fields[F.cases.projects])}))};

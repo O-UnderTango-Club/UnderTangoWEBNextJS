@@ -103,7 +103,7 @@ check('un evento necesita ocurrencia y evidencia; no se activa sólo por fecha',
 check('se rechazan ciclos y dependencias ausentes',()=>{const a=t('a',{[F.tasks.dependencies]:['b']}),b=t('b',{[F.tasks.dependencies]:['a']}),data={...d,tasks:[a,b]};assert.throws(()=>m.validateTask(a,data,'ready'),/ciclo/);assert.equal(m.classify(a,{...data,tasks:[a]}).stage,'catalog');});
 check('Wish conserva visibilidad con proyecto de origen cerrado y destino activo',()=>{const closed=row('closed',{[F.projects.status]:'Completado'}),a=t('Wish',{[F.tasks.projects]:['closed','p']});const b=m.board({...d,projects:[p,closed],tasks:[a]});assert.equal(b.tasks[0].stage,'ready');assert.deepEqual(b.fronts[0].tasks,['Wish']);});
 check('acciones compartidas se muestran una sola vez y proyectos no compiten con Seguimientos',()=>{const p2=row('p2',{...p.fields,[F.projects.front]:'Secundario',legacyGate:'En espera'}),a=t('compartida',{[F.tasks.projects]:['p','p2']});const b=m.board({...d,projects:[p,p2],tasks:[a]});assert.equal(b.fronts.flatMap(f=>f.tasks).length,1);assert.equal(b.tasks[0].stage,'ready');});
-check('ninguna acción desaparece por filtros; plazas limitadas y próximos pasos faltantes visibles',()=>{const projects=Array.from({length:5},(_,i)=>row('p'+i,{...p.fields,[F.projects.rank]:i+1})),tasks=projects.slice(0,4).map((p,i)=>t('t'+i,{[F.tasks.projects]:[p.id]})).concat(t('huérfana',{[F.tasks.projects]:[]}));const b=m.board({...d,projects,tasks});assert.equal(b.tasks.length,5);assert.equal(b.fronts[0].tasks.length,3);assert.ok(b.projectIssues.some(p=>p.id==='p4'));assert.equal(b.tasks.find(t=>t.id==='huérfana').stage,'catalog');});
+check('ninguna acción desaparece por filtros; plazas limitadas y proyectos sin acciones no son errores',()=>{const projects=Array.from({length:5},(_,i)=>row('p'+i,{...p.fields,[F.projects.rank]:i+1})),tasks=projects.slice(0,4).map((p,i)=>t('t'+i,{[F.tasks.projects]:[p.id]})).concat(t('huérfana',{[F.tasks.projects]:[]}));const b=m.board({...d,projects,tasks});assert.equal(b.tasks.length,5);assert.equal(b.fronts[0].tasks.length,3);assert.equal(b.projectIssues.length,0);assert.equal(b.tasks.find(t=>t.id==='huérfana').stage,'ready');});
 const accessUrl=moduleUrl(compile('../src/lib/panel-access.ts'));
 const access=await import(accessUrl);
 const operationsUrl=moduleUrl(compile('../src/lib/panel-operations.ts').replace('"./panel-model"',JSON.stringify(modelUrl)));
@@ -206,3 +206,12 @@ try{
  assert.deepEqual(m.board(await server.snapshot(true)).fronts[0].tasks,['accion1','accion2','accion3']);count++;console.log('OK bajar 1.1 a 1.4 retira su acción y sube los puestos 2, 3 y 4; promoverla revierte el orden');
 }finally{globalThis.fetch=originalFetch;}
 console.log(`${count} verificaciones aprobadas.`);
+
+check('proyecto descartado no es abierto y la acción sin proyecto no se etiqueta como por catalogar',()=>{
+ const excluded=row('descartado',{[F.projects.status]:'Descartado'});
+ assert.equal(m.projectOpen(excluded),false);
+ const standalone=t('sin proyecto',{[F.tasks.projects]:[],[F.tasks.front]:'Terciario',[F.tasks.rank]:4});
+ const x={...d,rankingMode:'action',tasks:[standalone]};
+ assert.equal(m.classify(standalone,x).stage,'ready');
+ assert.deepEqual(m.board(x).fronts.find(f=>f.name==='Terciario').tasks,['sin proyecto']);
+});

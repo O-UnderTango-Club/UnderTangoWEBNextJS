@@ -176,8 +176,8 @@ async function performMutation(input: any, actor: string) {
     if("order" in change){if(!Number.isInteger(change.order)||change.order<0||change.order>9999)throw new PanelError("El orden debe ser un entero positivo."); fields[F.tasks.order]=change.order||null;}
     for(const [key,records] of [["projects",data.projects],["cases",data.cases],["dependencies",data.tasks],["events",data.events]] as const) if(key in change)fields[F.tasks[key]]=refs(change[key],records);
     let stage:EditableStage|undefined=change.stage;
-    if(stage&&!states[stage])throw new PanelError("Estado inválido.");
-    if(!current&&!stage) stage="catalog";
+    if(stage&&(!states[stage]||stage==="catalog"))throw new PanelError("Estado inválido.");
+    if(!current&&!stage) stage="ready";
     if(stage){[fields[F.tasks.status],fields[F.tasks.gate]]=states[stage];}
     const actionRanking=operational&&data.rankingMode==="action";
     if(("front" in change||"rank" in change)&&!actionRanking)throw new PanelError("El ranking individual todavía no está habilitado.",409);
@@ -231,7 +231,7 @@ async function performMutation(input: any, actor: string) {
       const name=text(change.name,250).replace(/\s+/g," ").trim();
       if(!name)throw new PanelError("Escribí el nombre del proyecto.");
       if(data.projects.some(p=>String(p.fields[F.projects.name]||"").replace(/\s+/g," ").trim().toLowerCase()===name.toLowerCase()))throw new PanelError("Ya existe un proyecto con ese nombre. Buscalo para vincular la acción, incluso entre los cerrados.",409);
-      if(change.status!==undefined&&!["Activo","En espera"].includes(change.status))throw new PanelError("Elegí Activo o En espera para el nuevo proyecto.");
+      if(change.status!==undefined&&change.status!=="Activo")throw new PanelError("Todo proyecto nuevo debe comenzar Activo.");
       fields[F.projects.name]=name;fields[F.projects.purpose]=text(change.purpose??"",1500);fields[F.projects.status]=change.status||"Activo";
     }
     if("doc" in change)fields[F.projects.doc]=doc(change.doc);
@@ -245,8 +245,8 @@ async function performMutation(input: any, actor: string) {
       recordRanks(destination);if(current.fields[F.projects.front]!==front)recordRanks(ordered(current.fields[F.projects.front]));
     }
     if("status" in change){
-      if(!["Activo","En espera","Completado","Archivado"].includes(change.status))throw new PanelError("Estado de proyecto inválido.");
-      if(current&&["Completado","Archivado"].includes(change.status)&&data.tasks.some(t=>!closed(t)&&taskProjects(t,data).includes(current.id)))throw new PanelError("Primero resolvé o reasigná las acciones abiertas del proyecto.");
+      if(!["Activo","En espera","Completado","Descartado"].includes(change.status))throw new PanelError("Estado de proyecto inválido.");
+      if(current&&["Completado","Descartado"].includes(change.status)&&data.tasks.some(t=>!closed(t)&&taskProjects(t,data).includes(current.id)))throw new PanelError("Primero resolvé o reasigná las acciones abiertas del proyecto.");
       fields[F.projects.status]=change.status;
     }
   } else {
@@ -278,7 +278,7 @@ async function performMutation(input: any, actor: string) {
   cached=undefined;
   for(let i=0;i<rankChanges.length;i+=10){
     try{await airtable(table,"?returnFieldsByFieldId=true",{method:"PATCH",body:JSON.stringify({records:rankChanges.slice(i,i+10),typecast:false})});}
-    catch{throw new PanelError("La posición cambió, pero la reordenación pudo quedar incompleta. Actualizá y revisá las posiciones repetidas en Por catalogar.",503);}
+    catch{throw new PanelError("La posición cambió, pero la reordenación pudo quedar incompleta. Actualizá y revisá las posiciones repetidas en Alertas de datos.",503);}
   }
   // Read back the affected row: a successful response is never replaced by an optimistic local state.
   const verified=await airtable(table,`/${saved.id}?returnFieldsByFieldId=true`);

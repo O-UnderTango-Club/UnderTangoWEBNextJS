@@ -19,7 +19,7 @@ type Field = { id: string; label: string; type: "text" | "date" | "amount" | "se
 export const FINANCE_FIELDS: Record<FinanceTable, Record<string, Field>> = {
   obligations: {
     name: { id: "fldTyZmuXoFysSWDz", label: "Obligación", type: "text" },
-    type: { id: "fldsQRvXiJqEDwpQ7", label: "Tipo", type: "select", choices: ["Por cobrar", "Por pagar", "Saldada"], readChoices: ["Deuda refinanciada"] },
+    type: { id: "fldsQRvXiJqEDwpQ7", label: "Tipo", type: "select", choices: ["Por cobrar", "Por pagar"], readChoices: ["Saldada", "Deuda refinanciada"] },
     concept: { id: "fldVKVA6Qv50uXFON", label: "Concepto", type: "text" },
     originalAmount: { id: "fldSQgRtIBF8lf0EH", label: "Importe original", type: "amount" },
     currency: { id: "fld1d4ZilO9HE4xfk", label: "Moneda", type: "select", choices: ["BRL", "ARS", "USD", "R$"] },

@@ -91,11 +91,10 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
   const nextAvailableAt=Number.isFinite(availableTime)&&availableTime>now?new Date(availableTime).toISOString():"";
   if(activateAt&&!Number.isFinite(activationTime)) issues.push("Fecha de activación inválida");
   const deps=links(f[F.tasks.dependencies]), events=links(f[F.tasks.events]);
-  const projects=taskProjects(t,data), caseIds=links(f[F.tasks.cases]);
+  const caseIds=links(f[F.tasks.cases]);
   if (!s(f[F.tasks.name]).trim()) issues.push("Falta el nombre de la acción");
   // La vinculación a proyectos/casos aporta contexto, no determina si una acción es válida.
   if (caseIds.some(id=>!data.cases.some(c=>c.id===id))) issues.push("Caso vinculado no encontrado");
-  if (projects.length && !data.projects.some(p=>projects.includes(p.id)&&projectOpen(p))) issues.push("Sólo vinculada a proyectos cerrados");
   if (data.rankingMode==="action" && !groupId) {
     if(!FRONTS.includes(s(f[F.tasks.front]))) issues.push("Asignar frente a la acción");
     if(!Number.isInteger(f[F.tasks.rank]) || f[F.tasks.rank]<1) issues.push("Asignar posición a la acción");

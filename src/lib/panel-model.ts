@@ -122,7 +122,7 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
   const scheduled=!!nextAvailableAt;
   const released=gate==="En espera" && !!(deps.length+events.length) && !blockers.length && !issues.length && !scheduled;
   // Los errores de datos se muestran dentro de la acción; nunca definen otro estado.
-  const stage: Stage=scheduled?"scheduled":blockers.length?"waiting":gate==="En acción"?"doing":gate==="En espera"?"waiting":gate==="Acción recurrente"?"recurring":"ready";
+  const stage: Stage=scheduled?"scheduled":blockers.length?"waiting":gate==="En acción"?"doing":gate==="Acción recurrente"?"recurring":"ready";
   return {stage,issues,blockers,released,nextAvailableAt};
 }
 export function board(data: Snapshot, now=Date.now()) {

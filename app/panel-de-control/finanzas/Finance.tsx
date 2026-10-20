@@ -7,10 +7,12 @@ import { buildFinanceSubmission, financeWarnings, formatFinanceAmount, newFinanc
 import css from "./finance.module.css";
 
 type Data = FinanceSnapshot & { actor:string; readOnly:boolean };
+type ArchiveIntent = { action:"archiveMovement";requestId:string;revision:string;id:string;archive:boolean;reason:string };
 const pendingKey = "undertango.finance.pending.v1";
+const archiveKey = "undertango.finance.archive.pending.v1";
 const title = (table: FinanceTable) => table === "obligations" ? "Obligaciones" : "Movimientos";
 class ApiError extends Error { constructor(message:string,public status=503,public code="connection",public uncertain=false) { super(message); } }
-async function api(submission?: FinanceSubmission): Promise<unknown> {
+async function api(submission?: FinanceSubmission | ArchiveIntent): Promise<unknown> {
   let response: Response;
   try {
     response = await fetch("/api/panel/finance",{method:submission ? "POST" : "GET",credentials:"same-origin",cache:"no-store",
@@ -56,6 +58,7 @@ export default function Finance() {
   const [onlyIssues,setOnlyIssues] = useState(false), [limit,setLimit] = useState(30);
   const [draft,setDraft] = useState<FinanceDraft>();
   const [pending,setPending] = useState<FinanceSubmission | null>(null);
+  const [archivePending,setArchivePending] = useState<ArchiveIntent | null>(null);
   const sending = useRef(false), reading = useRef(false), loadedPending = useRef(false);
   const refresh = useCallback(async () => {
     if (reading.current) return null;
@@ -76,6 +79,17 @@ export default function Finance() {
           }
         } catch { setError("No se pudo consultar el estado del último envío de este navegador."); }
       }
+      try {
+        const savedArchive=sessionStorage.getItem(archiveKey);
+        if (savedArchive) {
+          const parsed:unknown=JSON.parse(savedArchive);
+          if (isObject(parsed) && parsed.actor === value.actor && isObject(parsed.intent) && parsed.intent.action === "archiveMovement"
+            && typeof parsed.intent.id === "string" && typeof parsed.intent.requestId === "string"
+            && typeof parsed.intent.revision === "string" && typeof parsed.intent.archive === "boolean"
+            && typeof parsed.intent.reason === "string") setArchivePending(parsed.intent as ArchiveIntent);
+          else setError("Hay una eliminación anterior que necesita revisión. Actualizá y comprobá los registros.");
+        }
+      } catch { setError("No se pudo recuperar la última eliminación pendiente."); }
       return value;
     } catch (e) { setData(undefined); setNeedsAccess(e instanceof ApiError && (e.status === 401 || e.status === 403)); setError(e instanceof Error ? e.message : "No se pudieron consultar las finanzas."); return null; }
     finally { reading.current = false; setLoading(false); }
@@ -109,12 +123,33 @@ export default function Finance() {
     } finally { sending.current = false; setBusy(false); }
   };
 
+  const changeArchive = async (intent:ArchiveIntent) => {
+    if (!data || data.readOnly || sending.current || pending) throw new ApiError("No se puede cambiar este registro ahora.",409,"disabled");
+    if (archivePending && JSON.stringify(archivePending) !== JSON.stringify(intent)) throw new ApiError("Primero resolvé la eliminación pendiente.",409,"pending");
+    sending.current=true;setBusy(true);setError("");
+    try {
+      sessionStorage.setItem(archiveKey,JSON.stringify({actor:data.actor,intent}));
+      setArchivePending(intent);
+      const result=checkedReceipt(await api(intent),intent.requestId);
+      sessionStorage.removeItem(archiveKey);setArchivePending(null);setDraft(undefined);
+      setNotice(intent.archive ? "Registro eliminado de la vista. Podés restaurarlo en «Registros eliminados»." : "Registro restaurado.");
+      const updated=await refresh();
+      if (updated && (updated.archivedMovements || []).some(r=>r.id===intent.id) !== intent.archive)
+        setError("El cambio tiene comprobante, pero la lectura requiere actualización. No repitas la operación.");
+      return result;
+    } catch(e) {
+      if (!(e instanceof ApiError && e.uncertain)) {sessionStorage.removeItem(archiveKey);setArchivePending(null);}
+      setError(e instanceof Error ? e.message : "No se pudo verificar el cambio.");throw e;
+    } finally {sending.current=false;setBusy(false);}
+  };
+  const archive = (id:string,archive:boolean) => changeArchive({action:"archiveMovement",requestId:crypto.randomUUID(),revision:data!.revision,id,archive,reason:archive ? "Eliminado desde Finanzas" : "Restaurado desde Finanzas"}).then(()=>{});
   const today = new Date().toLocaleDateString("sv-SE",{timeZone:"America/Argentina/Cordoba"});
   const [year,setYear] = useState(Number(today.slice(0,4)));
   const [entry,setEntry] = useState<"Ingreso"|"Egreso"|null>(null);
   const [shown,setShown] = useState(8);
   const years = data ? [...new Set(data.movements.map(r => Number((financeText(r,"movements","date") || "").slice(0,4))).filter(Number.isInteger).filter(n => n > 2000))].sort((a,b) => b-a) : [];
-  const movements = data ? data.movements.filter(r => (financeText(r,"movements","date") || "").startsWith(String(year)))
+  const archivedIds = new Set((data?.archivedMovements || []).map(r=>r.id));
+  const movements = data ? data.movements.filter(r => !archivedIds.has(r.id) && (financeText(r,"movements","date") || "").startsWith(String(year)))
     .sort((a,b) => (financeText(b,"movements","date") || "").localeCompare(financeText(a,"movements","date") || "") || b.id.localeCompare(a.id)) : [];
   const totals = new Map<string,{income:bigint;expense:bigint}>();
   for (const row of movements) {
@@ -129,13 +164,13 @@ export default function Finance() {
   const column = (kind:"Ingreso"|"Egreso") => {
     const rows = movements.filter(r => financeText(r,"movements","type") === kind);
     return <section className={css.ledgerColumn} aria-label={kind === "Ingreso" ? "Últimos ingresos" : "Últimos egresos"}>
-      <div className={css.columnHeader}><h2>{kind === "Ingreso" ? "Ingresos" : "Egresos"}</h2><button type="button" className={css.primary} disabled={data?.readOnly || !!pending || busy} onClick={() => setEntry(kind)}>+ Agregar {kind.toLocaleLowerCase()}</button></div>
+      <div className={css.columnHeader}><h2>{kind === "Ingreso" ? "Ingresos" : "Egresos"}</h2><button type="button" className={css.primary} disabled={data?.readOnly || !!pending || !!archivePending || busy} onClick={() => setEntry(kind)}>+ Agregar {kind.toLocaleLowerCase()}</button></div>
       <p className={css.small}>{rows.length} movimientos del año, del más reciente al más antiguo.</p>
       <div className={css.ledgerList}>{rows.slice(0,shown).map(row => {
         const state = financeText(row,"movements","status");
         return <article className={css.ledgerRow} key={row.id}>
           <div><time>{financeText(row,"movements","date") || "Sin fecha"}</time><strong>{financeText(row,"movements","name") || "Sin nombre"}</strong><span className={css.small}>{financeText(row,"movements","concept") || ""}</span></div>
-          <div className={css.ledgerRight}><b>{formatFinanceAmount(financeText(row,"movements","amount"),financeText(row,"movements","currency"))}</b><span className={state === "Confirmado" ? css.confirmed : css.unconfirmed}>{state || "Sin confirmar"}</span><button type="button" disabled={!!pending || busy} onClick={() => setDraft(newFinanceDraft("movements",data!,row))}>Ver / editar</button></div>
+          <div className={css.ledgerRight}><b>{formatFinanceAmount(financeText(row,"movements","amount"),financeText(row,"movements","currency"))}</b><span className={state === "Confirmado" ? css.confirmed : css.unconfirmed}>{state || "Sin confirmar"}</span><button type="button" disabled={!!pending || !!archivePending || busy} onClick={() => setDraft(newFinanceDraft("movements",data!,row))}>Ver / editar</button></div>
         </article>;
       })}</div>
       {!rows.length ? <p className={css.empty}>Todavía no hay {kind.toLocaleLowerCase()}s registrados en {year}.</p> : null}
@@ -143,20 +178,28 @@ export default function Finance() {
     </section>;
   };
   return <main className={css.finance}>
-    <header className={css.header}><div><a href="/panel-de-control">← Panel de control</a><p className={css.eyebrow}>Ø UnderTango · finanzas privadas</p><h1>Ingresos y egresos</h1><p>Movimientos registrados, ordenados por fecha.</p></div><button type="button" disabled={loading || busy || !!draft || !!entry || !!pending} onClick={() => void refresh()}>{loading ? "Actualizando…" : "Actualizar"}</button></header>
+    <header className={css.header}><div><a href="/panel-de-control">← Panel de control</a><p className={css.eyebrow}>Ø UnderTango · finanzas privadas</p><h1>Ingresos y egresos</h1><p>Movimientos registrados, ordenados por fecha.</p></div><button type="button" disabled={loading || busy || !!draft || !!entry || !!pending || !!archivePending} onClick={() => void refresh()}>{loading ? "Actualizando…" : "Actualizar"}</button></header>
     {notice ? <p className={css.notice} role="status">{notice}</p> : null}
     {error ? <p className={css.error} role="alert">{error}</p> : null}
     {loading && !data ? <p role="status">Leyendo movimientos…</p> : null}
     {!data && !loading ? <section className={css.empty}><h2>{needsAccess ? "Ingresar a Finanzas" : "No pudimos cargar los movimientos"}</h2><p>{needsAccess ? "Ingresá desde el panel de control con tu acceso habitual." : "Probá de nuevo con Actualizar."}</p><a href="/panel-de-control">Abrir panel de control</a></section> : null}
     {data ? <>
-      <div className={css.context}><span>Supabase · {data.movements.length} movimientos conservados</span><span>Lectura {new Date(data.updatedAt).toLocaleString("es-AR",{timeZone:"America/Argentina/Cordoba"})}</span></div>
+      <div className={css.context}><span>Supabase · {data.movements.length - archivedIds.size} movimientos visibles</span><span>Lectura {new Date(data.updatedAt).toLocaleString("es-AR",{timeZone:"America/Argentina/Cordoba"})}</span></div>
       {data.readOnly ? <p className={css.warning}>Vista de solo lectura.</p> : null}
       {pending ? <section className={css.pending}><h2>Envío pendiente de confirmación</h2><p>Reintentá el mismo envío para evitar duplicados.</p><Review submission={pending} data={data}/><button type="button" className={css.primary} disabled={busy || data.readOnly} onClick={() => void send(pending).catch(() => {})}>Reintentar el mismo envío</button></section> : null}
+      {archivePending ? <section className={css.pending}><h2>Eliminación o restauración sin confirmación</h2><p>Reintentá el mismo envío para confirmar su resultado sin duplicar acciones.</p><button type="button" className={css.primary} disabled={busy} onClick={() => void changeArchive(archivePending).catch(()=>{})}>Reintentar el mismo envío</button></section> : null}
       <div className={css.yearBar}><label>Año <select value={year} onChange={e => {setYear(Number(e.target.value));setShown(8);}}>{[...new Set([year,...years])].sort((a,b)=>b-a).map(y => <option key={y} value={y}>{y}</option>)}</select></label><p className={css.small}>Solo los movimientos confirmados, con fecha e importe, entran en el resultado. Cada moneda se calcula por separado.</p></div>
       <section className={css.result} aria-label="Resultado anual"><h2>Resultado {year}</h2>{totals.size ? <div className={css.resultGrid}>{[...totals.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([currency,t]) => <div className={css.resultCard} key={currency}><h3>{currency}</h3><dl><div><dt>Ingresos</dt><dd>{display(t.income,currency)}</dd></div><div><dt>Egresos</dt><dd>{display(t.expense,currency)}</dd></div><div className={css.net}><dt>Resultado</dt><dd>{display(t.income-t.expense,currency)}</dd></div></dl></div>)}</div> : <p>No hay movimientos confirmados con importe para {year}.</p>}<p className={css.small}>Resultado = ingresos menos egresos registrados. No representa el efectivo disponible ni incluye un saldo inicial. El histórico contiene conversiones de moneda y un posible egreso duplicado de vestuario por ARS 100.000; revisalo antes de usar este resultado como balance.</p></section>
       <div className={css.ledger}>{column("Ingreso")}{column("Egreso")}</div>
-      {entry ? <QuickEntry kind={entry} data={data} today={today} busy={busy} locked={busy || !!pending} send={send} onClose={() => {if (!busy && !pending) setEntry(null);}}/> : null}
-      {draft ? <Editor key={`${draft.table}:${draft.id || "new"}`} initial={draft} data={data} busy={busy} locked={busy || !!pending} pending={pending} send={send} onClose={() => {if (!busy && !pending) setDraft(undefined);}}/> : null}
+      <details className={css.archived}><summary>Registros eliminados ({archivedIds.size})</summary>
+        <p className={css.small}>Se conservan en Supabase y en la auditoría. No entran en las columnas ni en el resultado.</p>
+        {(data.archivedMovements || []).map(item => {const row=data.movements.find(r=>r.id===item.id);return <div className={css.archivedRow} key={item.id}>
+          <span>{row ? financeText(row,"movements","name") : item.id} · {row ? formatFinanceAmount(financeText(row,"movements","amount"),financeText(row,"movements","currency")) : ""} · {new Date(item.archivedAt).toLocaleDateString("es-AR",{timeZone:"America/Argentina/Cordoba"})}</span>
+          <button type="button" disabled={busy || !!pending || !!archivePending || data.readOnly} onClick={() => void archive(item.id,false).catch(()=>{})}>Restaurar</button>
+        </div>;})}
+      </details>
+      {entry ? <QuickEntry kind={entry} data={data} today={today} busy={busy} locked={busy || !!pending || !!archivePending} send={send} onClose={() => {if (!busy && !pending && !archivePending) setEntry(null);}}/> : null}
+      {draft ? <Editor key={`${draft.table}:${draft.id || "new"}`} initial={draft} data={data} busy={busy} locked={busy || !!pending || !!archivePending} pending={pending} send={send} archive={archive} onClose={() => {if (!busy && !pending && !archivePending) setDraft(undefined);}}/> : null}
     </> : null}
   </main>;
 }
@@ -213,9 +256,10 @@ function LinkField({label,options,value,onChange,disabled}:{label:string;options
     {!disabled ? <><input aria-label={`Buscar ${label.toLocaleLowerCase()} para vincular`} value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar para vincular…"/><select aria-label={`Vincular ${label.toLocaleLowerCase()}`} value="" disabled={value.length >= 30} onChange={e => {if(e.target.value)onChange([...value,e.target.value]);}}><option value="">Elegir un registro…</option>{choices.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></> : null}
   </fieldset>;
 }
-function Editor({initial,data,busy,locked,pending,send,onClose}:{initial:FinanceDraft;data:Data;busy:boolean;locked:boolean;pending:FinanceSubmission|null;send:(s:FinanceSubmission)=>Promise<FinanceReceipt>;onClose:()=>void}) {
+function Editor({initial,data,busy,locked,pending,send,archive,onClose}:{initial:FinanceDraft;data:Data;busy:boolean;locked:boolean;pending:FinanceSubmission|null;send:(s:FinanceSubmission)=>Promise<FinanceReceipt>;archive:(id:string,archive:boolean)=>Promise<void>;onClose:()=>void}) {
   const [draft,setDraft] = useState(initial), [prepared,setPrepared] = useState<FinanceSubmission>();
   const [error,setError] = useState(""), [duplicate,setDuplicate] = useState(false), [conflict,setConflict] = useState(false);
+  const [confirmDelete,setConfirmDelete] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {const d=dialog.current; d?.showModal();const old=document.body.style.overflow;document.body.style.overflow="hidden";return()=>{d?.close();document.body.style.overflow=old;};},[]);
   function value(id:string,next:FinanceCell) {setDraft(d => ({...d,values:{...d.values,[id]:next}}));setError("");}
@@ -246,7 +290,8 @@ function Editor({initial,data,busy,locked,pending,send,onClose}:{initial:Finance
     {prepared ? <><h2>Revisar antes de guardar</h2><Review submission={prepared} data={data}/></> : null}
     {pending ? <p className={css.warning} role="status">El envío conserva su identificador. Si se perdió la respuesta, reintentá el mismo envío; no cambies los datos todavía.</p> : null}
     {error ? <p className={css.error} role="alert">{error}</p> : null}
-    <footer>{prepared && !locked ? <button type="button" onClick={() => setPrepared(undefined)}>Volver a corregir</button> : null}{conflict ? <p>Cerrá este formulario y actualizá los datos antes de preparar otro cambio.</p> : null}
-      {!data.readOnly && !conflict ? pending ? <button type="button" className={css.primary} disabled={busy} onClick={() => void confirm(pending)}>Reintentar el mismo envío</button> : prepared ? <button type="button" className={css.primary} disabled={locked} onClick={() => void confirm(prepared)}>Confirmar y guardar en Supabase</button> : <button type="submit" className={css.primary} disabled={locked}>Revisar cambios</button> : null}</footer>
+    {confirmDelete ? <section className={css.deleteConfirm}><h3>Eliminar registro de la vista</h3><p><strong>{draft.values[F[draft.table].name.id]}</strong> saldrá de Ingresos/Egresos y del resultado. Se conservará en «Registros eliminados» para restaurarlo.</p><button type="button" disabled={locked} onClick={()=>setConfirmDelete(false)}>Cancelar</button> <button type="button" className={css.danger} disabled={locked} onClick={() => void archive(draft.id!,true).catch(e=>setError(e instanceof Error?e.message:"No se pudo eliminar."))}>Confirmar eliminación</button></section> : null}
+    <footer>{!data.readOnly && draft.table === "movements" && draft.id && !prepared && !confirmDelete ? <button type="button" className={css.dangerOutline} disabled={locked} onClick={()=>setConfirmDelete(true)}>Eliminar registro</button> : null}{prepared && !locked ? <button type="button" onClick={() => setPrepared(undefined)}>Volver a corregir</button> : null}{conflict ? <p>Cerrá este formulario y actualizá los datos antes de preparar otro cambio.</p> : null}
+      {!data.readOnly && !conflict && !confirmDelete ? pending ? <button type="button" className={css.primary} disabled={busy} onClick={() => void confirm(pending)}>Reintentar el mismo envío</button> : prepared ? <button type="button" className={css.primary} disabled={locked} onClick={() => void confirm(prepared)}>Confirmar y guardar en Supabase</button> : <button type="submit" className={css.primary} disabled={locked}>Revisar cambios</button> : null}</footer>
   </form></dialog>;
 }

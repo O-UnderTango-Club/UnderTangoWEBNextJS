@@ -12,6 +12,7 @@ export type FinanceReceipt = { ok: true; id: string; ids: string[]; requestId: s
 export type FinanceSnapshot = {
   contract: 1; status: "staged" | "validated" | "active"; revision: string; updatedAt: string;
   obligations: FinanceRecord[]; movements: FinanceRecord[];
+  archivedMovements?: { id: string; archivedAt: string; reason: string | null }[];
   contacts: FinanceReference[]; cases: FinanceReference[]; operations: FinanceReference[];
 };
 type Field = { id: string; label: string; type: "text" | "date" | "amount" | "select" | "links";
@@ -122,6 +123,13 @@ export function parseFinanceSnapshot(value: unknown, allowStaged = false): Finan
         }
       }
     }
+  }
+  if (value.archivedMovements !== undefined) {
+    if (!Array.isArray(value.archivedMovements) || value.archivedMovements.some(row =>
+      !isObject(row) || typeof row.id !== "string" || !identifiers.movements.has(row.id)
+      || typeof row.archivedAt !== "string" || !Number.isFinite(Date.parse(row.archivedAt))
+      || row.reason !== null && typeof row.reason !== "string")) throw invalid();
+    if (new Set(value.archivedMovements.map(row => row.id)).size !== value.archivedMovements.length) throw invalid();
   }
   const snapshot = value as unknown as FinanceSnapshot;
   for (const table of ["obligations", "movements"] as const) {

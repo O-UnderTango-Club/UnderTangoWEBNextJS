@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { FINANCE_FIELDS as F, financeText, financeLinks, financeTotals, isObject, parseFinanceSnapshot,
+import { FINANCE_FIELDS as F, financeText, financeLinks, decimalCents, centsDecimal, isObject, parseFinanceSnapshot,
   type FinanceCell, type FinanceReceipt, type FinanceRecord, type FinanceSnapshot, type FinanceTable } from "../../../src/lib/finance-model";
 import { buildFinanceSubmission, financeWarnings, formatFinanceAmount, newFinanceDraft, parsePendingFinance, retainFinanceAttempt, verifyFinanceReadback,
   type FinanceDraft, type FinanceSubmission } from "../../../src/lib/finance-workflow";
@@ -108,44 +108,93 @@ export default function Finance() {
       setError(e instanceof Error ? e.message : "No se pudo completar el envío."); throw e;
     } finally { sending.current = false; setBusy(false); }
   };
-  const rows = data ? data[table].filter(row => {
-    const names = financeLinks(row,table,"contacts").map(id => referenceName(data,"contacts",id)).join(" ");
-    const text = [financeText(row,table,"name"),financeText(row,table,"concept"),financeText(row,table,"notes"),names].join(" ").toLocaleLowerCase();
-    return text.includes(query.toLocaleLowerCase()) && (!currency || (financeText(row,table,"currency") || "unknown") === currency)
-      && (!status || financeText(row,table,"status") === status) && (!onlyIssues || financeWarnings(row,table,data).length > 0);
-  }) : [];
-  const totals = data ? financeTotals(data).filter(t => t.table === table) : [];
-  function changeTable(next:FinanceTable) { setTable(next); setCurrency(""); setStatus(""); setQuery(""); setLimit(30); }
+
+  const today = new Date().toLocaleDateString("sv-SE",{timeZone:"America/Argentina/Cordoba"});
+  const [year,setYear] = useState(Number(today.slice(0,4)));
+  const [entry,setEntry] = useState<"Ingreso"|"Egreso"|null>(null);
+  const [shown,setShown] = useState(8);
+  const years = data ? [...new Set(data.movements.map(r => Number((financeText(r,"movements","date") || "").slice(0,4))).filter(Number.isInteger).filter(n => n > 2000))].sort((a,b) => b-a) : [];
+  const movements = data ? data.movements.filter(r => (financeText(r,"movements","date") || "").startsWith(String(year)))
+    .sort((a,b) => (financeText(b,"movements","date") || "").localeCompare(financeText(a,"movements","date") || "") || b.id.localeCompare(a.id)) : [];
+  const totals = new Map<string,{income:bigint;expense:bigint}>();
+  for (const row of movements) {
+    if (financeText(row,"movements","status") !== "Confirmado") continue;
+    const amount = financeText(row,"movements","amount"), currency = financeText(row,"movements","currency"), kind = financeText(row,"movements","type");
+    if (!amount || !currency || !["Ingreso","Egreso"].includes(kind || "")) continue;
+    const group = totals.get(currency) || {income:BigInt(0),expense:BigInt(0)};
+    if (kind === "Ingreso") group.income += decimalCents(amount); else group.expense += decimalCents(amount);
+    totals.set(currency,group);
+  }
+  const display = (value:bigint,currency:string) => formatFinanceAmount(centsDecimal(value),currency);
+  const column = (kind:"Ingreso"|"Egreso") => {
+    const rows = movements.filter(r => financeText(r,"movements","type") === kind);
+    return <section className={css.ledgerColumn} aria-label={kind === "Ingreso" ? "Últimos ingresos" : "Últimos egresos"}>
+      <div className={css.columnHeader}><h2>{kind === "Ingreso" ? "Ingresos" : "Egresos"}</h2><button type="button" className={css.primary} disabled={data?.readOnly || !!pending || busy} onClick={() => setEntry(kind)}>+ Agregar {kind.toLocaleLowerCase()}</button></div>
+      <p className={css.small}>{rows.length} movimientos del año, del más reciente al más antiguo.</p>
+      <div className={css.ledgerList}>{rows.slice(0,shown).map(row => {
+        const state = financeText(row,"movements","status");
+        return <article className={css.ledgerRow} key={row.id}>
+          <div><time>{financeText(row,"movements","date") || "Sin fecha"}</time><strong>{financeText(row,"movements","name") || "Sin nombre"}</strong><span className={css.small}>{financeText(row,"movements","concept") || ""}</span></div>
+          <div className={css.ledgerRight}><b>{formatFinanceAmount(financeText(row,"movements","amount"),financeText(row,"movements","currency"))}</b><span className={state === "Confirmado" ? css.confirmed : css.unconfirmed}>{state || "Sin confirmar"}</span><button type="button" disabled={!!pending || busy} onClick={() => setDraft(newFinanceDraft("movements",data!,row))}>Ver / editar</button></div>
+        </article>;
+      })}</div>
+      {!rows.length ? <p className={css.empty}>Todavía no hay {kind.toLocaleLowerCase()}s registrados en {year}.</p> : null}
+      {rows.length > shown ? <button type="button" onClick={() => setShown(n => n+10)}>Ver más {kind.toLocaleLowerCase()}s</button> : null}
+    </section>;
+  };
   return <main className={css.finance}>
-    <header className={css.header}><div><a href="/panel-de-control">← Panel de control</a><p className={css.eyebrow}>Ø UnderTango · operación privada</p><h1>Finanzas</h1><p>Obligaciones y movimientos, sin mezclar monedas ni anticipar cobros.</p></div>
-      <button type="button" disabled={loading || busy || !!draft || !!pending} onClick={() => void refresh()}>{loading ? "Actualizando…" : "Actualizar datos"}</button></header>
+    <header className={css.header}><div><a href="/panel-de-control">← Panel de control</a><p className={css.eyebrow}>Ø UnderTango · finanzas privadas</p><h1>Ingresos y egresos</h1><p>Movimientos registrados, ordenados por fecha.</p></div><button type="button" disabled={loading || busy || !!draft || !!entry || !!pending} onClick={() => void refresh()}>{loading ? "Actualizando…" : "Actualizar"}</button></header>
     {notice ? <p className={css.notice} role="status">{notice}</p> : null}
     {error ? <p className={css.error} role="alert">{error}</p> : null}
-    {loading && !data ? <p role="status">Comprobando acceso y leyendo finanzas…</p> : null}
-    {!data && !loading ? <section className={css.empty}><h2>{needsAccess ? "Ingresar a Finanzas" : "No pudimos cargar los datos financieros"}</h2><p>{needsAccess ? "Finanzas usa el mismo acceso que el panel de control. Abrilo desde tu navegador habitual." : "No hace falta volver a habilitar el navegador. Podés reintentar con Actualizar datos."}</p>{needsAccess ? <a href="/panel-de-control">Abrir mi panel de control</a> : null}</section> : null}
+    {loading && !data ? <p role="status">Leyendo movimientos…</p> : null}
+    {!data && !loading ? <section className={css.empty}><h2>{needsAccess ? "Ingresar a Finanzas" : "No pudimos cargar los movimientos"}</h2><p>{needsAccess ? "Ingresá desde el panel de control con tu acceso habitual." : "Probá de nuevo con Actualizar."}</p><a href="/panel-de-control">Abrir panel de control</a></section> : null}
     {data ? <>
-      <div className={css.context}><span>Supabase · {data.obligations.length} obligaciones · {data.movements.length} movimientos</span><span>Lectura {new Date(data.updatedAt).toLocaleString("es-AR",{timeZone:"America/Argentina/Cordoba"})}</span></div>
-      {data.readOnly ? <p className={css.warning} role="status">Publicación de prueba: solo lectura. Los cambios reales siguen en el sistema operativo vigente.</p> : null}
-      {pending ? <section className={css.pending} aria-label="Envío pendiente de confirmación"><h2>Hay un envío sin confirmación</h2><p>Conservamos su identificador. No crees otra operación: reintentá este mismo envío para recuperar su comprobante o completarlo una sola vez.</p><p className={css.small}>Identificador: {pending.requestId}</p>
-        <Review submission={pending} data={data}/><button type="button" className={css.primary} disabled={busy || data.readOnly} onClick={() => void send(pending).catch(() => {})}>{busy ? "Comprobando…" : "Reintentar el mismo envío"}</button></section> : null}
-      <nav className={css.tabs} aria-label="Secciones de finanzas">{(["obligations","movements"] as const).map(t => <button type="button" key={t} aria-pressed={table === t} className={table === t ? css.active : ""} onClick={() => changeTable(t)}>{title(t)} <span>{data[t].length}</span></button>)}</nav>
-      <section className={css.summary}><h2>{table === "obligations" ? "Saldos de obligaciones" : "Importes de movimientos registrados"}</h2><p>Esto no es la caja disponible. Una cuenta por cobrar no es dinero recibido. Los pendientes y cada moneda se mantienen separados.</p>
-        <details><summary>Ver subtotales por moneda, tipo y estado</summary><div className={css.tableScroll}><table><caption>Subtotales de todos los registros de esta sección, sin aplicar los filtros de búsqueda.</caption><thead><tr><th>Moneda</th><th>Tipo</th><th>Estado</th><th>Importe conocido</th><th>Información pendiente</th></tr></thead><tbody>{totals.map(t => <tr key={JSON.stringify([t.currency,t.type,t.status])}><td>{t.currency || "Sin moneda"}</td><td>{t.type || "Sin tipo"}</td><td>{t.status || "Sin estado"}</td><td>{formatFinanceAmount(t.knownSubtotal)}</td><td>{t.unknown ? `${t.unknown} de ${t.records} sin importe` : `${t.records} registros con importe`}</td></tr>)}</tbody></table></div></details></section>
-      <div className={css.toolbar}><label>Buscar<input type="search" value={query} onChange={e => {setQuery(e.target.value);setLimit(30);}} placeholder="Nombre, concepto, contraparte o notas"/></label><label>Moneda<select value={currency} onChange={e => {setCurrency(e.target.value);setLimit(30);}}><option value="">Todas, sin sumar entre sí</option>{F[table].currency.choices!.map(c => <option key={c}>{c}</option>)}<option value="unknown">Sin moneda informada</option></select></label><label>Estado<select value={status} onChange={e => {setStatus(e.target.value);setLimit(30);}}><option value="">Todos</option>{[...F[table].status.choices!, ...(F[table].status.readChoices || [])].map(s => <option key={s}>{s}</option>)}</select></label></div>
-      <div className={css.listHeader}><label className={css.checkbox}><input type="checkbox" checked={onlyIssues} onChange={e => {setOnlyIssues(e.target.checked);setLimit(30);}}/>Solo registros que requieren revisión</label><button type="button" className={css.primary} disabled={data.readOnly || !!pending || busy || !!error} onClick={() => setDraft(newFinanceDraft(table,data))}>+ {table === "obligations" ? "Registrar obligación" : "Registrar movimiento"}</button></div>
-      <p className={css.small}>{rows.length} registros encontrados. Buscá antes de crear para evitar duplicados.</p>
-      <div className={css.cards}>{rows.slice(0,limit).map(row => {
-        const warnings = financeWarnings(row,table,data);
-        return <article key={row.id} className={css.card}><div className={css.cardTop}><span>{financeText(row,table,"type") || "Tipo pendiente"}</span><span className={css.badge}>{financeText(row,table,"status") || "Estado pendiente"}</span></div><h3>{financeText(row,table,"name") || "Sin nombre"}</h3><p className={css.amount}>{formatFinanceAmount(financeText(row,table,table === "obligations" ? "balance" : "amount"),financeText(row,table,"currency"))}</p><p className={css.small}>{table === "obligations" ? "Saldo registrado · no equivale a caja" : "Movimiento registrado · no equivale a saldo disponible"}</p>
-          <p>{financeText(row,table,"concept") || "Sin concepto adicional"}</p><p className={css.small}>{financeLinks(row,table,"contacts").map(id => referenceName(data,"contacts",id)).join(" · ") || "Contraparte no vinculada"}</p><p className={css.small}>{table === "obligations" ? "Vencimiento" : "Fecha"}: {financeText(row,table,table === "obligations" ? "dueDate" : "date") || "No informado"}</p>
-          {warnings.length ? <ul className={css.issues}>{warnings.map(w => <li key={w}>{w}</li>)}</ul> : null}
-          <button type="button" disabled={!!pending || busy || !!error} onClick={() => setDraft(newFinanceDraft(table,data,row))}>{data.readOnly ? "Ver detalle" : "Ver / editar"}</button></article>;
-      })}</div>
-      {!rows.length ? <p className={css.empty}>No hay coincidencias con estos filtros.</p> : null}
-      {rows.length > limit ? <button type="button" onClick={() => setLimit(n => n + 30)}>Mostrar más registros</button> : null}
+      <div className={css.context}><span>Supabase · {data.movements.length} movimientos conservados</span><span>Lectura {new Date(data.updatedAt).toLocaleString("es-AR",{timeZone:"America/Argentina/Cordoba"})}</span></div>
+      {data.readOnly ? <p className={css.warning}>Vista de solo lectura.</p> : null}
+      {pending ? <section className={css.pending}><h2>Envío pendiente de confirmación</h2><p>Reintentá el mismo envío para evitar duplicados.</p><Review submission={pending} data={data}/><button type="button" className={css.primary} disabled={busy || data.readOnly} onClick={() => void send(pending).catch(() => {})}>Reintentar el mismo envío</button></section> : null}
+      <div className={css.yearBar}><label>Año <select value={year} onChange={e => {setYear(Number(e.target.value));setShown(8);}}>{[...new Set([year,...years])].sort((a,b)=>b-a).map(y => <option key={y} value={y}>{y}</option>)}</select></label><p className={css.small}>Solo los movimientos confirmados, con fecha e importe, entran en el resultado. Cada moneda se calcula por separado.</p></div>
+      <section className={css.result} aria-label="Resultado anual"><h2>Resultado {year}</h2>{totals.size ? <div className={css.resultGrid}>{[...totals.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([currency,t]) => <div className={css.resultCard} key={currency}><h3>{currency}</h3><dl><div><dt>Ingresos</dt><dd>{display(t.income,currency)}</dd></div><div><dt>Egresos</dt><dd>{display(t.expense,currency)}</dd></div><div className={css.net}><dt>Resultado</dt><dd>{display(t.income-t.expense,currency)}</dd></div></dl></div>)}</div> : <p>No hay movimientos confirmados con importe para {year}.</p>}<p className={css.small}>Resultado = ingresos menos egresos registrados. No representa el efectivo disponible ni incluye un saldo inicial.</p></section>
+      <div className={css.ledger}>{column("Ingreso")}{column("Egreso")}</div>
+      {entry ? <QuickEntry kind={entry} data={data} today={today} busy={busy} locked={busy || !!pending} send={send} onClose={() => {if (!busy && !pending) setEntry(null);}}/> : null}
       {draft ? <Editor key={`${draft.table}:${draft.id || "new"}`} initial={draft} data={data} busy={busy} locked={busy || !!pending} pending={pending} send={send} onClose={() => {if (!busy && !pending) setDraft(undefined);}}/> : null}
     </> : null}
   </main>;
+}
+
+function QuickEntry({kind,data,today,busy,locked,send,onClose}:{kind:"Ingreso"|"Egreso";data:Data;today:string;busy:boolean;locked:boolean;send:(s:FinanceSubmission)=>Promise<FinanceReceipt>;onClose:()=>void}) {
+  const [name,setName] = useState(""),[date,setDate] = useState(today),[amount,setAmount] = useState(""),[currency,setCurrency] = useState("ARS"),[concept,setConcept] = useState("");
+  const [prepared,setPrepared] = useState<FinanceSubmission>(),[error,setError] = useState("");
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {const d=dialog.current;d?.showModal();const old=document.body.style.overflow;document.body.style.overflow="hidden";return()=>{d?.close();document.body.style.overflow=old;};},[]);
+  function review(e:FormEvent) {
+    e.preventDefault();
+    try {
+      const duplicate=data.movements.find(r => financeText(r,"movements","name")?.trim().toLocaleLowerCase() === name.trim().toLocaleLowerCase()
+        && financeText(r,"movements","date") === date && financeText(r,"movements","type") === kind);
+      if (duplicate) throw new Error("Ya existe un movimiento con este nombre y fecha. Revisalo en la lista antes de agregar otro.");
+      const draft=newFinanceDraft("movements",data);
+      draft.values[F.movements.name.id]=name.trim(); draft.values[F.movements.date.id]=date;
+      draft.values[F.movements.type.id]=kind; draft.values[F.movements.amount.id]=amount;
+      draft.values[F.movements.currency.id]=currency; draft.values[F.movements.status.id]="Confirmado";
+      draft.values[F.movements.concept.id]=concept.trim() || null;
+      setPrepared(buildFinanceSubmission(draft,data,crypto.randomUUID()));setError("");
+    } catch(e) {setError(e instanceof Error ? e.message : "Revisá los datos.");}
+  }
+  return <dialog ref={dialog} className={css.dialog} aria-label={`Agregar ${kind.toLocaleLowerCase()}`} onCancel={e => {e.preventDefault();if(!locked)onClose();}}><form onSubmit={review}>
+    <div className={css.dialogHeader}><h2>Agregar {kind.toLocaleLowerCase()}</h2><button type="button" disabled={locked} onClick={onClose}>Cerrar</button></div>
+    <p className={css.small}>Registrá únicamente dinero que efectivamente ingresó o salió. Las obligaciones pendientes no van acá.</p>
+    {!prepared ? <fieldset className={css.fields} disabled={locked}><legend className={css.srOnly}>Datos del movimiento</legend><div className={css.formGrid}>
+      <label className={css.full}>Concepto breve<input required value={name} maxLength={200} onChange={e=>setName(e.target.value)} placeholder="Ej.: Wish — pago saxofonista"/></label>
+      <label>Fecha<input required type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
+      <label>Importe<input required inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="400,00"/></label>
+      <label>Moneda<select value={currency} onChange={e=>setCurrency(e.target.value)}>{F.movements.currency.choices!.map(c=><option key={c}>{c}</option>)}</select></label>
+      <label className={css.full}>Detalle opcional<textarea value={concept} maxLength={2000} onChange={e=>setConcept(e.target.value)} rows={3}/></label>
+    </div></fieldset> : <><h3>Revisar antes de guardar</h3><Review submission={prepared} data={data}/></>}
+    {error ? <p className={css.error} role="alert">{error}</p> : null}
+    <footer>{prepared ? <button type="button" disabled={locked} onClick={()=>setPrepared(undefined)}>Corregir</button> : null}
+      {prepared ? <button type="button" className={css.primary} disabled={locked} onClick={() => void send(prepared).then(onClose).catch(e=>setError(e instanceof Error?e.message:"No se pudo guardar."))}>Confirmar y guardar</button>
+        : <button type="submit" className={css.primary} disabled={locked}>Revisar {kind.toLocaleLowerCase()}</button>}</footer>
+  </form></dialog>;
 }
 
 function Review({submission,data}:{submission:FinanceSubmission;data:FinanceSnapshot}) {

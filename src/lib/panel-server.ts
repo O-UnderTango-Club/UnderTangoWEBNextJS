@@ -91,7 +91,7 @@ export function responseBoard(data: ServerSnapshot) {
 export async function migratePanelToSupabase(){
   throw new PanelError("La importación se valida fuera del panel. Airtable sigue operativo; no se cambió la fuente de datos.",409);
 }
-const states: Record<EditableStage,[string,string|null]>={ready:["Pendiente","Acción inmediata"],recurring:["Pendiente","Acción recurrente"],doing:["En curso","En acción"],waiting:["En espera","En espera"],catalog:["Pendiente","Por revisar"],done:["Hecho","Terminada"],cancelled:["Cancelado",null]};
+const states: Record<EditableStage,[string,string|null]>={ready:["Pendiente","Acción inmediata"],recurring:["Pendiente","Acción recurrente"],doing:["En curso","En acción"],waiting:["En espera","En espera"],done:["Hecho","Terminada"],cancelled:["Cancelado",null]};
 function text(value: unknown,max=500) { if(typeof value!=="string"||value.length>max) throw new PanelError(`Texto inválido (máximo ${max} caracteres).`); return value.trim(); }
 function activation(value: unknown) {
   const v=text(value,40); if(!v) return null;
@@ -176,8 +176,9 @@ async function performMutation(input: any, actor: string) {
     if("order" in change){if(!Number.isInteger(change.order)||change.order<0||change.order>9999)throw new PanelError("El orden debe ser un entero positivo."); fields[F.tasks.order]=change.order||null;}
     for(const [key,records] of [["projects",data.projects],["cases",data.cases],["dependencies",data.tasks],["events",data.events]] as const) if(key in change)fields[F.tasks[key]]=refs(change[key],records);
     let stage:EditableStage|undefined=change.stage;
-    if(stage&&(!states[stage]||stage==="catalog"))throw new PanelError("Estado inválido.");
+    if(stage&&!states[stage])throw new PanelError("Estado inválido.");
     if(!current&&!stage) stage="ready";
+    if(!current&&!["ready","recurring"].includes(stage || "")) throw new PanelError("Toda acción nueva debe comenzar activa.");
     if(stage){[fields[F.tasks.status],fields[F.tasks.gate]]=states[stage];}
     const actionRanking=operational&&data.rankingMode==="action";
     if(("front" in change||"rank" in change)&&!actionRanking)throw new PanelError("El ranking individual todavía no está habilitado.",409);

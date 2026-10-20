@@ -35,7 +35,7 @@ const project = render({kind:'project',initial:{name:'Proyecto nuevo',purpose:'R
 assert.match(project, /Crear proyecto/); assert.match(project, /Nombre del proyecto/);
 assert.match(project, /Propósito/); assert.doesNotMatch(project, /Posición en el frente/);
 assert.doesNotMatch(project, /option[^>]*>Archivado/);
-const task = render({kind:'task',initial:{name:'Borrador intacto',stage:'catalog',projects:[],cases:[],dependencies:[],events:[]}});
+const task = render({kind:'task',initial:{name:'Borrador intacto',stage:'ready',projects:[],cases:[],dependencies:[],events:[]}});
 assert.match(task, /Borrador intacto/); assert.match(task, /Crear proyecto y seleccionarlo/);
 assert.match(task, /Proyectos vinculados/); assert.match(task, /la acción se guarda por separado/);
 const readOnly = render({kind:'project',initial:{name:'Prueba',status:'Activo'}},{data:{...data,readOnly:true}});
@@ -75,7 +75,7 @@ function findElement(node,predicate){
  await findElement(kept,n=>n.type==='form').props.onSubmit({preventDefault(){}});
  assert.deepEqual(submitted,{stage:'ready',dependencies:[],events:[]},'Keeping schedule must not remove activation');
  availabilityMode='now';
- const waiting=QuickForm({editor:{...quickEditor,initial:{...quickEditor.initial,stage:'catalog'}},data:{...data,tasks:[scheduledTask]},busy:false,onSave:async changes=>{submitted=changes;}});
+ const waiting=QuickForm({editor:{...quickEditor,initial:{...quickEditor.initial,stage:'waiting',dependencies:['pending']}},data:{...data,tasks:[scheduledTask,{id:'pending',name:'Pendiente',stage:'ready'}]},busy:false,onSave:async changes=>{submitted=changes;}});
  await findElement(waiting,n=>n.type==='form').props.onSubmit({preventDefault(){}});
  assert.equal(Object.hasOwn(submitted,'activateAt'),false,'Non-executable state must preserve schedule');
  const readOnly=QuickForm({editor:quickEditor,data:{...data,tasks:[scheduledTask],readOnly:true},busy:false});

@@ -80,11 +80,11 @@ check('Frentes sólo incluye acciones inmediatas y repone la plaza al cambiar de
  }
  current.fields[F.tasks.status]='Pendiente';current.fields[F.tasks.gate]='Acción inmediata';assert.deepEqual(m.board(data).fronts[0].tasks,['actual','siguiente']);
 });
-check('una espera sin vínculo queda visible por catalogar',()=>{const a=t('a',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera'});assert.equal(m.classify(a,{...d,tasks:[a]}).stage,'catalog');assert.throws(()=>m.validateTask(a,{...d,tasks:[a]},'waiting'));});
+check('una espera incompleta mantiene estado pero muestra el problema en sus datos',()=>{const a=t('a',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera'});const state=m.classify(a,{...d,tasks:[a]});assert.equal(state.stage,'ready');assert.ok(state.issues.includes('Espera sin dependencia vinculada'));assert.throws(()=>m.validateTask(a,{...d,tasks:[a]},'waiting'));});
 check('el ranking explica estados contradictorios y esperas sin vínculo sin habilitar la acción',()=>{
  const a=t('O2',{[F.tasks.status]:'En curso',[F.tasks.gate]:'En espera'}),b=m.board({...d,tasks:[a]});
  const summary=m.projectActionSummary('p',b.tasks);
- assert.equal(summary.ready,0);assert.equal(summary.open,1);assert.match(summary.text,/por catalogar/);
+ assert.equal(summary.ready,0);assert.equal(summary.open,1);assert.match(summary.text,/revisar datos/);
  assert.ok(summary.issues.includes('Estados incompatibles en Seguimientos'));assert.ok(summary.issues.includes('Espera sin dependencia vinculada'));
  assert.deepEqual(b.fronts[0].tasks,[]);
 });
@@ -97,10 +97,10 @@ check('el resumen distingue un próximo paso ausente, una acción en curso y una
 });
 check('todos los predecesores deben terminar; cancelar no equivale a terminar',()=>{
  const a=t('a',{[F.tasks.status]:'Hecho'}),b=t('b'),c=t('c',{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera',[F.tasks.dependencies]:['a','b']});
- const data={...d,tasks:[a,b,c]};assert.equal(m.classify(c,data).stage,'waiting');b.fields[F.tasks.status]='Hecho';assert.equal(m.classify(c,data).stage,'ready');b.fields[F.tasks.status]='Cancelado';assert.equal(m.classify(c,data).stage,'catalog');
+ const data={...d,tasks:[a,b,c]};assert.equal(m.classify(c,data).stage,'waiting');b.fields[F.tasks.status]='Hecho';assert.equal(m.classify(c,data).stage,'ready');b.fields[F.tasks.status]='Cancelado';assert.equal(m.classify(c,data).stage,'ready');assert.ok(m.classify(c,data).issues.length);
 });
 check('un evento necesita ocurrencia y evidencia; no se activa sólo por fecha',()=>{const a=t('a',{[F.tasks.events]:['e']}),e=row('e',{[F.events.name]:'Respuesta',[F.events.status]:'Ocurrido',[F.events.occurred]:'2026-09-05'}),data={...d,tasks:[a],events:[e]};assert.equal(m.classify(a,data).stage,'waiting');e.fields[F.events.evidence]='Llegó la respuesta';assert.equal(m.classify(a,data).stage,'ready');});
-check('se rechazan ciclos y dependencias ausentes',()=>{const a=t('a',{[F.tasks.dependencies]:['b']}),b=t('b',{[F.tasks.dependencies]:['a']}),data={...d,tasks:[a,b]};assert.throws(()=>m.validateTask(a,data,'ready'),/ciclo/);assert.equal(m.classify(a,{...data,tasks:[a]}).stage,'catalog');});
+check('se rechazan ciclos y dependencias ausentes',()=>{const a=t('a',{[F.tasks.dependencies]:['b']}),b=t('b',{[F.tasks.dependencies]:['a']}),data={...d,tasks:[a,b]};assert.throws(()=>m.validateTask(a,data,'ready'),/ciclo/);assert.equal(m.classify(a,{...data,tasks:[a]}).stage,'ready');assert.ok(m.classify(a,{...data,tasks:[a]}).issues.length);});
 check('Wish conserva visibilidad con proyecto de origen cerrado y destino activo',()=>{const closed=row('closed',{[F.projects.status]:'Completado'}),a=t('Wish',{[F.tasks.projects]:['closed','p']});const b=m.board({...d,projects:[p,closed],tasks:[a]});assert.equal(b.tasks[0].stage,'ready');assert.deepEqual(b.fronts[0].tasks,['Wish']);});
 check('acciones compartidas se muestran una sola vez y proyectos no compiten con Seguimientos',()=>{const p2=row('p2',{...p.fields,[F.projects.front]:'Secundario',legacyGate:'En espera'}),a=t('compartida',{[F.tasks.projects]:['p','p2']});const b=m.board({...d,projects:[p,p2],tasks:[a]});assert.equal(b.fronts.flatMap(f=>f.tasks).length,1);assert.equal(b.tasks[0].stage,'ready');});
 check('ninguna acción desaparece por filtros; plazas limitadas y proyectos sin acciones no son errores',()=>{const projects=Array.from({length:5},(_,i)=>row('p'+i,{...p.fields,[F.projects.rank]:i+1})),tasks=projects.slice(0,4).map((p,i)=>t('t'+i,{[F.tasks.projects]:[p.id]})).concat(t('huérfana',{[F.tasks.projects]:[]}));const b=m.board({...d,projects,tasks});assert.equal(b.tasks.length,5);assert.equal(b.fronts[0].tasks.length,3);assert.equal(b.projectIssues.length,0);assert.equal(b.tasks.find(t=>t.id==='huérfana').stage,'ready');});

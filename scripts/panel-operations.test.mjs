@@ -262,7 +262,8 @@ try {
     await assert.rejects(server.mutate(await intent('project','p',{rank:2}),'test-actor'),/cada acción/);
     db.tasks.push(task('missing',0,'p',{[F.tasks.front]:''}));
     const result=server.responseBoard(await server.snapshot());
-    assert.equal(result.tasks.find(t=>t.id==='missing').stage,'catalog');
+    assert.equal(result.tasks.find(t=>t.id==='missing').stage,'ready');
+    assert.ok(result.tasks.find(t=>t.id==='missing').issues.length);
     assert.ok(!result.fronts.some(f=>f.tasks.includes('missing')));
   });
   await check('crear proyecto con dos acciones y esperar a todas sin mover otras posiciones',async()=>{

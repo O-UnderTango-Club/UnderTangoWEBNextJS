@@ -28,7 +28,7 @@ export function frontPosition(front: string, rank: number) {
 }
 export type Raw = { id: string; fields: Record<string, any> };
 export type Snapshot = { projects: Raw[]; tasks: Raw[]; events: Raw[]; cases: Raw[]; updatedAt: string; rankingMode?: "project" | "action" };
-export type Stage = "ready" | "recurring" | "scheduled" | "doing" | "waiting" | "catalog" | "done" | "cancelled";
+export type Stage = "ready" | "recurring" | "scheduled" | "doing" | "waiting" | "done" | "cancelled";
 export type EditableStage = Exclude<Stage,"scheduled">;
 export function nextPanelDay(now=Date.now()) {
   const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Argentina/Cordoba",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(now));
@@ -69,7 +69,7 @@ export function storedStage(t: Raw): EditableStage {
   if(gate==="En acción") return "doing";
   if(gate==="En espera") return "waiting";
   if(gate==="Acción inmediata") return "ready";
-  return "catalog";
+  return "ready";
 }
 export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage; issues: string[]; blockers: string[]; released: boolean; nextAvailableAt: string } {
   const f=t.fields, issues: string[]=[], blockers: string[]=[];
@@ -101,9 +101,9 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
     if(!Number.isInteger(f[F.tasks.rank]) || f[F.tasks.rank]<1) issues.push("Asignar posición a la acción");
     if(data.tasks.some(other=>other.id!==t.id&&!closed(other)&&other.fields[F.tasks.front]===f[F.tasks.front]&&other.fields[F.tasks.rank]===f[F.tasks.rank]&&!!f[F.tasks.rank])) issues.push("Posición repetida entre acciones");
   }
-  if (!gate || gate==="Por revisar") issues.push("Definir la acción y su estado");
   const expected: Record<string,string>={"Acción inmediata":"Pendiente","Acción recurrente":"Pendiente","En acción":"En curso","En espera":"En espera"};
-  if (gate && gate!=="Por revisar" && expected[gate]!==status) issues.push("Estados incompatibles en Seguimientos");
+  if (!expected[gate]) issues.push("Estado operativo no reconocido");
+  else if (expected[gate]!==status) issues.push("Estados incompatibles en Seguimientos");
   if (gate==="En espera" && !deps.length && !events.length) issues.push("Espera sin dependencia vinculada");
   if(groupId&&(!Number.isInteger(f[F.tasks.groupOrder])||f[F.tasks.groupOrder]<1)) issues.push("Orden de paso inválido");
   if (cycleFrom(t.id,data.tasks)) issues.push("Dependencias circulares");
@@ -121,7 +121,8 @@ export function classify(t: Raw, data: Snapshot, now=Date.now()): { stage: Stage
   }
   const scheduled=!!nextAvailableAt;
   const released=gate==="En espera" && !!(deps.length+events.length) && !blockers.length && !issues.length && !scheduled;
-  const stage: Stage=issues.length?"catalog":scheduled?"scheduled":blockers.length?"waiting":gate==="En acción"?"doing":gate==="Acción recurrente"?"recurring":"ready";
+  // Los errores de datos se muestran dentro de la acción; nunca definen otro estado.
+  const stage: Stage=scheduled?"scheduled":blockers.length?"waiting":gate==="En acción"?"doing":gate==="En espera"?"waiting":gate==="Acción recurrente"?"recurring":"ready";
   return {stage,issues,blockers,released,nextAvailableAt};
 }
 export function board(data: Snapshot, now=Date.now()) {
@@ -136,9 +137,9 @@ export function board(data: Snapshot, now=Date.now()) {
     const members=tasks.filter(t=>t.groupId===group.id).sort((a,b)=>a.groupOrder-b.groupOrder||a.id.localeCompare(b.id));
     group.memberIds=members.map(t=>t.id);
     group.projectIds=unique(members.flatMap(t=>t.projectIds));
-    const next=members.find(t=>["ready","recurring"].includes(t.stage));
+    const next=members.find(t=>["ready","recurring"].includes(t.stage)&&!t.issues.length);
     group.nextId=next?.id||"";
-    if(!["done","cancelled","scheduled","catalog"].includes(group.stage)) {
+    if(!["done","cancelled","scheduled"].includes(group.stage)) {
       group.stage=next?"ready":members.some(t=>t.stage==="doing")?"doing":members.some(t=>t.stage==="scheduled")?"scheduled":"waiting";
       if(group.stage==="scheduled") group.nextAvailableAt=members.filter(t=>t.stage==="scheduled"&&t.nextAvailableAt).map(t=>t.nextAvailableAt).sort()[0]||"";
     }
@@ -153,9 +154,9 @@ export function board(data: Snapshot, now=Date.now()) {
     return (pa?FRONTS.indexOf(pa.front):9)-(pb?FRONTS.indexOf(pb.front):9)||(pa?.rank||9999)-(pb?.rank||9999)||(a.order||9999)-(b.order||9999)||a.name.localeCompare(b.name,"es")||a.id.localeCompare(b.id);
   });
   const fronts=FRONTS.map(name=>({name,tasks:tasks.filter(t=>{
-    if(data.rankingMode==="action") return !t.groupId&&["ready","recurring"].includes(t.stage)&&t.front===name&&Number.isInteger(t.rank)&&t.rank>0;
+    if(data.rankingMode==="action") return !t.issues.length&&!t.groupId&&["ready","recurring"].includes(t.stage)&&t.front===name&&Number.isInteger(t.rank)&&t.rank>0;
     const p=priorityProject(t.projectIds);
-    return ["ready","recurring"].includes(t.stage)&&p?.front===name&&Number.isInteger(p.rank)&&p.rank>=1&&p.rank!==9999;
+    return !t.issues.length&&["ready","recurring"].includes(t.stage)&&p?.front===name&&Number.isInteger(p.rank)&&p.rank>=1&&p.rank!==9999;
   }).slice(0,3).map(t=>t.id)}));
   const projectIssues=projects.filter(p=>p.open).flatMap(p=>{
     const reasons=[];
@@ -170,20 +171,21 @@ export function board(data: Snapshot, now=Date.now()) {
 export type Board = ReturnType<typeof board>;
 export function projectActionSummary(projectId: string, tasks: Board["tasks"]) {
   const open = tasks.filter(t=>t.projectIds.includes(projectId)&&!["done","cancelled"].includes(t.stage));
-  const ready = open.filter(t=>["ready","recurring"].includes(t.stage)).length;
-  const counts = ([ ["catalog","por catalogar"], ["scheduled","programadas"], ["waiting","en espera"], ["doing","en curso"] ] as const)
+  const ready = open.filter(t=>["ready","recurring"].includes(t.stage)&&!t.issues.length).length;
+  const counts = ([ ["scheduled","programadas"], ["waiting","en espera"], ["doing","en curso"] ] as const)
     .map(([stage,label])=>{const count=open.filter(t=>t.stage===stage).length;return count?`${count} ${label}`:"";}).filter(Boolean);
+  if(open.some(t=>t.issues.length)) counts.push("revisar datos");
   return {
     open: open.length,
     ready,
-    text: ready?`${ready} ${ready===1?"acción inmediata":"acciones inmediatas"}`:open.length?`Sin acción inmediata: ${counts.join(" · ")}.`:"Falta definir una próxima acción.",
+    text: ready?`${ready} ${ready===1?"acción inmediata":"acciones inmediatas"}`:open.length?`Sin acción inmediata: ${counts.join(" · ")||"revisar estado"}.`:"Sin acciones abiertas asociadas.",
     issues: ready?[]:unique(open.flatMap(t=>t.issues)).slice(0,3)
   };
 }
 export function validateTask(t: Raw, data: Snapshot, stage: Stage) {
   if(!s(t.fields[F.tasks.name]).trim()) throw new Error("Escribí una acción concreta.");
   if(cycleFrom(t.id,data.tasks.filter(x=>x.id!==t.id).concat(t))) throw new Error("La dependencia crea un ciclo.");
-  if(["catalog","done","cancelled"].includes(stage)) return;
+  if(["done","cancelled"].includes(stage)) return;
   const check=classify(t,{...data,tasks:data.tasks.filter(x=>x.id!==t.id).concat(t)});
   if(check.issues.length) throw new Error(check.issues.join(". "));
   if(["ready","recurring","doing"].includes(stage)&&check.blockers.length) throw new Error("Todavía hay dependencias pendientes. Usá En espera.");

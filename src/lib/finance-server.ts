@@ -79,9 +79,9 @@ function previewSelected(env: NodeJS.ProcessEnv) {
   try { return financePreviewConfig(env); }
   catch { throw new FinanceError("El acceso financiero de prueba falta o venció. No se usa la conexión de producción.",409,"preview"); }
 }
-async function rpc(name: "ut_finance_snapshot_v1" | "ut_finance_commit_v1" | "ut_finance_receipt_v1" | "ut_finance_preview_v1", body: Record<string,unknown>, options: Options) {
+async function rpc(name: "ut_finance_snapshot_v1" | "ut_finance_commit_v1" | "ut_finance_receipt_v1" | "ut_finance_preview_v1" | "ut_finance_archive_v1", body: Record<string,unknown>, options: Options) {
   const {url,key} = name === "ut_finance_preview_v1" ? previewSelected(options.env || process.env) : selected(options.env || process.env);
-  const isWrite = name === "ut_finance_commit_v1";
+  const isWrite = name === "ut_finance_commit_v1" || name === "ut_finance_archive_v1";
   let response: Response;
   try {
     response = await (options.fetcher || fetch)(`${url}/rest/v1/rpc/${name}`,{
@@ -142,4 +142,19 @@ export async function commitFinance(input: unknown, actor: string, options: Opti
   if (typeof input.revision !== "string" || !revisionPattern.test(input.revision)) inputError("Actualizá los datos antes de guardar.");
   const change = validateFinanceChange(input.change);
   return receipt(await rpc("ut_finance_commit_v1",{p_request_id:requestId,p_actor:actor,p_expected_revision:input.revision,p_change:change},options),requestId);
+}
+
+export async function archiveFinance(input: unknown, actor: string, options: Options = {}): Promise<FinanceReceipt> {
+  if (!isObject(input)) inputError("Solicitud de eliminación inválida.");
+  keys(input,["action","requestId","revision","id","archive","reason"]);
+  if (input.action !== "archiveMovement") inputError("Acción financiera desconocida.");
+  const requestId=identity(input.requestId,actor);
+  if (typeof input.revision !== "string" || !revisionPattern.test(input.revision)
+    || typeof input.id !== "string" || !input.id || input.id.length > 80
+    || typeof input.archive !== "boolean" || typeof input.reason !== "string"
+    || !input.reason.trim() || input.reason.length > 500) inputError("Revisá el registro y actualizá los datos.");
+  return receipt(await rpc("ut_finance_archive_v1",{
+    p_request_id:requestId,p_actor:actor,p_expected_revision:input.revision,
+    p_id:input.id,p_archive:input.archive,p_reason:input.reason
+  },options),requestId);
 }

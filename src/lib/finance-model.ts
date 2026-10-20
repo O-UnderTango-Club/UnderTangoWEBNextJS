@@ -15,16 +15,16 @@ export type FinanceSnapshot = {
   contacts: FinanceReference[]; cases: FinanceReference[]; operations: FinanceReference[];
 };
 type Field = { id: string; label: string; type: "text" | "date" | "amount" | "select" | "links";
-  choices?: readonly string[]; target?: keyof Pick<FinanceSnapshot,"obligations" | "movements" | "contacts" | "cases" | "operations">; readOnly?: boolean };
+  choices?: readonly string[]; readChoices?: readonly string[]; target?: keyof Pick<FinanceSnapshot,"obligations" | "movements" | "contacts" | "cases" | "operations">; readOnly?: boolean };
 export const FINANCE_FIELDS: Record<FinanceTable, Record<string, Field>> = {
   obligations: {
     name: { id: "fldTyZmuXoFysSWDz", label: "Obligación", type: "text" },
-    type: { id: "fldsQRvXiJqEDwpQ7", label: "Tipo", type: "select", choices: ["Por cobrar", "Por pagar", "Saldada"] },
+    type: { id: "fldsQRvXiJqEDwpQ7", label: "Tipo", type: "select", choices: ["Por cobrar", "Por pagar", "Saldada"], readChoices: ["Deuda refinanciada"] },
     concept: { id: "fldVKVA6Qv50uXFON", label: "Concepto", type: "text" },
     originalAmount: { id: "fldSQgRtIBF8lf0EH", label: "Importe original", type: "amount" },
     currency: { id: "fld1d4ZilO9HE4xfk", label: "Moneda", type: "select", choices: ["BRL", "ARS", "USD", "R$"] },
     balance: { id: "fldLK5IhLNJnaupRS", label: "Saldo actual", type: "amount" },
-    status: { id: "fldpVOPqM6JMfpgWh", label: "Estado", type: "select", choices: ["Pendiente", "Parcial", "Saldada", "En revisión"] },
+    status: { id: "fldpVOPqM6JMfpgWh", label: "Estado", type: "select", choices: ["Pendiente", "Parcial", "Saldada", "En revisión"], readChoices: ["Refinanciada", "Vigente"] },
     originDate: { id: "fld8CzxJmRPItsBfD", label: "Fecha de origen", type: "date" },
     dueDate: { id: "fldBJga4d04ADmfXO", label: "Vencimiento", type: "date" },
     followUpDate: { id: "fldzNN01DonCW0ivs", label: "Próximo seguimiento", type: "date" },
@@ -118,7 +118,7 @@ export function parseFinanceSnapshot(value: unknown, allowStaged = false): Finan
           if (typeof cell !== "string") throw invalid();
           if (field.type === "amount" && !decimal.test(cell)) throw invalid();
           if (field.type === "date" && !validFinanceDate(cell)) throw invalid();
-          if (field.type === "select" && !field.choices?.includes(cell)) throw invalid();
+          if (field.type === "select" && !field.choices?.includes(cell) && !field.readChoices?.includes(cell)) throw invalid();
         }
       }
     }

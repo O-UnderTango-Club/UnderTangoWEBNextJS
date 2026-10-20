@@ -50,6 +50,7 @@ export default function Finance() {
   const [data,setData] = useState<Data>();
   const [loading,setLoading] = useState(true), [busy,setBusy] = useState(false);
   const [error,setError] = useState(""), [notice,setNotice] = useState("");
+  const [needsAccess,setNeedsAccess] = useState(false);
   const [table,setTable] = useState<FinanceTable>("obligations");
   const [query,setQuery] = useState(""), [currency,setCurrency] = useState(""), [status,setStatus] = useState("");
   const [onlyIssues,setOnlyIssues] = useState(false), [limit,setLimit] = useState(30);
@@ -63,7 +64,7 @@ export default function Finance() {
       const raw = await api();
       if (!isObject(raw) || typeof raw.actor !== "string" || !raw.actor) throw new Error("No se pudo verificar el acceso.");
       const value:Data = {...parseFinanceSnapshot(raw,raw.readOnly === true),actor:raw.actor,readOnly:raw.readOnly === true};
-      setData(value); setError("");
+      setData(value); setError(""); setNeedsAccess(false);
       if (!loadedPending.current) {
         loadedPending.current = true;
         try {
@@ -76,7 +77,7 @@ export default function Finance() {
         } catch { setError("No se pudo consultar el estado del último envío de este navegador."); }
       }
       return value;
-    } catch (e) { setData(undefined); setError(e instanceof Error ? e.message : "No se pudieron consultar las finanzas."); return null; }
+    } catch (e) { setData(undefined); setNeedsAccess(e instanceof ApiError && (e.status === 401 || e.status === 403)); setError(e instanceof Error ? e.message : "No se pudieron consultar las finanzas."); return null; }
     finally { reading.current = false; setLoading(false); }
   },[]);
   useEffect(() => { void refresh(); },[refresh]);
@@ -121,7 +122,7 @@ export default function Finance() {
     {notice ? <p className={css.notice} role="status">{notice}</p> : null}
     {error ? <p className={css.error} role="alert">{error}</p> : null}
     {loading && !data ? <p role="status">Comprobando acceso y leyendo finanzas…</p> : null}
-    {!data && !loading ? <section className={css.empty}><h2>Los datos no están disponibles en esta vista</h2><p>No mostramos una copia antigua ni cambiamos de fuente automáticamente.</p><a href="/panel-de-control/activar">Habilitar este navegador para el panel</a></section> : null}
+    {!data && !loading ? <section className={css.empty}><h2>{needsAccess ? "Ingresar a Finanzas" : "No pudimos cargar los datos financieros"}</h2><p>{needsAccess ? "Finanzas usa el mismo acceso que el panel de control. Abrilo desde tu navegador habitual." : "No hace falta volver a habilitar el navegador. Podés reintentar con Actualizar datos."}</p>{needsAccess ? <a href="/panel-de-control">Abrir mi panel de control</a> : null}</section> : null}
     {data ? <>
       <div className={css.context}><span>Supabase · {data.obligations.length} obligaciones · {data.movements.length} movimientos</span><span>Lectura {new Date(data.updatedAt).toLocaleString("es-AR",{timeZone:"America/Argentina/Cordoba"})}</span></div>
       {data.readOnly ? <p className={css.warning} role="status">Publicación de prueba: solo lectura. Los cambios reales siguen en el sistema operativo vigente.</p> : null}
@@ -130,7 +131,7 @@ export default function Finance() {
       <nav className={css.tabs} aria-label="Secciones de finanzas">{(["obligations","movements"] as const).map(t => <button type="button" key={t} aria-pressed={table === t} className={table === t ? css.active : ""} onClick={() => changeTable(t)}>{title(t)} <span>{data[t].length}</span></button>)}</nav>
       <section className={css.summary}><h2>{table === "obligations" ? "Saldos de obligaciones" : "Importes de movimientos registrados"}</h2><p>Esto no es la caja disponible. Una cuenta por cobrar no es dinero recibido. Los pendientes y cada moneda se mantienen separados.</p>
         <details><summary>Ver subtotales por moneda, tipo y estado</summary><div className={css.tableScroll}><table><caption>Subtotales de todos los registros de esta sección, sin aplicar los filtros de búsqueda.</caption><thead><tr><th>Moneda</th><th>Tipo</th><th>Estado</th><th>Importe conocido</th><th>Información pendiente</th></tr></thead><tbody>{totals.map(t => <tr key={JSON.stringify([t.currency,t.type,t.status])}><td>{t.currency || "Sin moneda"}</td><td>{t.type || "Sin tipo"}</td><td>{t.status || "Sin estado"}</td><td>{formatFinanceAmount(t.knownSubtotal)}</td><td>{t.unknown ? `${t.unknown} de ${t.records} sin importe` : `${t.records} registros con importe`}</td></tr>)}</tbody></table></div></details></section>
-      <div className={css.toolbar}><label>Buscar<input type="search" value={query} onChange={e => {setQuery(e.target.value);setLimit(30);}} placeholder="Nombre, concepto, contraparte o notas"/></label><label>Moneda<select value={currency} onChange={e => {setCurrency(e.target.value);setLimit(30);}}><option value="">Todas, sin sumar entre sí</option>{F[table].currency.choices!.map(c => <option key={c}>{c}</option>)}<option value="unknown">Sin moneda informada</option></select></label><label>Estado<select value={status} onChange={e => {setStatus(e.target.value);setLimit(30);}}><option value="">Todos</option>{F[table].status.choices!.map(s => <option key={s}>{s}</option>)}</select></label></div>
+      <div className={css.toolbar}><label>Buscar<input type="search" value={query} onChange={e => {setQuery(e.target.value);setLimit(30);}} placeholder="Nombre, concepto, contraparte o notas"/></label><label>Moneda<select value={currency} onChange={e => {setCurrency(e.target.value);setLimit(30);}}><option value="">Todas, sin sumar entre sí</option>{F[table].currency.choices!.map(c => <option key={c}>{c}</option>)}<option value="unknown">Sin moneda informada</option></select></label><label>Estado<select value={status} onChange={e => {setStatus(e.target.value);setLimit(30);}}><option value="">Todos</option>{[...F[table].status.choices!, ...(F[table].status.readChoices || [])].map(s => <option key={s}>{s}</option>)}</select></label></div>
       <div className={css.listHeader}><label className={css.checkbox}><input type="checkbox" checked={onlyIssues} onChange={e => {setOnlyIssues(e.target.checked);setLimit(30);}}/>Solo registros que requieren revisión</label><button type="button" className={css.primary} disabled={data.readOnly || !!pending || busy || !!error} onClick={() => setDraft(newFinanceDraft(table,data))}>+ {table === "obligations" ? "Registrar obligación" : "Registrar movimiento"}</button></div>
       <p className={css.small}>{rows.length} registros encontrados. Buscá antes de crear para evitar duplicados.</p>
       <div className={css.cards}>{rows.slice(0,limit).map(row => {
@@ -184,7 +185,7 @@ function Editor({initial,data,busy,locked,pending,send,onClose}:{initial:Finance
     <fieldset disabled={disabled} className={css.fields}><legend className={css.srOnly}>Datos de la operación</legend><div className={css.formGrid}>{Object.entries(F[draft.table]).filter(([,f]) => f.type !== "links").map(([name,field]) => {
       const current = draft.values[field.id]; const text = typeof current === "string" ? current : "";
       const long = ["concept","notes","nextAction"].includes(name);
-      return <label key={field.id} className={long || name === "name" ? css.full : ""}>{field.label}{field.type === "select" ? <select value={text} onChange={e => value(field.id,e.target.value || null)}><option value="">No informado</option>{field.choices!.filter(c => draft.id || !(name === "type" && c === "Saldada")).map(c => <option key={c}>{c}</option>)}</select> : long ? <textarea rows={name === "notes" ? 5 : 3} value={text} onChange={e => value(field.id,e.target.value)} maxLength={20000}/> : <input type={field.type === "date" ? "date" : "text"} inputMode={field.type === "amount" ? "decimal" : undefined} value={text} onChange={e => value(field.id,e.target.value)} placeholder={field.type === "amount" ? "Sin separadores de miles: 1234,50" : undefined} maxLength={20000}/>}</label>;
+      return <label key={field.id} className={long || name === "name" ? css.full : ""}>{field.label}{field.type === "select" ? <select value={text} onChange={e => value(field.id,e.target.value || null)}><option value="">No informado</option>{text && !field.choices!.includes(text) ? <option value={text} disabled>{text} · valor registrado</option> : null}{field.choices!.filter(c => draft.id || !(name === "type" && c === "Saldada")).map(c => <option key={c}>{c}</option>)}</select> : long ? <textarea rows={name === "notes" ? 5 : 3} value={text} onChange={e => value(field.id,e.target.value)} maxLength={20000}/> : <input type={field.type === "date" ? "date" : "text"} inputMode={field.type === "amount" ? "decimal" : undefined} value={text} onChange={e => value(field.id,e.target.value)} placeholder={field.type === "amount" ? "Sin separadores de miles: 1234,50" : undefined} maxLength={20000}/>}</label>;
     })}</div></fieldset>
     <details className={css.details} open={draft.table === "movements"}><summary>Vínculos y orden de los registros</summary>{Object.entries(F[draft.table]).filter(([,f]) => f.type === "links").map(([,field]) => <LinkField key={field.id} label={field.label} options={data[field.target!].map(r => ({id:r.id,name:referenceName(data,field.target!,r.id)}))} value={draft.values[field.id] as string[]} onChange={next => value(field.id,next)} disabled={disabled || field.readOnly === true}/>)}</details>
     {draft.table === "movements" && links.length ? <fieldset className={css.balanceSection} disabled={disabled}><legend>Actualización de saldos: opcional y explícita</legend><p>No descontamos este importe de cada obligación. Marcá únicamente los saldos que revisaste e indicá su nuevo valor.</p>{links.map(id => {

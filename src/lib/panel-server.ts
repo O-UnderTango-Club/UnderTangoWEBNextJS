@@ -178,6 +178,7 @@ async function performMutation(input: any, actor: string) {
     let stage:EditableStage|undefined=change.stage;
     if(stage&&!states[stage])throw new PanelError("Estado inválido.");
     if(!current&&!stage) stage="ready";
+    if(!current&&!["ready","recurring"].includes(stage || "")) throw new PanelError("Toda acción nueva debe comenzar activa.");
     if(stage){[fields[F.tasks.status],fields[F.tasks.gate]]=states[stage];}
     const actionRanking=operational&&data.rankingMode==="action";
     if(("front" in change||"rank" in change)&&!actionRanking)throw new PanelError("El ranking individual todavía no está habilitado.",409);

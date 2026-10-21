@@ -702,25 +702,41 @@
   letter-spacing: 0.1em;
 }
 
-.deviceSelect {
+.midiDevices {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: -2px 0 9px;
+  gap: 5px;
+  margin: -2px 0 10px;
+}
+
+.midiDevicesLabel {
   color: #817c88;
   font: 7px ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.12em;
 }
 
-.deviceSelect select {
-  min-width: 0;
-  max-width: 250px;
-  height: 24px;
-  padding: 0 5px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #e4dedb;
-  background: #15151b;
-  font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+.midiDevice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 4px 6px;
+  border: 1px solid rgba(130, 215, 184, 0.2);
+  color: #b8d9cd;
+  background: rgba(130, 215, 184, 0.04);
+  overflow-wrap: anywhere;
+  font: 8px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.midiDevice::before {
+  width: 4px;
+  height: 4px;
+  flex: 0 0 4px;
+  border-radius: 50%;
+  background: #82d7b8;
+  box-shadow: 0 0 7px rgba(130, 215, 184, 0.7);
+  content: "";
 }
 
 .keybed {

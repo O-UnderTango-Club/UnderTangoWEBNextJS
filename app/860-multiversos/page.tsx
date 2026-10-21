@@ -877,7 +877,7 @@ export default function Multiversos860Page() {
   };
 
 
-  const recordedCount = recordedCount;
+  const recordedCount = recordedNotes.filter((note) => note !== null).length;
 
   return (
     <main className={styles.console}>

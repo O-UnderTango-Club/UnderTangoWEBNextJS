@@ -363,13 +363,167 @@
   font: 8px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-.channelScroller {
+.controlBay {
   max-width: 1420px;
   margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 248px;
+  align-items: start;
+  gap: 14px;
+}
+
+.channelScroller {
+  min-width: 0;
+  max-width: none;
+  margin: 0;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-color: rgba(214, 155, 118, 0.38) rgba(255, 255, 255, 0.04);
   scrollbar-width: thin;
+}
+
+.presetPanel {
+  min-width: 0;
+  min-height: 229px;
+  padding: 13px;
+  border: 1px solid rgba(216, 206, 216, 0.12);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(203, 143, 110, 0.11), transparent 58%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+}
+
+.presetHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.presetHeader .eyebrow {
+  margin-bottom: 5px;
+}
+
+.presetHeader h3 {
+  margin: 0;
+  color: #f1eae5;
+  font: 400 22px/1.05 var(--font-undertango-editorial), Georgia, serif;
+}
+
+.presetHeader h3 span {
+  margin-left: 5px;
+  color: #c99877;
+  font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+  vertical-align: middle;
+}
+
+.presetList {
+  display: grid;
+  gap: 6px;
+  max-height: 162px;
+  overflow-y: auto;
+  scrollbar-color: rgba(214, 155, 118, 0.34) rgba(255, 255, 255, 0.035);
+  scrollbar-width: thin;
+}
+
+.presetItem {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 7px 8px 9px;
+  border: 1px solid rgba(220, 167, 124, 0.17);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.presetItemInfo {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.presetItemInfo strong {
+  overflow: hidden;
+  color: #e8e0dc;
+  font: 500 10px/1.25 var(--font-undertango-sans), Arial, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presetItemInfo small {
+  color: #88838f;
+  font: 7px ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.07em;
+}
+
+.presetItemInfo small i {
+  color: #c99877;
+  font-style: normal;
+}
+
+.presetLoadButton,
+.presetSaveButton {
+  flex: 0 0 auto;
+  min-height: 27px;
+  padding: 0 8px;
+  border: 1px solid rgba(220, 167, 124, 0.42);
+  background: rgba(220, 167, 124, 0.09);
+  color: #dfb58f;
+  font: 8px ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.presetLoadButton:hover,
+.presetSaveButton:hover {
+  background: rgba(220, 167, 124, 0.2);
+}
+
+.presetForm {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 10px;
+  padding: 10px;
+  border: 1px solid rgba(220, 167, 124, 0.28);
+  background: rgba(8, 9, 12, 0.72);
+}
+
+.presetForm label {
+  color: #a39ba2;
+  font: 7px ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.11em;
+}
+
+.presetForm input {
+  width: 100%;
+  min-height: 33px;
+  padding: 0 9px;
+  border: 1px solid rgba(216, 206, 216, 0.2);
+  border-radius: 0;
+  outline: none;
+  background: rgba(255, 255, 255, 0.045);
+  color: #f4f0ed;
+  font: 11px var(--font-undertango-sans), Arial, sans-serif;
+}
+
+.presetForm input:focus {
+  border-color: rgba(220, 167, 124, 0.72);
+}
+
+.presetForm input::placeholder {
+  color: #716c76;
+}
+
+.presetFormActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.presetHint {
+  margin: 9px 0 0;
+  color: #77727d;
+  font: 8px/1.45 var(--font-undertango-sans), Arial, sans-serif;
 }
 
 .channels {
@@ -868,6 +1022,14 @@
     justify-content: flex-start;
   }
 
+  .controlBay {
+    grid-template-columns: 1fr;
+  }
+
+  .presetPanel {
+    min-height: 0;
+  }
+
   .savedMessage {
     text-align: left;
   }
@@ -992,6 +1154,14 @@
 
   .channels {
     min-width: 890px;
+  }
+
+  .presetPanel {
+    padding: 12px;
+  }
+
+  .presetList {
+    max-height: 210px;
   }
 
   .channel {

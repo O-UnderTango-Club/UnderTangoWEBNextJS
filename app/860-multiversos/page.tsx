@@ -57,10 +57,10 @@ const CONTROLS: ControlDefinition[] = [
   { number: "03", name: "SUB", role: "gravedad", unit: "SUBGRAVE" },
   { number: "04", name: "CORTE", role: "filtro", unit: "FRECUENCIA" },
   { number: "05", name: "Q", role: "resonancia", unit: "RESONANCIA" },
-  { number: "06", name: "PULSO", role: "modulaci�n", unit: "TREMOLACI�N" },
-  { number: "07", name: "DERIVA", role: "desafinaci�n", unit: "MOVIMIENTO" },
+  { number: "06", name: "PULSO", role: "modulación", unit: "TREMOLACIÓN" },
+  { number: "07", name: "DERIVA", role: "desafinación", unit: "MOVIMIENTO" },
   { number: "08", name: "ECO", role: "retardo", unit: "DELAY" },
-  { number: "09", name: "ESPACIO", role: "reverberaci�n", unit: "ROOM" },
+  { number: "09", name: "ESPACIO", role: "reverberación", unit: "ROOM" },
 ];
 
 const INITIAL_VALUES = [0.26, 0.68, 0.32, 0.58, 0.16, 0.18, 0.14, 0.15, 0.24];
@@ -87,7 +87,7 @@ function clamp(value: number, min = 0, max = 1) {
 }
 
 function noteName(note: number) {
-  const names = ["DO", "DO?", "RE", "RE?", "MI", "FA", "FA?", "SOL", "SOL?", "LA", "LA?", "SI"];
+  const names = ["DO", "DO#", "RE", "RE#", "MI", "FA", "FA#", "SOL", "SOL#", "LA", "LA#", "SI"];
   return names[note % 12] + (Math.floor(note / 12) - 1);
 }
 
@@ -320,7 +320,7 @@ export default function Multiversos860Page() {
     }
     if (engine.context.state !== "running") await engine.context.resume();
     setAudioActive(true);
-    setAudioMessage("AUDIO LISTO � VCA ABIERTO AL TECLADO");
+    setAudioMessage("AUDIO LISTO · VCA ABIERTO AL TECLADO");
   }, []);
 
   const updateControl = useCallback((index: number, nextValue: number) => {
@@ -381,12 +381,12 @@ export default function Multiversos860Page() {
 
   const connectMidi = useCallback(async () => {
     if (!window.isSecureContext) {
-      setMidiMessage("MIDI NECESITA UNA CONEXI�N HTTPS");
+      setMidiMessage("MIDI NECESITA UNA CONEXIÓN HTTPS");
       return;
     }
     const requestAccess = (navigator as MidiNavigator).requestMIDIAccess;
     if (!requestAccess) {
-      setMidiMessage("MIDI NO EST� DISPONIBLE EN ESTE NAVEGADOR");
+      setMidiMessage("MIDI NO ESTÁ DISPONIBLE EN ESTE NAVEGADOR");
       return;
     }
     try {
@@ -399,7 +399,7 @@ export default function Multiversos860Page() {
         }));
         setMidiInputs(inputs);
         setMidiInputId((current) => inputs.some((input) => input.id === current) ? current : (inputs[0]?.id || ""));
-        setMidiMessage(inputs.length > 0 ? "MIDI LISTO � " + inputs.length + " ENTRADA(S)" : "CONECT� EL CASIO O LOS FADERS USB");
+        setMidiMessage(inputs.length > 0 ? "MIDI LISTO · " + inputs.length + " ENTRADA(S)" : "CONECTÁ EL CASIO O LOS FADERS USB");
       };
       access.onstatechange = refreshInputs;
       refreshInputs();
@@ -438,7 +438,7 @@ export default function Multiversos860Page() {
           });
           midiLearnRef.current = null;
           setMidiLearnFor(null);
-          setMidiMessage("FADER " + CONTROLS[waitingFor].number + " VINCULADO � CC " + first);
+          setMidiMessage("FADER " + CONTROLS[waitingFor].number + " VINCULADO · CC " + first);
           return;
         }
         const mappedIndex = Object.keys(ccMapRef.current).find((key) => ccMapRef.current[Number(key)] === first);
@@ -667,7 +667,7 @@ export default function Multiversos860Page() {
   const beginMidiLearn = (index: number) => {
     midiLearnRef.current = index;
     setMidiLearnFor(index);
-    setMidiMessage("MOV� EL FADER PARA ASIGNAR " + CONTROLS[index].number);
+    setMidiMessage("MOVÉ EL FADER PARA ASIGNAR " + CONTROLS[index].number);
   };
 
   const toggleStep = (index: number) => {
@@ -697,7 +697,7 @@ export default function Multiversos860Page() {
     try {
       const saved = localStorage.getItem("860-multiversos-escena");
       if (!saved) {
-        setSavedMessage("TODAV�A NO HAY ESCENA GUARDADA");
+        setSavedMessage("TODAVÍA NO HAY ESCENA GUARDADA");
         window.setTimeout(() => setSavedMessage(""), 1800);
         return;
       }
@@ -723,26 +723,26 @@ export default function Multiversos860Page() {
     <main className={styles.console}>
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
-          <span className={styles.brandMark}>�</span>
+          <span className={styles.brandMark}>&#9670;</span>
           <span className={styles.brandText}>UNDER TANGO CLUB<small>LABORATORIO SONORO</small></span>
         </a>
         <div className={styles.topbarRight}>
           <span className={styles.liveDot} />
-          <span className={styles.topbarCode}>PROYECTO 860 <b>�</b> EXPERIMENTO 01</span>
+          <span className={styles.topbarCode}>PROYECTO 860 <b>·</b> EXPERIMENTO 01</span>
         </div>
       </header>
 
       <div className={styles.world} aria-label="Espacio visual generativo">
-        <canvas ref={canvasRef} className={styles.canvas} aria-label="Constelaci�n visual que reacciona al sonido" role="img" />
+        <canvas ref={canvasRef} className={styles.canvas} aria-label="Constelación visual que reacciona al sonido" role="img" />
         <div className={styles.worldShade} />
         <div className={styles.worldTopline}>
           <span>RUIDO <i>+</i> VCO / VCA <i>+</i> FILTRO</span>
-          <span className={styles.worldState}><b /> S�NTESIS EN TIEMPO REAL</span>
+          <span className={styles.worldState}><b /> SÍNTESIS EN TIEMPO REAL</span>
         </div>
         <div className={styles.worldTitle}>
-          <p className={styles.eyebrow}>UNA M�QUINA PARA ABRIR UNIVERSOS</p>
+          <p className={styles.eyebrow}>UNA MÁQUINA PARA ABRIR UNIVERSOS</p>
           <h1><span>860</span><br />MULTIVERSOS</h1>
-          <p className={styles.worldDescription}>Mov� una frecuencia.<br />Mir� qu� mundo aparece.</p>
+          <p className={styles.worldDescription}>Mové una frecuencia.<br />Mirá qué mundo aparece.</p>
           <div className={styles.worldActions}>
             <button type="button" className={styles.audioButton} onClick={toggleAudio}>
               <span className={audioActive ? styles.pauseIcon : styles.playIcon} />
@@ -765,15 +765,15 @@ export default function Multiversos860Page() {
       <div className={styles.horizon}>
         <span>LA FRONTERA ENTRE ESCUCHAR Y VER</span>
         <i />
-        <span>ARRASTR� � TOC� � CONECT�</span>
+        <span>ARRASTRÁ · TOCÁ · CONECTÁ</span>
       </div>
 
       <section className={styles.deck} aria-labelledby="deck-heading">
         <div className={styles.deckHeader}>
           <div>
-            <p className={styles.eyebrow}>CONTROL DE S�NTESIS <span>�</span> 09 CANALES</p>
+            <p className={styles.eyebrow}>CONTROL DE SÍNTESIS <span>·</span> 09 CANALES</p>
             <h2 id="deck-heading">El tablero <em>multiversal.</em></h2>
-            <p className={styles.deckIntro}>Cada fader abre una dimensi�n. Arrancamos con la arquitectura que ya probamos y seguimos afinando el mapa.</p>
+            <p className={styles.deckIntro}>Cada fader abre una dimensión. Arrancamos con la arquitectura que ya probamos y seguimos afinando el mapa.</p>
           </div>
           <div className={styles.sceneActions}>
             <span className={styles.savedMessage} aria-live="polite">{savedMessage}</span>
@@ -800,7 +800,7 @@ export default function Multiversos860Page() {
                     step="0.001"
                     value={values[index]}
                     onChange={(event) => updateControl(index, Number(event.target.value))}
-                    aria-label={"Dimensi�n " + control.number + ": " + control.name}
+                    aria-label={"Dimensión " + control.number + ": " + control.name}
                   />
                   <span className={styles.faderTicks} aria-hidden="true" />
                 </label>
@@ -813,7 +813,7 @@ export default function Multiversos860Page() {
                     onClick={() => beginMidiLearn(index)}
                     aria-label={"Aprender fader MIDI para " + control.name}
                   >
-                    {midiLearnFor === index ? "MOV�" : "APRENDER"}
+                    {midiLearnFor === index ? "MOVÉ" : "APRENDER"}
                   </button>
                 </div>
               </article>
@@ -825,7 +825,7 @@ export default function Multiversos860Page() {
           <div className={styles.sequencePanel}>
             <div className={styles.sequenceHeader}>
               <div>
-                <p className={styles.eyebrow}>RELOJ / FRASE C�CLICA</p>
+                <p className={styles.eyebrow}>RELOJ / FRASE CÍCLICA</p>
                 <h3>Secuencia <em>de nueve.</em></h3>
               </div>
               <button
@@ -911,14 +911,14 @@ export default function Multiversos860Page() {
                 </button>
               ))}
             </div>
-            <p className={styles.keyboardHint}>Casio por USB MIDI, o prob� con A W S E D F T G Y H U J K.</p>
+            <p className={styles.keyboardHint}>Casio por USB MIDI, o probá con A W S E D F T G Y H U J K.</p>
           </div>
         </div>
       </section>
 
       <footer className={styles.footer}>
-        <span>� UNDER TANGO CLUB <i>/</i> 860 MULTIVERSOS</span>
-        <span>{connectedInput ? "ENTRADA ACTIVA � " + connectedInput.name : "PROTOTIPO SONORO � AUDIO Y VISUALES GENERATIVOS"}</span>
+        <span>&#9670; UNDER TANGO CLUB <i>/</i> 860 MULTIVERSOS</span>
+        <span>{connectedInput ? "ENTRADA ACTIVA · " + connectedInput.name : "PROTOTIPO SONORO · AUDIO Y VISUALES GENERATIVOS"}</span>
       </footer>
     </main>
   );

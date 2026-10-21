@@ -287,7 +287,7 @@ export default function Multiversos860Page() {
   const [audioActive, setAudioActive] = useState(false);
   const [audioMessage, setAudioMessage] = useState("AUDIO EN ESPERA");
   const [midiInputs, setMidiInputs] = useState<Array<{ id: string; name: string }>>([]);
-    const [midiMessage, setMidiMessage] = useState("MIDI SIN CONECTAR");
+  const [midiMessage, setMidiMessage] = useState("MIDI SIN CONECTAR");
   const [midiLearnFor, setMidiLearnFor] = useState<number | null>(null);
   const [ccMap, setCcMap] = useState<Record<number, CcBinding>>({});
   const [activeNote, setActiveNote] = useState<number | null>(null);

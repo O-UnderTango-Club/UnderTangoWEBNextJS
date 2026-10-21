@@ -31,10 +31,16 @@ type MidiNavigator = Navigator & {
   requestMIDIAccess?: (options?: { sysex?: boolean }) => Promise<MidiAccessLike>;
 };
 
-type SoundEngine = {
-  context: AudioContext;
+type NoteVoice = {
   oscillator: OscillatorNode;
   sub: OscillatorNode;
+  oscillatorEnvelope: GainNode;
+  subEnvelope: GainNode;
+};
+
+type SoundEngine = {
+  context: AudioContext;
+  noteVoices: Map<number, NoteVoice>;
   sequenceOscillator: OscillatorNode;
   sequenceSub: OscillatorNode;
   noise: AudioBufferSourceNode;
@@ -131,14 +137,6 @@ function makeRoomImpulse(context: AudioContext) {
 
 function createSoundEngine(): SoundEngine {
   const context = new AudioContext();
-  const oscillator = context.createOscillator();
-  oscillator.type = "sawtooth";
-  oscillator.frequency.value = frequencyForNote(48);
-
-  const sub = context.createOscillator();
-  sub.type = "sine";
-  sub.frequency.value = frequencyForNote(36);
-
   const sequenceOscillator = context.createOscillator();
   sequenceOscillator.type = "sawtooth";
   sequenceOscillator.frequency.value = frequencyForNote(48);
@@ -187,7 +185,6 @@ function createSoundEngine(): SoundEngine {
   const driftDepth = context.createGain();
   driftDepth.gain.value = 0;
   driftLfo.connect(driftDepth);
-  driftDepth.connect(oscillator.detune);
 
   const dry = context.createGain();
   dry.gain.value = 0.88;
@@ -218,13 +215,11 @@ function createSoundEngine(): SoundEngine {
   const output = context.createGain();
   output.gain.value = 0.56;
 
-  oscillator.connect(oscillatorGain);
-  sub.connect(subGain);
   sequenceOscillator.connect(sequenceOscillatorGain);
   sequenceSub.connect(sequenceSubGain);
   noise.connect(noiseGain);
-  oscillatorGain.connect(envelope);
-  subGain.connect(envelope);
+  oscillatorGain.connect(filter);
+  subGain.connect(filter);
   noiseGain.connect(envelope);
   envelope.connect(filter);
   sequenceOscillatorGain.connect(sequenceEnvelope);
@@ -243,8 +238,6 @@ function createSoundEngine(): SoundEngine {
   analyser.connect(output);
   output.connect(context.destination);
 
-  oscillator.start();
-  sub.start();
   sequenceOscillator.start();
   sequenceSub.start();
   noise.start();
@@ -253,8 +246,7 @@ function createSoundEngine(): SoundEngine {
 
   return {
     context,
-    oscillator,
-    sub,
+    noteVoices: new Map<number, NoteVoice>(),
     sequenceOscillator,
     sequenceSub,
     noise,
@@ -285,6 +277,36 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
   const now = context.currentTime;
   parameter.cancelScheduledValues(now);
   parameter.setTargetAtTime(value, now, time);
+}
+
+function updateLiveVoiceLevels(engine: SoundEngine) {
+  const voices = Array.from(engine.activeNotes.entries());
+  const count = Math.max(1, voices.length);
+  let loudestVelocity = 0;
+  for (const [note, velocity] of voices) {
+    const voice = engine.noteVoices.get(note);
+    if (!voice) continue;
+    const level = (0.38 * velocity) / Math.sqrt(count);
+    smooth(voice.oscillatorEnvelope.gain, level, engine.context, 0.012);
+    smooth(voice.subEnvelope.gain, level, engine.context, 0.012);
+    loudestVelocity = Math.max(loudestVelocity, velocity);
+  }
+  smooth(engine.envelope.gain, loudestVelocity > 0 ? 0.38 * loudestVelocity : 0.0001, engine.context, loudestVelocity > 0 ? 0.012 : 0.08);
+}
+
+function retireNoteVoice(engine: SoundEngine, voice: NoteVoice) {
+  const stopAt = engine.context.currentTime + 0.22;
+  smooth(voice.oscillatorEnvelope.gain, 0.0001, engine.context, 0.035);
+  smooth(voice.subEnvelope.gain, 0.0001, engine.context, 0.035);
+  voice.oscillator.stop(stopAt);
+  voice.sub.stop(stopAt);
+  window.setTimeout(() => {
+    engine.driftDepth.disconnect(voice.oscillator.detune);
+    voice.oscillator.disconnect();
+    voice.sub.disconnect();
+    voice.oscillatorEnvelope.disconnect();
+    voice.subEnvelope.disconnect();
+  }, 260);
 }
 
 function applyControl(engine: SoundEngine, index: number, value: number, bpm: number) {
@@ -333,6 +355,7 @@ export default function Multiversos860Page() {
   const [midiLearnFor, setMidiLearnFor] = useState<number | null>(null);
   const [ccMap, setCcMap] = useState<Record<number, CcBinding>>({});
   const [activeNote, setActiveNote] = useState<number | null>(null);
+  const [heldNotes, setHeldNotes] = useState<number[]>([]);
   const [savedMessage, setSavedMessage] = useState("");
 
   const valuesRef = useRef(values);
@@ -350,6 +373,7 @@ export default function Multiversos860Page() {
   const midiLearnRef = useRef<number | null>(null);
   const ccMapRef = useRef(ccMap);
   const activeNoteRef = useRef<number | null>(null);
+  const pressedNotesRef = useRef(new Set<number>());
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   valuesRef.current = values;
@@ -383,34 +407,65 @@ export default function Multiversos860Page() {
   }, []);
 
   const startNote = useCallback((note: number, velocity = 0.86) => {
-    void ensureAudio().then(() => {
+    pressedNotesRef.current.add(note);
+    const activate = () => {
       const engine = engineRef.current;
-      if (!engine) return;
-      engine.activeNotes.set(note, clamp(velocity));
-      smooth(engine.oscillator.frequency, frequencyForNote(note), engine.context, 0.016);
-      smooth(engine.sub.frequency, frequencyForNote(note - 12), engine.context, 0.018);
-      smooth(engine.envelope.gain, 0.38 * clamp(velocity), engine.context, 0.012);
+      if (!engine || !pressedNotesRef.current.has(note)) return;
+      const safeVelocity = clamp(velocity);
+      let voice = engine.noteVoices.get(note);
+      if (!voice) {
+        const oscillator = engine.context.createOscillator();
+        oscillator.type = "sawtooth";
+        oscillator.frequency.value = frequencyForNote(note);
+        const sub = engine.context.createOscillator();
+        sub.type = "sine";
+        sub.frequency.value = frequencyForNote(note - 12);
+        const oscillatorEnvelope = engine.context.createGain();
+        const subEnvelope = engine.context.createGain();
+        oscillatorEnvelope.gain.value = 0.0001;
+        subEnvelope.gain.value = 0.0001;
+        oscillator.connect(oscillatorEnvelope);
+        oscillatorEnvelope.connect(engine.oscillatorGain);
+        sub.connect(subEnvelope);
+        subEnvelope.connect(engine.subGain);
+        engine.driftDepth.connect(oscillator.detune);
+        oscillator.start();
+        sub.start();
+        voice = { oscillator, sub, oscillatorEnvelope, subEnvelope };
+        engine.noteVoices.set(note, voice);
+      }
+      engine.activeNotes.set(note, safeVelocity);
+      updateLiveVoiceLevels(engine);
       setActiveNote(note);
-    }).catch(() => {
+      setHeldNotes(Array.from(engine.activeNotes.keys()));
+    };
+    const engine = engineRef.current;
+    if (engine?.context.state === "running") {
+      activate();
+      return;
+    }
+    void ensureAudio().then(activate).catch(() => {
+      pressedNotesRef.current.delete(note);
       setAudioMessage("NO SE PUDO INICIAR EL AUDIO");
     });
   }, [ensureAudio]);
 
   const releaseNote = useCallback((note: number) => {
+    pressedNotesRef.current.delete(note);
     const engine = engineRef.current;
-    if (!engine) return;
-    engine.activeNotes.delete(note);
-    const remaining = Array.from(engine.activeNotes.entries());
-    if (remaining.length > 0) {
-      const [lastNote, velocity] = remaining[remaining.length - 1];
-      smooth(engine.oscillator.frequency, frequencyForNote(lastNote), engine.context, 0.025);
-      smooth(engine.sub.frequency, frequencyForNote(lastNote - 12), engine.context, 0.025);
-      smooth(engine.envelope.gain, 0.38 * velocity, engine.context, 0.02);
-      setActiveNote(lastNote);
-    } else {
-      smooth(engine.envelope.gain, 0.0001, engine.context, 0.1);
+    if (!engine) {
+      setHeldNotes([]);
       setActiveNote(null);
+      return;
     }
+    const voice = engine.noteVoices.get(note);
+    engine.activeNotes.delete(note);
+    engine.noteVoices.delete(note);
+    if (voice) retireNoteVoice(engine, voice);
+    updateLiveVoiceLevels(engine);
+    const remaining = Array.from(engine.activeNotes.keys());
+    setHeldNotes(remaining);
+    setActiveNote(remaining.length > 0 ? remaining[remaining.length - 1] : null);
   }, []);
 
   const startSequenceNote = useCallback((note: number, velocity = 0.86) => {
@@ -495,8 +550,18 @@ export default function Multiversos860Page() {
   const toggleAudio = useCallback(() => {
     const engine = engineRef.current;
     if (engine && engine.context.state === "running") {
+      pressedNotesRef.current.clear();
       engine.activeNotes.clear();
+      const voices = Array.from(engine.noteVoices.values());
+      engine.noteVoices.clear();
+      voices.forEach((voice) => retireNoteVoice(engine, voice));
+      engine.sequenceActiveNotes.clear();
+      smooth(engine.sequenceEnvelope.gain, 0.0001, engine.context, 0.04);
       smooth(engine.envelope.gain, 0.0001, engine.context, 0.04);
+      if (isRecordingRef.current) stopRecording();
+      setIsSequencing(false);
+      setHeldNotes([]);
+      setActiveStep(-1);
       void engine.context.suspend().then(() => {
         setAudioActive(false);
         setActiveNote(null);
@@ -505,7 +570,7 @@ export default function Multiversos860Page() {
       return;
     }
     void ensureAudio().catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
-  }, [ensureAudio]);
+  }, [ensureAudio, stopRecording]);
 
   const connectMidi = useCallback(async () => {
     if (!window.isSecureContext) {
@@ -1085,7 +1150,7 @@ export default function Multiversos860Page() {
                   className={[
                     styles.pianoKey,
                     key.black ? styles.blackKey : styles.whiteKey,
-                    activeNote === key.note ? styles.keyPressed : "",
+                    heldNotes.includes(key.note) ? styles.keyPressed : "",
                   ].filter(Boolean).join(" ")}
                   onPointerDown={(event) => {
                     event.currentTarget.setPointerCapture(event.pointerId);

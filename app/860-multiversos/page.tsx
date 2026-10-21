@@ -18,6 +18,23 @@ type MidiInputLike = {
 
 type CcBinding = { inputId: string; cc: number };
 type RecordedPattern = Array<number | null>;
+type SceneSnapshot = {
+  values?: number[];
+  bpm?: number;
+  steps?: boolean[];
+  recordedNotes?: RecordedPattern;
+  hasRecording?: boolean;
+};
+type ScenePreset = SceneSnapshot & {
+  id: string;
+  title: string;
+  savedAt: number;
+  values: number[];
+  bpm: number;
+  steps: boolean[];
+  recordedNotes: RecordedPattern;
+  hasRecording: boolean;
+};
 
 type MidiAccessLike = {
   inputs: {
@@ -119,6 +136,22 @@ function readoutFor(index: number, value: number) {
   if (index === 5) return (0.5 + value * 7.5).toFixed(1) + " Hz";
   if (index === 6) return Math.round(value * 24) + " ct";
   return Math.round(value * 100) + "%";
+}
+
+function isScenePreset(value: unknown): value is ScenePreset {
+  if (!value || typeof value !== "object") return false;
+  const preset = value as Partial<ScenePreset>;
+  return typeof preset.id === "string"
+    && typeof preset.title === "string"
+    && preset.title.trim().length > 0
+    && typeof preset.savedAt === "number"
+    && Array.isArray(preset.values) && preset.values.length === 9
+    && preset.values.every((entry) => typeof entry === "number" && Number.isFinite(entry))
+    && typeof preset.bpm === "number"
+    && Array.isArray(preset.steps) && preset.steps.length === 9
+    && preset.steps.every((entry) => typeof entry === "boolean")
+    && Array.isArray(preset.recordedNotes) && preset.recordedNotes.length === 9
+    && typeof preset.hasRecording === "boolean";
 }
 
 function makeRoomImpulse(context: AudioContext) {
@@ -356,6 +389,9 @@ export default function Multiversos860Page() {
   const [ccMap, setCcMap] = useState<Record<number, CcBinding>>({});
   const [activeNote, setActiveNote] = useState<number | null>(null);
   const [heldNotes, setHeldNotes] = useState<number[]>([]);
+  const [presets, setPresets] = useState<ScenePreset[]>([]);
+  const [presetNameDraft, setPresetNameDraft] = useState("");
+  const [presetFormOpen, setPresetFormOpen] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
 
   const valuesRef = useRef(values);
@@ -374,6 +410,7 @@ export default function Multiversos860Page() {
   const ccMapRef = useRef(ccMap);
   const activeNoteRef = useRef<number | null>(null);
   const pressedNotesRef = useRef(new Set<number>());
+  const presetsRef = useRef(presets);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   valuesRef.current = values;
@@ -383,6 +420,7 @@ export default function Multiversos860Page() {
   ccMapRef.current = ccMap;
   midiLearnRef.current = midiLearnFor;
   activeNoteRef.current = activeNote;
+  presetsRef.current = presets;
 
   const ensureAudio = useCallback(async () => {
     let engine = engineRef.current;
@@ -878,6 +916,58 @@ export default function Multiversos860Page() {
     if (engine) applyControl(engine, 7, valuesRef.current[7], nextBpm);
   };
 
+  useEffect(() => {
+    try {
+      const savedPresets = localStorage.getItem("860-multiversos-presets");
+      if (savedPresets) {
+        const parsed: unknown = JSON.parse(savedPresets);
+        if (Array.isArray(parsed)) {
+          const validPresets = parsed.filter(isScenePreset);
+          if (validPresets.length > 0) {
+            presetsRef.current = validPresets;
+            setPresets(validPresets);
+            return;
+          }
+        }
+      }
+      const savedScene = localStorage.getItem("860-multiversos-escena");
+      const legacy = savedScene ? JSON.parse(savedScene) as SceneSnapshot : {};
+      const initialPreset: ScenePreset = {
+        id: "preset-timbre-captura-860",
+        title: "Timbre de la captura",
+        savedAt: Date.now(),
+        values: Array.isArray(legacy.values) && legacy.values.length === 9
+          ? legacy.values.map((value) => clamp(value))
+          : INITIAL_VALUES.slice(),
+        bpm: typeof legacy.bpm === "number" ? Math.min(150, Math.max(70, legacy.bpm)) : 106,
+        steps: Array.isArray(legacy.steps) && legacy.steps.length === 9
+          ? legacy.steps.map((step) => step === true)
+          : INITIAL_STEPS.slice(),
+        recordedNotes: Array.isArray(legacy.recordedNotes) && legacy.recordedNotes.length === 9
+          ? legacy.recordedNotes.map((note) => typeof note === "number" && Number.isInteger(note) && note >= 0 && note <= 127 ? note : null)
+          : Array(9).fill(null),
+        hasRecording: legacy.hasRecording === true,
+      };
+      const initialPresets = [initialPreset];
+      localStorage.setItem("860-multiversos-presets", JSON.stringify(initialPresets));
+      presetsRef.current = initialPresets;
+      setPresets(initialPresets);
+    } catch {
+      const fallback: ScenePreset = {
+        id: "preset-timbre-captura-860",
+        title: "Timbre de la captura",
+        savedAt: Date.now(),
+        values: INITIAL_VALUES.slice(),
+        bpm: 106,
+        steps: INITIAL_STEPS.slice(),
+        recordedNotes: Array(9).fill(null),
+        hasRecording: false,
+      };
+      presetsRef.current = [fallback];
+      setPresets([fallback]);
+    }
+  }, []);
+
   const beginMidiLearn = (index: number) => {
     midiLearnRef.current = index;
     setMidiLearnFor(index);
@@ -893,19 +983,63 @@ export default function Multiversos860Page() {
     });
   };
 
-  const saveScene = () => {
+  const applyScene = (scene: SceneSnapshot) => {
+    if (Array.isArray(scene.values) && scene.values.length === 9) {
+      scene.values.forEach((value, index) => updateControl(index, clamp(value)));
+    }
+    if (typeof scene.bpm === "number" && Number.isFinite(scene.bpm)) {
+      handleBpmChange(Math.min(150, Math.max(70, scene.bpm)));
+    }
+    if (Array.isArray(scene.steps) && scene.steps.length === 9 && scene.steps.every((step) => typeof step === "boolean")) {
+      const nextSteps = scene.steps.slice();
+      setSteps(nextSteps);
+      stepsRef.current = nextSteps;
+    }
+    const restoredPattern: RecordedPattern = Array.isArray(scene.recordedNotes) && scene.recordedNotes.length === 9
+      ? scene.recordedNotes.map((note) => typeof note === "number" && Number.isInteger(note) && note >= 0 && note <= 127 ? note : null)
+      : Array(9).fill(null);
+    const restoredHasRecording = scene.hasRecording === true
+      && Array.isArray(scene.recordedNotes)
+      && scene.recordedNotes.length === 9;
+    recordedNotesRef.current = restoredPattern;
+    setRecordedNotes(restoredPattern);
+    hasRecordingRef.current = restoredHasRecording;
+    setHasRecording(restoredHasRecording);
+  };
+
+  const openPresetForm = () => {
+    setPresetNameDraft("");
+    setPresetFormOpen(true);
+  };
+
+  const saveNamedPreset = () => {
+    const title = presetNameDraft.trim();
+    if (!title) {
+      setSavedMessage("ESCRIBÍ UN NOMBRE PARA EL PRESET");
+      return;
+    }
+    const preset: ScenePreset = {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      title,
+      savedAt: Date.now(),
+      values: valuesRef.current.slice(),
+      bpm: bpmRef.current,
+      steps: stepsRef.current.slice(),
+      recordedNotes: recordedNotesRef.current.slice(),
+      hasRecording: hasRecordingRef.current,
+    };
+    const next = [preset, ...presetsRef.current];
     try {
-      localStorage.setItem("860-multiversos-escena", JSON.stringify({
-        values: valuesRef.current,
-        bpm: bpmRef.current,
-        steps: stepsRef.current,
-        recordedNotes: recordedNotesRef.current,
-        hasRecording: hasRecordingRef.current,
-      }));
-      setSavedMessage("ESCENA GUARDADA");
-      window.setTimeout(() => setSavedMessage(""), 1800);
+      localStorage.setItem("860-multiversos-presets", JSON.stringify(next));
+      localStorage.setItem("860-multiversos-escena", JSON.stringify(preset));
+      presetsRef.current = next;
+      setPresets(next);
+      setPresetFormOpen(false);
+      setPresetNameDraft("");
+      setSavedMessage("PRESET GUARDADO · " + title.toUpperCase());
+      window.setTimeout(() => setSavedMessage(""), 2400);
     } catch {
-      setSavedMessage("NO SE PUDO GUARDAR");
+      setSavedMessage("NO SE PUDO GUARDAR EL PRESET");
     }
   };
 
@@ -917,28 +1051,19 @@ export default function Multiversos860Page() {
         window.setTimeout(() => setSavedMessage(""), 1800);
         return;
       }
-      const scene = JSON.parse(saved) as { values?: number[]; bpm?: number; steps?: boolean[]; recordedNotes?: Array<number | null>; hasRecording?: boolean };
-      if (Array.isArray(scene.values) && scene.values.length === 9) {
-        scene.values.forEach((value, index) => updateControl(index, clamp(value)));
-      }
-      if (typeof scene.bpm === "number") handleBpmChange(Math.min(150, Math.max(70, scene.bpm)));
-      if (Array.isArray(scene.steps) && scene.steps.length === 9) {
-        setSteps(scene.steps);
-        stepsRef.current = scene.steps;
-      }
-      const restoredPattern: RecordedPattern = Array.isArray(scene.recordedNotes) && scene.recordedNotes.length === 9
-        ? scene.recordedNotes.map((note) => typeof note === "number" && Number.isInteger(note) && note >= 0 && note <= 127 ? note : null)
-        : Array(9).fill(null);
-      const restoredHasRecording = scene.hasRecording === true && Array.isArray(scene.recordedNotes) && scene.recordedNotes.length === 9;
-      recordedNotesRef.current = restoredPattern;
-      setRecordedNotes(restoredPattern);
-      hasRecordingRef.current = restoredHasRecording;
-      setHasRecording(restoredHasRecording);
+      const scene = JSON.parse(saved) as SceneSnapshot;
+      applyScene(scene);
       setSavedMessage("ESCENA RECUPERADA");
       window.setTimeout(() => setSavedMessage(""), 1800);
     } catch {
       setSavedMessage("NO SE PUDO RECUPERAR");
     }
+  };
+
+  const loadPreset = (preset: ScenePreset) => {
+    applyScene(preset);
+    setSavedMessage("PRESET CARGADO · " + preset.title.toUpperCase());
+    window.setTimeout(() => setSavedMessage(""), 2400);
   };
 
 
@@ -1003,10 +1128,11 @@ export default function Multiversos860Page() {
           <div className={styles.sceneActions}>
             <span className={styles.savedMessage} aria-live="polite">{savedMessage}</span>
             <button type="button" className={styles.textButton} onClick={restoreScene}>RECUPERAR</button>
-            <button type="button" className={styles.textButton} onClick={saveScene}>GUARDAR ESCENA</button>
+            <button type="button" className={styles.textButton} onClick={openPresetForm}>GUARDAR ESCENA</button>
           </div>
         </div>
 
+        <div className={styles.controlBay}>
         <div className={styles.channelScroller} aria-label="Nueve faders sonoros">
           <div className={styles.channels}>
             {CONTROLS.map((control, index) => (
@@ -1044,6 +1170,51 @@ export default function Multiversos860Page() {
               </article>
             ))}
           </div>
+        </div>
+        <aside className={styles.presetPanel} aria-labelledby="preset-heading">
+          <div className={styles.presetHeader}>
+            <div>
+              <p className={styles.eyebrow}>MEMORIA DE TIMBRES</p>
+              <h3 id="preset-heading">Presets <span>{String(presets.length).padStart(2, "0")}</span></h3>
+            </div>
+          </div>
+          {presetFormOpen && (
+            <form
+              className={styles.presetForm}
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveNamedPreset();
+              }}
+            >
+              <label htmlFor="preset-title">TÍTULO DE LA ESCENA</label>
+              <input
+                id="preset-title"
+                type="text"
+                maxLength={40}
+                value={presetNameDraft}
+                onChange={(event) => setPresetNameDraft(event.target.value)}
+                placeholder="Ej. Nube de madrugada"
+                autoFocus
+              />
+              <div className={styles.presetFormActions}>
+                <button type="button" className={styles.textButton} onClick={() => setPresetFormOpen(false)}>CANCELAR</button>
+                <button type="submit" className={styles.presetSaveButton}>GUARDAR</button>
+              </div>
+            </form>
+          )}
+          <div className={styles.presetList} aria-live="polite">
+            {presets.map((preset) => (
+              <article className={styles.presetItem} key={preset.id}>
+                <div className={styles.presetItemInfo}>
+                  <strong>{preset.title}</strong>
+                  <small>{preset.bpm} BPM <i>·</i> 9 FADERS</small>
+                </div>
+                <button type="button" className={styles.presetLoadButton} onClick={() => loadPreset(preset)}>CARGAR</button>
+              </article>
+            ))}
+          </div>
+          <p className={styles.presetHint}>Guarda y recupera el timbre, tempo y secuencia de cada escena.</p>
+        </aside>
         </div>
 
         <div className={styles.playSurface}>

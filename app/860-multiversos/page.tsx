@@ -17,6 +17,7 @@ type MidiInputLike = {
 };
 
 type CcBinding = { inputId: string; cc: number };
+type RecordedPattern = Array<number | null>;
 
 type MidiAccessLike = {
   inputs: {
@@ -34,12 +35,17 @@ type SoundEngine = {
   context: AudioContext;
   oscillator: OscillatorNode;
   sub: OscillatorNode;
+  sequenceOscillator: OscillatorNode;
+  sequenceSub: OscillatorNode;
   noise: AudioBufferSourceNode;
   noiseGain: GainNode;
   oscillatorGain: GainNode;
   subGain: GainNode;
+  sequenceOscillatorGain: GainNode;
+  sequenceSubGain: GainNode;
   filter: BiquadFilterNode;
   envelope: GainNode;
+  sequenceEnvelope: GainNode;
   tremolo: GainNode;
   pulseLfo: OscillatorNode;
   pulseDepth: GainNode;
@@ -51,6 +57,7 @@ type SoundEngine = {
   roomMix: GainNode;
   analyser: AnalyserNode;
   activeNotes: Map<number, number>;
+  sequenceActiveNotes: Map<number, number>;
 };
 
 const CONTROLS: ControlDefinition[] = [
@@ -132,6 +139,14 @@ function createSoundEngine(): SoundEngine {
   sub.type = "sine";
   sub.frequency.value = frequencyForNote(36);
 
+  const sequenceOscillator = context.createOscillator();
+  sequenceOscillator.type = "sawtooth";
+  sequenceOscillator.frequency.value = frequencyForNote(48);
+
+  const sequenceSub = context.createOscillator();
+  sequenceSub.type = "sine";
+  sequenceSub.frequency.value = frequencyForNote(36);
+
   const noiseBuffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate);
   const noiseData = noiseBuffer.getChannelData(0);
   for (let sample = 0; sample < noiseData.length; sample += 1) {
@@ -143,6 +158,8 @@ function createSoundEngine(): SoundEngine {
 
   const oscillatorGain = context.createGain();
   const subGain = context.createGain();
+  const sequenceOscillatorGain = context.createGain();
+  const sequenceSubGain = context.createGain();
   const noiseGain = context.createGain();
   const filter = context.createBiquadFilter();
   filter.type = "lowpass";
@@ -151,6 +168,8 @@ function createSoundEngine(): SoundEngine {
 
   const envelope = context.createGain();
   envelope.gain.value = 0.0001;
+  const sequenceEnvelope = context.createGain();
+  sequenceEnvelope.gain.value = 0.0001;
   const tremolo = context.createGain();
   tremolo.gain.value = 1;
 
@@ -201,12 +220,17 @@ function createSoundEngine(): SoundEngine {
 
   oscillator.connect(oscillatorGain);
   sub.connect(subGain);
+  sequenceOscillator.connect(sequenceOscillatorGain);
+  sequenceSub.connect(sequenceSubGain);
   noise.connect(noiseGain);
-  oscillatorGain.connect(filter);
-  subGain.connect(filter);
-  noiseGain.connect(filter);
-  filter.connect(envelope);
-  envelope.connect(tremolo);
+  oscillatorGain.connect(envelope);
+  subGain.connect(envelope);
+  noiseGain.connect(envelope);
+  envelope.connect(filter);
+  sequenceOscillatorGain.connect(sequenceEnvelope);
+  sequenceSubGain.connect(sequenceEnvelope);
+  sequenceEnvelope.connect(filter);
+  filter.connect(tremolo);
   tremolo.connect(dry);
   dry.connect(compressor);
   tremolo.connect(delay);
@@ -221,6 +245,8 @@ function createSoundEngine(): SoundEngine {
 
   oscillator.start();
   sub.start();
+  sequenceOscillator.start();
+  sequenceSub.start();
   noise.start();
   pulseLfo.start();
   driftLfo.start();
@@ -229,12 +255,17 @@ function createSoundEngine(): SoundEngine {
     context,
     oscillator,
     sub,
+    sequenceOscillator,
+    sequenceSub,
     noise,
     noiseGain,
     oscillatorGain,
     subGain,
+    sequenceOscillatorGain,
+    sequenceSubGain,
     filter,
     envelope,
+    sequenceEnvelope,
     tremolo,
     pulseLfo,
     pulseDepth,
@@ -246,6 +277,7 @@ function createSoundEngine(): SoundEngine {
     roomMix,
     analyser,
     activeNotes: new Map<number, number>(),
+    sequenceActiveNotes: new Map<number, number>(),
   };
 }
 
@@ -258,8 +290,14 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
 function applyControl(engine: SoundEngine, index: number, value: number, bpm: number) {
   const context = engine.context;
   if (index === 0) smooth(engine.noiseGain.gain, value * 0.34, context);
-  if (index === 1) smooth(engine.oscillatorGain.gain, value * 0.72, context);
-  if (index === 2) smooth(engine.subGain.gain, value * 0.48, context);
+  if (index === 1) {
+    smooth(engine.oscillatorGain.gain, value * 0.72, context);
+    smooth(engine.sequenceOscillatorGain.gain, value * 0.72, context);
+  }
+  if (index === 2) {
+    smooth(engine.subGain.gain, value * 0.48, context);
+    smooth(engine.sequenceSubGain.gain, value * 0.48, context);
+  }
   if (index === 3) smooth(engine.filter.frequency, 120 + value * value * 11_000, context);
   if (index === 4) smooth(engine.filter.Q, 0.4 + value * 11, context);
   if (index === 5) {
@@ -282,6 +320,10 @@ export default function Multiversos860Page() {
   const [values, setValues] = useState<number[]>(INITIAL_VALUES);
   const [bpm, setBpm] = useState(106);
   const [steps, setSteps] = useState<boolean[]>(INITIAL_STEPS);
+  const [recordedNotes, setRecordedNotes] = useState<RecordedPattern>(Array(9).fill(null));
+  const [hasRecording, setHasRecording] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [sequenceRun, setSequenceRun] = useState(0);
   const [activeStep, setActiveStep] = useState(-1);
   const [isSequencing, setIsSequencing] = useState(false);
   const [audioActive, setAudioActive] = useState(false);
@@ -296,6 +338,12 @@ export default function Multiversos860Page() {
   const valuesRef = useRef(values);
   const bpmRef = useRef(bpm);
   const stepsRef = useRef(steps);
+  const recordedNotesRef = useRef<RecordedPattern>(Array(9).fill(null));
+  const hasRecordingRef = useRef(false);
+  const isRecordingRef = useRef(false);
+  const recordingStartedAtRef = useRef<number | null>(null);
+  const recordingStepDurationRef = useRef((60_000 / 106) / 2);
+  const recordingTimeoutRef = useRef<number | null>(null);
   const activeStepRef = useRef(activeStep);
   const engineRef = useRef<SoundEngine | null>(null);
   const midiAccessRef = useRef<MidiAccessLike | null>(null);
@@ -365,6 +413,85 @@ export default function Multiversos860Page() {
     }
   }, []);
 
+  const startSequenceNote = useCallback((note: number, velocity = 0.86) => {
+    void ensureAudio().then(() => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      engine.sequenceActiveNotes.set(note, clamp(velocity));
+      smooth(engine.sequenceOscillator.frequency, frequencyForNote(note), engine.context, 0.016);
+      smooth(engine.sequenceSub.frequency, frequencyForNote(note - 12), engine.context, 0.018);
+      smooth(engine.sequenceEnvelope.gain, 0.38 * clamp(velocity), engine.context, 0.012);
+    }).catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
+  }, [ensureAudio]);
+
+  const releaseSequenceNote = useCallback((note: number) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.sequenceActiveNotes.delete(note);
+    const remaining = Array.from(engine.sequenceActiveNotes.entries());
+    if (remaining.length > 0) {
+      const [lastNote, velocity] = remaining[remaining.length - 1];
+      smooth(engine.sequenceOscillator.frequency, frequencyForNote(lastNote), engine.context, 0.025);
+      smooth(engine.sequenceSub.frequency, frequencyForNote(lastNote - 12), engine.context, 0.025);
+      smooth(engine.sequenceEnvelope.gain, 0.38 * velocity, engine.context, 0.02);
+    } else {
+      smooth(engine.sequenceEnvelope.gain, 0.0001, engine.context, 0.1);
+    }
+  }, []);
+
+  const captureNote = useCallback((note: number) => {
+    const startedAt = recordingStartedAtRef.current;
+    const stepDuration = recordingStepDurationRef.current;
+    if (!isRecordingRef.current || startedAt === null || stepDuration <= 0) return;
+    const elapsed = performance.now() - startedAt;
+    if (elapsed >= stepDuration * 9) return;
+    const index = Math.round(elapsed / stepDuration) % 9;
+    const nextPattern = recordedNotesRef.current.slice();
+    nextPattern[index] = note;
+    recordedNotesRef.current = nextPattern;
+    setRecordedNotes(nextPattern);
+    if (!stepsRef.current[index]) {
+      const nextSteps = stepsRef.current.slice();
+      nextSteps[index] = true;
+      stepsRef.current = nextSteps;
+      setSteps(nextSteps);
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (!isRecordingRef.current) return;
+    isRecordingRef.current = false;
+    if (recordingTimeoutRef.current !== null) {
+      window.clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+    recordingStartedAtRef.current = null;
+    hasRecordingRef.current = true;
+    setHasRecording(true);
+    setIsRecording(false);
+  }, []);
+
+  const startRecording = useCallback(() => {
+    if (isRecordingRef.current) {
+      stopRecording();
+      return;
+    }
+    void ensureAudio().then(() => {
+      const emptyPattern: RecordedPattern = Array(9).fill(null);
+      recordedNotesRef.current = emptyPattern;
+      setRecordedNotes(emptyPattern);
+      hasRecordingRef.current = false;
+      setHasRecording(false);
+      recordingStepDurationRef.current = (60_000 / bpmRef.current) / 2;
+      recordingStartedAtRef.current = performance.now();
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      setIsSequencing(true);
+      setSequenceRun((current) => current + 1);
+      recordingTimeoutRef.current = window.setTimeout(stopRecording, recordingStepDurationRef.current * 9);
+    }).catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
+  }, [ensureAudio, stopRecording]);
+
   const toggleAudio = useCallback(() => {
     const engine = engineRef.current;
     if (engine && engine.context.state === "running") {
@@ -419,6 +546,7 @@ export default function Multiversos860Page() {
         const second = event.data[2] || 0;
         const kind = status & 0xf0;
         if (kind === 0x90 && second > 0) {
+          captureNote(first);
           startNote(first, second / 127);
           return;
         }
@@ -459,7 +587,7 @@ export default function Multiversos860Page() {
         if (input.onmidimessage === onMessage) input.onmidimessage = null;
       });
     };
-  }, [midiInputs, releaseNote, startNote, updateControl]);
+  }, [captureNote, midiInputs, releaseNote, startNote, updateControl]);
 
   useEffect(() => {
     const keyMap: Record<string, number> = {
@@ -474,6 +602,7 @@ export default function Multiversos860Page() {
       const note = keyMap[key];
       if (note === undefined || held.has(key) || event.repeat) return;
       held.add(key);
+      captureNote(note);
       startNote(note);
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -489,7 +618,7 @@ export default function Multiversos860Page() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [releaseNote, startNote]);
+  }, [captureNote, releaseNote, startNote]);
 
   useEffect(() => {
     if (!isSequencing) {
@@ -502,16 +631,25 @@ export default function Multiversos860Page() {
       const step = cursor % 9;
       setActiveStep(step);
       if (stepsRef.current[step]) {
-        const note = 48 + STEP_NOTES[step];
-        startNote(note, 0.9);
-        window.setTimeout(() => releaseNote(note), Math.max(100, duration * 0.72));
+        const note = hasRecordingRef.current ? recordedNotesRef.current[step] : 48 + STEP_NOTES[step];
+        if (note !== null) {
+          startSequenceNote(note, 0.9);
+          window.setTimeout(() => releaseSequenceNote(note), Math.max(100, duration * 0.72));
+        }
       }
       cursor += 1;
     };
     tick();
     const timer = window.setInterval(tick, duration);
-    return () => window.clearInterval(timer);
-  }, [bpm, isSequencing, releaseNote, startNote]);
+    return () => {
+      window.clearInterval(timer);
+      const engine = engineRef.current;
+      if (engine) {
+        engine.sequenceActiveNotes.clear();
+        smooth(engine.sequenceEnvelope.gain, 0.0001, engine.context, 0.04);
+      }
+    };
+  }, [bpm, isSequencing, sequenceRun, releaseSequenceNote, startSequenceNote]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -664,6 +802,7 @@ export default function Multiversos860Page() {
       if (engine) void engine.context.close();
       const access = midiAccessRef.current;
       if (access) access.onstatechange = null;
+      if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
     };
   }, []);
 
@@ -695,6 +834,8 @@ export default function Multiversos860Page() {
         values: valuesRef.current,
         bpm: bpmRef.current,
         steps: stepsRef.current,
+        recordedNotes: recordedNotesRef.current,
+        hasRecording: hasRecordingRef.current,
       }));
       setSavedMessage("ESCENA GUARDADA");
       window.setTimeout(() => setSavedMessage(""), 1800);
@@ -711,7 +852,7 @@ export default function Multiversos860Page() {
         window.setTimeout(() => setSavedMessage(""), 1800);
         return;
       }
-      const scene = JSON.parse(saved) as { values?: number[]; bpm?: number; steps?: boolean[] };
+      const scene = JSON.parse(saved) as { values?: number[]; bpm?: number; steps?: boolean[]; recordedNotes?: Array<number | null>; hasRecording?: boolean };
       if (Array.isArray(scene.values) && scene.values.length === 9) {
         scene.values.forEach((value, index) => updateControl(index, clamp(value)));
       }
@@ -720,6 +861,14 @@ export default function Multiversos860Page() {
         setSteps(scene.steps);
         stepsRef.current = scene.steps;
       }
+      const restoredPattern: RecordedPattern = Array.isArray(scene.recordedNotes) && scene.recordedNotes.length === 9
+        ? scene.recordedNotes.map((note) => typeof note === "number" && Number.isInteger(note) && note >= 0 && note <= 127 ? note : null)
+        : Array(9).fill(null);
+      const restoredHasRecording = scene.hasRecording === true && Array.isArray(scene.recordedNotes) && scene.recordedNotes.length === 9;
+      recordedNotesRef.current = restoredPattern;
+      setRecordedNotes(restoredPattern);
+      hasRecordingRef.current = restoredHasRecording;
+      setHasRecording(restoredHasRecording);
       setSavedMessage("ESCENA RECUPERADA");
       window.setTimeout(() => setSavedMessage(""), 1800);
     } catch {
@@ -837,32 +986,60 @@ export default function Multiversos860Page() {
                 <p className={styles.eyebrow}>RELOJ / FRASE CÍCLICA</p>
                 <h3>Secuencia <em>de nueve.</em></h3>
               </div>
-              <button
-                type="button"
-                className={isSequencing ? styles.stopButton : styles.sequenceButton}
-                onClick={() => {
-                  if (isSequencing) setIsSequencing(false);
-                  else void ensureAudio().then(() => setIsSequencing(true));
-                }}
-              >
-                {isSequencing ? "DETENER" : "? INICIAR"}
-              </button>
-            </div>
-            <div className={styles.steps} aria-label="Secuenciador de nueve pasos">
-              {steps.map((enabled, index) => (
+              <div className={styles.sequenceActions}>
                 <button
                   type="button"
-                  key={index}
-                  className={[styles.step, enabled ? styles.stepEnabled : "", activeStep === index ? styles.stepCurrent : ""].filter(Boolean).join(" ")}
-                  onClick={() => toggleStep(index)}
-                  aria-label={"Paso " + (index + 1) + (enabled ? ", activo" : ", apagado")}
-                  aria-pressed={enabled}
+                  className={isRecording ? styles.stopButton : styles.sequenceButton}
+                  onClick={startRecording}
+                  aria-pressed={isRecording}
                 >
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <i />
+                  {isRecording ? "PARAR REC" : "GRABAR"}
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className={isSequencing ? styles.stopButton : styles.sequenceButton}
+                  onClick={() => {
+                    if (isSequencing) {
+                      if (isRecordingRef.current) stopRecording();
+                      setIsSequencing(false);
+                    } else {
+                      void ensureAudio().then(() => {
+                        setSequenceRun((current) => current + 1);
+                        setIsSequencing(true);
+                      });
+                    }
+                  }}
+                >
+                  {isSequencing ? "DETENER" : "INICIAR"}
+                </button>
+              </div>
             </div>
+            <div className={styles.steps} aria-label="Secuenciador de nueve pasos">
+              {steps.map((enabled, index) => {
+                const note = hasRecording ? recordedNotes[index] : enabled ? 48 + STEP_NOTES[index] : null;
+                return (
+                  <button
+                    type="button"
+                    key={index}
+                    className={[styles.step, enabled ? styles.stepEnabled : "", activeStep === index ? styles.stepCurrent : ""].filter(Boolean).join(" ")}
+                    onClick={() => toggleStep(index)}
+                    aria-label={"Paso " + (index + 1) + (enabled ? ", activo" : ", apagado") + (note === null ? "" : ", nota " + noteName(note))}
+                    aria-pressed={enabled}
+                  >
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <small className={styles.stepNote}>{note === null ? "—" : noteName(note)}</small>
+                    <i />
+                  </button>
+                );
+              })}
+            </div>
+            <p className={styles.recordStatus} aria-live="polite">
+              {isRecording
+                ? "REC · " + recordedNotes.filter((note) => note !== null).length + " NOTA(S) · TOCÁ EN LOS 9 PASOS"
+                : hasRecording
+                  ? "BUCLE GRABADO · " + recordedNotes.filter((note) => note !== null).length + " NOTA(S) · SE REPITE AL INICIAR"
+                  : "GRABAR CAPTURA UNA VUELTA DE 9 PASOS Y LA REPITE"}
+            </p>
             <div className={styles.tempoRow}>
               <span>70</span>
               <input
@@ -872,6 +1049,7 @@ export default function Multiversos860Page() {
                 value={bpm}
                 onChange={(event) => handleBpmChange(Number(event.target.value))}
                 aria-label="Tempo en pulsos por minuto"
+                disabled={isRecording}
               />
               <span>150</span>
               <strong>{bpm}<small> BPM</small></strong>
@@ -909,6 +1087,7 @@ export default function Multiversos860Page() {
                   ].filter(Boolean).join(" ")}
                   onPointerDown={(event) => {
                     event.currentTarget.setPointerCapture(event.pointerId);
+                    captureNote(key.note);
                     startNote(key.note, 0.9);
                   }}
                   onPointerUp={() => releaseNote(key.note)}

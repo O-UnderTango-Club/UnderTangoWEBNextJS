@@ -16,6 +16,8 @@ type MidiInputLike = {
   onmidimessage: ((event: { data: ArrayLike<number> }) => void) | null;
 };
 
+type CcBinding = { inputId: string; cc: number };
+
 type MidiAccessLike = {
   inputs: {
     values: () => IterableIterator<MidiInputLike>;
@@ -285,10 +287,9 @@ export default function Multiversos860Page() {
   const [audioActive, setAudioActive] = useState(false);
   const [audioMessage, setAudioMessage] = useState("AUDIO EN ESPERA");
   const [midiInputs, setMidiInputs] = useState<Array<{ id: string; name: string }>>([]);
-  const [midiInputId, setMidiInputId] = useState("");
-  const [midiMessage, setMidiMessage] = useState("MIDI SIN CONECTAR");
+    const [midiMessage, setMidiMessage] = useState("MIDI SIN CONECTAR");
   const [midiLearnFor, setMidiLearnFor] = useState<number | null>(null);
-  const [ccMap, setCcMap] = useState<Record<number, number>>({});
+  const [ccMap, setCcMap] = useState<Record<number, CcBinding>>({});
   const [activeNote, setActiveNote] = useState<number | null>(null);
   const [savedMessage, setSavedMessage] = useState("");
 
@@ -398,7 +399,6 @@ export default function Multiversos860Page() {
           name: input.name || "Entrada MIDI",
         }));
         setMidiInputs(inputs);
-        setMidiInputId((current) => inputs.some((input) => input.id === current) ? current : (inputs[0]?.id || ""));
         setMidiMessage(inputs.length > 0 ? "MIDI LISTO · " + inputs.length + " ENTRADA(S)" : "CONECTÁ EL CASIO O LOS FADERS USB");
       };
       access.onstatechange = refreshInputs;
@@ -409,47 +409,57 @@ export default function Multiversos860Page() {
   }, []);
 
   useEffect(() => {
-    const input = midiAccessRef.current?.inputs.get(midiInputId);
-    if (!input) return;
-    const onMessage = (event: { data: ArrayLike<number> }) => {
-      const status = event.data[0] || 0;
-      const first = event.data[1] || 0;
-      const second = event.data[2] || 0;
-      const kind = status & 0xf0;
-      if (kind === 0x90 && second > 0) {
-        startNote(first, second / 127);
-        return;
-      }
-      if (kind === 0x80 || (kind === 0x90 && second === 0)) {
-        releaseNote(first);
-        return;
-      }
-      if (kind === 0xb0) {
-        const waitingFor = midiLearnRef.current;
-        if (waitingFor !== null) {
-          setCcMap((current) => {
-            const next = { ...current };
-            Object.keys(next).forEach((key) => {
-              if (next[Number(key)] === first) delete next[Number(key)];
-            });
-            next[waitingFor] = first;
-            ccMapRef.current = next;
-            return next;
-          });
-          midiLearnRef.current = null;
-          setMidiLearnFor(null);
-          setMidiMessage("FADER " + CONTROLS[waitingFor].number + " VINCULADO · CC " + first);
+    const access = midiAccessRef.current;
+    if (!access || midiInputs.length === 0) return;
+    const inputs = Array.from(access.inputs.values());
+    const handlers = inputs.map((input) => {
+      const onMessage = (event: { data: ArrayLike<number> }) => {
+        const status = event.data[0] || 0;
+        const first = event.data[1] || 0;
+        const second = event.data[2] || 0;
+        const kind = status & 0xf0;
+        if (kind === 0x90 && second > 0) {
+          startNote(first, second / 127);
           return;
         }
-        const mappedIndex = Object.keys(ccMapRef.current).find((key) => ccMapRef.current[Number(key)] === first);
-        if (mappedIndex !== undefined) updateControl(Number(mappedIndex), second / 127);
-      }
-    };
-    input.onmidimessage = onMessage;
+        if (kind === 0x80 || (kind === 0x90 && second === 0)) {
+          releaseNote(first);
+          return;
+        }
+        if (kind === 0xb0) {
+          const waitingFor = midiLearnRef.current;
+          if (waitingFor !== null) {
+            setCcMap((current) => {
+              const next = { ...current };
+              Object.keys(next).forEach((key) => {
+                const binding = next[Number(key)];
+                if (binding && binding.inputId === input.id && binding.cc === first) delete next[Number(key)];
+              });
+              next[waitingFor] = { inputId: input.id, cc: first };
+              ccMapRef.current = next;
+              return next;
+            });
+            midiLearnRef.current = null;
+            setMidiLearnFor(null);
+            setMidiMessage("FADER " + CONTROLS[waitingFor].number + " · " + (input.name || "ENTRADA MIDI") + " · CC " + first);
+            return;
+          }
+          const mappedIndex = Object.keys(ccMapRef.current).find((key) => {
+            const binding = ccMapRef.current[Number(key)];
+            return binding?.inputId === input.id && binding.cc === first;
+          });
+          if (mappedIndex !== undefined) updateControl(Number(mappedIndex), second / 127);
+        }
+      };
+      input.onmidimessage = onMessage;
+      return { input, onMessage };
+    });
     return () => {
-      if (input.onmidimessage === onMessage) input.onmidimessage = null;
+      handlers.forEach(({ input, onMessage }) => {
+        if (input.onmidimessage === onMessage) input.onmidimessage = null;
+      });
     };
-  }, [midiInputId, releaseNote, startNote, updateControl]);
+  }, [midiInputs, releaseNote, startNote, updateControl]);
 
   useEffect(() => {
     const keyMap: Record<string, number> = {
@@ -717,7 +727,6 @@ export default function Multiversos860Page() {
     }
   };
 
-  const connectedInput = midiInputs.find((input) => input.id === midiInputId);
 
   return (
     <main className={styles.console}>
@@ -873,7 +882,7 @@ export default function Multiversos860Page() {
             <div className={styles.keyboardHeader}>
               <div>
                 <p className={styles.eyebrow}>ENTRADA EXTERNA</p>
-                <h3>Casio <em>/ MIDI.</em></h3>
+                <h3>Casio + faders <em>/ MIDI.</em></h3>
               </div>
               <button type="button" className={styles.connectButton} onClick={() => void connectMidi()}>
                 CONECTAR MIDI
@@ -881,12 +890,12 @@ export default function Multiversos860Page() {
             </div>
             <p className={styles.midiMessage} aria-live="polite">{midiMessage}</p>
             {midiInputs.length > 0 && (
-              <label className={styles.deviceSelect}>
-                ENTRADA
-                <select value={midiInputId} onChange={(event) => setMidiInputId(event.target.value)}>
-                  {midiInputs.map((input) => <option key={input.id} value={input.id}>{input.name}</option>)}
-                </select>
-              </label>
+              <div className={styles.midiDevices} aria-label="Entradas MIDI conectadas">
+                <span className={styles.midiDevicesLabel}>ENTRADAS ACTIVAS</span>
+                {midiInputs.map((input) => (
+                  <span className={styles.midiDevice} key={input.id}>{input.name}</span>
+                ))}
+              </div>
             )}
             <div className={styles.keybed} aria-label="Teclado virtual de una octava">
               {PIANO_KEYS.map((key) => (
@@ -911,14 +920,14 @@ export default function Multiversos860Page() {
                 </button>
               ))}
             </div>
-            <p className={styles.keyboardHint}>Casio por USB MIDI, o probá con A W S E D F T G Y H U J K.</p>
+            <p className={styles.keyboardHint}>Casio y faders USB MIDI, o probá con A W S E D F T G Y H U J K.</p>
           </div>
         </div>
       </section>
 
       <footer className={styles.footer}>
         <span>&#9670; UNDER TANGO CLUB <i>/</i> 860 MULTIVERSOS</span>
-        <span>{connectedInput ? "ENTRADA ACTIVA · " + connectedInput.name : "PROTOTIPO SONORO · AUDIO Y VISUALES GENERATIVOS"}</span>
+        <span>{midiInputs.length > 0 ? "MIDI ACTIVO · " + midiInputs.length + " DISPOSITIVO(S)" : "PROTOTIPO SONORO · AUDIO Y VISUALES GENERATIVOS"}</span>
       </footer>
     </main>
   );

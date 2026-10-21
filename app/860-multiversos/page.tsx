@@ -1035,9 +1035,9 @@ export default function Multiversos860Page() {
             </div>
             <p className={styles.recordStatus} aria-live="polite">
               {isRecording
-                ? "REC · " + recordedNotes.filter((note) => note !== null).length + " NOTA(S) · TOCÁ EN LOS 9 PASOS"
+                ? "REC · " + recordedNotes.filter((note) => note !== null).length + (recordedNotes.filter((note) => note !== null).length === 1 ? " NOTA" : " NOTAS") + " · TOCÁ EN LOS 9 PASOS"
                 : hasRecording
-                  ? "BUCLE GRABADO · " + recordedNotes.filter((note) => note !== null).length + " NOTA(S) · SE REPITE AL INICIAR"
+                  ? "BUCLE GRABADO · " + recordedNotes.filter((note) => note !== null).length + (recordedNotes.filter((note) => note !== null).length === 1 ? " NOTA" : " NOTAS") + " · " + (isSequencing ? "EN LOOP" : "INICIÁ PARA REPRODUCIR")
                   : "GRABAR CAPTURA UNA VUELTA DE 9 PASOS Y LA REPITE"}
             </p>
             <div className={styles.tempoRow}>

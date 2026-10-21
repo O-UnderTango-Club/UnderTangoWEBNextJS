@@ -1018,7 +1018,7 @@ export default function Multiversos860Page() {
             </div>
             <div className={styles.steps} aria-label="Secuenciador de nueve pasos">
               {steps.map((enabled, index) => {
-                const note = hasRecording ? recordedNotes[index] : enabled ? 48 + STEP_NOTES[index] : null;
+                const note = hasRecording || isRecording ? recordedNotes[index] : enabled ? 48 + STEP_NOTES[index] : null;
                 return (
                   <button
                     type="button"

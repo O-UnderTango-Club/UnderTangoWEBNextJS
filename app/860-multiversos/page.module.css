@@ -581,6 +581,21 @@
   gap: 16px;
 }
 
+.sequenceActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.recordStatus {
+  min-height: 12px;
+  margin: 8px 0 0;
+  color: #8b8791;
+  font: 7px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+}
+
 .sequenceHeader h3,
 .keyboardHeader h3 {
   margin: 3px 0 0;
@@ -630,6 +645,11 @@
 
 .step span {
   font: 7px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.stepNote {
+  color: #a6a1ac;
+  font: 6px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .step i {
@@ -981,6 +1001,17 @@
   .sequencePanel,
   .keyboardPanel {
     padding: 15px 12px;
+  }
+
+  .sequenceHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sequenceActions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .steps {

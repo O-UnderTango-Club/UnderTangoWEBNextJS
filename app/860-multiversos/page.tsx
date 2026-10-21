@@ -802,7 +802,7 @@ export default function Multiversos860Page() {
                     onChange={(event) => updateControl(index, Number(event.target.value))}
                     aria-label={"Dimensi�n " + control.number + ": " + control.name}
                   />
-                  <span className={styles.faderTicks}>?<br />?<br />?<br />?<br />?</span>
+                  <span className={styles.faderTicks} aria-hidden="true" />
                 </label>
                 <div className={styles.channelReadout}>{readoutFor(index, values[index])}</div>
                 <div className={styles.channelFooter}>

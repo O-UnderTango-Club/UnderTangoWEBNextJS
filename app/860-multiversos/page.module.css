@@ -503,8 +503,15 @@
   position: absolute;
   top: 14px;
   left: calc(50% + 18px);
-  color: rgba(219, 203, 207, 0.32);
-  font: 8px/18px ui-monospace, SFMono-Regular, Menlo, monospace;
+  width: 8px;
+  height: 96px;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(219, 203, 207, 0.32) 0,
+    rgba(219, 203, 207, 0.32) 1px,
+    transparent 1px,
+    transparent 19px
+  );
   pointer-events: none;
 }
 

@@ -53,7 +53,7 @@ console.log('Project/action rendering checks passed: context, inherited links, e
 let availabilityMode="now", quickEvidence, stateIndex=0;
 const { QuickForm } = load('../app/panel-de-control/Panel.tsx', {
   '../../src/lib/panel-model':model,'./Dependencies':dependencies,'./FrontProjects':frontProjects,'./panel.module.css':{default:{}},
-  react:{...React,useState:initial=>[stateIndex++===4&&quickEvidence!==undefined?quickEvidence:initial==="now"?availabilityMode:initial,()=>{}]}
+  react:{...React,useRef:()=>({current:null}),useEffect(){},useState:initial=>[stateIndex++===4&&quickEvidence!==undefined?quickEvidence:initial==="now"?availabilityMode:initial,()=>{}]}
 });
 const scheduledTask={id:'scheduled',name:'Recurrente para mañana',baseStage:'recurring',stage:'scheduled',front:'Primario',rank:1,activateAt:'2099-01-01T03:00:00Z',dependencies:[],eventIds:[]};
 const quickEditor={kind:'task',id:'scheduled',mode:'status',initial:{stage:'recurring',front:'Primario',rank:1,reason:'',dependencies:[],events:[]}};
@@ -92,15 +92,16 @@ function findElement(node,predicate){
   const empty=QuickForm(props);
   assert.ok(findElement(empty,n=>n.props?.id==='quick-evidence'),'Closure result must be shown');
   assert.equal(findElement(empty,n=>n.type===dependencies.default),undefined,'Closing must not show the start-condition selector');
-  assert.ok(findElement(empty,n=>n.props?.id==='quick-save-hint'),'Disabled save must explain the missing result');
-  assert.equal(findElement(empty,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,true);
+  assert.equal(findElement(empty,n=>n.props?.id==='quick-evidence').props.required,stage==='cancelled');
+  assert.equal(findElement(empty,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,stage==='cancelled');
   await findElement(empty,n=>n.type==='form').props.onSubmit({preventDefault(){}});
-  assert.equal(closed,undefined,'Empty result must not submit');
+  if(stage==='done')assert.deepEqual(closed,{stage,dependencies:['previous'],events:['confirmed']},'Finalizada saves without result and preserves links');
+  else assert.equal(closed,undefined,'Discard still requires a reason');
   quickEvidence='Trabajo verificado';stateIndex=0;
   const complete=QuickForm(props);
   assert.equal(findElement(complete,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,false);
   await findElement(complete,n=>n.type==='form').props.onSubmit({preventDefault(){}});
   assert.deepEqual(closed,{stage,dependencies:['previous'],events:['confirmed'],evidence:'Trabajo verificado'},'Closure must preserve linked history');
  }
- console.log('Closure form passed: visible result, explained validation, save enabled with evidence, preserved dependencies');
+ console.log('Closure form passed: completion without result, optional evidence, discard reason, preserved dependencies');
 })().catch(error=>{console.error(error);process.exitCode=1;});

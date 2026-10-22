@@ -248,8 +248,8 @@ try {
     assert.equal(result.tasks.filter(t=>t.id==='t').length,1);
     assert.equal(result.tasks.find(t=>t.id==='t').rank,before);
   });
-  await check('finalizar libera posición; reabrir agrega al final sin colisión',async()=>{
-    await server.mutate(await intent('task','v',{stage:'done',evidence:'Verificado'}),'test-actor');
+  await check('finalizar sin resultado libera posición; reabrir agrega al final sin colisión',async()=>{
+    await server.mutate(await intent('task','v',{stage:'done'}),'test-actor');
     let result=server.responseBoard(await server.snapshot());
     assert.deepEqual(result.tasks.filter(t=>t.front==='Primario'&&!['done','cancelled'].includes(t.stage)).map(t=>t.rank),[1,2]);
     await server.mutate(await intent('task','v',{stage:'ready'}),'test-actor');

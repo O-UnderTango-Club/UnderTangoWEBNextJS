@@ -215,7 +215,7 @@ async function performMutation(input: any, actor: string) {
     const validationData=rankChanges.length?{...data,tasks:data.tasks.map(t=>{const patch=rankChanges.find(p=>p.id===t.id);return patch?{...t,fields:{...t.fields,...patch.fields}}:t;})}:data;
     validateTask(candidate,validationData,target);
     const evidence="evidence" in change?text(change.evidence,1500):"";
-    if((stage==="done"||stage==="cancelled")&&!evidence)throw new PanelError(stage==="done"?"Registrá brevemente el resultado para finalizar.":"Registrá por qué se descarta.");
+    if(stage==="cancelled"&&!evidence)throw new PanelError("Registrá por qué se descarta.");
     const comment="comment" in change?text(change.comment,10000):"";
     if(evidence||comment){
       const original=current?(operational?current:await airtable(table,`/${current.id}?returnFieldsByFieldId=true`)):undefined;

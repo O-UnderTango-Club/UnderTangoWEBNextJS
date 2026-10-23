@@ -25,6 +25,12 @@ export default function MusicPage() {
             <p style={{ color: "#bdb8ae", fontSize: 20 }}>Cheryl Lynn</p>
             <a href="https://www.youtube.com/watch?v=fI569nw0YUQ" target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", background: "#d1a844", color: "#111214", padding: "14px 20px", borderRadius: 8, fontWeight: 700, marginTop: 12 }}>Escuchar en YouTube ↗</a>
           </article>
+          <article style={{ border: "1px solid #514735", borderRadius: 16, padding: "clamp(20px, 4vw, 36px)", marginTop: 24 }}>
+            <p style={{ color: "#d1a844", marginTop: 0 }}>02 · Para preparar</p>
+            <h3 style={{ fontSize: 28, margin: "12px 0" }}>街のドルフィン (Dolphin in Town)</h3>
+            <p style={{ color: "#bdb8ae", fontSize: 20 }}>Kingo Hamada</p>
+            <a href="https://www.youtube.com/watch?v=x2aA6GEEABA" target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", background: "#d1a844", color: "#111214", padding: "14px 20px", borderRadius: 8, fontWeight: 700, marginTop: 12 }}>Escuchar en YouTube ↗</a>
+          </article>
         </section>
       </div>
     </main>

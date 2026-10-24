@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "86 · Música | UnderTango Club",
-  description: "Temas para sacar con la banda de UnderTango.",
+  description: "Conciertos, ensayos, repertorio y preparación musical de UnderTango.",
   alternates: { canonical: "/86" },
 };
 
@@ -15,7 +15,8 @@ export default function MusicPage() {
         <header style={{ margin: "48px 0" }}>
           <p style={{ color: "#d1a844", letterSpacing: ".14em" }}>DEPARTAMENTO 86</p>
           <h1 style={{ fontSize: "clamp(36px, 7vw, 72px)", margin: "12px 0" }}>Música</h1>
-          <p style={{ color: "#bdb8ae", lineHeight: 1.7 }}>Ensayos, repertorio y preparación musical de UnderTango.</p>
+          <p style={{ color: "#bdb8ae", lineHeight: 1.7 }}>Conciertos, ensayos, repertorio y preparación musical de UnderTango.</p>
+          <Link href="/80/803" style={{ display: "inline-block", maxWidth: "100%", boxSizing: "border-box", background: "#d1a844", color: "#111214", padding: "16px 22px", borderRadius: 10, fontWeight: 700, lineHeight: 1.5, marginTop: 24 }}>Soy músico de UnderTango y quiero pertenecer a la red →</Link>
         </header>
         <section aria-labelledby="temas-banda">
           <h2 id="temas-banda" style={{ fontSize: "clamp(24px, 4vw, 36px)" }}>Temas para sacar con la banda</h2>

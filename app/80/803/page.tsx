@@ -34,7 +34,9 @@ export default function RedGuidePage() {
           <h1>{title}</h1>
           <p className={styles.lead}>Más fácil encontrarnos. Más tiempo para hacer música.</p>
           <p>Estamos desarrollando una app móvil para resolver las necesidades de cada departamento de UnderTango. En Música, empezamos por algo fundamental: <strong>coordinar los ensayos entre todos.</strong></p>
+          <p className={styles.note}><strong>Antes de descargar la versión Android:</strong> pasale a Pablo el correo de la cuenta de Google que usás en Google Play y esperá a que te confirme que ya te agregó como participante de la prueba. El enlace de descarga funciona con esa cuenta habilitada.</p>
           <a className={styles.primary} href={downloadUrl}>Descargar app de prueba para Android ↗</a>
+          <p>¿Querés empezar ahora? <a className={styles.textLink} href={appUrl}>Usar la red desde el navegador ↗</a>. Ingresá con Google y elegí 86 · Música; para esta opción no necesitás estar en la lista de prueba de Google Play.</p>
           <p className={styles.caption}>Abrí este enlace desde tu celular. La app está en versión de prueba y seguimos mejorándola.</p>
         </header>
 
@@ -44,7 +46,7 @@ export default function RedGuidePage() {
           <ol className={styles.steps}>
             <li>
               <span className={styles.number} aria-hidden="true">1</span>
-              <div><h3>Descargá la aplicación</h3><p>Desde tu celular Android, abrí el enlace de descarga. Si Google Play te pide elegir una cuenta, usá la cuenta de Google con la que vas a ingresar a la red. Si te lo pide, elegí participar de la prueba. Después tocá “Descargar app de prueba” (o “Download test app”) e instalala desde Google Play.</p><a className={styles.textLink} href={downloadUrl}>Abrir el enlace de descarga ↗</a></div>
+              <div><h3>Pedí acceso y descargá la aplicación</h3><p>Primero pasale a Pablo tu correo de Google Play. Cuando te confirme que tu cuenta está habilitada para la prueba, abrí el enlace de descarga desde tu celular Android. Si Google Play te pide elegir una cuenta, usá la cuenta de Google con la que vas a ingresar a la red. Si te lo pide, elegí participar de la prueba. Después tocá “Descargar app de prueba” (o “Download test app”) e instalala desde Google Play.</p><a className={styles.textLink} href={downloadUrl}>Abrir el enlace de descarga ↗</a></div>
             </li>
             <li>
               <span className={styles.number} aria-hidden="true">2</span>

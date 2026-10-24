@@ -74,6 +74,14 @@ export default function StartupUnderTango() {
         </div>
       </section>
 
+      <section id="aspectos-legales-elitros" className={styles.section} aria-labelledby="legales-title">
+        <div><p className={styles.eyebrow}>DOCUMENTOS DE TRABAJO · 80ø7</p><h2 id="legales-title">Aspectos legales<br />del Programa ELITROS.</h2></div>
+        <div className={styles.copy}>
+          <p>Notas de reunión sobre la estructura jurídica, el modelo de negocio, los Términos y Condiciones, la marca y la tokenización de UnderTango.</p>
+          <p><a href="https://docs.google.com/document/d/126lX6PdZLz6yhwPoKXWDJ4W4-ys4oCvraHYhIGuSq7c/edit"><strong>Abrir notas de reunión en Google Docs <span aria-hidden="true">↗</span></strong></a></p>
+        </div>
+      </section>
+
       <section id="herramientas" className={styles.tools} aria-labelledby="tools-title">
         <div className={styles.toolsIntro}>
           <p className={styles.eyebrow}>04 / LAS HERRAMIENTAS CON LAS QUE TRABAJAMOS</p>

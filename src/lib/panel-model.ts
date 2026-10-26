@@ -138,8 +138,9 @@ export function board(data: Snapshot, now=Date.now()) {
     group.projectIds=unique(members.flatMap(t=>t.projectIds));
     const next=members.find(t=>["ready","recurring"].includes(t.stage)&&!t.issues.length);
     group.nextId=next?.id||"";
+    const allResolved=members.length>0&&members.every(t=>["done","cancelled"].includes(t.stage));
     if(!["done","cancelled","scheduled"].includes(group.stage)) {
-      group.stage=next?"ready":members.some(t=>t.stage==="doing")?"doing":members.some(t=>t.stage==="scheduled")?"scheduled":"waiting";
+      group.stage=next?"ready":members.some(t=>t.stage==="doing")?"doing":members.some(t=>t.stage==="scheduled")?"scheduled":allResolved?"ready":"waiting";
       if(group.stage==="scheduled") group.nextAvailableAt=members.filter(t=>t.stage==="scheduled"&&t.nextAvailableAt).map(t=>t.nextAvailableAt).sort()[0]||"";
     }
     if(group.stage==="scheduled") for(const member of members) {

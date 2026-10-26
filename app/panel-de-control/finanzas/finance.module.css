@@ -5,3 +5,23 @@
 @media(max-width:900px){.ledger{grid-template-columns:1fr}.yearBar{display:block}.yearBar p{margin-top:12px}}
 
 .archived{margin:28px 0;border:1px solid #d5dcd3;border-radius:9px;padding:12px 18px;background:#fffefb}.archivedRow{display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #e4e7e1;padding:10px 0}.archivedRow span{overflow-wrap:anywhere}.deleteConfirm{background:#fff3ee;border:1px solid #dfb3a3;border-radius:9px;padding:16px;margin-top:20px}.finance .danger{background:#9a3328;color:#fff;border-color:#9a3328}.finance .dangerOutline{color:#9a3328;border-color:#c67c72;margin-right:auto}@media(max-width:760px){.archivedRow{align-items:flex-start;flex-direction:column}}
+
+.monthly{margin:24px 0 30px;padding:22px;background:#e8eee8;border:1px solid #c6d7c9;border-radius:12px}
+.monthlyHeader{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:16px}
+.monthlyHeader h2{margin:0}
+.monthlyHeader p{max-width:680px;margin:0}
+.monthlyGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.monthlyCard{min-width:0;background:#fffefb;border:1px solid #d1dbd2;border-radius:9px;padding:14px}
+.monthlyCard h3{margin:0 0 8px}
+.chartScroll{overflow-x:auto}
+.monthlySvg{display:block;width:100%;height:auto;min-width:500px;overflow:visible}
+.chartGridLine{stroke:#dce3dc;stroke-width:1}
+.chartAxisLabel,.chartMonthLabel{fill:#60716b;font-size:11px}
+.chartIncomeBar{fill:#28735c}
+.chartExpenseBar{fill:#bf6c51}
+.chartLegend{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0 0;font-size:13px;color:#60716b}
+.chartLegend span{display:inline-flex;align-items:center;gap:7px}
+.chartLegend i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.incomeSwatch{background:#28735c}
+.expenseSwatch{background:#bf6c51}
+@media(max-width:760px){.monthly{padding:18px 14px}.monthlyHeader{display:block}.monthlyHeader p{margin-top:6px}.monthlyGrid{grid-template-columns:1fr}}

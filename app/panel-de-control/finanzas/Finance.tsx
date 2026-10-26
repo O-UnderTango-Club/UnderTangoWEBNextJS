@@ -48,6 +48,56 @@ function cellLabel(value:FinanceCell, table:FinanceTable, fieldId:string, data:F
   return value === null || value === "" ? "No informado" : value;
 }
 
+type MonthlySeries = {income:bigint;expense:bigint};
+const MONTHS = [
+  {short:"ENE",long:"Enero"},{short:"FEB",long:"Febrero"},{short:"MAR",long:"Marzo"},
+  {short:"ABR",long:"Abril"},{short:"MAY",long:"Mayo"},{short:"JUN",long:"Junio"},
+  {short:"JUL",long:"Julio"},{short:"AGO",long:"Agosto"},{short:"SEP",long:"Septiembre"},
+  {short:"OCT",long:"Octubre"},{short:"NOV",long:"Noviembre"},{short:"DIC",long:"Diciembre"},
+] as const;
+
+function MonthlyChart({currency,year,months,display}:{currency:string;year:number;months:MonthlySeries[];display:(value:bigint,currency:string)=>string}) {
+  const plotLeft=72,plotRight=708,plotTop=16,plotHeight=164,plotWidth=plotRight-plotLeft;
+  const max=months.reduce((highest,month)=>{
+    const income=month.income>highest?month.income:highest;
+    return month.expense>income?month.expense:income;
+  },BigInt(0));
+  const scale=(value:bigint) => max>BigInt(0) && value>BigInt(0) ? Number(value*BigInt(10000)/max)/10000 : 0;
+  const barHeight=(value:bigint) => value>BigInt(0) ? Math.max(1,plotHeight*scale(value)) : 0;
+  const ticks=[{label:max,value:max,y:plotTop},{label:max/BigInt(2),value:max/BigInt(2),y:plotTop+plotHeight/2},{label:BigInt(0),value:BigInt(0),y:plotTop+plotHeight}];
+  const compact=(value:bigint)=>new Intl.NumberFormat("es-AR",{notation:"compact",maximumFractionDigits:1}).format(Number(centsDecimal(value)));
+  return <article className={css.monthlyCard}>
+    <h3>{currency}</h3>
+    <div className={css.chartScroll}>
+      <svg className={css.monthlySvg} viewBox="0 0 720 218" role="img" aria-label={`Ingresos y egresos mensuales en ${currency} durante ${year}`}>
+        <title>Movimientos mensuales en {currency} · {year}</title>
+        <desc>Barras verdes: ingresos. Barras terracota: egresos. El eje vertical está expresado en {currency}.</desc>
+        {ticks.map((tick,index)=><g key={index}>
+          <line className={css.chartGridLine} x1={plotLeft} x2={plotRight} y1={tick.y} y2={tick.y}/>
+          <text className={css.chartAxisLabel} x={plotLeft-8} y={tick.y+4} textAnchor="end">{compact(tick.value)}</text>
+        </g>)}
+        {months.map((month,index)=>{
+          const center=plotLeft+(index+.5)*(plotWidth/12);
+          const incomeHeight=barHeight(month.income),expenseHeight=barHeight(month.expense);
+          return <g key={MONTHS[index].short}>
+            <rect className={css.chartIncomeBar} x={center-14} y={plotTop+plotHeight-incomeHeight} width="12" height={incomeHeight} rx="2">
+              <title>{MONTHS[index].long}: ingresos {display(month.income,currency)}</title>
+            </rect>
+            <rect className={css.chartExpenseBar} x={center+2} y={plotTop+plotHeight-expenseHeight} width="12" height={expenseHeight} rx="2">
+              <title>{MONTHS[index].long}: egresos {display(month.expense,currency)}</title>
+            </rect>
+            <text className={css.chartMonthLabel} x={center} y={plotTop+plotHeight+23} textAnchor="middle">{MONTHS[index].short}</text>
+          </g>;
+        })}
+      </svg>
+    </div>
+    <div className={css.chartLegend}><span><i className={css.incomeSwatch}/>Ingresos</span><span><i className={css.expenseSwatch}/>Egresos</span></div>
+    <ul className={css.srOnly} aria-label={`Detalle mensual de ${currency} en ${year}`}>
+      {months.map((month,index)=><li key={MONTHS[index].long}>{MONTHS[index].long}: ingresos {display(month.income,currency)}, egresos {display(month.expense,currency)}</li>)}
+    </ul>
+  </article>;
+}
+
 export default function Finance() {
   const [data,setData] = useState<Data>();
   const [loading,setLoading] = useState(true), [busy,setBusy] = useState(false);
@@ -152,13 +202,22 @@ export default function Finance() {
   const movements = data ? data.movements.filter(r => !archivedIds.has(r.id) && (financeText(r,"movements","date") || "").startsWith(String(year)))
     .sort((a,b) => (financeText(b,"movements","date") || "").localeCompare(financeText(a,"movements","date") || "") || b.id.localeCompare(a.id)) : [];
   const totals = new Map<string,{income:bigint;expense:bigint}>();
+  const monthlyTotals = new Map<string,MonthlySeries[]>();
   for (const row of movements) {
     if (financeText(row,"movements","status") !== "Confirmado") continue;
     const amount = financeText(row,"movements","amount"), currency = financeText(row,"movements","currency"), kind = financeText(row,"movements","type");
     if (!amount || !currency || !["Ingreso","Egreso"].includes(kind || "")) continue;
+    const cents = decimalCents(amount);
     const group = totals.get(currency) || {income:BigInt(0),expense:BigInt(0)};
-    if (kind === "Ingreso") group.income += decimalCents(amount); else group.expense += decimalCents(amount);
+    if (kind === "Ingreso") group.income += cents; else group.expense += cents;
     totals.set(currency,group);
+    const date = financeText(row,"movements","date") || "";
+    const monthIndex = Number(date.slice(5,7)) - 1;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && monthIndex >= 0 && monthIndex < 12) {
+      const series = monthlyTotals.get(currency) || Array.from({length:12},() => ({income:BigInt(0),expense:BigInt(0)}));
+      if (kind === "Ingreso") series[monthIndex].income += cents; else series[monthIndex].expense += cents;
+      monthlyTotals.set(currency,series);
+    }
   }
   const display = (value:bigint,currency:string) => formatFinanceAmount(centsDecimal(value),currency);
   const column = (kind:"Ingreso"|"Egreso") => {
@@ -190,6 +249,11 @@ export default function Finance() {
       {archivePending ? <section className={css.pending}><h2>Eliminación o restauración sin confirmación</h2><p>Reintentá el mismo envío para confirmar su resultado sin duplicar acciones.</p><button type="button" className={css.primary} disabled={busy} onClick={() => void changeArchive(archivePending).catch(()=>{})}>Reintentar el mismo envío</button></section> : null}
       <div className={css.yearBar}><label>Año <select value={year} onChange={e => {setYear(Number(e.target.value));setShown(8);}}>{[...new Set([year,...years])].sort((a,b)=>b-a).map(y => <option key={y} value={y}>{y}</option>)}</select></label><p className={css.small}>Solo los movimientos confirmados, con fecha e importe, entran en el resultado. Cada moneda se calcula por separado.</p></div>
       <section className={css.result} aria-label="Resultado anual"><h2>Resultado {year}</h2>{totals.size ? <div className={css.resultGrid}>{[...totals.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([currency,t]) => <div className={css.resultCard} key={currency}><h3>{currency}</h3><dl><div><dt>Ingresos</dt><dd>{display(t.income,currency)}</dd></div><div><dt>Egresos</dt><dd>{display(t.expense,currency)}</dd></div><div className={css.net}><dt>Resultado</dt><dd>{display(t.income-t.expense,currency)}</dd></div></dl></div>)}</div> : <p>No hay movimientos confirmados con importe para {year}.</p>}<p className={css.small}>Resultado = ingresos menos egresos registrados. No representa el efectivo disponible ni incluye un saldo inicial. El histórico contiene conversiones de moneda y un posible egreso duplicado de vestuario por ARS 100.000; revisalo antes de usar este resultado como balance.</p></section>
+            <section className={css.monthly} aria-labelledby="monthly-title">
+        <div className={css.monthlyHeader}><h2 id="monthly-title">Movimientos por mes</h2><p className={css.small}>Importes confirmados del año seleccionado. Cada moneda mantiene su propia escala.</p></div>
+        {monthlyTotals.size ? <div className={css.monthlyGrid}>{[...monthlyTotals.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([currency,months])=><MonthlyChart key={currency} currency={currency} year={year} months={months} display={display}/>)}</div>
+          : <p className={css.empty}>No hay movimientos mensuales confirmados con importe para {year}.</p>}
+      </section>
       <div className={css.ledger}>{column("Ingreso")}{column("Egreso")}</div>
       <details className={css.archived}><summary>Registros eliminados ({archivedIds.size})</summary>
         <p className={css.small}>Se conservan en Supabase y en la auditoría. No entran en las columnas ni en el resultado.</p>

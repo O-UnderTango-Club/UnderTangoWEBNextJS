@@ -11,6 +11,8 @@ declare
 begin
   if p_group_id is null then return false; end if;
 
+  perform 1 from operativo.migration_control where singleton for update;
+
   select * into group_row
   from operativo.follow_ups g
   where g.id = p_group_id

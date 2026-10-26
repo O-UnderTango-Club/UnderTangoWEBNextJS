@@ -2,11 +2,11 @@
 
 ## Regla vigente
 
-Supabase operativo es la fuente canónica. Airtable queda histórico, sin fallback ante errores. Cada acción abierta tiene frente y posición propios. Los proyectos siguen vinculados como contexto, pero no determinan el orden. Una acción compartida aparece una sola vez.
+Supabase operativo es la fuente canónica. Airtable queda histórico, sin fallback ante errores. Cada acción conserva una posición general única dentro de su frente. Los proyectos siguen vinculados como contexto, pero no determinan el orden. Una acción compartida aparece una sola vez.
 
-`1.4` significa acción en el frente Primario, posición 4: no es un decimal ni el puesto de un proyecto. La posición es única entre acciones abiertas del mismo frente. Las acciones del mismo proyecto pueden estar intercaladas con otras.
+En la vista Frentes, `2.1` significa el primer puesto visible hoy en Secundario; `2.2`, el segundo. No son las posiciones generales 1 y 2. Para cambiar el orden general, se usa «Ver ranking» o el editor de posición. Al cerrar una acción, el guardado compacta el ranking de ese frente y preserva el orden relativo.
 
-Frentes toma las primeras tres acciones ejecutables de cada frente. Esperas, acciones en curso y registros por revisar mantienen su posición pero no ocupan esos tres lugares. Las dependencias y estados conservan las reglas existentes. La recurrencia no crea ejecuciones automáticas.
+Frentes toma hasta las primeras tres acciones ejecutables de cada frente. Las tarjetas muestran puestos visibles consecutivos. Las esperas, acciones en curso y registros por revisar no ocupan esos lugares. Las acciones En espera aparecen debajo de los frentes, ordenadas como `E1`, `E2`, etc., sin mostrar un frente activo. Supabase conserva su frente y posición de origen como referencia interna para reactivarlas en el mismo orden. Las dependencias y estados conservan las reglas existentes. La recurrencia no crea ejecuciones automáticas.
 
 ## Datos y guardado
 

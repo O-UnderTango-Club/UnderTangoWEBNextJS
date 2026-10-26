@@ -49,3 +49,7 @@ El botón principal es **Crear proyecto**. Guarda nombre, propósito opcional, e
 **Agregar acción** permite vincular proyectos existentes o crear y seleccionar uno sin cerrar ni perder el borrador. La creación del proyecto se confirma por separado; la acción y sus vínculos se guardan al enviar su formulario. Un proyecto sin acciones aparece para definir su próximo paso, sin ocupar cupos ni recibir ranking.
 
 Los nombres duplicados se rechazan también si el proyecto está cerrado, ignorando mayúsculas y espacios repetidos. Se conservan la revisión global, los comprobantes idempotentes y la auditoría. La migración `20260911032054_enable_panel_project_creation` habilita sólo los campos existentes necesarios, sin modificar registros ni ranking.
+
+## Grupos con todos los pasos resueltos
+
+Cuando el último paso abierto de un grupo queda finalizado o descartado y el grupo sigue marcado como acción inmediata, el grupo deja de estar en espera y se promociona automáticamente al frente Primario en el primer puesto. Las promociones múltiples se ordenan según la cola de espera anterior. El ranking de origen y el movimiento quedan registrados en la auditoría de Supabase. Si el grupo recibe un nuevo paso abierto, su disponibilidad vuelve a depender del estado y los bloqueos de ese paso.

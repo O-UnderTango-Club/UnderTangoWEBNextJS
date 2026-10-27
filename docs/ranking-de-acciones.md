@@ -50,6 +50,8 @@ El botón principal es **Crear proyecto**. Guarda nombre, propósito opcional, e
 
 Los nombres duplicados se rechazan también si el proyecto está cerrado, ignorando mayúsculas y espacios repetidos. Se conservan la revisión global, los comprobantes idempotentes y la auditoría. La migración `20260911032054_enable_panel_project_creation` habilita sólo los campos existentes necesarios, sin modificar registros ni ranking.
 
-## Grupos con todos los pasos resueltos
+## Estado y cierre de los grupos
 
-Cuando el último paso abierto de un grupo queda finalizado o descartado y el grupo sigue marcado como acción inmediata, el grupo deja de estar en espera y se promociona automáticamente al frente Primario en el primer puesto. Las promociones múltiples se ordenan según la cola de espera anterior. El ranking de origen y el movimiento quedan registrados en la auditoría de Supabase. Si el grupo recibe un nuevo paso abierto, su disponibilidad vuelve a depender del estado y los bloqueos de ese paso.
+En la tarjeta, **Editar grupo** abre el selector de estado directamente. **Editar detalles** conserva el formulario para nombre, días y composición. No se puede cerrar un grupo que todavía contiene pasos abiertos; primero deben finalizarse, descartarse o retirarse.
+
+Cuando todos los pasos de un grupo están **finalizados**, Supabase lo finaliza automáticamente y compacta su frente sin cambiar el orden relativo de las demás acciones. El cambio queda auditado. Un paso descartado no se considera realizado y no provoca el cierre automático; el usuario puede decidir el estado del grupo. El proceso inicial aplica la misma regla a los grupos existentes. La reapertura manual permite incorporar pasos nuevos.

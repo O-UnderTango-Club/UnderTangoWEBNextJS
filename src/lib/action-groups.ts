@@ -28,7 +28,7 @@ export function planGroup(data: Snapshot, id: string | undefined, change: GroupC
   const patches: GroupPatch[] = [{ table: 'follow_ups', id: id || null, create: !id, fields: {
     ...(change.weekdays===undefined?{}:{[F.tasks.weekdays]:change.weekdays}),
     [F.tasks.name]: name, [F.tasks.kind]: 'group', [F.tasks.front]: change.front,
-    [F.tasks.status]: 'Pendiente', [F.tasks.gate]: 'Acción inmediata',
+    ...(!current ? { [F.tasks.status]: 'Pendiente', [F.tasks.gate]: 'Acción inmediata' } : {}),
   } }];
   const add = (memberId: string, fields: Record<string, unknown>) => {
     const found = patches.find(p => p.id === memberId && !p.create);

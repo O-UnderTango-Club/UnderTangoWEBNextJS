@@ -140,8 +140,8 @@ export function board(data: Snapshot, now=Date.now()) {
     group.nextId=next?.id||"";
     const allResolved=members.length>0&&members.every(t=>["done","cancelled"].includes(t.stage));
     const parentActionable=allResolved&&!group.issues.length&&!group.blockers.length&&["ready","recurring","doing"].includes(group.stage);
-    if(!parentActionable&&!["done","cancelled","scheduled"].includes(group.stage)) {
-      group.stage=next?"ready":members.some(t=>t.stage==="doing")?"doing":members.some(t=>t.stage==="scheduled")?"scheduled":"waiting";
+    if(!parentActionable&&!["done","cancelled","scheduled","waiting","doing"].includes(group.stage)) {
+      group.stage=next?(group.baseStage==="recurring"?"recurring":"ready"):members.some(t=>t.stage==="doing")?"doing":members.some(t=>t.stage==="scheduled")?"scheduled":"waiting";
       if(group.stage==="scheduled") group.nextAvailableAt=members.filter(t=>t.stage==="scheduled"&&t.nextAvailableAt).map(t=>t.nextAvailableAt).sort()[0]||"";
     }
     if(group.stage==="scheduled") for(const member of members) {

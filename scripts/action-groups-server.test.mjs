@@ -13,3 +13,9 @@ await server.mutate(await intent('task','a',{stage:'done',evidence:'Completada e
 await server.mutate(await intent('group',created.id,{name:'Grupo',members:['c'],front:'Secundario',rank:1}),'test');assert.equal(db.tasks.find(t=>t.id==='a').fields[F.tasks.front],undefined);
 await server.mutate(await intent('task',created.id,{doneToday:true}),'test');assert.equal(server.responseBoard(await server.snapshot()).tasks.find(t=>t.id==='c').stage,'scheduled');
 console.log('OK servidor: crear/reintentar, proteger miembro, mover grupo, completar paso, retirar finalizada y descansar grupo');
+await assert.rejects(server.mutate(await intent('task',created.id,{stage:'done'}),'test'),/Primero resolvé o retirá/);
+assert.equal(db.tasks.find(t=>t.id===created.id).fields[F.tasks.status],'Pendiente');
+await server.mutate(await intent('task','c',{stage:'done'}),'test');
+await server.mutate(await intent('task',created.id,{stage:'done'}),'test');
+assert.equal(db.tasks.find(t=>t.id===created.id).fields[F.tasks.status],'Hecho');
+console.log('OK estado directo: no cierra con pasos abiertos; permite finalizar sin comentario al resolverlos');

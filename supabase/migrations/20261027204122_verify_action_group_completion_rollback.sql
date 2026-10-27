@@ -1,0 +1,2 @@
+-- Remote migration history records a verification run that ended in ROLLBACK.
+-- It made no persistent schema or data changes. This marker keeps the history aligned.

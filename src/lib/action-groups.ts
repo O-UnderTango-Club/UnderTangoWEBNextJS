@@ -22,13 +22,14 @@ export function planGroup(data: Snapshot, id: string | undefined, change: GroupC
     return member;
   });
   if(change.weekdays!==undefined&&!validWeekdays(change.weekdays))throw new Error("Elegí al menos un día de la semana.");
+  const allCompleted = !!current && members.every(member => member.fields[F.tasks.status] === 'Hecho');
   const groupId = id || NEW_GROUP;
   const previous = data.tasks.filter(t => t.fields[F.tasks.group] === id && !!id);
   const removed = previous.filter(t => !change.members.includes(t.id));
   const patches: GroupPatch[] = [{ table: 'follow_ups', id: id || null, create: !id, fields: {
     ...(change.weekdays===undefined?{}:{[F.tasks.weekdays]:change.weekdays}),
     [F.tasks.name]: name, [F.tasks.kind]: 'group', [F.tasks.front]: change.front,
-    [F.tasks.status]: 'Pendiente', [F.tasks.gate]: 'Acción inmediata',
+    ...(!current ? { [F.tasks.status]: 'Pendiente', [F.tasks.gate]: 'Acción inmediata' } : allCompleted ? { [F.tasks.status]: 'Hecho', [F.tasks.gate]: 'Terminada' } : {}),
   } }];
   const add = (memberId: string, fields: Record<string, unknown>) => {
     const found = patches.find(p => p.id === memberId && !p.create);
@@ -44,7 +45,7 @@ export function planGroup(data: Snapshot, id: string | undefined, change: GroupC
       .sort((a,b) => a.fields[F.tasks.rank] - b.fields[F.tasks.rank] || a.id.localeCompare(b.id));
     // Removed members become independent after the old group position, preserving internal order.
     if (current && front === current.fields[F.tasks.front]) units.splice(Math.max(0, Math.min(units.length, current.fields[F.tasks.rank] - 1)), 0, ...removed.filter(t => !closed(t)).sort((a,b) => a.fields[F.tasks.groupOrder] - b.fields[F.tasks.groupOrder]));
-    if (front === change.front) units.splice(Math.min(change.rank - 1, units.length), 0, { id: groupId, fields: {} });
+    if (front === change.front && !allCompleted) units.splice(Math.min(change.rank - 1, units.length), 0, { id: groupId, fields: {} });
     units.forEach((t,index) => {
       if (t.id === groupId) patches[0].fields[F.tasks.rank] = index + 1;
       else if (t.fields[F.tasks.rank] !== index + 1) add(t.id, { [F.tasks.rank]: index + 1 });

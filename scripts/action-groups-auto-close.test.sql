@@ -73,5 +73,46 @@ begin
 end
 $test$;
 
+
+-- Exercise the same atomic RPC, revision and idempotency path used by the panel.
+do $rpc_test$
+declare
+  group_id text;
+  step_id text;
+  next_rank integer;
+  before_revision text;
+  status_field text;
+  gate_field text;
+  request_id uuid := gen_random_uuid();
+  patch jsonb;
+  intent jsonb := '{"kind":"test_group_completion"}'::jsonb;
+  receipt jsonb;
+begin
+  perform 1 from operativo.migration_control where singleton for update;
+  select coalesce(max(posicion_de_accion), 0) + 1 into next_rank
+    from operativo.follow_ups where frente_de_accion = 'Primario' and estado not in ('Hecho','Cancelado');
+  insert into operativo.follow_ups(seguimiento, tipo_de_accion, frente_de_accion, posicion_de_accion)
+    values ('TEST rpc ' || gen_random_uuid(), 'group', 'Primario', next_rank) returning id into group_id;
+  insert into operativo.follow_ups(seguimiento, grupo_de_accion, orden_en_grupo)
+    values ('TEST rpc step', group_id, 1) returning id into step_id;
+  select global_revision::text into before_revision from operativo.migration_control where singleton;
+  select f->>'id' into status_field from operativo.migration_manifest,
+    lateral jsonb_array_elements(definition->'fields') f
+    where target_table='follow_ups' and f->>'column'='estado';
+  select f->>'id' into gate_field from operativo.migration_manifest,
+    lateral jsonb_array_elements(definition->'fields') f
+    where target_table='follow_ups' and f->>'column'='estado_de_accion';
+  patch := jsonb_build_array(jsonb_build_object('table','follow_ups','id',step_id,'create',false,
+    'fields',jsonb_build_object(status_field,'Hecho',gate_field,'Terminada')));
+  receipt := public.ut_panel_commit_v2(request_id,'test:rpc',intent,before_revision,patch);
+  if receipt->>'ok' <> 'true' or (select estado from operativo.follow_ups where id=group_id) <> 'Hecho'
+  then raise exception 'Panel RPC did not close the completed group'; end if;
+  if receipt->>'revision' <> (select global_revision::text from operativo.migration_control where singleton)
+  then raise exception 'Panel RPC returned an incorrect revision'; end if;
+  if public.ut_panel_commit_v2(request_id,'test:rpc',intent,before_revision,patch) is distinct from receipt
+  then raise exception 'Panel RPC retry was not idempotent'; end if;
+end
+$rpc_test$;
+
 set constraints all immediate;
 rollback;

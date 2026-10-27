@@ -133,7 +133,6 @@ on operativo.follow_ups
 for each row
 execute function operativo.promote_resolved_action_group_on_change();
 
-set constraints follow_ups_action_position_unique deferred;
 select set_config('undertango.actor', 'system:resolved-group-promotion', true);
 
 do $migration$

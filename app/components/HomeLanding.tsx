@@ -17,6 +17,7 @@ export default function HomeLanding(){
   const {t}=useHomeLanguage();
   const [open,setOpen]=useState<"shows"|"classes"|null>(null);
   const toggle=(key:"shows"|"classes")=>setOpen(current=>current===key?null:key);
+  const isControl=(target: EventTarget)=>target instanceof Element && Boolean(target.closest("a, button"));
   return <section className={styles.landing} id="inicio" aria-label={t("Descubrí las experiencias")}>
     <a className={styles.skip} href="#intentions">{t("Descubrí las experiencias")} ↓</a>
     <header className={styles.header}>
@@ -24,7 +25,7 @@ export default function HomeLanding(){
       <LanguageButtons />
     </header>
     <div className={styles.panels} id="descubrir">
-      <article className={styles.panel}>
+      <article className={styles.panel} onClick={(event)=>{if(!isControl(event.target)) toggle("shows");}}>
         <Image className={styles.photo} src="/assets/images/grupal1.png" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
         <div className={styles.shade}/>
         <div className={styles.panelBody}>
@@ -38,8 +39,8 @@ export default function HomeLanding(){
           </div>}
         </div>
       </article>
-      <article className={styles.panel}>
-        <Image className={styles.photo} src="/assets/images/tango-class-1.jpg" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
+      <article className={styles.panel} onClick={(event)=>{if(!isControl(event.target)) toggle("classes");}}>
+        <Image className={styles.photo} src="/assets/images/tango-class-4.jpg" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
         <div className={styles.shade}/>
         <div className={styles.panelBody}>
           <p className={styles.eyebrow}>02 · UNDER TANGO</p>
@@ -52,7 +53,7 @@ export default function HomeLanding(){
           </div>}
         </div>
       </article>
-      <article className={styles.panel}>
+      <article className={styles.panel} onClick={(event)=>{if(!isControl(event.target)) window.location.assign("https://red.undertangoclub.com/");}}>
         <Image className={styles.photo} src="/images/home/cultura-conecta-iguazu.webp" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
         <div className={styles.shade}/>
         <div className={styles.panelBody}>

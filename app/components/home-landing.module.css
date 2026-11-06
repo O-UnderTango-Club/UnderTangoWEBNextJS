@@ -75,3 +75,7 @@
  .panel:nth-child(2) .photo{object-position:50% 50%}
  .panel:nth-child(3) .photo{object-position:70% 45%}
 }
+
+/* Toda la tarjeta indica su interacción; los enlaces mantienen su acción propia. */
+.panel{cursor:pointer}
+.panel:has(.options) .options{cursor:auto}

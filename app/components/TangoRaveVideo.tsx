@@ -1,6 +1,9 @@
+"use client";
 import styles from "./TangoRaveVideo.module.css";
+import { useHomeLanguage } from "./home-language";
 
 export default function TangoRaveVideo() {
+  const { t } = useHomeLanguage();
   return (
     <figure className={styles.figure}>
       <div className={styles.frame}>
@@ -14,9 +17,7 @@ export default function TangoRaveVideo() {
         />
       </div>
       <figcaption>
-        <a href="https://youtube.com/shorts/7yVf96vjurQ" target="_blank" rel="noopener noreferrer">
-          Tango Rave en vivo · Ver en YouTube ↗
-        </a>
+        <a href="https://youtube.com/shorts/7yVf96vjurQ" target="_blank" rel="noopener noreferrer">{t("Tango Rave en vivo · Ver en YouTube ↗")}</a>
       </figcaption>
     </figure>
   );

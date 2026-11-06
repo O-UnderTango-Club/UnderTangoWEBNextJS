@@ -1,97 +1,66 @@
-'use client';
+"use client";
+import { useState } from "react";
+import Image from "next/image";
+import { useHomeLanguage, type SiteLanguage } from "./home-language";
+import styles from "./home-landing.module.css";
 
-import { useRef, useState } from 'react';
-import Image from 'next/image';
-import styles from './home-landing.module.css';
-
-type IconName = 'calendar' | 'learn' | 'music' | 'compass' | 'business' | 'search' | 'arrow' | 'home' | 'contact';
-
-function Icon({ name, className }: { name: IconName; className?: string }) {
-  const paths: Record<IconName, React.ReactNode> = {
-    calendar: <><rect x="4" y="5" width="16" height="16" rx="2" /><path d="M8 3v4m8-4v4M4 11h16m-11 4h1m4 0h1m-6 3h1" /></>,
-    learn: <><path d="m2 9 10-5 10 5-10 5-10-5Zm4 2v6c4 3 8 3 12 0v-6m4-2v8" /></>,
-    music: <><path d="M9 18V5l11-2v13M9 9l11-2" /><ellipse cx="6" cy="18" rx="3" ry="3" /><ellipse cx="17" cy="16" rx="3" ry="3" /></>,
-    compass: <><circle cx="12" cy="12" r="9" /><path d="m16 8-2 6-6 2 2-6 6-2Z" /></>,
-    business: <><rect x="3" y="7" width="18" height="14" rx="2" /><path d="M8 7V4h8v3M3 12c5 3 13 3 18 0m-9 0v4" /></>,
-    search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>,
-    arrow: <path d="M4 12h16m-6-6 6 6-6 6" />,
-    home: <><path d="m3 10 9-7 9 7v11h-6v-7H9v7H3V10Z" /></>,
-    contact: <><path d="M21 11.5a9 9 0 0 1-9 9 10 10 0 0 1-4-.8L3 21l1.3-5A9 9 0 1 1 21 11.5Z" /><path d="M8 11h8m-8 4h5" /></>,
-  };
-  return <svg className={className} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+function Flag({code}:{code:SiteLanguage}) {
+  if(code==="en") return <svg viewBox="0 0 30 20" width="24" height="16" aria-hidden="true"><path fill="#fff" d="M0 0h30v20H0z"/><path fill="#c8102e" d="M12.5 0h5v20h-5zM0 7.5h30v5H0z"/></svg>;
+  if(code==="pt") return <svg viewBox="0 0 30 20" width="24" height="16" aria-hidden="true"><path fill="#009739" d="M0 0h30v20H0z"/><path fill="#ffdf00" d="m15 2 12 8-12 8L3 10z"/><circle cx="15" cy="10" r="4.5" fill="#002776"/><path d="M11 8.5q4-1 8 3" stroke="#fff" strokeWidth="1" fill="none"/></svg>;
+  return <svg viewBox="0 0 30 20" width="24" height="16" aria-hidden="true"><path fill="#74acdf" d="M0 0h30v20H0z"/><path fill="#fff" d="M0 6.67h30v6.66H0z"/><circle cx="15" cy="10" r="2" fill="#f6b40e"/></svg>;
 }
-
-const categories: { title: string; description: string; href: string; icon: IconName; image: string; position?: string; keywords: string; mobileOnly?: boolean }[] = [
-  { title: 'Eventos', description: 'Milongas, shows y encuentros', href: '/agenda', icon: 'calendar', image: '/assets/images/grupal1.png', position: 'center 20%', keywords: 'agenda calendario milonga show festival rave bailar' },
-  { title: 'Clases', description: 'Aprendé y compartí el tango', href: '#classes', icon: 'learn', image: '/assets/images/la-cava-registro-01.webp', position: 'center 14%', keywords: 'aprender escuela curso baile grupales privadas academia' },
-  { title: 'Equipo', description: 'Conocé a quienes hacen UnderTango', href: '/central', icon: 'music', image: '/assets/images/tango-rave-elenco.jpg', keywords: 'personas profesionales musicos bailarines artistas equipo', mobileOnly: true },
-  { title: 'Experiencias', description: 'Viví el tango en Iguazú', href: '/la-cava', icon: 'compass', image: '/images/home/cultura-conecta-iguazu.webp', position: '70% 45%', keywords: 'turismo cultura cataratas iguazu cena la cava' },
-  { title: 'Negocios', description: 'Llevá cultura a tu proyecto', href: '/produccion-artistica', icon: 'business', image: '/assets/images/tango-rave-elenco.jpg', position: 'center 15%', keywords: 'contratar produccion empresas hoteles eventos corporativos oportunidades' },
-];
-
-const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-
-export default function HomeLanding() {
-  const [query, setQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const terms = normalize(query).split(/\s+/).filter(Boolean);
-  const matches = categories.filter(category => terms.every(term => normalize(`${category.title} ${category.description} ${category.keywords}`).includes(term)));
-
-  function openSearch() {
-    setSearchOpen(true);
-    requestAnimationFrame(() => searchRef.current?.focus());
-  }
-
-  return (
-    <div className={styles.landing} id="inicio">
-      <a className={styles.skipLink} href="#descubrir">Ir a las categorías</a>
-      <header className={styles.header}>
-        <a className={styles.brand} href="#inicio" aria-label="UnderTango, inicio"><span className={styles.symbol} aria-hidden="true">Ø</span><span>UnderTango</span></a>
-        <nav className={styles.desktopNav} aria-label="Navegación principal">
-          <a href="#descubrir">Descubrir</a><a href="/agenda">Eventos</a><a href="/central">Equipo</a><a href="/produccion-artistica">Negocios</a><a href="/la-cava">Experiencias</a>
-        </nav>
-        <button className={styles.searchToggle} type="button" onClick={openSearch} aria-label="Buscar en UnderTango" aria-controls="home-search"><Icon name="search" /></button>
-        <a className={styles.contactLink} href="https://wa.me/5493757618270" target="_blank" rel="noopener noreferrer">Conectemos <Icon name="arrow" /></a>
-      </header>
-
-      <div className={styles.hero}>
-        <Image className={styles.heroImage} src="/images/home/cultura-conecta-iguazu.webp" alt="Una pareja baila tango frente a las Cataratas del Iguazú al atardecer. Ilustración de UnderTango." fill priority sizes="100vw" quality={85} />
-        <div className={styles.heroShade} />
-        <div className={styles.heroContent}>
-          <p className={styles.eyebrow}>DESDE IGUAZÚ, AL MUNDO</p>
-          <h1 className={styles.title}><span className={styles.desktopTitle}>Más tango.<br />Más oportunidades.</span><span className={styles.mobileTitle}>Cultura<br />que conecta.</span></h1>
-          <p className={styles.lede}>Personas, experiencias y oportunidades.<br />La cultura argentina en movimiento.</p>
-          <form id="home-search" className={`${styles.search} ${searchOpen ? styles.searchExpanded : ''}`} role="search" onSubmit={event => { event.preventDefault(); document.getElementById('descubrir')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }}>
-            <Icon name="search" />
-            <label className={styles.srOnly} htmlFor="home-query">Buscar secciones de UnderTango</label>
-            <input ref={searchRef} id="home-query" type="search" placeholder="Buscá eventos, clases, artistas…" value={query} onChange={event => setQuery(event.target.value)} aria-controls="home-categories" />
-            <button type="submit" aria-label="Ver resultados"><Icon name="arrow" /></button>
-          </form>
+export function LanguageButtons(){
+  const {language,change,t}=useHomeLanguage();
+  return <div className={styles.language} role="group" aria-label={t("Idiomas")}>{([["es","ES","Español"],["en","EN","English"],["pt","PT","Português"]] as const).map(([code,label,name])=><button key={code} type="button" onClick={()=>change(code)} aria-pressed={language===code} aria-label={name} lang={code}><Flag code={code}/><span>{label}</span></button>)}</div>;
+}
+export default function HomeLanding(){
+  const {t}=useHomeLanguage();
+  const [open,setOpen]=useState<"shows"|"classes"|null>(null);
+  const toggle=(key:"shows"|"classes")=>setOpen(current=>current===key?null:key);
+  return <section className={styles.landing} id="inicio" aria-label={t("Descubrí las experiencias")}>
+    <a className={styles.skip} href="#intentions">{t("Descubrí las experiencias")} ↓</a>
+    <header className={styles.header}>
+      <a href="/" className={styles.brand} aria-label="UnderTango Club"><span aria-hidden="true">Ø</span><strong>UnderTango</strong></a>
+      <LanguageButtons />
+    </header>
+    <div className={styles.panels} id="descubrir">
+      <article className={styles.panel}>
+        <Image className={styles.photo} src="/assets/images/showsImage1.png" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
+        <div className={styles.shade}/>
+        <div className={styles.panelBody}>
+          <p className={styles.eyebrow}>01 · UNDER TANGO</p>
+          <button type="button" className={styles.panelToggle} onClick={()=>toggle("shows")} aria-expanded={open==="shows"} aria-controls="home-shows-options"><span>{t("Shows")}</span><span className={styles.plus} aria-hidden="true">{open==="shows"?"−":"+"}</span></button>
+          {open!=="shows" && <p className={styles.hint}>{t("Elegí un país")}</p>}
+          {open==="shows" && <div id="home-shows-options" className={styles.options}>
+            <a href="/agenda" aria-label={t("Ver actividades en Argentina")}><span>🇦🇷 {t("Argentina · Puerto Iguazú")}<small>Restaurante A Piacere · {t("Sábados · 21:00")}</small></span><span aria-hidden="true">↗</span></a>
+            <a href="/agenda" aria-label={t("Ver actividades en Brasil")}><span>🇧🇷 {t("Brasil · Foz do Iguaçu")}<small>Hotel Wish · {t("Viernes · 21:00")}</small></span><span aria-hidden="true">↗</span></a>
+            <a href="/shows"><span>{t("Más información")}</span><span aria-hidden="true">↗</span></a>
+          </div>}
         </div>
-        <p className={styles.imageCaption}>Tango. Naturaleza. Encuentro.</p>
-      </div>
-
-      <div id="descubrir" className={styles.discovery}>
-        <div className={styles.discoveryHeading}><p>ENCONTRÁ TU PRÓXIMA EXPERIENCIA</p><span>Una cultura. Muchas formas de vivirla.</span></div>
-        <div id="home-categories" className={styles.categories}>
-          {matches.map(category => <a key={category.title} href={category.href} className={`${styles.card} ${category.mobileOnly && !terms.length ? styles.mobileOnly : ''}`} data-undertango-event="intent_click" data-undertango-intent={category.title.toLowerCase()} data-undertango-cta={`Portada: ${category.title}`}>
-            <div className={styles.cardImage}><Image src={category.image} alt="" fill sizes="(max-width: 700px) 1px, (max-width: 1200px) 25vw, 280px" style={{ objectPosition: category.position }} /></div>
-            <Icon name={category.icon} className={styles.categoryIcon} />
-            <div className={styles.cardCopy}><strong>{category.title}</strong><span>{category.description}</span></div>
-            <Icon name="arrow" className={styles.cardArrow} />
-          </a>)}
+      </article>
+      <article className={styles.panel}>
+        <Image className={styles.photo} src="/assets/images/clasesImage1.png" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
+        <div className={styles.shade}/>
+        <div className={styles.panelBody}>
+          <p className={styles.eyebrow}>02 · UNDER TANGO</p>
+          <button type="button" className={styles.panelToggle} onClick={()=>toggle("classes")} aria-expanded={open==="classes"} aria-controls="home-classes-options"><span>{t("Clases")}</span><span className={styles.plus} aria-hidden="true">{open==="classes"?"−":"+"}</span></button>
+          {open!=="classes" && <p className={styles.hint}>{t("Elegí un país")}</p>}
+          {open==="classes" && <div id="home-classes-options" className={styles.options}>
+            <a href="/clasesGrupales#argentina" aria-label={t("Ver actividades en Argentina")}><span>🇦🇷 {t("Argentina · Puerto Iguazú")}<small>La Estación · {t("Domingos · 20:00")}</small></span><span aria-hidden="true">↗</span></a>
+            <a href="/clasesGrupales#brasil" aria-label={t("Ver actividades en Brasil")}><span>🇧🇷 {t("Brasil · Foz do Iguaçu")}<small>Gaia Apometria · {t("Domingos · 16:00–17:00")}</small></span><span aria-hidden="true">↗</span></a>
+            <a href="https://83.undertangoclub.com/academia/tango"><span>{t("Más información")}</span><span aria-hidden="true">↗</span></a>
+          </div>}
         </div>
-        {terms.length > 0 && <p className={styles.searchStatus} role="status">{matches.length ? `${matches.length} ${matches.length === 1 ? 'sección encontrada' : 'secciones encontradas'}` : 'No encontramos una sección con ese nombre. Probá con tango, clases o shows.'} <button type="button" onClick={() => { setQuery(''); searchRef.current?.focus(); }}>Ver todas</button></p>}
-        <div className={styles.discoveryFooter}><span>PUERTO IGUAZÚ <i /> TRIPLE FRONTERA</span><div className={styles.footerLinks}><a href="/central">Ø Central</a><a href="#intentions">Conocé UnderTango <span aria-hidden="true">↓</span></a></div></div>
-      </div>
-
-      <nav className={styles.mobileNav} aria-label="Accesos rápidos">
-        <a href="#inicio" aria-label="Ir al inicio"><Icon name="home" /><span>Inicio</span></a>
-        <a href="#descubrir"><Icon name="compass" /><span>Explorar</span></a>
-        <a href="/central"><Icon name="business" /><span>Ø Central</span></a>
-        <a href="/reservas"><Icon name="contact" /><span>Contacto</span></a>
-      </nav>
+      </article>
+      <article className={styles.panel}>
+        <Image className={styles.photo} src="/assets/images/tango-rave-elenco.jpg" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
+        <div className={styles.shade}/>
+        <div className={styles.panelBody}>
+          <p className={styles.eyebrow}>03 · UNDER TANGO</p>
+          <a href="https://red.undertangoclub.com/" className={styles.networkLink} aria-label={t("Ir a la Red UnderTango")}><span>{t("Todos los departamentos")}</span><span className={styles.plus} aria-hidden="true">↗</span></a>
+          <p className={styles.hint}>{t("Explorá nuestras áreas y participá de la red.")}</p>
+        </div>
+      </article>
     </div>
-  );
+  </section>;
 }

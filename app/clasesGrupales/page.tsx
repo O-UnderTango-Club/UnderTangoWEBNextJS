@@ -3,75 +3,81 @@
 import Image from "next/image";
 import Header from "../components/header";
 import Footer from "../components/footer";
+import { HomeLanguageProvider, useHomeLanguage } from "../components/home-language";
+import { LanguageButtons } from "../components/HomeLanding";
 import "../styles/navbar.css";
 import "../styles/footer.css";
 
 const whatsapp = "https://wa.me/5493757618270";
 
-export default function ClasesGrupalesPage() {
+function ClasesGrupalesContent() {
+  const { t } = useHomeLanguage();
   return (
     <>
       <Header />
+      <LanguageButtons />
       <main className="classes-page">
         <section className="hero" aria-labelledby="classes-title">
           <div className="hero-copy">
             <p className="eyebrow">Ø UNDERTANGO CLUB · TRIPLE FRONTERA</p>
-            <h1 id="classes-title">Un lugar para encontrarnos en el tango.</h1>
-            <p className="intro">Clases grupales en Puerto Iguazú y Foz do Iguaçu. Dos ciudades, un mismo abrazo.</p>
+            <h1 id="classes-title">{t("Un lugar para encontrarnos en el tango.")}</h1>
+            <p className="intro">{t("Clases grupales en Puerto Iguazú y Foz do Iguaçu. Dos ciudades, un mismo abrazo.")}</p>
             <div className="actions">
-              <a className="button primary" href="#horarios">Ver días y lugares <span aria-hidden="true">↓</span></a>
-              <a className="button secondary" href={whatsapp} target="_blank" rel="noopener noreferrer">Consultar por WhatsApp <span aria-hidden="true">↗</span></a>
+              <a className="button primary" href="#horarios">{t("Ver días y lugares")}<span aria-hidden="true">↓</span></a>
+              <a className="button secondary" href={whatsapp} target="_blank" rel="noopener noreferrer">{t("Consultar por WhatsApp")}<span aria-hidden="true">↗</span></a>
             </div>
           </div>
           <div className="hero-image">
             <Image src="/assets/images/grupal1.png" alt="Encuentro de tango de UnderTango Club" width={900} height={700} priority />
-            <p>El tango se aprende compartiéndolo.</p>
+            <p>{t("El tango se aprende compartiéndolo.")}</p>
           </div>
         </section>
 
         <section className="schedule" id="horarios" aria-labelledby="schedule-title">
           <div className="section-heading">
-            <div><p className="eyebrow">ENCUENTROS SEMANALES</p><h2 id="schedule-title">Elegí dónde bailar</h2></div>
-            <p>Todos los domingos, en dos espacios de la Triple Frontera.</p>
+            <div><p className="eyebrow">{t("ENCUENTROS SEMANALES")}</p><h2 id="schedule-title">{t("Elegí dónde bailar")}</h2></div>
+            <p>{t("Todos los domingos, en dos espacios de la Triple Frontera.")}</p>
           </div>
           <div className="cards">
-            <article className="card">
-              <p className="card-city">BRASIL · FOZ DO IGUAÇU</p>
+            <article className="card" id="brasil">
+              <p className="card-city">{t("BRASIL · FOZ DO IGUAÇU")}</p>
               <h3>Espacio Gaia Apometria</h3>
-              <p className="card-kind">Clase grupal de tango para principiantes</p>
-              <p className="card-time">Domingos <strong>16:00–17:00</strong></p>
-              <p>Espacio Gaia Apometria, Foz do Iguaçu.</p>
-              <a className="card-link" href="https://wa.me/5493757618270?text=Hola%2C%20quiero%20consultar%20por%20la%20clase%20grupal%20de%20tango%20en%20Espacio%20Gaia%20Apometria%20en%20Foz." target="_blank" rel="noopener noreferrer">Consultar por esta clase <span aria-hidden="true">↗</span></a>
+              <p className="card-kind">{t("Clase grupal de tango para todos los niveles")}</p>
+              <p className="card-time">{t("Domingos")}<strong>16:00–17:00</strong></p>
+              <p>{t("Rua Joaquim Firmino 1227, Jardim Eldorado, Foz do Iguaçu.")}</p>
+              <p>{t("R$ 15 por persona · Práctica con medias")}</p>
+              <a className="card-link" href="https://wa.me/5493757618270?text=Hola%2C%20quiero%20consultar%20por%20la%20clase%20grupal%20de%20tango%20en%20Espacio%20Gaia%20Apometria%20en%20Foz." target="_blank" rel="noopener noreferrer">{t("Consultar por esta clase")}<span aria-hidden="true">↗</span></a>
             </article>
-            <article className="card">
-              <p className="card-city">ARGENTINA · PUERTO IGUAZÚ</p>
+            <article className="card" id="argentina">
+              <p className="card-city">{t("ARGENTINA · PUERTO IGUAZÚ")}</p>
               <h3>Espacio La Estación</h3>
-              <p className="card-kind">Clase grupal de tango</p>
-              <p className="card-time">Domingos <strong>20:00</strong></p>
-              <p>1 de Mayo 815, Puerto Iguazú, Misiones.</p>
-              <a className="card-link" href="https://wa.me/5493757618270?text=Hola%2C%20quiero%20consultar%20por%20la%20clase%20grupal%20de%20tango%20en%20La%20Estaci%C3%B3n%20en%20Puerto%20Iguaz%C3%BA." target="_blank" rel="noopener noreferrer">Consultar por esta clase <span aria-hidden="true">↗</span></a>
+              <p className="card-kind">{t("Clase grupal de tango para todos los niveles")}</p>
+              <p className="card-time">{t("Domingos")}<strong>20:00</strong></p>
+              <p>{t("1 de Mayo 815, Puerto Iguazú, Misiones.")}</p>
+              <p>{t("ARS 5.000 la clase")}</p>
+              <a className="card-link" href="https://wa.me/5493757618270?text=Hola%2C%20quiero%20consultar%20por%20la%20clase%20grupal%20de%20tango%20en%20La%20Estaci%C3%B3n%20en%20Puerto%20Iguaz%C3%BA." target="_blank" rel="noopener noreferrer">{t("Consultar por esta clase")}<span aria-hidden="true">↗</span></a>
             </article>
           </div>
-          <p className="schedule-note">Consultanos para conocer los detalles y confirmar la actividad.</p>
+          <p className="schedule-note">{t("Consultanos para conocer los detalles y confirmar la actividad.")}</p>
         </section>
 
         <section className="shows" aria-labelledby="shows-title">
           <div className="section-heading">
-            <div><p className="eyebrow">TAMBIÉN PODÉS VERNOS BAILAR</p><h2 id="shows-title">Tango en vivo</h2></div>
-            <p>Dos encuentros semanales para disfrutar de nuestros shows.</p>
+            <div><p className="eyebrow">{t("TAMBIÉN PODÉS VERNOS BAILAR")}</p><h2 id="shows-title">{t("Tango en vivo")}</h2></div>
+            <p>{t("Dos encuentros semanales para disfrutar de nuestros shows.")}</p>
           </div>
           <div className="show-list">
-            <div><p className="show-day">VIERNES · 21:00</p><h3>Hotel Wish</h3><p>Foz do Iguaçu, Brasil</p></div>
-            <div><p className="show-day">SÁBADOS · 21:00</p><h3>Restaurante A Piacere</h3><p>Puerto Iguazú, Argentina</p></div>
+            <div><p className="show-day">{t("VIERNES · 21:00")}</p><h3>Hotel Wish</h3><p>{t("Foz do Iguaçu, Brasil")}</p></div>
+            <div><p className="show-day">{t("SÁBADOS · 21:00")}</p><h3>Restaurante A Piacere</h3><p>{t("Puerto Iguazú, Argentina")}</p></div>
           </div>
-          <a className="button light" href="/agenda">Ver agenda completa <span aria-hidden="true">↗</span></a>
+          <a className="button light" href="/agenda">{t("Ver agenda completa")}<span aria-hidden="true">↗</span></a>
         </section>
 
         <section className="invitation">
-          <p className="eyebrow">NOS GUSTARÍA CONOCERTE</p>
-          <h2>¿Tenés ganas de bailar?</h2>
-          <p>Escribinos y te contamos más sobre las clases y las próximas actividades.</p>
-          <a className="button primary" href={whatsapp} target="_blank" rel="noopener noreferrer">Hablar con UnderTango <span aria-hidden="true">↗</span></a>
+          <p className="eyebrow">{t("NOS GUSTARÍA CONOCERTE")}</p>
+          <h2>{t("¿Tenés ganas de bailar?")}</h2>
+          <p>{t("Escribinos y te contamos más sobre las clases y las próximas actividades.")}</p>
+          <a className="button primary" href={whatsapp} target="_blank" rel="noopener noreferrer">{t("Hablar con UnderTango")}<span aria-hidden="true">↗</span></a>
         </section>
       </main>
       <Footer />
@@ -136,3 +142,5 @@ export default function ClasesGrupalesPage() {
     </>
   );
 }
+
+export default function ClasesGrupalesPage() { return <HomeLanguageProvider><ClasesGrupalesContent /></HomeLanguageProvider>; }

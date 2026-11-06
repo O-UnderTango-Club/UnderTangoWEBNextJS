@@ -25,7 +25,7 @@ export default function HomeLanding(){
     </header>
     <div className={styles.panels} id="descubrir">
       <article className={styles.panel}>
-        <Image className={styles.photo} src="/assets/images/showsImage1.png" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
+        <Image className={styles.photo} src="/assets/images/portada-shows.png" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
         <div className={styles.shade}/>
         <div className={styles.panelBody}>
           <p className={styles.eyebrow}>01 · UNDER TANGO</p>
@@ -39,7 +39,7 @@ export default function HomeLanding(){
         </div>
       </article>
       <article className={styles.panel}>
-        <Image className={styles.photo} src="/assets/images/clasesImage1.png" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
+        <Image className={styles.photo} src="/assets/images/portada-clases.png" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
         <div className={styles.shade}/>
         <div className={styles.panelBody}>
           <p className={styles.eyebrow}>02 · UNDER TANGO</p>
@@ -53,7 +53,7 @@ export default function HomeLanding(){
         </div>
       </article>
       <article className={styles.panel}>
-        <Image className={styles.photo} src="/assets/images/tango-rave-elenco.jpg" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
+        <Image className={styles.photo} src="/assets/images/portada-red.png" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
         <div className={styles.shade}/>
         <div className={styles.panelBody}>
           <p className={styles.eyebrow}>03 · UNDER TANGO</p>

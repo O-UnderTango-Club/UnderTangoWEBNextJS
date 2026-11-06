@@ -1,4 +1,4 @@
-.landing{background:#081824;color:#faf5ed;font-family:var(--font-undertango-sans),Arial,sans-serif;min-height:100svh;display:flex;flex-direction:column}
+.landing{padding:0!important;background:#081824;color:#faf5ed;font-family:var(--font-undertango-sans),Arial,sans-serif;min-height:100svh;display:flex;flex-direction:column}
 .landing *{box-sizing:border-box}
 .landing a{color:inherit;text-decoration:none}
 .landing button,.landing a{font:inherit}
@@ -15,7 +15,7 @@
 .language button:hover{background:#ffffff1a}
 .language svg{display:block;border-radius:2px;box-shadow:0 0 0 1px #ffffff44}
 .panels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;flex:1;min-height:calc(100svh - 76px)}
-.panel{position:relative;min-width:0;min-height:480px;overflow:hidden;display:flex;align-items:flex-end;background:#152531}
+.panel{position:relative;min-width:0;min-height:0;overflow:hidden;display:flex;align-items:flex-end;background:#152531}
 .photo{object-fit:cover;object-position:center;transition:transform .5s ease}
 .panel:hover .photo{transform:scale(1.035)}
 .shade{position:absolute;inset:0;background:linear-gradient(180deg,#0b141923 6%,#08131a80 40%,#08131ae8 100%)}

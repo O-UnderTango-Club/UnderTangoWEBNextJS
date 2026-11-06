@@ -263,15 +263,13 @@ export default function HomePage() {
                 Trabajamos por contratación y adaptamos artistas, duración, sonido y despliegue técnico a las necesidades de cada producción.
               </p>
               <a
-                href="https://wa.me/5493757618270?text=Hola%2C%20llegu%C3%A9%20desde%20la%20web%20de%20UnderTango%20y%20quiero%20saber%20qu%C3%A9%20shows%20o%20actividades%20puedo%20ver."
+                href="/agenda"
                 className="agenda-link"
-                target="_blank"
-                rel="noopener noreferrer"
                 data-undertango-intent="ver_tango"
                 data-undertango-subintent="cronograma_publico"
-                data-undertango-cta="Consultar cronograma"
+                data-undertango-cta="Ver agenda"
               >
-                ¿Buscás actividades abiertas al público? Consultar cronograma
+                ¿Buscás actividades abiertas al público? Ver agenda
               </a>
             </div>
             <div className="image-content">
@@ -284,8 +282,8 @@ export default function HomePage() {
           <div className="content-wrapper classes-wrapper">
             <div className="text-content">
               <p className="commercial-eyebrow">APRENDER TANGO</p>
-              <h2>Clases de Tango en Iguazú</h2>
-              <p>Elegí una experiencia privada o grupal y aprendé tango en la frontera con Brasil y Paraguay.</p>
+              <h2>Clases de tango en la Triple Frontera</h2>
+              <p>Elegí una clase privada o grupal y descubrí nuestros encuentros en Puerto Iguazú y Foz do Iguaçu.</p>
               <div className="button-group">
                 <a
                   href="/clasesPrivadas"

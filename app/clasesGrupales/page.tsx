@@ -42,17 +42,19 @@ function ClasesGrupalesContent() {
             <article className="card" id="brasil">
               <p className="card-city">{t("BRASIL · FOZ DO IGUAÇU")}</p>
               <h3>Espacio Gaia Apometria</h3>
-              <p className="card-kind">{t("Clase grupal de tango para principiantes")}</p>
+              <p className="card-kind">{t("Clase grupal de tango para todos los niveles")}</p>
               <p className="card-time">{t("Domingos")}<strong>16:00–17:00</strong></p>
-              <p>{t("Espacio Gaia Apometria, Foz do Iguaçu.")}</p>
+              <p>{t("Rua Joaquim Firmino 1227, Jardim Eldorado, Foz do Iguaçu.")}</p>
+              <p>{t("R$ 15 por persona · Práctica con medias")}</p>
               <a className="card-link" href="https://wa.me/5493757618270?text=Hola%2C%20quiero%20consultar%20por%20la%20clase%20grupal%20de%20tango%20en%20Espacio%20Gaia%20Apometria%20en%20Foz." target="_blank" rel="noopener noreferrer">{t("Consultar por esta clase")}<span aria-hidden="true">↗</span></a>
             </article>
             <article className="card" id="argentina">
               <p className="card-city">{t("ARGENTINA · PUERTO IGUAZÚ")}</p>
               <h3>Espacio La Estación</h3>
-              <p className="card-kind">{t("Clase grupal de tango")}</p>
+              <p className="card-kind">{t("Clase grupal de tango para todos los niveles")}</p>
               <p className="card-time">{t("Domingos")}<strong>20:00</strong></p>
               <p>{t("1 de Mayo 815, Puerto Iguazú, Misiones.")}</p>
+              <p>{t("ARS 5.000 la clase")}</p>
               <a className="card-link" href="https://wa.me/5493757618270?text=Hola%2C%20quiero%20consultar%20por%20la%20clase%20grupal%20de%20tango%20en%20La%20Estaci%C3%B3n%20en%20Puerto%20Iguaz%C3%BA." target="_blank" rel="noopener noreferrer">{t("Consultar por esta clase")}<span aria-hidden="true">↗</span></a>
             </article>
           </div>

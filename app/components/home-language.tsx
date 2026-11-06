@@ -454,9 +454,21 @@ const dictionary: Record<string, {en:string;pt:string}> = {
     "en": "Tango Rave live · Watch on YouTube ↗",
     "pt": "Tango Rave ao vivo · Ver no YouTube ↗"
   },
-  "Todos los derechos reservados.": {
-    "en": "All rights reserved.",
-    "pt": "Todos os direitos reservados."
+  "Clase grupal de tango para todos los niveles": {
+    "en": "Group tango class for all levels",
+    "pt": "Aula de tango em grupo para todos os níveis"
+  },
+  "Rua Joaquim Firmino 1227, Jardim Eldorado, Foz do Iguaçu.": {
+    "en": "Rua Joaquim Firmino 1227, Jardim Eldorado, Foz do Iguaçu.",
+    "pt": "Rua Joaquim Firmino 1227, Jardim Eldorado, Foz do Iguaçu."
+  },
+  "R$ 15 por persona · Práctica con medias": {
+    "en": "R$ 15 per person · Dance in socks",
+    "pt": "R$ 15 por pessoa · Prática com meias"
+  },
+  "ARS 5.000 la clase": {
+    "en": "ARS 5,000 per class",
+    "pt": "ARS 5.000 por aula"
   }
 };
 const Context = createContext<{language:SiteLanguage;change:(value:SiteLanguage)=>void}>({language:"es",change:()=>{}});

@@ -46,3 +46,32 @@
  .options{margin-top:10px}.options a{padding:8px 0;font-size:13px}.options small{font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.photo{transition:none}}
+
+/* Portada: marcos inspirados en la geometría art déco y el dorado antiguo. */
+.panels{gap:clamp(10px,1.25vw,20px);padding:0 clamp(12px,1.5vw,24px) clamp(14px,1.5vw,24px)}
+.panel{border:1px solid #b58b58;box-shadow:inset 0 0 0 4px #111c22,0 8px 26px #0005}
+.panel::before,.panel::after{content:"";position:absolute;z-index:2;inset:9px;pointer-events:none}
+.panel::before{border:1px solid #e3bf80a8;box-shadow:inset 0 0 0 3px #121b21a0,inset 0 0 0 4px #b18a5b75}
+.panel::after{inset:14px;background:
+ linear-gradient(#e5c58b,#e5c58b) left top / 44px 1px no-repeat,
+ linear-gradient(#e5c58b,#e5c58b) left top / 1px 44px no-repeat,
+ linear-gradient(#e5c58b,#e5c58b) right top / 44px 1px no-repeat,
+ linear-gradient(#e5c58b,#e5c58b) right top / 1px 44px no-repeat,
+ linear-gradient(#e5c58b,#e5c58b) left bottom / 44px 1px no-repeat,
+ linear-gradient(#e5c58b,#e5c58b) left bottom / 1px 44px no-repeat,
+ linear-gradient(#e5c58b,#e5c58b) right bottom / 44px 1px no-repeat,
+ linear-gradient(#e5c58b,#e5c58b) right bottom / 1px 44px no-repeat;
+ opacity:.9}
+.panel:nth-child(1) .photo{object-position:58% center}
+.panel:nth-child(2) .photo{object-position:50% 54%}
+.panel:nth-child(3) .photo{object-position:70% center}
+.panelBody{padding:clamp(32px,4vw,58px)}
+@media(max-width:700px){
+ .panels{gap:8px;padding:0 10px 12px}
+ .panel::before{inset:6px;box-shadow:inset 0 0 0 2px #121b21a0,inset 0 0 0 3px #b18a5b75}
+ .panel::after{inset:10px;background-size:28px 1px,1px 28px,28px 1px,1px 28px,28px 1px,1px 28px,28px 1px,1px 28px}
+ .panelBody{padding:18px 23px}
+ .panel:nth-child(1) .photo{object-position:55% 42%}
+ .panel:nth-child(2) .photo{object-position:50% 50%}
+ .panel:nth-child(3) .photo{object-position:70% 45%}
+}

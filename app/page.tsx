@@ -1,6 +1,7 @@
 'use client';
 
 import Script from 'next/script';
+import { HomeLanguageProvider, useHomeLanguage } from './components/home-language';
 import HomeLanding from './components/HomeLanding';
 import Footer from './components/footer';
 import TangoRaveVideo from './components/TangoRaveVideo';
@@ -35,7 +36,8 @@ const croppedHorizontalIframeStyle = {
   transform: 'translate(-50%, -50%)',
 };
 
-export default function HomePage() {
+function HomeContent() {
+  const { t } = useHomeLanguage();
   useHomeEffects();
 
   return (
@@ -71,16 +73,14 @@ export default function HomePage() {
         <section id="intentions" className="intent-gateway section-animate visible" aria-labelledby="intentions-title">
           <div className="intent-shell">
             <p className="intent-eyebrow">Ø UNDERTANGO CLUB · PUERTO IGUAZÚ · TRIPLE FRONTERA</p>
-            <h2 id="intentions-title">¿Qué estás buscando?</h2>
-            <p className="intent-lede">
-              Mirá cómo se vive cada experiencia y elegí la que mejor encaja con lo que necesitás.
-            </p>
+            <h2 id="intentions-title">{t("¿Qué estás buscando?")}</h2>
+            <p className="intent-lede">{t("Mirá cómo se vive cada experiencia y elegí la que mejor encaja con lo que necesitás.")}</p>
 
             <div className="intent-grid">
               <article className="intent-card">
                 <span className="intent-number" style={{ marginBottom: '18px' }}>01</span>
-                <h2>Así se vive un show de tango</h2>
-                <p>Una pareja de tango en escena: un formato directo, elegante y adaptable a hoteles, eventos y gastronomía.</p>
+                <h2>{t("Así se vive un show de tango")}</h2>
+                <p>{t("Una pareja de tango en escena: un formato directo, elegante y adaptable a hoteles, eventos y gastronomía.")}</p>
 
                 <div style={videoFrameStyle}>
                   <iframe
@@ -101,15 +101,13 @@ export default function HomePage() {
                   data-undertango-intent="contratar_show"
                   data-undertango-subintent="show_danza_tango"
                   data-undertango-cta="Quiero este show de tango"
-                >
-                  Quiero este show →
-                </a>
+                >{t("Quiero este show →")}</a>
               </article>
 
               <article className="intent-card">
                 <span className="intent-number" style={{ marginBottom: '18px' }}>02</span>
-                <h2>Así se vive una clase de tango</h2>
-                <p>Una experiencia simple, participativa y pensada para disfrutar el tango desde el primer momento.</p>
+                <h2>{t("Así se vive una clase de tango")}</h2>
+                <p>{t("Una experiencia simple, participativa y pensada para disfrutar el tango desde el primer momento.")}</p>
 
                 <div style={videoFrameStyle}>
                   <iframe
@@ -130,9 +128,7 @@ export default function HomePage() {
                   data-undertango-intent="aprender_tango"
                   data-undertango-subintent="clase_experiencia"
                   data-undertango-cta="Quiero tomar una clase"
-                >
-                  Quiero tomar una clase →
-                </a>
+                >{t("Quiero tomar una clase →")}</a>
                 <a
                   href="https://wa.me/5493757618270?text=Hola%2C%20llegu%C3%A9%20desde%20la%20web%20de%20UnderTango%20y%20quiero%20consultar%20por%20una%20clase%20de%20tango%20para%20incluir%20en%20un%20paquete%20tur%C3%ADstico."
                   className="intent-card-cta"
@@ -143,15 +139,13 @@ export default function HomePage() {
                   data-undertango-subintent="clase_paquete_turistico"
                   data-undertango-cta="Quiero una clase para un paquete turístico"
                   style={{ display: 'block', marginTop: '10px' }}
-                >
-                  Quiero una clase para un paquete turístico →
-                </a>
+                >{t("Quiero una clase para un paquete turístico →")}</a>
               </article>
 
               <article className="intent-card">
                 <span className="intent-number" style={{ marginBottom: '18px' }}>03</span>
-                <h2>Así se vive una producción Triple Frontera</h2>
-                <p>Música, danza y producción escénica integradas para experiencias de mayor escala y presencia.</p>
+                <h2>{t("Así se vive una producción Triple Frontera")}</h2>
+                <p>{t("Música, danza y producción escénica integradas para experiencias de mayor escala y presencia.")}</p>
 
                 <div style={videoFrameStyle}>
                   <iframe
@@ -172,9 +166,7 @@ export default function HomePage() {
                   data-undertango-intent="contratar_show"
                   data-undertango-subintent="produccion_triple_frontera"
                   data-undertango-cta="Quiero una producción completa"
-                >
-                  Quiero una producción completa →
-                </a>
+                >{t("Quiero una producción completa →")}</a>
               </article>
             </div>
 
@@ -191,7 +183,7 @@ export default function HomePage() {
               }}
             >
               <div>
-              <p className="intent-eyebrow" style={{ marginBottom: '10px' }}>04 · PRODUCTO DE AUTORÍA</p>
+              <p className="intent-eyebrow" style={{ marginBottom: '10px' }}>{t("04 · PRODUCTO DE AUTORÍA")}</p>
               <h2
                 style={{
                   color: '#ffffff',
@@ -211,9 +203,7 @@ export default function HomePage() {
                   lineHeight: 1.7,
                   margin: '0 0 12px',
                 }}
-              >
-                Banda en vivo, bailarines y electrónica en un formato original de Ø UnderTango Club.
-              </p>
+              >{t("Banda en vivo, bailarines y electrónica en un formato original de Ø UnderTango Club.")}</p>
               <a
                 href="/shows#tango-rave"
                 className="intent-card-cta"
@@ -221,9 +211,7 @@ export default function HomePage() {
                 data-undertango-intent="contratar_show"
                 data-undertango-subintent="tango_rave"
                 data-undertango-cta="Conocer Tango Rave"
-              >
-                Conocer Tango Rave →
-              </a>
+              >{t("Conocer Tango Rave →")}</a>
               </div>
               <TangoRaveVideo />
             </article>
@@ -233,9 +221,9 @@ export default function HomePage() {
         <section id="shows" className="section-animate commercial-intro">
           <div className="content-wrapper">
             <div className="text-content">
-              <p className="commercial-eyebrow">PRODUCCIÓN ARTÍSTICA A MEDIDA</p>
-              <h2>Contratá un show en la Triple Frontera</h2>
-              <p>Tango, música en vivo y experiencias escénicas diseñadas para cada espacio, público y ocasión.</p>
+              <p className="commercial-eyebrow">{t("PRODUCCIÓN ARTÍSTICA A MEDIDA")}</p>
+              <h2>{t("Contratá un show en la Triple Frontera")}</h2>
+              <p>{t("Tango, música en vivo y experiencias escénicas diseñadas para cada espacio, público y ocasión.")}</p>
               <div className="button-group">
                 <a
                   href="https://wa.me/5493757618270?text=Hola%2C%20llegu%C3%A9%20desde%20la%20web%20de%20UnderTango%20y%20quiero%20consultar%20por%20la%20contrataci%C3%B3n%20de%20un%20show."
@@ -245,9 +233,7 @@ export default function HomePage() {
                   data-undertango-intent="contratar_show"
                   data-undertango-subintent="consulta_comercial"
                   data-undertango-cta="Solicitar una propuesta"
-                >
-                  Solicitar una propuesta
-                </a>
+                >{t("Solicitar una propuesta")}</a>
                 <a
                   href="/reservas#shows"
                   className="catalog-button secondary-button"
@@ -255,22 +241,16 @@ export default function HomePage() {
                   data-undertango-intent="contratar_show"
                   data-undertango-subintent="catalogo_shows"
                   data-undertango-cta="Conocer los espectáculos"
-                >
-                  Conocer los espectáculos
-                </a>
+                >{t("Conocer los espectáculos")}</a>
               </div>
-              <p className="commercial-note">
-                Trabajamos por contratación y adaptamos artistas, duración, sonido y despliegue técnico a las necesidades de cada producción.
-              </p>
+              <p className="commercial-note">{t("Trabajamos por contratación y adaptamos artistas, duración, sonido y despliegue técnico a las necesidades de cada producción.")}</p>
               <a
                 href="/agenda"
                 className="agenda-link"
                 data-undertango-intent="ver_tango"
                 data-undertango-subintent="cronograma_publico"
                 data-undertango-cta="Ver agenda"
-              >
-                ¿Buscás actividades abiertas al público? Ver agenda
-              </a>
+              >{t("¿Buscás actividades abiertas al público? Ver agenda")}</a>
             </div>
             <div className="image-content">
               <img src="/assets/images/showsImage1.png" alt="Producción artística de UnderTango Club en Puerto Iguazú" />
@@ -281,9 +261,9 @@ export default function HomePage() {
         <section id="classes" className="section-animate">
           <div className="content-wrapper classes-wrapper">
             <div className="text-content">
-              <p className="commercial-eyebrow">APRENDER TANGO</p>
-              <h2>Clases de tango en la Triple Frontera</h2>
-              <p>Elegí una clase privada o grupal y descubrí nuestros encuentros en Puerto Iguazú y Foz do Iguaçu.</p>
+              <p className="commercial-eyebrow">{t("APRENDER TANGO")}</p>
+              <h2>{t("Clases de tango en la Triple Frontera")}</h2>
+              <p>{t("Elegí una clase privada o grupal y descubrí nuestros encuentros en Puerto Iguazú y Foz do Iguaçu.")}</p>
               <div className="button-group">
                 <a
                   href="/clasesPrivadas"
@@ -292,9 +272,7 @@ export default function HomePage() {
                   data-undertango-intent="aprender_tango"
                   data-undertango-subintent="clase_privada"
                   data-undertango-cta="Clases Privadas"
-                >
-                  Clases Privadas
-                </a>
+                >{t("Clases Privadas")}</a>
                 <a
                   href="/clasesGrupales"
                   className="action-button"
@@ -302,9 +280,7 @@ export default function HomePage() {
                   data-undertango-intent="aprender_tango"
                   data-undertango-subintent="clase_grupal"
                   data-undertango-cta="Clases Grupales"
-                >
-                  Clases Grupales
-                </a>
+                >{t("Clases Grupales")}</a>
               </div>
             </div>
             <div className="image-content">
@@ -316,11 +292,11 @@ export default function HomePage() {
         <section id="fashion" className="section-animate">
           <div className="content-wrapper">
             <div className="text-content">
-              <h2>Moda de Tango en Misiones</h2>
-              <p>Viste con elegancia y estilo para cada milonga y evento de tango en Iguazú.</p>
+              <h2>{t("Moda de Tango en Misiones")}</h2>
+              <p>{t("Viste con elegancia y estilo para cada milonga y evento de tango en Iguazú.")}</p>
               <div className="button-group">
-                <a href="/moda" className="catalog-button">Taller</a>
-                <a href="/pages/otonio-invierno-2025.pdf" target="_blank" rel="noopener noreferrer" className="catalog-button">Ver Catálogo</a>
+                <a href="/moda" className="catalog-button">{t("Taller")}</a>
+                <a href="/pages/otonio-invierno-2025.pdf" target="_blank" rel="noopener noreferrer" className="catalog-button">{t("Ver Catálogo")}</a>
               </div>
             </div>
             <div className="image-content">
@@ -332,11 +308,8 @@ export default function HomePage() {
         <section id="description1" className="description section-animate">
           <div className="content-wrapper">
             <div className="text-content">
-              <h2>Nuestra Pasión por el Tango en Iguazú</h2>
-              <p>
-                En UnderTango, vivimos y respiramos tango. Nuestra misión es compartir esta pasión con el mundo,
-                creando experiencias únicas que trascienden el baile y conectan personas en la Triple Frontera.
-              </p>
+              <h2>{t("Nuestra Pasión por el Tango en Iguazú")}</h2>
+              <p>{t("En UnderTango, vivimos y respiramos tango. Nuestra misión es compartir esta pasión con el mundo, creando experiencias únicas que trascienden el baile y conectan personas en la Triple Frontera.")}</p>
             </div>
             <div className="image-content">
               <img src="/assets/images/NuestraPasionIcon.png" alt="Pasión por el Tango en la Triple Frontera" />
@@ -345,29 +318,29 @@ export default function HomePage() {
         </section>
 
         <section id="historia" className="diagonal-section section-animate">
-          <h2>Nuestra Historia</h2>
+          <h2>{t("Nuestra Historia")}</h2>
           <div className="timeline">
-            <div className="timeline-item"><div className="timeline-content"><h3>2013</h3><p>Fundación de UnderTango como academia de tango moderno.</p></div></div>
-            <div className="timeline-item"><div className="timeline-content"><h3>2015</h3><p>Comenzamos a realizar shows como compañía de tango.</p></div></div>
-            <div className="timeline-item"><div className="timeline-content"><h3>2017</h3><p>Expandimos nuestros servicios como productora artística.</p></div></div>
-            <div className="timeline-item"><div className="timeline-content"><h3>2023</h3><p>Registro de la marca en el Instituto de la Propiedad Industrial (INPI).</p></div></div>
-            <div className="timeline-item"><div className="timeline-content"><h3>2025</h3><p>Lanzamiento de Moda UnderTango para expandir nuestra pasión.</p></div></div>
-            <div className="timeline-item"><div className="timeline-content"><h3>2026</h3><p>Fundación de la startup tecnológica y la red social de UnderTango Club, aún en construcción.</p></div></div>
+            <div className="timeline-item"><div className="timeline-content"><h3>2013</h3><p>{t("Fundación de UnderTango como academia de tango moderno.")}</p></div></div>
+            <div className="timeline-item"><div className="timeline-content"><h3>2015</h3><p>{t("Comenzamos a realizar shows como compañía de tango.")}</p></div></div>
+            <div className="timeline-item"><div className="timeline-content"><h3>2017</h3><p>{t("Expandimos nuestros servicios como productora artística.")}</p></div></div>
+            <div className="timeline-item"><div className="timeline-content"><h3>2023</h3><p>{t("Registro de la marca en el Instituto de la Propiedad Industrial (INPI).")}</p></div></div>
+            <div className="timeline-item"><div className="timeline-content"><h3>2025</h3><p>{t("Lanzamiento de Moda UnderTango para expandir nuestra pasión.")}</p></div></div>
+            <div className="timeline-item"><div className="timeline-content"><h3>2026</h3><p>{t("Fundación de la startup tecnológica y la red social de UnderTango Club, aún en construcción.")}</p></div></div>
           </div>
         </section>
 
         <section id="map" className="section-animate">
-          <h2>Encuéntranos</h2>
+          <h2>{t("Encuéntranos")}</h2>
           <div className="map-container">
             <a href="https://www.google.com/maps/place/Undertango+Club/" target="_blank" rel="noopener noreferrer" className="map-link">
               <img src="/assets/images/mapsScreen3.png" alt="Ubicación de UnderTango Club en Puerto Iguazú" />
             </a>
             <div className="info-overlay">
               <div className="info-content">
-                <h3>Información de Contacto</h3>
+                <h3>{t("Información de Contacto")}</h3>
                 <ul>
-                  <li><i className="fas fa-map-marker-alt"></i> Dirección: 1 de Mayo 850, Puerto Iguazú, Misiones</li>
-                  <li><i className="fas fa-phone"></i> Teléfono: +54 9 3757 61-8270</li>
+                  <li><i className="fas fa-map-marker-alt"></i>{t("Dirección: 1 de Mayo 850, Puerto Iguazú, Misiones")}</li>
+                  <li><i className="fas fa-phone"></i>{t("Teléfono: +54 9 3757 61-8270")}</li>
                   <li><i className="fas fa-envelope"></i> Email: undertangoclub@gmail.com</li>
                 </ul>
                 <div className="social-links">
@@ -381,7 +354,7 @@ export default function HomePage() {
         </section>
 
         <section id="clients" className="section-animate">
-          <h2>Nuestros Clientes</h2>
+          <h2>{t("Nuestros Clientes")}</h2>
           <div className="client-logos">
             <img src="/assets/images/casamalbec-Photoroom.jpg" alt="Casa Malbec" />
             <img src="/assets/images/crucerosIguazu.jpg" alt="Cruceros Iguazú" />
@@ -395,3 +368,5 @@ export default function HomePage() {
     </>
   );
 }
+
+export default function HomePage() { return <HomeLanguageProvider><HomeContent /></HomeLanguageProvider>; }

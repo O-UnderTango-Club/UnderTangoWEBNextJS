@@ -26,7 +26,7 @@ export default function HomeLanding(){
     </header>
     <div className={styles.welcomeVideo} aria-label="UnderTango Club">
       <video autoPlay muted loop playsInline preload="metadata" aria-label="Video de bienvenida de UnderTango Club">
-        <source src="/assets/images/welcome.mp4" type="video/mp4" />
+        <source src="https://under-tango-web.vercel.app/assets/images/welcome.mp4" type="video/mp4" />
       </video>
     </div>
     <div className={styles.panels} id="descubrir">

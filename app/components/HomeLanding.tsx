@@ -24,6 +24,11 @@ export default function HomeLanding(){
       <a href="/" className={styles.brand} aria-label="UnderTango Club"><span aria-hidden="true">Ø</span><strong>UnderTango</strong></a>
       <LanguageButtons />
     </header>
+    <div className={styles.welcomeVideo} aria-label="UnderTango Club">
+      <video autoPlay muted loop playsInline preload="metadata" aria-label="Video de bienvenida de UnderTango Club">
+        <source src="/assets/images/welcome.mp4" type="video/mp4" />
+      </video>
+    </div>
     <div className={styles.panels} id="descubrir">
       <article className={styles.panel} onClick={(event)=>{if(!isControl(event.target)) toggle("shows");}}>
         <Image className={styles.photo} src="/assets/images/grupal1.png" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
@@ -40,7 +45,7 @@ export default function HomeLanding(){
         </div>
       </article>
       <article className={styles.panel} onClick={(event)=>{if(!isControl(event.target)) toggle("classes");}}>
-        <Image className={styles.photo} src="/assets/images/tango-class-4.jpg" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
+        <Image className={styles.photo} src="/assets/images/tango-class-1.jpg" alt="" fill priority sizes="(max-width: 700px) 100vw, 34vw" />
         <div className={styles.shade}/>
         <div className={styles.panelBody}>
           <p className={styles.eyebrow}>02 · UNDER TANGO</p>

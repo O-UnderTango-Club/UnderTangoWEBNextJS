@@ -79,3 +79,8 @@
 /* Toda la tarjeta indica su interacción; los enlaces mantienen su acción propia. */
 .panel{cursor:pointer}
 .panel:has(.options) .options{cursor:auto}
+
+/* Video de bienvenida recuperado, seguido de los tres accesos. */
+.welcomeVideo{position:relative;overflow:hidden;background:#08131a; height:clamp(300px,55vw,70svh);min-height:300px}
+.welcomeVideo video{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
+@media(max-width:700px){.welcomeVideo{height:50svh;min-height:260px}}

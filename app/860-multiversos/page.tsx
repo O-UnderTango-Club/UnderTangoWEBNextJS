@@ -336,44 +336,92 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
 }
 
 function FrequencySpace() {
-  const [phase, setPhase] = useState(0);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
-    let frame = 0, last = 0;
-    const tick = (time: number) => {
-      if (time - last >= 65) { last = time; setPhase(time / 900); }
-      frame = window.requestAnimationFrame(tick);
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    type Vec = {x:number; y:number; z:number};
+    const cross = (a:Vec,b:Vec):Vec => ({x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x});
+    const normalise = (v:Vec):Vec => { const d=Math.hypot(v.x,v.y,v.z)||1; return {x:v.x/d,y:v.y/d,z:v.z/d}; };
+    // Órbita de Lissajous: relaciones de frecuencia 111:222:333 = 1:2:3.
+    const point = (t:number):Vec => ({x:Math.sin(t),y:Math.sin(2*t+0.7),z:Math.sin(3*t+1.2)});
+    const rings: Vec[][] = [];
+    const segments = 240, sides = 10, radius = 0.065;
+    for (let i=0;i<=segments;i++) {
+      const t=i/segments*Math.PI*2, p=point(t), prev=point(t-0.002), next=point(t+0.002);
+      const tangent=normalise({x:next.x-prev.x,y:next.y-prev.y,z:next.z-prev.z});
+      const ref = Math.abs(tangent.z)>0.9 ? {x:0,y:1,z:0} : {x:0,y:0,z:1};
+      const n=normalise(cross(tangent,ref)), b=normalise(cross(tangent,n));
+      const ring:Vec[]=[];
+      for(let j=0;j<sides;j++){
+        const a=2*Math.PI*j/sides, c=Math.cos(a)*radius, d=Math.sin(a)*radius;
+        ring.push({x:p.x+n.x*c+b.x*d,y:p.y+n.y*c+b.y*d,z:p.z+n.z*c+b.z*d});
+      }
+      rings.push(ring);
+    }
+    let frame=0, width=0, height=0, last=0;
+    const resize=() => {
+      const box=canvas.getBoundingClientRect(), ratio=Math.min(window.devicePixelRatio||1,2);
+      width=box.width; height=box.height;
+      canvas.width=Math.round(width*ratio); canvas.height=Math.round(height*ratio);
+      context.setTransform(ratio,0,0,ratio,0,0);
     };
-    frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
+    resize(); window.addEventListener("resize",resize);
+    const draw=(time:number) => {
+      frame=window.requestAnimationFrame(draw);
+      if(time-last<35) return;
+      last=time;
+      context.clearRect(0,0,width,height);
+      const spin=time*0.00014, cs=Math.cos(spin), sn=Math.sin(spin);
+      const tilt=0.48, ct=Math.cos(tilt), st=Math.sin(tilt);
+      const scale=Math.min(width,height)*0.24;
+      const project=(v:Vec) => {
+        const x=v.x*cs-v.y*sn, y=v.x*sn+v.y*cs;
+        const yy=y*ct-v.z*st, depth=y*st+v.z*ct;
+        const perspective=4.5/(4.5-depth);
+        return {x:width/2+x*scale*perspective,y:height*0.51-yy*scale*perspective,z:depth};
+      };
+      const center=project({x:0,y:0,z:0});
+      const axes=[
+        {v:{x:1.6,y:0,z:0},color:"#345a9b",label:"X · 111 Hz"},
+        {v:{x:0,y:1.6,z:0},color:"#a25d94",label:"Y · 222 Hz"},
+        {v:{x:0,y:0,z:1.6},color:"#26857e",label:"Z · 333 Hz"},
+      ];
+      context.lineWidth=1;
+      for(const axis of axes){
+        const tip=project(axis.v);
+        context.setLineDash([4,6]); context.strokeStyle=axis.color+"77";
+        context.beginPath(); context.moveTo(center.x,center.y); context.lineTo(tip.x,tip.y); context.stroke();
+        context.setLineDash([]); context.fillStyle=axis.color; context.beginPath(); context.arc(tip.x,tip.y,3,0,Math.PI*2); context.fill();
+        context.font="14px Georgia, serif"; context.textAlign=tip.x<center.x?"right":"left";
+        context.fillText(axis.label,tip.x+(tip.x<center.x?-8:8),tip.y-7);
+      }
+      const faces:Array<{points:Array<{x:number;y:number;z:number}>;depth:number;hue:number;light:number}>=[];
+      for(let i=0;i<segments;i++){
+        for(let j=0;j<sides;j++){
+          const k=(j+1)%sides;
+          const pts=[project(rings[i][j]),project(rings[i+1][j]),project(rings[i+1][k]),project(rings[i][k])];
+          const depth=pts.reduce((sum,p)=>sum+p.z,0)/4;
+          const light=Math.max(28,Math.min(74,48+depth*8+Math.cos(j*2*Math.PI/sides)*9));
+          faces.push({points:pts,depth,hue:210+50*i/segments,light});
+        }
+      }
+      faces.sort((a,b)=>a.depth-b.depth);
+      context.lineWidth=0.45;
+      for(const face of faces){
+        context.beginPath(); context.moveTo(face.points[0].x,face.points[0].y);
+        for(let i=1;i<face.points.length;i++) context.lineTo(face.points[i].x,face.points[i].y);
+        context.closePath();
+        context.fillStyle="hsl("+face.hue+" 48% "+face.light+"%)"; context.fill();
+        context.strokeStyle="rgba(35,44,80,.15)"; context.stroke();
+      }
+    };
+    frame=window.requestAnimationFrame(draw);
+    return () => { window.cancelAnimationFrame(frame); window.removeEventListener("resize",resize); };
   }, []);
-  const origin = {x:300, y:262};
-  const axes = [
-    {label:"X", hz:111, dx:184, dy:104, color:"#273e75", ratio:1},
-    {label:"Y", hz:222, dx:-184, dy:104, color:"#85517b", ratio:2},
-    {label:"Z", hz:333, dx:0, dy:-195, color:"#226a69", ratio:3},
-  ];
-  const wave = (dx:number, dy:number, ratio:number) => {
-    const length = Math.hypot(dx, dy), px = -dy / length, py = dx / length;
-    return Array.from({length:121}, (_, i) => {
-      const t = i / 120;
-      const displacement = Math.sin(t * Math.PI * 2 * 3 * ratio - phase * ratio) * 9 * Math.sin(Math.PI * t);
-      return (i ? "L" : "M") + (origin.x + dx * t + px * displacement).toFixed(1) + " " + (origin.y + dy * t + py * displacement).toFixed(1);
-    }).join(" ");
-  };
-  return <span aria-label="Tres vibraciones en los ejes X, Y y Z. Cuarta dimensión: el tiempo." style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",opacity:0,animation:"zeroSpaceFade 2s ease forwards",color:"#17191e"}}>
-    <svg viewBox="0 0 600 450" role="img" aria-label="X: 111 Hz, Y: 222 Hz y Z: 333 Hz" style={{width:"min(90vw, 720px)",height:"auto",maxHeight:"65vh",overflow:"visible"}}>
-      <defs><radialGradient id="zeroField"><stop offset="0%" stopColor="#e3e9f3" stopOpacity=".8"/><stop offset="100%" stopColor="#fff" stopOpacity="0"/></radialGradient></defs>
-      <ellipse cx="300" cy="250" rx="255" ry="195" fill="url(#zeroField)"/>
-      <path d="M116 366 L300 262 L484 366 L300 445 Z" fill="#edf0f6" fillOpacity=".42" stroke="#c8cedb" strokeWidth="1"/>
-      <path d="M162 340 L346 444 M208 314 L392 418 M254 288 L438 392 M438 340 L254 444 M392 314 L208 418 M346 288 L162 392" fill="none" stroke="#c9cedb" strokeOpacity=".55" strokeWidth="1"/>
-      {axes.map((axis) => <g key={axis.label}>
-        <line x1={origin.x} y1={origin.y} x2={origin.x + axis.dx} y2={origin.y + axis.dy} stroke={axis.color} strokeOpacity=".35" strokeWidth="1.2" strokeDasharray="4 6"/>
-        <path d={wave(axis.dx, axis.dy, axis.ratio)} fill="none" stroke={axis.color} strokeWidth="2.6" strokeLinecap="round"/>
-        <circle cx={origin.x + axis.dx} cy={origin.y + axis.dy} r="4.5" fill={axis.color}/>
-        <text x={origin.x + axis.dx + (axis.dx > 0 ? 12 : axis.dx < 0 ? -12 : 0)} y={origin.y + axis.dy + (axis.dy < 0 ? -17 : 24)} textAnchor={axis.dx > 0 ? "start" : axis.dx < 0 ? "end" : "middle"} fill={axis.color} fontFamily="Georgia, serif" fontSize="19">{axis.label} · {axis.hz} Hz</text>
-      </g>)}
-      <circle cx="300" cy="262" r="6" fill="#17191e"/>
-    </svg>
+  return <span aria-label="Objeto tridimensional formado por las vibraciones de 111, 222 y 333 hercios en los ejes X, Y y Z." style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",opacity:0,animation:"zeroSpaceFade 2s ease forwards",color:"#17191e"}}>
+    <canvas ref={canvasRef} role="img" aria-label="Órbita tridimensional de las tres frecuencias" style={{display:"block",width:"min(92vw, 820px)",height:"min(66vh, 600px)"}} />
     <span style={{margin:"8px 0 0",fontFamily:"Georgia, serif",fontSize:"clamp(1.2rem, 2.6vw, 2.2rem)",letterSpacing:".02em",textAlign:"center"}}>Cuarta dimensión: el tiempo</span>
   </span>;
 }

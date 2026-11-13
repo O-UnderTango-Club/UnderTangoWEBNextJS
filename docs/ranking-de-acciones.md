@@ -52,6 +52,6 @@ Los nombres duplicados se rechazan también si el proyecto está cerrado, ignora
 
 ## Estado y cierre de los grupos
 
-En la tarjeta, **Editar grupo** abre el selector de estado directamente. **Editar detalles** conserva el formulario para nombre, días y composición. No se puede cerrar un grupo que todavía contiene pasos abiertos; primero deben finalizarse, descartarse o retirarse.
+En la tarjeta, **Editar grupo** abre el selector de estado directamente. **Editar detalles** conserva el formulario para nombre, días y composición. Al marcar el grupo como **Finalizada**, el panel finaliza todos sus pasos, incluso los descartados, en el mismo guardado. Se conservan sus resultados, vínculos e historial; las modificaciones quedan auditadas. Descartar un grupo continúa requiriendo resolver o retirar sus pasos abiertos.
 
 Cuando todos los pasos de un grupo están **finalizados**, Supabase lo finaliza automáticamente y compacta su frente sin cambiar el orden relativo de las demás acciones. El cambio queda auditado. Un paso descartado no se considera realizado y no provoca el cierre automático; el usuario puede decidir el estado del grupo. El proceso inicial aplica la misma regla a los grupos existentes. La reapertura manual permite incorporar pasos nuevos.

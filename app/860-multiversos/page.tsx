@@ -403,23 +403,26 @@ function ModuleZero() {
         const from = forward.getChannelData(channel), to = reverse.getChannelData(channel);
         for (let i = 0; i < from.length; i++) to[i] = from[from.length - 1 - i];
       }
-      const wave = (backward = false) => {
+      const wave = (backward = false, last = false) => {
         const source = context.createBufferSource(), gain = context.createGain();
         source.buffer = backward ? reverse : forward;
+        source.loop = true;
         const now = context.currentTime;
-        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(1, now + 0.8);
-        gain.gain.setValueAtTime(1, now + 7.2); gain.gain.linearRampToValueAtTime(0, now + 8);
+        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(1, now + 0.3);
+        gain.gain.setValueAtTime(1, now + 8);
+        gain.gain.linearRampToValueAtTime(0, now + (last ? 9.5 : 8.3));
         source.connect(gain); gain.connect(context.destination);
         source.onended = () => { source.disconnect(); gain.disconnect(); };
         source.start(now);
+        source.stop(now + (last ? 9.5 : 8.3));
       };
-      const gong = (fifth = false) => {
+      const gong = (fifth = false, emphasis = 1) => {
         const now = context.currentTime, root = fifth ? 220 * 1.5 : 220;
         [1, 1.5, 2.08, 2.76, 4.1].forEach((partial, index) => {
           const oscillator = context.createOscillator(), envelope = context.createGain();
           oscillator.type = index === 0 ? "sine" : "triangle";
           oscillator.frequency.value = root * partial;
-          const amplitude = [0.16, 0.085, 0.045, 0.025, 0.012][index];
+          const amplitude = [0.16, 0.085, 0.045, 0.025, 0.012][index] * emphasis;
           envelope.gain.setValueAtTime(0.0001, now);
           envelope.gain.exponentialRampToValueAtTime(amplitude, now + 0.015);
           envelope.gain.exponentialRampToValueAtTime(0.0001, now + 4.5 - index * 0.45);
@@ -433,26 +436,27 @@ function ModuleZero() {
       };
       setStage("opening"); wave();
       at(8000, () => { setStage("darkening"); wave(true); });
-      at(16000, () => { setStage("opening"); wave(); });
+      at(16000, () => { setStage("opening"); wave(false, true); });
       at(24000, () => setStage("question"));
-      at(30000, () => { setStage("one"); gong(); });
-      at(33000, () => { setStage("darkening"); wave(true); });
-      at(41000, () => { setStage("opening"); wave(); });
-      at(49000, () => { setStage("one-again"); gong(); });
-      at(51500, () => { setStage("two"); gong(true); });
+      at(30000, () => { setStage("one"); gong(false, 1.3); });
+      at(33000, () => setStage("fast-darkening"));
+      at(35000, () => setStage("fast-opening"));
+      at(37000, () => { setStage("one-again"); gong(); });
+      at(39500, () => { setStage("two"); gong(true); });
     } catch {
       if (audioRef.current) void audioRef.current.close();
       audioRef.current = null; runningRef.current = false; setStage("ready");
     }
   };
 
-  const light = ["opening", "question", "one", "one-again", "two"].includes(stage);
-  const symbol = stage === "opening" || stage === "darkening";
+  const light = ["opening", "fast-opening", "question", "one", "one-again", "two"].includes(stage);
+  const symbol = ["opening", "darkening", "fast-opening", "fast-darkening"].includes(stage);
+  const fast = stage === "fast-opening" || stage === "fast-darkening" || stage === "one-again";
   const question = stage === "question";
   const dots = ["one", "one-again", "two"].includes(stage);
   return <section aria-label="Módulo cero: el vacío" style={{background:"#000",height:"100svh",position:"relative",opacity:1,transform:"none",animation:"none"}}>
     <style>{`@keyframes zeroDrift { 0% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } 50% { transform:translate(5%, -4%) rotate(8deg) scale(1.15); } 100% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } } @keyframes zeroGrain { 0% { transform:translate(0,0); } 25% { transform:translate(-2%,1%); } 50% { transform:translate(1%,-2%); } 75% { transform:translate(2%,2%); } 100% { transform:translate(0,0); } }`}</style>
-    <button type="button" onClick={() => void start()} aria-label={stage === "ready" ? "Iniciar el módulo cero" : "Módulo cero en desarrollo"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:light?"#fff":"#000",transition:"background-color 8s cubic-bezier(.63,.02,.93,.38)",cursor:stage === "ready"?"pointer":"default",display:"grid",placeItems:"center",overflow:"hidden",isolation:"isolate"}}>
+    <button type="button" onClick={() => void start()} aria-label={stage === "ready" ? "Iniciar el módulo cero" : "Módulo cero en desarrollo"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:light?"#fff":"#000",transition:`background-color ${fast ? 2 : 8}s cubic-bezier(.63,.02,.93,.38)`,cursor:stage === "ready"?"pointer":"default",display:"grid",placeItems:"center",overflow:"hidden",isolation:"isolate"}}>
       <span aria-hidden="true" style={{position:"absolute",inset:"-60%",pointerEvents:"none",opacity:symbol?0.82:0,transition:"opacity 4s ease",mixBlendMode:"screen",filter:"blur(25px)",animation:"zeroDrift 18s ease-in-out infinite",background:"radial-gradient(ellipse at 47% 48%, rgba(255,255,255,.85) 0%, rgba(153,180,222,.45) 8%, transparent 25%), radial-gradient(ellipse at 38% 60%, rgba(91,115,154,.55), transparent 24%), radial-gradient(ellipse at 62% 39%, rgba(139,120,156,.45), transparent 22%), repeating-conic-gradient(from 27deg at 50% 50%, rgba(179,199,231,.12) 0deg, transparent 9deg, rgba(117,134,160,.08) 18deg, transparent 29deg)"}} />
       <span aria-hidden="true" style={{position:"absolute",inset:"-20%",pointerEvents:"none",opacity:symbol?0.16:0,transition:"opacity 4s",mixBlendMode:"screen",animation:"zeroGrain 1.2s steps(3) infinite",backgroundImage:"repeating-radial-gradient(ellipse at 42% 47%, transparent 0 2px, rgba(255,255,255,.22) 3px, transparent 4px 7px), repeating-linear-gradient(127deg, transparent 0 5px, rgba(255,255,255,.15) 6px, transparent 7px 13px)"}} />
       <span aria-hidden="true" style={{position:"relative",fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:symbol?1:0,textShadow:"0 0 8px #fff, 0 0 32px #fff, 0 0 100px rgba(194,216,255,.8)",transition:"opacity 3s ease",lineHeight:1}}>∅</span>

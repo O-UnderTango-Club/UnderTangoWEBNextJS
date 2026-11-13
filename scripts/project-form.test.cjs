@@ -104,4 +104,17 @@ function findElement(node,predicate){
   assert.deepEqual(closed,{stage,dependencies:['previous'],events:['confirmed'],evidence:'Trabajo verificado'},'Closure must preserve linked history');
  }
  console.log('Closure form passed: completion without result, optional evidence, discard reason, preserved dependencies');
+ const groupEditor={kind:'task',id:'group',mode:'status',initial:{stage:'done',front:'Primario',rank:1,reason:'',dependencies:[],events:[]}};
+ const groupData={...data,tasks:[{id:'group',name:'Grupo',isGroup:true,memberIds:['step'],baseStage:'ready',stage:'ready',front:'Primario',rank:1,activateAt:''},{id:'step',name:'Paso',stage:'ready'}]};
+ let groupChanges;
+ quickEvidence='';stateIndex=0;
+ const groupDone=QuickForm({editor:groupEditor,data:groupData,busy:false,onSave:async changes=>{groupChanges=changes;}});
+ assert.equal(findElement(groupDone,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,false,'Open steps must not block completion');
+ assert.ok(findElement(groupDone,n=>typeof n.props?.children==='string'&&n.props.children.includes('todos sus pasos quedarán finalizados')));
+ await findElement(groupDone,n=>n.type==='form').props.onSubmit({preventDefault(){}});
+ assert.deepEqual(groupChanges,{stage:'done',dependencies:[],events:[]});
+ quickEvidence='Motivo';stateIndex=0;
+ const groupDiscard=QuickForm({editor:{...groupEditor,initial:{...groupEditor.initial,stage:'cancelled'}},data:groupData,busy:false});
+ assert.equal(findElement(groupDiscard,n=>n.type==='button'&&n.props.children==='Guardar estado').props.disabled,true,'Discard remains blocked while a step is open');
+ console.log('Group form passed: completion enabled, effect explained, discard guard retained');
 })().catch(error=>{console.error(error);process.exitCode=1;});

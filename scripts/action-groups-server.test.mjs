@@ -13,12 +13,15 @@ await server.mutate(await intent('task','a',{stage:'done',evidence:'Completada e
 await server.mutate(await intent('group',created.id,{name:'Grupo',members:['c'],front:'Secundario',rank:1}),'test');assert.equal(db.tasks.find(t=>t.id==='a').fields[F.tasks.front],undefined);
 await server.mutate(await intent('task',created.id,{doneToday:true}),'test');assert.equal(server.responseBoard(await server.snapshot()).tasks.find(t=>t.id==='c').stage,'scheduled');
 console.log('OK servidor: crear/reintentar, proteger miembro, mover grupo, completar paso, retirar finalizada y descansar grupo');
-await assert.rejects(server.mutate(await intent('task',created.id,{stage:'done'}),'test'),/Primero resolvé o retirá/);
-assert.equal(db.tasks.find(t=>t.id===created.id).fields[F.tasks.status],'Pendiente');
-await server.mutate(await intent('task','c',{stage:'done'}),'test');
-await server.mutate(await intent('task',created.id,{stage:'done'}),'test');
+await assert.rejects(server.mutate(await intent('task',created.id,{stage:'cancelled',evidence:'Motivo'}),'test'),/Primero resolvé o retirá/);
+const directClose=await intent('task',created.id,{stage:'done'});
+const closeReceipt=await server.mutate(directClose,'test');
 assert.equal(db.tasks.find(t=>t.id===created.id).fields[F.tasks.status],'Hecho');
-console.log('OK estado directo: no cierra con pasos abiertos; permite finalizar sin comentario al resolverlos');
+assert.equal(db.tasks.find(t=>t.id==='c').fields[F.tasks.status],'Hecho');
+assert.equal(db.tasks.find(t=>t.id==='c').fields[F.tasks.gate],'Terminada');
+assert.equal(db.tasks.find(t=>t.id==='b').fields[F.tasks.status],'Pendiente');
+assert.deepEqual(await server.mutate(directClose,'test'),closeReceipt);
+console.log('OK estado directo: finalizar grupo finaliza los pasos, conserva otras acciones y admite reintento');
 await server.mutate(await intent('task',created.id,{stage:'ready'}),'test');
 const rank=db.tasks.find(t=>t.id===created.id).fields[F.tasks.rank];
 await server.mutate(await intent('group',created.id,{name:'Grupo',members:['c','b'],front:'Secundario',rank}),'test');
@@ -27,3 +30,21 @@ assert.equal(db.tasks.find(t=>t.id===created.id).fields[F.tasks.status],'Hecho')
 const removed=db.tasks.find(t=>t.id==='b');assert.equal(removed.fields[F.tasks.group],undefined);assert.equal(removed.fields[F.tasks.status],'Pendiente');
 const ranked=db.tasks.filter(t=>!g.isMember(t)&&!['Hecho','Cancelado'].includes(t.fields[F.tasks.status]));assert.equal(new Set(ranked.map(t=>t.fields[F.tasks.front]+':'+t.fields[F.tasks.rank])).size,ranked.length);
 console.log('OK retirar el último paso abierto cierra el grupo y conserva el paso y los rankings');
+
+const nextRank=Math.max(0,...db.tasks.filter(t=>!g.isMember(t)&&t.fields[F.tasks.front]==='Primario'&&!['Hecho','Cancelado'].includes(t.fields[F.tasks.status])).map(t=>Number(t.fields[F.tasks.rank])||0))+1;
+db.tasks.push({id:'e',fields:{[F.tasks.name]:'e',[F.tasks.front]:'Primario',[F.tasks.rank]:nextRank,[F.tasks.status]:'Pendiente',[F.tasks.gate]:'Acción inmediata',[F.tasks.result]:'Resultado previo'}});
+const mixed=await server.mutate(await intent('group',undefined,{name:'Grupo mixto',members:['b','d','e'],front:'Primario',rank:1}),'test');
+await server.mutate(await intent('task','d',{stage:'cancelled',evidence:'Motivo previo'}),'test');
+await server.mutate(await intent('task','e',{stage:'done'}),'test');
+const beforeResult=db.tasks.find(t=>t.id==='d').fields[F.tasks.result];
+const beforeCompleted=JSON.stringify(db.tasks.find(t=>t.id==='e'));
+const beforeUnrelated=JSON.stringify(db.tasks.find(t=>t.id==='a'));
+const closeMixed=await intent('task',mixed.id,{stage:'done'});
+const previousCalls=calls;
+await server.mutate(closeMixed,'test');
+assert.equal(calls,previousCalls+1,'group and steps must use one commit');
+for(const id of ['b','d','e']){const f=db.tasks.find(t=>t.id===id).fields;assert.equal(f[F.tasks.status],'Hecho');assert.equal(f[F.tasks.gate],'Terminada');}
+assert.equal(db.tasks.find(t=>t.id==='d').fields[F.tasks.result],beforeResult,'discard reason remains in history');
+assert.equal(JSON.stringify(db.tasks.find(t=>t.id==='e')),beforeCompleted,'completed steps are not rewritten');
+assert.equal(JSON.stringify(db.tasks.find(t=>t.id==='a')),beforeUnrelated,'unrelated actions do not change');
+console.log('OK grupo mixto: pasos abiertos y descartados finalizados, historial y ajenos conservados');

@@ -164,6 +164,7 @@ async function performMutation(input: any, actor: string) {
   }
   const fields: Record<string,any>={};
   const rankChanges: {id:string;fields:Record<string,any>}[]=[];
+  const memberChanges: OperationsPatch[]=[];
   if(kind==="task") {
     const allowed=["weekdays","front","rank","activateAt","name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence","comment"];
     if(Object.keys(change).some(k=>!allowed.includes(k))) throw new PanelError("Campo no editable.");
@@ -184,7 +185,14 @@ async function performMutation(input: any, actor: string) {
     if(("front" in change||"rank" in change)&&!actionRanking)throw new PanelError("El ranking individual todavía no está habilitado.",409);
     const candidate={id:current?.id||"new",fields:{...current?.fields,...fields}};
     if(current&&isMember(current)&&("front" in change||"rank" in change))throw new PanelError("La posición se cambia en el grupo. Para mover este paso por separado, retiralo del grupo.");
-    if(current&&isGroup(current)&&stage&&["done","cancelled"].includes(stage)&&data.tasks.some(t=>t.fields[F.tasks.group]===current.id&&!closed(t)))throw new PanelError("Primero resolvé o retirá las acciones abiertas del grupo.");
+    if(current&&isGroup(current)&&stage==="cancelled"&&data.tasks.some(t=>t.fields[F.tasks.group]===current.id&&!closed(t)))throw new PanelError("Primero resolvé o retirá las acciones abiertas del grupo.");
+    if(current&&isGroup(current)&&stage==="done"){
+      if(!operational||!("globalRevision" in data))throw new PanelError("Finalizar grupos requiere el sistema operativo de Supabase.",409);
+      // Group and every step are committed together at the same snapshot revision.
+      for(const member of data.tasks.filter(t=>t.fields[F.tasks.group]===current.id))
+        if(member.fields[F.tasks.status]!=="Hecho"||member.fields[F.tasks.gate]!=="Terminada")
+          memberChanges.push({table:"follow_ups",id:member.id,create:false,fields:{[F.tasks.status]:"Hecho",[F.tasks.gate]:"Terminada"}});
+    }
     if(actionRanking){
       const wasClosed=current?closed(current):false, isClosed=closed(candidate);
       if(isClosed&&("front" in change||"rank" in change))throw new PanelError("Reabrí la acción antes de cambiar su posición.");
@@ -273,6 +281,7 @@ async function performMutation(input: any, actor: string) {
     return operationsCall(()=>commitOperations(input.requestId,actor,input,data.globalRevision,[
       {table:destination,id:current?.id||null,fields,create:!current},
       ...rankChanges.map(p=>({table:kind==="task"?"follow_ups" as const:"projects" as const,id:p.id,fields:p.fields,create:false})),
+      ...memberChanges,
     ]));
   }
   const saved=await airtable(table,current?`/${current.id}?returnFieldsByFieldId=true`:"?returnFieldsByFieldId=true",{method:current?"PATCH":"POST",body:JSON.stringify({fields,typecast:false})});

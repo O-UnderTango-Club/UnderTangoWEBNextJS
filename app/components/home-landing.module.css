@@ -102,3 +102,8 @@
  .landing:has(.options) .panel{min-height:110px}
  .landing:has(.options) .panel:has(.options){min-height:290px}
 }
+
+/* Acceso a la agenda sobre el video de bienvenida. */
+.landing .calendarLink{position:absolute;left:50%;bottom:clamp(12px,2vw,24px);z-index:2;transform:translateX(-50%);display:inline-flex;align-items:center;justify-content:center;gap:9px;max-width:calc(100% - 32px);padding:11px 17px;border:1px solid #e3bf80;border-radius:5px;background:#081824ed;color:#fff;font-size:clamp(12px,2.8vw,14px);font-weight:700;line-height:1.2;white-space:nowrap;box-shadow:0 4px 18px #0008;transition:background .2s ease}
+.landing .calendarLink:hover{background:#263b47}
+.calendarLink svg{flex:none}

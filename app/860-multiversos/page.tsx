@@ -337,14 +337,18 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
 
 function ModuleZero() {
   const [stage, setStage] = useState("ready");
+  const [pulseCount, setPulseCount] = useState(0);
+  const [pulseRate, setPulseRate] = useState(2);
   const audioRef = useRef<AudioContext | null>(null);
   const timersRef = useRef<number[]>([]);
   const runningRef = useRef(false);
   const runRef = useRef(0);
+  const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
     const stop = () => {
       runRef.current++;
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
       timersRef.current.forEach(window.clearTimeout);
       timersRef.current = [];
       runningRef.current = false;
@@ -362,7 +366,7 @@ function ModuleZero() {
       const context = new AudioContext();
       audioRef.current = context;
       await context.resume();
-      const render = new OfflineAudioContext(2, context.sampleRate * 8, context.sampleRate);
+      const render = new OfflineAudioContext(2, context.sampleRate * 26, context.sampleRate);
       const buffer = render.createBuffer(2, render.sampleRate * 4, render.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const samples = buffer.getChannelData(channel);
@@ -398,23 +402,17 @@ function ModuleZero() {
         const samples = forward.getChannelData(channel);
         for (let i = 0; i < samples.length; i++) samples[i] *= boost;
       }
-      const reverse = context.createBuffer(2, forward.length, forward.sampleRate);
-      for (let channel = 0; channel < 2; channel++) {
-        const from = forward.getChannelData(channel), to = reverse.getChannelData(channel);
-        for (let i = 0; i < from.length; i++) to[i] = from[from.length - 1 - i];
-      }
-      const wave = (backward = false, last = false) => {
+      const wave = () => {
         const source = context.createBufferSource(), gain = context.createGain();
-        source.buffer = backward ? reverse : forward;
-        source.loop = true;
+        source.buffer = forward;
         const now = context.currentTime;
-        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(1, now + 0.3);
-        gain.gain.setValueAtTime(1, now + 8);
-        gain.gain.linearRampToValueAtTime(0, now + (last ? 9.5 : 8.3));
+        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(1, now + 3);
+        gain.gain.setValueAtTime(1, now + 24);
+        gain.gain.linearRampToValueAtTime(0, now + 25.5);
         source.connect(gain); gain.connect(context.destination);
         source.onended = () => { source.disconnect(); gain.disconnect(); };
         source.start(now);
-        source.stop(now + (last ? 9.5 : 8.3));
+        source.stop(now + 25.5);
       };
       const gong = (fifth = false, emphasis = 1) => {
         const now = context.currentTime, root = fifth ? 220 * 1.5 : 220;
@@ -434,26 +432,73 @@ function ModuleZero() {
       const at = (ms: number, action: () => void) => {
         timersRef.current.push(window.setTimeout(() => { if (run === runRef.current) action(); }, ms));
       };
+      const accelerate = () => {
+        setStage("multiplying");
+        const duration = 12, beginning = context.currentTime + 0.08;
+        const beat = context.createBuffer(1, Math.floor(context.sampleRate * 0.012), context.sampleRate);
+        const samples = beat.getChannelData(0);
+        for (let i = 0; i < samples.length; i++) {
+          const time = i / context.sampleRate;
+          samples[i] = (Math.sin(2 * Math.PI * 220 * time) * 0.65 + (Math.random() * 2 - 1) * 0.35) * Math.exp(-time * 450);
+        }
+        const hits: Array<{time: number; rate: number}> = [];
+        let position = 0;
+        while (position < duration) {
+          const rate = 2 * Math.pow(111 / 2, position / duration);
+          hits.push({time: position, rate});
+          const source = context.createBufferSource(), gain = context.createGain();
+          source.buffer = beat;
+          gain.gain.value = 0.22 / Math.sqrt(Math.max(1, rate / 12));
+          source.connect(gain); gain.connect(context.destination);
+          source.onended = () => { source.disconnect(); gain.disconnect(); };
+          source.start(beginning + position);
+          position += 1 / rate;
+        }
+        const pitch = context.createOscillator(), pitchGain = context.createGain();
+        pitch.type = "sine"; pitch.frequency.value = 111;
+        pitchGain.gain.setValueAtTime(0, beginning + duration - 0.15);
+        pitchGain.gain.linearRampToValueAtTime(0.09, beginning + duration + 0.6);
+        pitch.connect(pitchGain); pitchGain.connect(context.destination);
+        pitch.start(beginning + duration - 0.15);
+        const draw = () => {
+          if (run !== runRef.current || audioRef.current !== context) return;
+          const elapsed = context.currentTime - beginning;
+          let count = 0;
+          while (count < hits.length && hits[count].time <= elapsed) count++;
+          setPulseCount(count);
+          setPulseRate(count ? hits[count - 1].rate : 2);
+          if (elapsed >= duration) { setPulseRate(111); setStage("vertical"); frameRef.current = null; return; }
+          frameRef.current = window.requestAnimationFrame(draw);
+        };
+        frameRef.current = window.requestAnimationFrame(draw);
+      };
       setStage("opening"); wave();
-      at(8000, () => { setStage("darkening"); wave(true); });
-      at(16000, () => { setStage("opening"); wave(false, true); });
+      at(8000, () => setStage("darkening"));
+      at(16000, () => setStage("opening"));
       at(24000, () => setStage("question"));
       at(30000, () => { setStage("one"); gong(false, 1.3); });
       at(33000, () => setStage("fast-darkening"));
       at(35000, () => setStage("fast-opening"));
       at(37000, () => { setStage("one-again"); gong(); });
       at(39500, () => { setStage("two"); gong(true); });
+      at(42500, accelerate);
     } catch {
       if (audioRef.current) void audioRef.current.close();
       audioRef.current = null; runningRef.current = false; setStage("ready");
     }
   };
 
-  const light = ["opening", "fast-opening", "question", "one", "one-again", "two"].includes(stage);
+  const light = ["opening", "fast-opening", "question", "one", "one-again", "two", "multiplying", "vertical"].includes(stage);
   const symbol = ["opening", "darkening", "fast-opening", "fast-darkening"].includes(stage);
   const fast = stage === "fast-opening" || stage === "fast-darkening" || stage === "one-again";
   const question = stage === "question";
-  const dots = ["one", "one-again", "two"].includes(stage);
+  const dots = ["one", "one-again", "two", "multiplying", "vertical"].includes(stage);
+  const many = stage === "multiplying" || stage === "vertical";
+  const pointPosition = (index: number) => {
+    let n = index, fraction = 0, scale = 0.5;
+    while (n > 0) { fraction += (n % 2) * scale; n = Math.floor(n / 2); scale *= 0.5; }
+    return 10 + 180 * fraction;
+  };
   return <section aria-label="Módulo cero: el vacío" style={{background:"#000",height:"100svh",position:"relative",opacity:1,transform:"none",animation:"none"}}>
     <style>{`@keyframes zeroDrift { 0% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } 50% { transform:translate(5%, -4%) rotate(8deg) scale(1.15); } 100% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } } @keyframes zeroGrain { 0% { transform:translate(0,0); } 25% { transform:translate(-2%,1%); } 50% { transform:translate(1%,-2%); } 75% { transform:translate(2%,2%); } 100% { transform:translate(0,0); } }`}</style>
     <button type="button" onClick={() => void start()} aria-label={stage === "ready" ? "Iniciar el módulo cero" : "Módulo cero en desarrollo"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:light?"#fff":"#000",transition:`background-color ${fast ? 2 : 8}s cubic-bezier(.63,.02,.93,.38)`,cursor:stage === "ready"?"pointer":"default",display:"grid",placeItems:"center",overflow:"hidden",isolation:"isolate"}}>
@@ -461,7 +506,12 @@ function ModuleZero() {
       <span aria-hidden="true" style={{position:"absolute",inset:"-20%",pointerEvents:"none",opacity:symbol?0.16:0,transition:"opacity 4s",mixBlendMode:"screen",animation:"zeroGrain 1.2s steps(3) infinite",backgroundImage:"repeating-radial-gradient(ellipse at 42% 47%, transparent 0 2px, rgba(255,255,255,.22) 3px, transparent 4px 7px), repeating-linear-gradient(127deg, transparent 0 5px, rgba(255,255,255,.15) 6px, transparent 7px 13px)"}} />
       <span aria-hidden="true" style={{position:"relative",fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:symbol?1:0,textShadow:"0 0 8px #fff, 0 0 32px #fff, 0 0 100px rgba(194,216,255,.8)",transition:"opacity 3s ease",lineHeight:1}}>∅</span>
       <span aria-hidden={!question} style={{position:"absolute",maxWidth:"min(85vw, 900px)",color:"#111",fontFamily:"Georgia, serif",fontSize:"clamp(1.5rem, 3.5vw, 3.6rem)",lineHeight:1.3,fontWeight:400,opacity:question?1:0,transition:"opacity 1.5s ease",pointerEvents:"none"}}>¿Cuál es la entidad mínima capaz de ser imaginada?</span>
-      <span aria-hidden="true" style={{position:"absolute",display:"flex",gap:"clamp(42px, 8vw, 140px)",alignItems:"center",opacity:dots?1:0,transition:"opacity 1.2s ease",pointerEvents:"none"}}><i style={{display:"block",width:"clamp(12px, 1.4vw, 20px)",height:"clamp(12px, 1.4vw, 20px)",borderRadius:"50%",background:"#000"}} />{stage === "two" && <i style={{display:"block",width:"clamp(12px, 1.4vw, 20px)",height:"clamp(12px, 1.4vw, 20px)",borderRadius:"50%",background:"#000"}} />}</span>
+      <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",opacity:dots?1:0,transform:stage === "vertical"?"rotate(90deg)":"rotate(0deg)",transition:"opacity 1.2s ease, transform 4s ease-in-out",pointerEvents:"none"}}>
+        {stage === "one" || stage === "one-again" ? <circle cx="100" cy="20" r="10" fill="#000" /> : <><circle cx="10" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /><circle cx="190" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /></>}
+        {many && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
+        {stage === "vertical" && <line x1="10" y1="20" x2="190" y2="20" stroke="#000" strokeWidth="3" />}
+      </svg>
+      {many && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{stage === "vertical" ? "111 Hz · TONO" : `${pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO`}</span>}
     </button>
   </section>;
 }

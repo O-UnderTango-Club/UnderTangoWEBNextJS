@@ -438,6 +438,16 @@ function ModuleZero() {
       const at = (ms: number, action: () => void) => {
         timersRef.current.push(window.setTimeout(() => { if (run === runRef.current) action(); }, ms));
       };
+      const addTone = (frequency: number, volume: number) => {
+        const oscillator = context.createOscillator(), gain = context.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = frequency;
+        const now = context.currentTime;
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(volume, now + 1);
+        oscillator.connect(gain); gain.connect(context.destination);
+        oscillator.start(now);
+      };
       const accelerate = () => {
         setStage("multiplying");
         const duration = 12, beginning = context.currentTime + 0.08;
@@ -481,7 +491,14 @@ function ModuleZero() {
           while (count < hits.length && hits[count].time <= elapsed) count++;
           setPulseCount(count);
           setPulseRate(count ? hits[count - 1].rate : 2);
-          if (elapsed >= duration) { setPulseRate(111); setStage("vertical"); frameRef.current = null; return; }
+          if (elapsed >= duration) {
+            setPulseRate(111); setStage("vertical"); frameRef.current = null;
+            at(4000, () => { setStage("pair"); addTone(222, 0.06); });
+            at(9000, () => setStage("plus"));
+            at(11000, () => setStage("equals"));
+            at(13000, () => { setStage("triad"); addTone(333, 0.05); });
+            return;
+          }
           frameRef.current = window.requestAnimationFrame(draw);
         };
         frameRef.current = window.requestAnimationFrame(draw);
@@ -499,12 +516,13 @@ function ModuleZero() {
     }
   };
 
-  const light = ["opening", "fast-opening", "question", "one", "one-again", "two", "multiplying", "vertical"].includes(stage);
+  const light = ["opening", "fast-opening", "question", "one", "one-again", "two", "multiplying", "vertical", "pair", "plus", "equals", "triad"].includes(stage);
   const symbol = ["opening", "darkening", "fast-opening", "fast-darkening"].includes(stage);
   const fast = stage === "fast-opening" || stage === "fast-darkening" || stage === "one-again";
   const question = stage === "question";
   const dots = ["one", "one-again", "two", "multiplying", "vertical"].includes(stage);
   const many = stage === "multiplying" || stage === "vertical";
+  const expression = ["pair", "plus", "equals", "triad"].includes(stage);
   const pointPosition = (index: number) => {
     let n = index, fraction = 0, scale = 0.5;
     while (n > 0) { fraction += (n % 2) * scale; n = Math.floor(n / 2); scale *= 0.5; }
@@ -522,6 +540,13 @@ function ModuleZero() {
         {many && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
         {stage === "vertical" && <line x1="10" y1="20" x2="190" y2="20" stroke="#000" strokeWidth="3" />}
       </svg>
+      {expression && <span aria-label={stage === "triad" ? "111 hercios más 222 hercios igual a 333 hercios" : "111 y 222 hercios"} style={{position:"absolute",display:"grid",gridTemplateColumns:"1fr .65fr 1fr .65fr 1fr",alignItems:"center",justifyItems:"center",width:"min(85vw, 560px)",color:"#111",pointerEvents:"none"}}>
+        <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>111 Hz</small></span>
+        <span style={{fontFamily:"serif",fontSize:"clamp(30px, 5vw, 60px)",visibility:stage === "pair"?"hidden":"visible"}}>+</span>
+        <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>222 Hz</small></span>
+        <span style={{fontFamily:"serif",fontSize:"clamp(30px, 5vw, 60px)",visibility:stage === "equals" || stage === "triad"?"visible":"hidden"}}>=</span>
+        <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16,visibility:stage === "triad"?"visible":"hidden"}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>333 Hz</small></span>
+      </span>}
       {many && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{stage === "vertical" ? "111 Hz · TONO" : `${pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO`}</span>}
     </button>
   </section>;

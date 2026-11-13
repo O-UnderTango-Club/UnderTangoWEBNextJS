@@ -335,6 +335,49 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
   parameter.setTargetAtTime(value, now, time);
 }
 
+function FrequencySpace() {
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    let frame = 0, last = 0;
+    const tick = (time: number) => {
+      if (time - last >= 65) { last = time; setPhase(time / 900); }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+  const origin = {x:300, y:262};
+  const axes = [
+    {label:"X", hz:111, dx:184, dy:104, color:"#273e75", ratio:1},
+    {label:"Y", hz:222, dx:-184, dy:104, color:"#85517b", ratio:2},
+    {label:"Z", hz:333, dx:0, dy:-195, color:"#226a69", ratio:3},
+  ];
+  const wave = (dx:number, dy:number, ratio:number) => {
+    const length = Math.hypot(dx, dy), px = -dy / length, py = dx / length;
+    return Array.from({length:121}, (_, i) => {
+      const t = i / 120;
+      const displacement = Math.sin(t * Math.PI * 2 * 3 * ratio - phase * ratio) * 9 * Math.sin(Math.PI * t);
+      return (i ? "L" : "M") + (origin.x + dx * t + px * displacement).toFixed(1) + " " + (origin.y + dy * t + py * displacement).toFixed(1);
+    }).join(" ");
+  };
+  return <span aria-label="Tres vibraciones en los ejes X, Y y Z. Cuarta dimensión: el tiempo." style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",opacity:0,animation:"zeroSpaceFade 2s ease forwards",color:"#17191e"}}>
+    <svg viewBox="0 0 600 450" role="img" aria-label="X: 111 Hz, Y: 222 Hz y Z: 333 Hz" style={{width:"min(90vw, 720px)",height:"auto",maxHeight:"65vh",overflow:"visible"}}>
+      <defs><radialGradient id="zeroField"><stop offset="0%" stopColor="#e3e9f3" stopOpacity=".8"/><stop offset="100%" stopColor="#fff" stopOpacity="0"/></radialGradient></defs>
+      <ellipse cx="300" cy="250" rx="255" ry="195" fill="url(#zeroField)"/>
+      <path d="M116 366 L300 262 L484 366 L300 445 Z" fill="#edf0f6" fillOpacity=".42" stroke="#c8cedb" strokeWidth="1"/>
+      <path d="M162 340 L346 444 M208 314 L392 418 M254 288 L438 392 M438 340 L254 444 M392 314 L208 418 M346 288 L162 392" fill="none" stroke="#c9cedb" strokeOpacity=".55" strokeWidth="1"/>
+      {axes.map((axis) => <g key={axis.label}>
+        <line x1={origin.x} y1={origin.y} x2={origin.x + axis.dx} y2={origin.y + axis.dy} stroke={axis.color} strokeOpacity=".35" strokeWidth="1.2" strokeDasharray="4 6"/>
+        <path d={wave(axis.dx, axis.dy, axis.ratio)} fill="none" stroke={axis.color} strokeWidth="2.6" strokeLinecap="round"/>
+        <circle cx={origin.x + axis.dx} cy={origin.y + axis.dy} r="4.5" fill={axis.color}/>
+        <text x={origin.x + axis.dx + (axis.dx > 0 ? 12 : axis.dx < 0 ? -12 : 0)} y={origin.y + axis.dy + (axis.dy < 0 ? -17 : 24)} textAnchor={axis.dx > 0 ? "start" : axis.dx < 0 ? "end" : "middle"} fill={axis.color} fontFamily="Georgia, serif" fontSize="19">{axis.label} · {axis.hz} Hz</text>
+      </g>)}
+      <circle cx="300" cy="262" r="6" fill="#17191e"/>
+    </svg>
+    <span style={{margin:"8px 0 0",fontFamily:"Georgia, serif",fontSize:"clamp(1.2rem, 2.6vw, 2.2rem)",letterSpacing:".02em",textAlign:"center"}}>Cuarta dimensión: el tiempo</span>
+  </span>;
+}
+
 function ModuleZero() {
   const [stage, setStage] = useState("ready");
   const [pulseCount, setPulseCount] = useState(0);
@@ -496,7 +539,7 @@ function ModuleZero() {
             at(4000, () => { setStage("pair"); addTone(222, 0.06); });
             at(9000, () => setStage("plus"));
             at(11000, () => setStage("equals"));
-            at(13000, () => { setStage("triad"); addTone(333, 0.05); });
+            at(13000, () => { setStage("triad"); addTone(333, 0.05); at(7000, () => setStage("space")); });
             return;
           }
           frameRef.current = window.requestAnimationFrame(draw);
@@ -516,20 +559,20 @@ function ModuleZero() {
     }
   };
 
-  const light = ["opening", "fast-opening", "question", "one", "one-again", "two", "multiplying", "vertical", "pair", "plus", "equals", "triad"].includes(stage);
+  const light = ["opening", "fast-opening", "question", "one", "one-again", "two", "multiplying", "vertical", "pair", "plus", "equals", "triad", "space"].includes(stage);
   const symbol = ["opening", "darkening", "fast-opening", "fast-darkening"].includes(stage);
   const fast = stage === "fast-opening" || stage === "fast-darkening" || stage === "one-again";
   const question = stage === "question";
   const dots = ["one", "one-again", "two", "multiplying", "vertical"].includes(stage);
   const many = stage === "multiplying" || stage === "vertical";
-  const expression = ["pair", "plus", "equals", "triad"].includes(stage);
+  const expression = ["pair", "plus", "equals", "triad", "space"].includes(stage);
   const pointPosition = (index: number) => {
     let n = index, fraction = 0, scale = 0.5;
     while (n > 0) { fraction += (n % 2) * scale; n = Math.floor(n / 2); scale *= 0.5; }
     return 10 + 180 * fraction;
   };
   return <section aria-label="Módulo cero: el vacío" style={{background:"#000",height:"100svh",position:"relative",opacity:1,transform:"none",animation:"none"}}>
-    <style>{`@keyframes zeroDrift { 0% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } 50% { transform:translate(5%, -4%) rotate(8deg) scale(1.15); } 100% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } } @keyframes zeroGrain { 0% { transform:translate(0,0); } 25% { transform:translate(-2%,1%); } 50% { transform:translate(1%,-2%); } 75% { transform:translate(2%,2%); } 100% { transform:translate(0,0); } }`}</style>
+    <style>{`@keyframes zeroSpaceFade { from { opacity: 0; } to { opacity: 1; } } @keyframes zeroDrift { 0% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } 50% { transform:translate(5%, -4%) rotate(8deg) scale(1.15); } 100% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } } @keyframes zeroGrain { 0% { transform:translate(0,0); } 25% { transform:translate(-2%,1%); } 50% { transform:translate(1%,-2%); } 75% { transform:translate(2%,2%); } 100% { transform:translate(0,0); } }`}</style>
     <button type="button" onClick={() => void start()} aria-label={stage === "ready" ? "Iniciar el módulo cero" : "Módulo cero en desarrollo"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:light?"#fff":"#000",transition:`background-color ${fast ? 2 : 8}s cubic-bezier(.63,.02,.93,.38)`,cursor:stage === "ready"?"pointer":"default",display:"grid",placeItems:"center",overflow:"hidden",isolation:"isolate"}}>
       <span aria-hidden="true" style={{position:"absolute",inset:"-60%",pointerEvents:"none",opacity:symbol?0.82:0,transition:"opacity 4s ease",mixBlendMode:"screen",filter:"blur(25px)",animation:"zeroDrift 18s ease-in-out infinite",background:"radial-gradient(ellipse at 47% 48%, rgba(255,255,255,.85) 0%, rgba(153,180,222,.45) 8%, transparent 25%), radial-gradient(ellipse at 38% 60%, rgba(91,115,154,.55), transparent 24%), radial-gradient(ellipse at 62% 39%, rgba(139,120,156,.45), transparent 22%), repeating-conic-gradient(from 27deg at 50% 50%, rgba(179,199,231,.12) 0deg, transparent 9deg, rgba(117,134,160,.08) 18deg, transparent 29deg)"}} />
       <span aria-hidden="true" style={{position:"absolute",inset:"-20%",pointerEvents:"none",opacity:symbol?0.16:0,transition:"opacity 4s",mixBlendMode:"screen",animation:"zeroGrain 1.2s steps(3) infinite",backgroundImage:"repeating-radial-gradient(ellipse at 42% 47%, transparent 0 2px, rgba(255,255,255,.22) 3px, transparent 4px 7px), repeating-linear-gradient(127deg, transparent 0 5px, rgba(255,255,255,.15) 6px, transparent 7px 13px)"}} />
@@ -540,13 +583,14 @@ function ModuleZero() {
         {many && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
         {stage === "vertical" && <line x1="10" y1="20" x2="190" y2="20" stroke="#000" strokeWidth="3" />}
       </svg>
-      {expression && <span aria-label={stage === "triad" ? "111 hercios más 222 hercios igual a 333 hercios" : "111 y 222 hercios"} style={{position:"absolute",display:"grid",gridTemplateColumns:"1fr .65fr 1fr .65fr 1fr",alignItems:"center",justifyItems:"center",width:"min(85vw, 560px)",color:"#111",pointerEvents:"none"}}>
+      {expression && <span aria-label={stage === "triad" ? "111 hercios más 222 hercios igual a 333 hercios" : "111 y 222 hercios"} style={{position:"absolute",display:"grid",gridTemplateColumns:"1fr .65fr 1fr .65fr 1fr",alignItems:"center",justifyItems:"center",width:"min(85vw, 560px)",color:"#111",pointerEvents:"none",opacity:stage === "space" ? 0 : 1,transition:"opacity 1.5s ease"}}>
         <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>111 Hz</small></span>
         <span style={{fontFamily:"serif",fontSize:"clamp(30px, 5vw, 60px)",visibility:stage === "pair"?"hidden":"visible"}}>+</span>
         <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>222 Hz</small></span>
         <span style={{fontFamily:"serif",fontSize:"clamp(30px, 5vw, 60px)",visibility:stage === "equals" || stage === "triad"?"visible":"hidden"}}>=</span>
         <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16,visibility:stage === "triad"?"visible":"hidden"}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>333 Hz</small></span>
       </span>}
+      {stage === "space" && <FrequencySpace />}
       {many && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{stage === "vertical" ? "111 Hz · TONO" : `${pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO`}</span>}
     </button>
   </section>;

@@ -366,7 +366,7 @@ function ModuleZero() {
       const context = new AudioContext();
       audioRef.current = context;
       await context.resume();
-      const render = new OfflineAudioContext(2, context.sampleRate * 26, context.sampleRate);
+      const render = new OfflineAudioContext(2, context.sampleRate * 36, context.sampleRate);
       const buffer = render.createBuffer(2, render.sampleRate * 4, render.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const samples = buffer.getChannelData(channel);
@@ -404,15 +404,21 @@ function ModuleZero() {
       }
       const wave = () => {
         const source = context.createBufferSource(), gain = context.createGain();
+        const color = context.createBiquadFilter();
+        color.type = "lowpass";
         source.buffer = forward;
         const now = context.currentTime;
         gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(1, now + 3);
-        gain.gain.setValueAtTime(1, now + 24);
-        gain.gain.linearRampToValueAtTime(0, now + 25.5);
-        source.connect(gain); gain.connect(context.destination);
-        source.onended = () => { source.disconnect(); gain.disconnect(); };
+        gain.gain.setValueAtTime(1, now + 33.5);
+        gain.gain.linearRampToValueAtTime(0, now + 36);
+        color.frequency.setValueAtTime(18000, now);
+        color.frequency.setTargetAtTime(700, now + 24, 2);
+        color.Q.setValueAtTime(0.7, now);
+        color.Q.setTargetAtTime(1.4, now + 24, 2);
+        source.connect(color); color.connect(gain); gain.connect(context.destination);
+        source.onended = () => { source.disconnect(); color.disconnect(); gain.disconnect(); };
         source.start(now);
-        source.stop(now + 25.5);
+        source.stop(now + 36);
       };
       const gong = (fifth = false, emphasis = 1) => {
         const now = context.currentTime, root = fifth ? 220 * 1.5 : 220;
@@ -435,6 +441,11 @@ function ModuleZero() {
       const accelerate = () => {
         setStage("multiplying");
         const duration = 12, beginning = context.currentTime + 0.08;
+        const percussionGain = context.createGain();
+        percussionGain.gain.setValueAtTime(1, beginning);
+        percussionGain.gain.setValueAtTime(1, beginning + duration - 3);
+        percussionGain.gain.linearRampToValueAtTime(0, beginning + duration + 0.4);
+        percussionGain.connect(context.destination);
         const beat = context.createBuffer(1, Math.floor(context.sampleRate * 0.012), context.sampleRate);
         const samples = beat.getChannelData(0);
         for (let i = 0; i < samples.length; i++) {
@@ -449,17 +460,20 @@ function ModuleZero() {
           const source = context.createBufferSource(), gain = context.createGain();
           source.buffer = beat;
           gain.gain.value = 0.22 / Math.sqrt(Math.max(1, rate / 12));
-          source.connect(gain); gain.connect(context.destination);
+          source.connect(gain); gain.connect(percussionGain);
           source.onended = () => { source.disconnect(); gain.disconnect(); };
           source.start(beginning + position);
           position += 1 / rate;
         }
         const pitch = context.createOscillator(), pitchGain = context.createGain();
-        pitch.type = "sine"; pitch.frequency.value = 111;
-        pitchGain.gain.setValueAtTime(0, beginning + duration - 0.15);
-        pitchGain.gain.linearRampToValueAtTime(0.09, beginning + duration + 0.6);
+        pitch.type = "sine";
+        const pitchStart = beginning + duration - 4;
+        pitch.frequency.setValueAtTime(2 * Math.pow(111 / 2, (duration - 4) / duration), pitchStart);
+        pitch.frequency.exponentialRampToValueAtTime(111, beginning + duration);
+        pitchGain.gain.setValueAtTime(0, pitchStart);
+        pitchGain.gain.linearRampToValueAtTime(0.09, beginning + duration + 0.4);
         pitch.connect(pitchGain); pitchGain.connect(context.destination);
-        pitch.start(beginning + duration - 0.15);
+        pitch.start(pitchStart);
         const draw = () => {
           if (run !== runRef.current || audioRef.current !== context) return;
           const elapsed = context.currentTime - beginning;
@@ -477,11 +491,8 @@ function ModuleZero() {
       at(16000, () => setStage("opening"));
       at(24000, () => setStage("question"));
       at(30000, () => { setStage("one"); gong(false, 1.3); });
-      at(33000, () => setStage("fast-darkening"));
-      at(35000, () => setStage("fast-opening"));
-      at(37000, () => { setStage("one-again"); gong(); });
-      at(39500, () => { setStage("two"); gong(true); });
-      at(42500, accelerate);
+      at(32500, () => { setStage("two"); gong(true); });
+      at(35500, accelerate);
     } catch {
       if (audioRef.current) void audioRef.current.close();
       audioRef.current = null; runningRef.current = false; setStage("ready");
@@ -506,7 +517,7 @@ function ModuleZero() {
       <span aria-hidden="true" style={{position:"absolute",inset:"-20%",pointerEvents:"none",opacity:symbol?0.16:0,transition:"opacity 4s",mixBlendMode:"screen",animation:"zeroGrain 1.2s steps(3) infinite",backgroundImage:"repeating-radial-gradient(ellipse at 42% 47%, transparent 0 2px, rgba(255,255,255,.22) 3px, transparent 4px 7px), repeating-linear-gradient(127deg, transparent 0 5px, rgba(255,255,255,.15) 6px, transparent 7px 13px)"}} />
       <span aria-hidden="true" style={{position:"relative",fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:symbol?1:0,textShadow:"0 0 8px #fff, 0 0 32px #fff, 0 0 100px rgba(194,216,255,.8)",transition:"opacity 3s ease",lineHeight:1}}>∅</span>
       <span aria-hidden={!question} style={{position:"absolute",maxWidth:"min(85vw, 900px)",color:"#111",fontFamily:"Georgia, serif",fontSize:"clamp(1.5rem, 3.5vw, 3.6rem)",lineHeight:1.3,fontWeight:400,opacity:question?1:0,transition:"opacity 1.5s ease",pointerEvents:"none"}}>¿Cuál es la entidad mínima capaz de ser imaginada?</span>
-      <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",opacity:dots?1:0,transform:stage === "vertical"?"rotate(90deg)":"rotate(0deg)",transition:"opacity 1.2s ease, transform 4s ease-in-out",pointerEvents:"none"}}>
+      <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",opacity:dots?1:0,transform:`rotate(${stage === "vertical" ? 90 : stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,transition:"opacity 1.2s ease, transform 0.15s linear",pointerEvents:"none"}}>
         {stage === "one" || stage === "one-again" ? <circle cx="100" cy="20" r="10" fill="#000" /> : <><circle cx="10" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /><circle cx="190" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /></>}
         {many && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
         {stage === "vertical" && <line x1="10" y1="20" x2="190" y2="20" stroke="#000" strokeWidth="3" />}

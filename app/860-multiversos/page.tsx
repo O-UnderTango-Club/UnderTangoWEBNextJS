@@ -96,8 +96,9 @@ const CONTROLS: ControlDefinition[] = [
 ];
 
 const INITIAL_VALUES = [0.26, 0.68, 0.32, 0.58, 0.16, 0.18, 0.14, 0.15, 0.24];
-const INITIAL_STEPS = [true, false, true, false, false, true, false, true, false];
-const STEP_NOTES = [0, 3, 5, 7, 10, 12, 15, 17, 19];
+// Frase provisional para la presentación: se puede modificar desde el secuenciador.
+const INITIAL_STEPS = [true, true, true, false, true, true, true, false, true];
+const STEP_NOTES = [0, 7, 12, 15, 7, 10, 14, 19, 15];
 const PIANO_KEYS = [
   { note: 60, label: "C", black: false },
   { note: 61, label: "C#", black: true },
@@ -607,7 +608,10 @@ export default function Multiversos860Page() {
       });
       return;
     }
-    void ensureAudio().catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
+    void ensureAudio().then(() => {
+      setSequenceRun((current) => current + 1);
+      setIsSequencing(true);
+    }).catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
   }, [ensureAudio, stopRecording]);
 
   const connectMidi = useCallback(async () => {

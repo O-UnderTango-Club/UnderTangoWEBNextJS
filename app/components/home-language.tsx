@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 export type SiteLanguage = "es" | "en" | "pt";
 const dictionary: Record<string, {en:string;pt:string}> = {
+  "Calendario de actividades": { en: "Activities calendar", pt: "Agenda de atividades" },
   "¿Qué estás buscando?": {
     "en": "What are you looking for?",
     "pt": "O que você está procurando?"

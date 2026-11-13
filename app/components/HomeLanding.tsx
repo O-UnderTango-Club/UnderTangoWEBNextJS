@@ -28,6 +28,19 @@ export default function HomeLanding(){
       <video autoPlay muted loop playsInline preload="metadata" aria-label="Video de bienvenida de UnderTango Club">
         <source src="https://under-tango-web.vercel.app/assets/images/welcome.mp4" type="video/mp4" />
       </video>
+      <a
+        href="/usersCalendar"
+        className={styles.calendarLink}
+        data-undertango-intent="ver_tango"
+        data-undertango-subintent="cronograma_publico"
+        data-undertango-cta="Calendario de actividades"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M7 3v4M17 3v4M3 10h18" />
+        </svg>
+        <span>{t("Calendario de actividades")}</span>
+      </a>
     </div>
     <div className={styles.panels} id="descubrir">
       <article className={styles.panel} onClick={(event)=>{if(!isControl(event.target)) toggle("shows");}}>

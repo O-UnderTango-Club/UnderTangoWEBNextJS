@@ -336,106 +336,112 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
 }
 
 function ModuleZero() {
-  const [opened, setOpened] = useState(false);
+  const [stage, setStage] = useState("ready");
   const audioRef = useRef<AudioContext | null>(null);
-  const buffersRef = useRef<AudioBuffer[] | null>(null);
-  const sourceRef = useRef<{source: AudioBufferSourceNode; gain: GainNode} | null>(null);
-  const directionRef = useRef(false);
-  const clickRef = useRef(0);
-  const motionRef = useRef({ position: 0, started: 0, forward: false });
-  const positionNow = () => {
-    const m = motionRef.current;
-    return Math.max(0, Math.min(1, m.position + (m.forward ? 1 : -1) * (performance.now() - m.started) / 12000));
-  };
+  const timersRef = useRef<number[]>([]);
+  const runningRef = useRef(false);
+  const runRef = useRef(0);
+
   useEffect(() => {
-    const stop = () => { clickRef.current++; if (audioRef.current) { void audioRef.current.close(); audioRef.current = null; buffersRef.current = null; sourceRef.current = null; } };
+    const stop = () => {
+      runRef.current++;
+      timersRef.current.forEach(window.clearTimeout);
+      timersRef.current = [];
+      runningRef.current = false;
+      if (audioRef.current) { void audioRef.current.close(); audioRef.current = null; }
+    };
     window.addEventListener("multiversos-instrument-start", stop);
     return () => { window.removeEventListener("multiversos-instrument-start", stop); stop(); };
   }, []);
-  const open = async () => {
-    const next = !directionRef.current;
-    motionRef.current = {position: positionNow(), started: performance.now(), forward: next};
-    directionRef.current = next;
-    setOpened(next);
-    const click = ++clickRef.current;
+
+  const start = async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    const run = ++runRef.current;
     try {
-      const context = audioRef.current || new AudioContext();
+      const context = new AudioContext();
       audioRef.current = context;
       await context.resume();
-      if (!buffersRef.current) {
-      const render = new OfflineAudioContext(2, context.sampleRate * 12, context.sampleRate);
+      const render = new OfflineAudioContext(2, context.sampleRate * 8, context.sampleRate);
       const buffer = render.createBuffer(2, render.sampleRate * 4, render.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const samples = buffer.getChannelData(channel);
         for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
       }
-      const noise = render.createBufferSource();
-      noise.buffer = buffer;
-      noise.loop = true;
-      const filter = render.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.value = 430;
-      const breath = render.createGain();
-      breath.gain.value = 0.07;
-      const drift = render.createOscillator();
-      drift.frequency.value = 0.09;
-      const depth = render.createGain();
-      depth.gain.value = 0.035;
-      drift.connect(depth);
-      depth.connect(breath.gain);
-      const tone = render.createOscillator();
-      tone.type = "sine";
-      tone.frequency.value = 55;
-      const toneGain = render.createGain();
-      toneGain.gain.value = 0.035;
-      const master = render.createGain();
-      master.gain.value = 0.55;
+      const noise = render.createBufferSource(); noise.buffer = buffer; noise.loop = true;
+      const filter = render.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 430;
+      const breath = render.createGain(); breath.gain.value = 0.07;
+      const drift = render.createOscillator(); drift.frequency.value = 0.09;
+      const depth = render.createGain(); depth.gain.value = 0.035;
+      drift.connect(depth); depth.connect(breath.gain);
+      const tone = render.createOscillator(); tone.type = "sine"; tone.frequency.value = 55;
+      const toneGain = render.createGain(); toneGain.gain.value = 0.035;
+      const master = render.createGain(); master.gain.value = 0.55;
       noise.connect(filter); filter.connect(breath); breath.connect(master);
       tone.connect(toneGain); toneGain.connect(master); master.connect(render.destination);
       noise.start(); tone.start(); drift.start();
       const forward = await render.startRendering();
-      if (audioRef.current !== context) return;
+      if (run !== runRef.current || audioRef.current !== context) return;
       const reverse = context.createBuffer(2, forward.length, forward.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const from = forward.getChannelData(channel), to = reverse.getChannelData(channel);
         for (let i = 0; i < from.length; i++) to[i] = from[from.length - 1 - i];
       }
-      buffersRef.current = [forward, reverse];
-      }
-      if (click !== clickRef.current) return;
-      const now = context.currentTime;
-      const position = positionNow();
-      const remaining = (next ? 1 - position : position) * 12;
-      if (remaining <= 0.01) return;
-      if (sourceRef.current) {
-        const previousGain = sourceRef.current.gain.gain;
-        previousGain.cancelAndHoldAtTime(now);
-        previousGain.linearRampToValueAtTime(0, now + 0.08);
-        sourceRef.current.source.stop(now + 0.08);
-      }
-      const source = context.createBufferSource();
-      const gain = context.createGain();
-      source.buffer = buffersRef.current[next ? 0 : 1];
-      const level = Math.min(1, position * 12, (1 - position) * 12);
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(level, now + 0.08);
-      if (remaining > 1) {
-        gain.gain.linearRampToValueAtTime(1, now + Math.min(1, remaining - 0.1));
-        gain.gain.setValueAtTime(1, now + remaining - 1);
-      }
-      gain.gain.linearRampToValueAtTime(0, now + remaining);
-      source.connect(gain); gain.connect(context.destination);
-      source.onended = () => { source.disconnect(); gain.disconnect(); if (sourceRef.current?.source === source) sourceRef.current = null; };
-      sourceRef.current = {source, gain};
-      source.start(now, (next ? position : 1 - position) * 12);
+      const wave = (backward = false) => {
+        const source = context.createBufferSource(), gain = context.createGain();
+        source.buffer = backward ? reverse : forward;
+        const now = context.currentTime;
+        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(1, now + 0.8);
+        gain.gain.setValueAtTime(1, now + 7.2); gain.gain.linearRampToValueAtTime(0, now + 8);
+        source.connect(gain); gain.connect(context.destination);
+        source.onended = () => { source.disconnect(); gain.disconnect(); };
+        source.start(now);
+      };
+      const gong = (fifth = false) => {
+        const now = context.currentTime, root = fifth ? 220 * 1.5 : 220;
+        [1, 1.5, 2.08, 2.76, 4.1].forEach((partial, index) => {
+          const oscillator = context.createOscillator(), envelope = context.createGain();
+          oscillator.type = index === 0 ? "sine" : "triangle";
+          oscillator.frequency.value = root * partial;
+          const amplitude = [0.16, 0.085, 0.045, 0.025, 0.012][index];
+          envelope.gain.setValueAtTime(0.0001, now);
+          envelope.gain.exponentialRampToValueAtTime(amplitude, now + 0.015);
+          envelope.gain.exponentialRampToValueAtTime(0.0001, now + 4.5 - index * 0.45);
+          oscillator.connect(envelope); envelope.connect(context.destination);
+          oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
+          oscillator.start(now); oscillator.stop(now + 4.6);
+        });
+      };
+      const at = (ms: number, action: () => void) => {
+        timersRef.current.push(window.setTimeout(() => { if (run === runRef.current) action(); }, ms));
+      };
+      setStage("opening"); wave();
+      at(8000, () => { setStage("darkening"); wave(true); });
+      at(16000, () => { setStage("opening"); wave(); });
+      at(24000, () => setStage("question"));
+      at(30000, () => { setStage("one"); gong(); });
+      at(33000, () => { setStage("darkening"); wave(true); });
+      at(41000, () => { setStage("opening"); wave(); });
+      at(49000, () => { setStage("one-again"); gong(); });
+      at(51500, () => { setStage("two"); gong(true); });
     } catch {
       if (audioRef.current) void audioRef.current.close();
-      audioRef.current = null;
+      audioRef.current = null; runningRef.current = false; setStage("ready");
     }
   };
+
+  const light = ["opening", "question", "one", "one-again", "two"].includes(stage);
+  const symbol = stage === "opening" || stage === "darkening";
+  const question = stage === "question";
+  const dots = ["one", "one-again", "two"].includes(stage);
   return <section aria-label="Módulo cero: el vacío" style={{background:"#000",height:"100svh",position:"relative",opacity:1,transform:"none",animation:"none"}}>
-    <button type="button" onClick={() => void open()} aria-label={opened ? "Volver a la oscuridad" : "Abrir el módulo cero"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:opened?"#fff":"#000",transition:"background-color 12s linear",cursor:"pointer",display:"grid",placeItems:"center",overflow:"hidden"}}>
-      <span aria-hidden="true" style={{fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:opened?1:0,textShadow:opened?"0 0 8px #fff, 0 0 28px #fff, 0 0 90px #fff, 0 0 220px #fff":"none",transition:"opacity 7s ease, text-shadow 12s ease",lineHeight:1}}>∅</span>
+    <style>{`@keyframes zeroDrift { 0% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } 50% { transform:translate(5%, -4%) rotate(8deg) scale(1.15); } 100% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } } @keyframes zeroGrain { 0% { transform:translate(0,0); } 25% { transform:translate(-2%,1%); } 50% { transform:translate(1%,-2%); } 75% { transform:translate(2%,2%); } 100% { transform:translate(0,0); } }`}</style>
+    <button type="button" onClick={() => void start()} aria-label={stage === "ready" ? "Iniciar el módulo cero" : "Módulo cero en desarrollo"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:light?"#fff":"#000",transition:"background-color 8s cubic-bezier(.63,.02,.93,.38)",cursor:stage === "ready"?"pointer":"default",display:"grid",placeItems:"center",overflow:"hidden",isolation:"isolate"}}>
+      <span aria-hidden="true" style={{position:"absolute",inset:"-60%",pointerEvents:"none",opacity:symbol?0.82:0,transition:"opacity 4s ease",mixBlendMode:"screen",filter:"blur(25px)",animation:"zeroDrift 18s ease-in-out infinite",background:"radial-gradient(ellipse at 47% 48%, rgba(255,255,255,.85) 0%, rgba(153,180,222,.45) 8%, transparent 25%), radial-gradient(ellipse at 38% 60%, rgba(91,115,154,.55), transparent 24%), radial-gradient(ellipse at 62% 39%, rgba(139,120,156,.45), transparent 22%), repeating-conic-gradient(from 27deg at 50% 50%, rgba(179,199,231,.12) 0deg, transparent 9deg, rgba(117,134,160,.08) 18deg, transparent 29deg)"}} />
+      <span aria-hidden="true" style={{position:"absolute",inset:"-20%",pointerEvents:"none",opacity:symbol?0.16:0,transition:"opacity 4s",mixBlendMode:"screen",animation:"zeroGrain 1.2s steps(3) infinite",backgroundImage:"repeating-radial-gradient(ellipse at 42% 47%, transparent 0 2px, rgba(255,255,255,.22) 3px, transparent 4px 7px), repeating-linear-gradient(127deg, transparent 0 5px, rgba(255,255,255,.15) 6px, transparent 7px 13px)"}} />
+      <span aria-hidden="true" style={{position:"relative",fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:symbol?1:0,textShadow:"0 0 8px #fff, 0 0 32px #fff, 0 0 100px rgba(194,216,255,.8)",transition:"opacity 3s ease",lineHeight:1}}>∅</span>
+      <span aria-hidden={!question} style={{position:"absolute",maxWidth:"min(85vw, 900px)",color:"#111",fontFamily:"Georgia, serif",fontSize:"clamp(1.5rem, 3.5vw, 3.6rem)",lineHeight:1.3,fontWeight:400,opacity:question?1:0,transition:"opacity 1.5s ease",pointerEvents:"none"}}>¿Cuál es la entidad mínima capaz de ser imaginada?</span>
+      <span aria-hidden="true" style={{position:"absolute",display:"flex",gap:"clamp(42px, 8vw, 140px)",alignItems:"center",opacity:dots?1:0,transition:"opacity 1.2s ease",pointerEvents:"none"}}><i style={{display:"block",width:"clamp(12px, 1.4vw, 20px)",height:"clamp(12px, 1.4vw, 20px)",borderRadius:"50%",background:"#000"}} />{stage === "two" && <i style={{display:"block",width:"clamp(12px, 1.4vw, 20px)",height:"clamp(12px, 1.4vw, 20px)",borderRadius:"50%",background:"#000"}} />}</span>
     </button>
   </section>;
 }

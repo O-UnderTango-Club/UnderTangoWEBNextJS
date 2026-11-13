@@ -481,6 +481,10 @@ function ModuleZero() {
       const at = (ms: number, action: () => void) => {
         timersRef.current.push(window.setTimeout(() => { if (run === runRef.current) action(); }, ms));
       };
+      // Las tres voces comparten una salida y permanecen activas juntas.
+      const chordBus = context.createGain();
+      chordBus.gain.value = 0.8;
+      chordBus.connect(context.destination);
       const addTone = (frequency: number, volume: number) => {
         const oscillator = context.createOscillator(), gain = context.createGain();
         oscillator.type = "sine";
@@ -488,7 +492,7 @@ function ModuleZero() {
         const now = context.currentTime;
         gain.gain.setValueAtTime(0, now);
         gain.gain.linearRampToValueAtTime(volume, now + 1);
-        oscillator.connect(gain); gain.connect(context.destination);
+        oscillator.connect(gain); gain.connect(chordBus);
         oscillator.start(now);
       };
       const accelerate = () => {
@@ -524,8 +528,8 @@ function ModuleZero() {
         pitch.frequency.setValueAtTime(2 * Math.pow(111 / 2, (duration - 4) / duration), pitchStart);
         pitch.frequency.exponentialRampToValueAtTime(111, beginning + duration);
         pitchGain.gain.setValueAtTime(0, pitchStart);
-        pitchGain.gain.linearRampToValueAtTime(0.09, beginning + duration + 0.4);
-        pitch.connect(pitchGain); pitchGain.connect(context.destination);
+        pitchGain.gain.linearRampToValueAtTime(0.12, beginning + duration + 0.4);
+        pitch.connect(pitchGain); pitchGain.connect(chordBus);
         pitch.start(pitchStart);
         const draw = () => {
           if (run !== runRef.current || audioRef.current !== context) return;
@@ -536,10 +540,10 @@ function ModuleZero() {
           setPulseRate(count ? hits[count - 1].rate : 2);
           if (elapsed >= duration) {
             setPulseRate(111); setStage("vertical"); frameRef.current = null;
-            at(4000, () => { setStage("pair"); addTone(222, 0.06); });
+            at(4000, () => { setStage("pair"); addTone(222, 0.12); });
             at(9000, () => setStage("plus"));
             at(11000, () => setStage("equals"));
-            at(13000, () => { setStage("triad"); addTone(333, 0.05); at(7000, () => setStage("space")); });
+            at(13000, () => { setStage("triad"); addTone(333, 0.12); at(7000, () => setStage("space")); });
             return;
           }
           frameRef.current = window.requestAnimationFrame(draw);

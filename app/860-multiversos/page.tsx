@@ -387,7 +387,7 @@ function ModuleZero() {
   };
   return <section aria-label="Módulo cero: el vacío" style={{background:"#000",height:"100svh",position:"relative"}}>
     <button type="button" onClick={() => void open()} aria-label={opened ? "Módulo cero abierto" : "Abrir el módulo cero"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:"#000",color:"#ddd",cursor:opened?"default":"pointer",display:"grid",placeItems:"center"}}>
-      <span aria-hidden="true" style={{fontFamily:"serif",fontSize:"clamp(6rem, 18vw, 15rem)",fontWeight:200,opacity:opened?0.8:0,transition:"opacity 8s ease",lineHeight:1}}>∅</span>
+      <span aria-hidden="true" style={{fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:opened?1:0,textShadow:opened?"0 0 8px #fff, 0 0 28px rgba(220,235,255,.9), 0 0 70px rgba(151,188,255,.7), 0 0 130px rgba(100,145,255,.35)":"none",transition:"opacity 4s ease, text-shadow 6s ease",lineHeight:1}}>∅</span>
     </button>
   </section>;
 }

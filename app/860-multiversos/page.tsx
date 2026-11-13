@@ -335,6 +335,63 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
   parameter.setTargetAtTime(value, now, time);
 }
 
+function ModuleZero() {
+  const [opened, setOpened] = useState(false);
+  const audioRef = useRef<AudioContext | null>(null);
+  useEffect(() => {
+    const stop = () => { if (audioRef.current) { void audioRef.current.close(); audioRef.current = null; } };
+    window.addEventListener("multiversos-instrument-start", stop);
+    return () => { window.removeEventListener("multiversos-instrument-start", stop); stop(); };
+  }, []);
+  const open = async () => {
+    if (audioRef.current) return;
+    try {
+      const context = new AudioContext();
+      audioRef.current = context;
+      const buffer = context.createBuffer(2, context.sampleRate * 4, context.sampleRate);
+      for (let channel = 0; channel < 2; channel++) {
+        const samples = buffer.getChannelData(channel);
+        for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
+      }
+      const noise = context.createBufferSource();
+      noise.buffer = buffer;
+      noise.loop = true;
+      const filter = context.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 430;
+      const breath = context.createGain();
+      breath.gain.value = 0.07;
+      const drift = context.createOscillator();
+      drift.frequency.value = 0.09;
+      const depth = context.createGain();
+      depth.gain.value = 0.035;
+      drift.connect(depth);
+      depth.connect(breath.gain);
+      const tone = context.createOscillator();
+      tone.type = "sine";
+      tone.frequency.value = 55;
+      const toneGain = context.createGain();
+      toneGain.gain.value = 0.035;
+      const master = context.createGain();
+      master.gain.setValueAtTime(0.0001, context.currentTime);
+      master.gain.linearRampToValueAtTime(0.55, context.currentTime + 8);
+      noise.connect(filter); filter.connect(breath); breath.connect(master);
+      tone.connect(toneGain); toneGain.connect(master); master.connect(context.destination);
+      noise.start(); tone.start(); drift.start();
+      await context.resume();
+      setOpened(true);
+    } catch {
+      if (audioRef.current) void audioRef.current.close();
+      audioRef.current = null;
+    }
+  };
+  return <section aria-label="Módulo cero: el vacío" style={{background:"#000",height:"100svh",position:"relative"}}>
+    <button type="button" onClick={() => void open()} aria-label={opened ? "Módulo cero abierto" : "Abrir el módulo cero"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:"#000",color:"#ddd",cursor:opened?"default":"pointer",display:"grid",placeItems:"center"}}>
+      <span aria-hidden="true" style={{fontFamily:"serif",fontSize:"clamp(6rem, 18vw, 15rem)",fontWeight:200,opacity:opened?0.8:0,transition:"opacity 8s ease",lineHeight:1}}>∅</span>
+    </button>
+  </section>;
+}
+
 function playRhythm(engine: SoundEngine, step: number, cycle: number, section: number) {
   const { context, rhythmBus, rhythmNoise } = engine;
   const now = context.currentTime;
@@ -488,6 +545,7 @@ export default function Multiversos860Page() {
   presetsRef.current = presets;
 
   const ensureAudio = useCallback(async () => {
+    if (!engineRef.current || engineRef.current.context.state !== "running") window.dispatchEvent(new Event("multiversos-instrument-start"));
     let engine = engineRef.current;
     if (!engine) {
       engine = createSoundEngine();
@@ -1153,6 +1211,7 @@ export default function Multiversos860Page() {
 
   return (
     <main className={styles.console}>
+      <ModuleZero />
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
           <span className={styles.brandMark}>&#9670;</span>

@@ -342,6 +342,11 @@ function ModuleZero() {
   const sourceRef = useRef<{source: AudioBufferSourceNode; gain: GainNode} | null>(null);
   const directionRef = useRef(false);
   const clickRef = useRef(0);
+  const motionRef = useRef({ position: 0, started: 0, forward: false });
+  const positionNow = () => {
+    const m = motionRef.current;
+    return Math.max(0, Math.min(1, m.position + (m.forward ? 1 : -1) * (performance.now() - m.started) / 12000));
+  };
   useEffect(() => {
     const stop = () => { clickRef.current++; if (audioRef.current) { void audioRef.current.close(); audioRef.current = null; buffersRef.current = null; sourceRef.current = null; } };
     window.addEventListener("multiversos-instrument-start", stop);
@@ -349,6 +354,7 @@ function ModuleZero() {
   }, []);
   const open = async () => {
     const next = !directionRef.current;
+    motionRef.current = {position: positionNow(), started: performance.now(), forward: next};
     directionRef.current = next;
     setOpened(next);
     const click = ++clickRef.current;
@@ -357,7 +363,7 @@ function ModuleZero() {
       audioRef.current = context;
       await context.resume();
       if (!buffersRef.current) {
-      const render = new OfflineAudioContext(2, context.sampleRate * 16, context.sampleRate);
+      const render = new OfflineAudioContext(2, context.sampleRate * 12, context.sampleRate);
       const buffer = render.createBuffer(2, render.sampleRate * 4, render.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const samples = buffer.getChannelData(channel);
@@ -383,8 +389,7 @@ function ModuleZero() {
       const toneGain = render.createGain();
       toneGain.gain.value = 0.035;
       const master = render.createGain();
-      master.gain.setValueAtTime(0.0001, 0);
-      master.gain.linearRampToValueAtTime(0.55, 8);
+      master.gain.value = 0.55;
       noise.connect(filter); filter.connect(breath); breath.connect(master);
       tone.connect(toneGain); toneGain.connect(master); master.connect(render.destination);
       noise.start(); tone.start(); drift.start();
@@ -399,27 +404,37 @@ function ModuleZero() {
       }
       if (click !== clickRef.current) return;
       const now = context.currentTime;
+      const position = positionNow();
+      const remaining = (next ? 1 - position : position) * 12;
+      if (remaining <= 0.01) return;
       if (sourceRef.current) {
-        sourceRef.current.gain.gain.cancelScheduledValues(now);
-        sourceRef.current.gain.gain.setTargetAtTime(0.0001, now, 0.12);
-        sourceRef.current.source.stop(now + 0.7);
+        const previousGain = sourceRef.current.gain.gain;
+        previousGain.cancelAndHoldAtTime(now);
+        previousGain.linearRampToValueAtTime(0, now + 0.08);
+        sourceRef.current.source.stop(now + 0.08);
       }
       const source = context.createBufferSource();
       const gain = context.createGain();
       source.buffer = buffersRef.current[next ? 0 : 1];
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(1, now + 0.4);
+      const level = Math.min(1, position * 12, (1 - position) * 12);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(level, now + 0.08);
+      if (remaining > 1) {
+        gain.gain.linearRampToValueAtTime(1, now + Math.min(1, remaining - 0.1));
+        gain.gain.setValueAtTime(1, now + remaining - 1);
+      }
+      gain.gain.linearRampToValueAtTime(0, now + remaining);
       source.connect(gain); gain.connect(context.destination);
       source.onended = () => { source.disconnect(); gain.disconnect(); if (sourceRef.current?.source === source) sourceRef.current = null; };
       sourceRef.current = {source, gain};
-      source.start();
+      source.start(now, (next ? position : 1 - position) * 12);
     } catch {
       if (audioRef.current) void audioRef.current.close();
       audioRef.current = null;
     }
   };
   return <section aria-label="Módulo cero: el vacío" style={{background:"#000",height:"100svh",position:"relative",opacity:1,transform:"none",animation:"none"}}>
-    <button type="button" onClick={() => void open()} aria-label={opened ? "Volver a la oscuridad" : "Abrir el módulo cero"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:opened?"#fff":"#000",transition:"background-color 16s ease-in-out",cursor:"pointer",display:"grid",placeItems:"center",overflow:"hidden"}}>
+    <button type="button" onClick={() => void open()} aria-label={opened ? "Volver a la oscuridad" : "Abrir el módulo cero"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:opened?"#fff":"#000",transition:"background-color 12s linear",cursor:"pointer",display:"grid",placeItems:"center",overflow:"hidden"}}>
       <span aria-hidden="true" style={{fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:opened?1:0,textShadow:opened?"0 0 8px #fff, 0 0 28px #fff, 0 0 90px #fff, 0 0 220px #fff":"none",transition:"opacity 7s ease, text-shadow 12s ease",lineHeight:1}}>∅</span>
     </button>
   </section>;

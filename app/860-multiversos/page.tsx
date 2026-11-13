@@ -338,56 +338,89 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
 function ModuleZero() {
   const [opened, setOpened] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);
+  const buffersRef = useRef<AudioBuffer[] | null>(null);
+  const sourceRef = useRef<{source: AudioBufferSourceNode; gain: GainNode} | null>(null);
+  const directionRef = useRef(false);
+  const clickRef = useRef(0);
   useEffect(() => {
-    const stop = () => { if (audioRef.current) { void audioRef.current.close(); audioRef.current = null; } };
+    const stop = () => { clickRef.current++; if (audioRef.current) { void audioRef.current.close(); audioRef.current = null; buffersRef.current = null; sourceRef.current = null; } };
     window.addEventListener("multiversos-instrument-start", stop);
     return () => { window.removeEventListener("multiversos-instrument-start", stop); stop(); };
   }, []);
   const open = async () => {
-    if (audioRef.current) return;
+    const next = !directionRef.current;
+    directionRef.current = next;
+    setOpened(next);
+    const click = ++clickRef.current;
     try {
-      const context = new AudioContext();
+      const context = audioRef.current || new AudioContext();
       audioRef.current = context;
-      const buffer = context.createBuffer(2, context.sampleRate * 4, context.sampleRate);
+      await context.resume();
+      if (!buffersRef.current) {
+      const render = new OfflineAudioContext(2, context.sampleRate * 16, context.sampleRate);
+      const buffer = render.createBuffer(2, render.sampleRate * 4, render.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const samples = buffer.getChannelData(channel);
         for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
       }
-      const noise = context.createBufferSource();
+      const noise = render.createBufferSource();
       noise.buffer = buffer;
       noise.loop = true;
-      const filter = context.createBiquadFilter();
+      const filter = render.createBiquadFilter();
       filter.type = "lowpass";
       filter.frequency.value = 430;
-      const breath = context.createGain();
+      const breath = render.createGain();
       breath.gain.value = 0.07;
-      const drift = context.createOscillator();
+      const drift = render.createOscillator();
       drift.frequency.value = 0.09;
-      const depth = context.createGain();
+      const depth = render.createGain();
       depth.gain.value = 0.035;
       drift.connect(depth);
       depth.connect(breath.gain);
-      const tone = context.createOscillator();
+      const tone = render.createOscillator();
       tone.type = "sine";
       tone.frequency.value = 55;
-      const toneGain = context.createGain();
+      const toneGain = render.createGain();
       toneGain.gain.value = 0.035;
-      const master = context.createGain();
-      master.gain.setValueAtTime(0.0001, context.currentTime);
-      master.gain.linearRampToValueAtTime(0.55, context.currentTime + 8);
+      const master = render.createGain();
+      master.gain.setValueAtTime(0.0001, 0);
+      master.gain.linearRampToValueAtTime(0.55, 8);
       noise.connect(filter); filter.connect(breath); breath.connect(master);
-      tone.connect(toneGain); toneGain.connect(master); master.connect(context.destination);
+      tone.connect(toneGain); toneGain.connect(master); master.connect(render.destination);
       noise.start(); tone.start(); drift.start();
-      await context.resume();
-      setOpened(true);
+      const forward = await render.startRendering();
+      if (audioRef.current !== context) return;
+      const reverse = context.createBuffer(2, forward.length, forward.sampleRate);
+      for (let channel = 0; channel < 2; channel++) {
+        const from = forward.getChannelData(channel), to = reverse.getChannelData(channel);
+        for (let i = 0; i < from.length; i++) to[i] = from[from.length - 1 - i];
+      }
+      buffersRef.current = [forward, reverse];
+      }
+      if (click !== clickRef.current) return;
+      const now = context.currentTime;
+      if (sourceRef.current) {
+        sourceRef.current.gain.gain.cancelScheduledValues(now);
+        sourceRef.current.gain.gain.setTargetAtTime(0.0001, now, 0.12);
+        sourceRef.current.source.stop(now + 0.7);
+      }
+      const source = context.createBufferSource();
+      const gain = context.createGain();
+      source.buffer = buffersRef.current[next ? 0 : 1];
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(1, now + 0.4);
+      source.connect(gain); gain.connect(context.destination);
+      source.onended = () => { source.disconnect(); gain.disconnect(); if (sourceRef.current?.source === source) sourceRef.current = null; };
+      sourceRef.current = {source, gain};
+      source.start();
     } catch {
       if (audioRef.current) void audioRef.current.close();
       audioRef.current = null;
     }
   };
   return <section aria-label="Módulo cero: el vacío" style={{background:"#000",height:"100svh",position:"relative",opacity:1,transform:"none",animation:"none"}}>
-    <button type="button" onClick={() => void open()} aria-label={opened ? "Módulo cero abierto" : "Abrir el módulo cero"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:"#000",color:"#ddd",cursor:opened?"default":"pointer",display:"grid",placeItems:"center"}}>
-      <span aria-hidden="true" style={{fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:opened?1:0,textShadow:opened?"0 0 8px #fff, 0 0 28px rgba(220,235,255,.9), 0 0 70px rgba(151,188,255,.7), 0 0 130px rgba(100,145,255,.35)":"none",transition:"opacity 4s ease, text-shadow 6s ease",lineHeight:1}}>∅</span>
+    <button type="button" onClick={() => void open()} aria-label={opened ? "Volver a la oscuridad" : "Abrir el módulo cero"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:opened?"#fff":"#000",transition:"background-color 16s ease-in-out",cursor:"pointer",display:"grid",placeItems:"center",overflow:"hidden"}}>
+      <span aria-hidden="true" style={{fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:opened?1:0,textShadow:opened?"0 0 8px #fff, 0 0 28px #fff, 0 0 90px #fff, 0 0 220px #fff":"none",transition:"opacity 7s ease, text-shadow 12s ease",lineHeight:1}}>∅</span>
     </button>
   </section>;
 }

@@ -382,6 +382,22 @@ function ModuleZero() {
       noise.start(); tone.start(); drift.start();
       const forward = await render.startRendering();
       if (run !== runRef.current || audioRef.current !== context) return;
+      // Mantener el murmullo audible frente a los gongs sin alterar su textura.
+      let sumSquares = 0, peak = 0;
+      for (let channel = 0; channel < forward.numberOfChannels; channel++) {
+        const samples = forward.getChannelData(channel);
+        for (let i = 0; i < samples.length; i++) {
+          const sample = samples[i];
+          sumSquares += sample * sample;
+          peak = Math.max(peak, Math.abs(sample));
+        }
+      }
+      const rms = Math.sqrt(sumSquares / (forward.length * forward.numberOfChannels));
+      const boost = rms > 0 ? Math.min(5, 0.06 / rms, peak > 0 ? 0.6 / peak : 5) : 1;
+      for (let channel = 0; channel < forward.numberOfChannels; channel++) {
+        const samples = forward.getChannelData(channel);
+        for (let i = 0; i < samples.length; i++) samples[i] *= boost;
+      }
       const reverse = context.createBuffer(2, forward.length, forward.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const from = forward.getChannelData(channel), to = reverse.getChannelData(channel);

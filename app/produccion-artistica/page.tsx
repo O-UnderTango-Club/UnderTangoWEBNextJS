@@ -172,6 +172,30 @@ export default function ProduccionArtisticaPage() {
           </div>
         </section>
 
+        <section className={styles.section} aria-labelledby="videos-produccion-title">
+          <div className={styles.sectionHeading}>
+            <p className={styles.eyebrow}>MÚSICA Y DANZA · TRIPLE FRONTERA</p>
+            <h2 id="videos-produccion-title">Dos formas de vivir el espectáculo.</h2>
+            <p>Conocé Raíces da Fronteira y la banda UnderTango junto a João Aruk.</p>
+          </div>
+          <div className={styles.capabilityGrid}>
+            <article className={styles.capabilityCard}>
+              <h3>Raíces da Fronteira</h3>
+              <div className={styles.videoFrame}>
+                <iframe src="https://www.youtube.com/embed/5x1oUmMOsaY?rel=0&amp;playsinline=1" title="Raíces da Fronteira" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />
+              </div>
+              <p><a href="https://www.youtube.com/shorts/5x1oUmMOsaY" target="_blank" rel="noopener noreferrer">Ver en YouTube ↗</a></p>
+            </article>
+            <article className={styles.capabilityCard}>
+              <h3>Banda UnderTango con João Aruk</h3>
+              <div className={styles.videoFrame}>
+                <iframe src="https://www.youtube.com/embed/jKjgHl4xL0A?rel=0&amp;playsinline=1" title="Banda UnderTango con João Aruk" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />
+              </div>
+              <p><a href="https://youtu.be/jKjgHl4xL0A" target="_blank" rel="noopener noreferrer">Ver en YouTube ↗</a></p>
+            </article>
+          </div>
+        </section>
+
         <section className={styles.statement}>
           <p className={styles.eyebrow}>NO NECESITÁS LLEGAR CON EL SHOW RESUELTO</p>
           <h2>Necesitamos entender qué querés provocar.</h2>

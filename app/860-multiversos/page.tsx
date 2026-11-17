@@ -427,7 +427,8 @@ function FrequencySpace() {
 }
 
 type SceneZeroVector = [number, number, number];
-type SceneZeroVertex = { position: SceneZeroVector; normal: SceneZeroVector };
+type SceneZeroShape = { position: SceneZeroVector; normal: SceneZeroVector };
+type SceneZeroVertex = { curved: SceneZeroShape; angular: SceneZeroShape };
 type SceneZeroFace = [SceneZeroVertex, SceneZeroVertex, SceneZeroVertex, SceneZeroVertex];
 
 const SCENE_ZERO_DEFAULT_SECONDS = 8;
@@ -436,48 +437,96 @@ const SCENE_ZERO_DARKENING_MS = 8000;
 function sceneZeroMesh(): SceneZeroFace[] {
   const faces: SceneZeroFace[] = [];
   const sweep = (
-    steps: number,
+    facets: number,
+    subdivisions: number,
     profileSteps: number,
-    vertex: (angle: number, profile: number) => SceneZeroVertex,
+    vertex: (facet: number, position: number, profile: number) => SceneZeroVertex,
   ) => {
-    for (let i = 0; i < steps; i++) {
-      const a = i * Math.PI * 2 / steps;
-      const b = (i + 1) * Math.PI * 2 / steps;
-      for (let j = 0; j < profileSteps; j++) {
-        faces.push([vertex(a, j), vertex(b, j), vertex(b, j + 1), vertex(a, j + 1)]);
+    for (let facet = 0; facet < facets; facet++) {
+      for (let i = 0; i < subdivisions; i++) {
+        const a = i / subdivisions;
+        const b = (i + 1) / subdivisions;
+        for (let j = 0; j < profileSteps; j++) {
+          faces.push([vertex(facet, a, j), vertex(facet, b, j), vertex(facet, b, j + 1), vertex(facet, a, j + 1)]);
+        }
       }
     }
   };
 
-  // Torus and a bevelled diagonal bar with end caps.
-  sweep(112, 20, (angle, profile) => {
-    const crossSection = profile * Math.PI * 2 / 20;
-    const radius = 0.78 + 0.118 * Math.cos(crossSection);
+  // The same vertices describe a torus and the bevels of a twelve-sided frame.
+  const turn = Math.PI * 2;
+  const ringSides = 12;
+  const ringProfile = [
+    [0.108, 0.093, 1, 1],
+    [0.064, 0.157, 0, 1],
+    [0, 0.157, 0, 1],
+    [-0.064, 0.157, 0, 1],
+    [-0.108, 0.093, -1, 1],
+    [-0.108, 0, -1, 0],
+    [-0.108, -0.093, -1, -1],
+    [-0.064, -0.157, 0, -1],
+    [0, -0.157, 0, -1],
+    [0.064, -0.157, 0, -1],
+    [0.108, -0.093, 1, -1],
+    [0.108, 0, 1, 0],
+    [0.108, 0.093, 1, 1],
+  ];
+  sweep(ringSides, 8, ringProfile.length - 1, (facet, fraction, profile) => {
+    const a = facet * turn / ringSides;
+    const b = (facet + 1) * turn / ringSides;
+    const angle = a + (b - a) * fraction;
+    const midpoint = (a + b) / 2;
+    const section = (profile + 1) * turn / 12;
+    const radial = Math.cos(section);
+    const depth = Math.sin(section);
+    const radius = 0.78 + 0.116 * radial;
+    const [offset, z, nr, nz] = ringProfile[profile];
+    const flatRadius = 0.81 + offset;
     return {
-      position: [radius * Math.cos(angle), radius * Math.sin(angle), 0.118 * Math.sin(crossSection)],
-      normal: [Math.cos(crossSection) * Math.cos(angle), Math.cos(crossSection) * Math.sin(angle), Math.sin(crossSection)],
+      curved: {
+        position: [radius * Math.cos(angle), radius * Math.sin(angle), 0.116 * depth],
+        normal: [radial * Math.cos(angle), radial * Math.sin(angle), depth],
+      },
+      angular: {
+        position: [
+          flatRadius * (Math.cos(a) * (1 - fraction) + Math.cos(b) * fraction),
+          flatRadius * (Math.sin(a) * (1 - fraction) + Math.sin(b) * fraction),
+          z,
+        ],
+        normal: [nr * Math.cos(midpoint), nr * Math.sin(midpoint), nz],
+      },
     };
   });
+
+  // The diagonal changes from a round rod into a chamfered rectangular beam.
   const barProfile = [
     { length: -1.08, radius: 0, axial: -1, radial: 0 },
-    { length: -1.08, radius: 0.065, axial: -1, radial: 0 },
-    { length: -1.055, radius: 0.102, axial: -0.7, radial: 0.7 },
-    { length: -1.012, radius: 0.106, axial: 0, radial: 1 },
-    { length: 1.012, radius: 0.106, axial: 0, radial: 1 },
-    { length: 1.055, radius: 0.102, axial: 0.7, radial: 0.7 },
-    { length: 1.08, radius: 0.065, axial: 1, radial: 0 },
+    { length: -1.08, radius: 0.072, axial: -1, radial: 0 },
+    { length: -1.042, radius: 0.106, axial: -0.65, radial: 0.76 },
+    ...Array.from({ length: 9 }, (_, index) => ({
+      length: -1.008 + index * 0.252, radius: 0.108, axial: 0, radial: 1,
+    })),
+    { length: 1.042, radius: 0.106, axial: 0.65, radial: 0.76 },
+    { length: 1.08, radius: 0.072, axial: 1, radial: 0 },
     { length: 1.08, radius: 0, axial: 1, radial: 0 },
   ];
   const slope = Math.PI * 0.30;
   const horizontal = Math.cos(slope);
   const vertical = Math.sin(slope);
-  sweep(40, barProfile.length - 1, (angle, profile) => {
+  const corners = [[1, .70], [.70, 1], [-.70, 1], [-1, .70], [-1, -.70], [-.70, -1], [.70, -1], [1, -.70]];
+  sweep(corners.length, 4, barProfile.length - 1, (facet, fraction, profile) => {
     const { length, radius, axial, radial } = barProfile[profile];
-    const cross = Math.cos(angle);
-    const depth = Math.sin(angle);
+    const angle = Math.PI / 8 + (facet + fraction) * turn / corners.length;
+    const [ax, ay] = corners[facet];
+    const [bx, by] = corners[(facet + 1) % corners.length];
+    const midpoint = Math.PI / 8 + (facet + 0.5) * turn / corners.length;
+    const crossSection = (cross: number, depth: number, nc: number, nd: number): SceneZeroShape => ({
+      position: [length * horizontal - radius * cross * vertical, length * vertical + radius * cross * horizontal, 0.11 + radius * depth],
+      normal: [axial * horizontal - radial * nc * vertical, axial * vertical + radial * nc * horizontal, radial * nd],
+    });
     return {
-      position: [length * horizontal - radius * cross * vertical, length * vertical + radius * cross * horizontal, 0.09 + radius * depth],
-      normal: [axial * horizontal - radial * cross * vertical, axial * vertical + radial * cross * horizontal, radial * depth],
+      curved: crossSection(Math.cos(angle), Math.sin(angle), Math.cos(angle), Math.sin(angle)),
+      angular: crossSection(ax + (bx - ax) * fraction, (ay + (by - ay) * fraction) * 1.37, Math.cos(midpoint), Math.sin(midpoint)),
     };
   });
   return faces;
@@ -486,6 +535,15 @@ function sceneZeroMesh(): SceneZeroFace[] {
 function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkening: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const levelRef = useRef(0);
+  const orientation = useRef({ yaw: 0, pitch: 0 });
+  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
+  const redrawRef = useRef<() => void>(() => {});
+
+  const rotate = (x: number, y: number) => {
+    orientation.current.yaw += x;
+    orientation.current.pitch = Math.max(-1.15, Math.min(1.15, orientation.current.pitch + y));
+    redrawRef.current();
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -496,7 +554,7 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
     const from = levelRef.current;
     const target = darkening ? 0 : 1;
     const started = performance.now();
-    let frame = 0;
+    let frame: number | null = null;
     let width = 1;
     let height = 1;
     let density = 1;
@@ -511,8 +569,9 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
       context.fillRect(0, 0, width, height);
       if (level === 0) return progress;
 
-      const yaw = -0.41 + 0.69 * level;
-      const pitch = 0.27 - 0.43 * level;
+      const shape = level * level * (3 - 2 * level);
+      const yaw = -0.37 + 0.67 * level + orientation.current.yaw;
+      const pitch = 0.19 - 0.42 * level + orientation.current.pitch;
       const cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw);
       const cosPitch = Math.cos(pitch), sinPitch = Math.sin(pitch);
       const scale = Math.min(width, height) * 0.29;
@@ -520,21 +579,46 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
         const depth = -x * sinYaw + z * cosYaw;
         return [x * cosYaw + z * sinYaw, y * cosPitch - depth * sinPitch, y * sinPitch + depth * cosPitch];
       };
+      const mix = (from: SceneZeroVector, to: SceneZeroVector): SceneZeroVector => [
+        from[0] + (to[0] - from[0]) * shape,
+        from[1] + (to[1] - from[1]) * shape,
+        from[2] + (to[2] - from[2]) * shape,
+      ];
       const panels = mesh.flatMap((face) => {
-        const normals = face.map(({ normal }) => camera(normal));
-        const normal = normals.reduce(([x, y, z], [nx, ny, nz]) => [x + nx / 4, y + ny / 4, z + nz / 4] as SceneZeroVector, [0, 0, 0] as SceneZeroVector);
-        if (normal[2] <= 0) return [];
-        const vertices = face.map(({ position }) => camera(position));
-        const depth = vertices.reduce((sum, vertex) => sum + vertex[2], 0) / 4;
-        return [{ vertices, normal, depth }];
+        const vertices = face.map(({ curved, angular }) => camera(mix(curved.position, angular.position)));
+        let nx = 0, ny = 0, nz = 0, depth = 0, centerX = 0, centerY = 0;
+        face.forEach(({ curved, angular }, index) => {
+          const [x, y, z] = camera(mix(curved.normal, angular.normal));
+          nx += x; ny += y; nz += z;
+          centerX += vertices[index][0] / 4;
+          centerY += vertices[index][1] / 4;
+          depth += vertices[index][2] / 4;
+        });
+        const length = Math.hypot(nx, ny, nz);
+        if (length < 1e-5 || nz * (4.8 - depth) - nx * centerX - ny * centerY <= 0) return [];
+        return [{ vertices, normal: [nx / length, ny / length, nz / length], depth, centerX, centerY }];
       }).sort((a, b) => a.depth - b.depth);
 
-      for (const { vertices, normal: [nx, ny, nz] } of panels) {
-        // Sample broad and narrow reflected light sources from the surface normal.
-        const softbox = Math.max(0, -0.42 * nx + 0.57 * ny + 0.70 * nz);
-        const rim = Math.max(0, 0.89 * nx - 0.21 * ny + 0.38 * nz);
-        const reflection = Math.min(1, 0.12 + 0.43 * softbox ** 3 + 0.53 * softbox ** 24 + 0.6 * rim ** 15);
-        const metal = Math.round(255 * level * reflection);
+      for (const { vertices, normal: [nx, ny, nz], depth, centerX, centerY } of panels) {
+        // A moving reflection vector samples neutral light boxes and localized diffraction bands.
+        const distance = Math.hypot(centerX, centerY, 4.8 - depth);
+        const vx = -centerX / distance, vy = -centerY / distance, vz = (4.8 - depth) / distance;
+        const incidence = nx * vx + ny * vy + nz * vz;
+        const rx = 2 * incidence * nx - vx, ry = 2 * incidence * ny - vy, rz = 2 * incidence * nz - vz;
+        const softbox = Math.max(0, -.37 * rx + .72 * ry + .58 * rz);
+        const fill = Math.max(0, .83 * rx - .43 * ry + .35 * rz);
+        const streak = Math.exp(-17 * (ry - .44 * rx - .28) ** 2) * (.5 + .5 * Math.max(0, rz));
+        const split = Math.exp(-22 * (rx + .53 * ry + .31) ** 2) * .55;
+        const glint = Math.exp(-125 * (rx - 0.12 * ry + 0.17) ** 2) * Math.max(0, ry) ** 3;
+        const silver = 99 + 78 * softbox ** 3 + 52 * softbox ** 18 + 50 * fill ** 6 + 25 * (1 - incidence) ** 2 + 38 * glint;
+        const spectrum = 103 * Math.min(1, streak + split);
+        const phase = 6.5 * rx + 4.4 * ry + 2.0 * centerY;
+        const channel = (offset: number, tint: number) => {
+          const diffraction = spectrum * (.14 + .86 * (.5 + .5 * Math.cos(phase + offset)) ** 2);
+          const reflected = tint * silver + diffraction * (1 + 0.22 * (1 - level));
+          return Math.round(level * Math.min(251, reflected));
+        };
+
         context.beginPath();
         vertices.forEach(([x, y, z], index) => {
           const perspective = 4.8 / (4.8 - z);
@@ -544,7 +628,7 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
           else context.lineTo(px, py);
         });
         context.closePath();
-        context.fillStyle = `rgb(${Math.round(metal * 0.92)}, ${Math.round(metal * 0.97)}, ${metal})`;
+        context.fillStyle = `rgb(${channel(0, .96)}, ${channel(2.094, .99)}, ${channel(4.189, 1.04)})`;
         context.strokeStyle = context.fillStyle;
         context.lineWidth = 0.8;
         context.stroke();
@@ -553,6 +637,13 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
       return progress;
     };
 
+    const tick = (now: number) => {
+      frame = null;
+      if (paint(now) < 1) schedulePaint();
+    };
+    const schedulePaint = () => {
+      if (frame === null) frame = window.requestAnimationFrame(tick);
+    };
     const resize = () => {
       width = canvas.clientWidth;
       height = canvas.clientHeight;
@@ -561,20 +652,42 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
       canvas.height = Math.max(1, Math.round(height * density));
       paint(performance.now());
     };
-    const tick = (now: number) => {
-      if (paint(now) < 1) frame = window.requestAnimationFrame(tick);
-    };
     resize();
+    redrawRef.current = schedulePaint;
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
-    frame = window.requestAnimationFrame(tick);
+    schedulePaint();
     return () => {
       observer.disconnect();
-      window.cancelAnimationFrame(frame);
+      if (frame !== null) window.cancelAnimationFrame(frame);
     };
   }, [darkening, durationMs]);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="zero-object" />;
+  return <canvas ref={canvasRef} className="zero-object" role="img" tabIndex={0}
+    aria-label="Conjunto vacío tridimensional. Arrastrá o usá las flechas para girarlo."
+    onPointerDown={(event) => {
+      if (event.button !== 0 || drag.current) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    }}
+    onPointerMove={(event) => {
+      const previous = drag.current;
+      if (previous?.id !== event.pointerId) return;
+      rotate((event.clientX - previous.x) * .009, (event.clientY - previous.y) * .009);
+      drag.current = { id: previous.id, x: event.clientX, y: event.clientY };
+    }}
+    onLostPointerCapture={(event) => {
+      if (drag.current?.id === event.pointerId) drag.current = null;
+    }}
+    onKeyDown={(event) => {
+      const direction: Record<string, [number, number]> = {
+        ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+      };
+      const step = direction[event.key];
+      if (!step) return;
+      event.preventDefault();
+      rotate(step[0] * .14, step[1] * .14);
+    }} />;
 }
 
 function ModuleZero() {
@@ -820,7 +933,10 @@ function ModuleZero() {
         position: relative; display: grid; place-items: center; min-height: 100svh;
         width: 100%; padding: 0; border: 0; overflow: hidden; isolation: isolate;
       }
-      .zero-object { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+      .zero-start, .zero-object { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .zero-start { border: 0; padding: 0; background: transparent; cursor: pointer; }
+      .zero-object { cursor: grab; touch-action: none; }
+      .zero-object:active { cursor: grabbing; }
       .zero-controls { padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
       .zero-controls h2 { margin: 0 0 2rem; font: 400 clamp(1.15rem, 2.1vw, 2rem)/1.15 Georgia, serif; }
       .zero-controls label, .zero-controls output { font-size: .875rem; }
@@ -843,7 +959,8 @@ function ModuleZero() {
         .zero-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       }
     `}</style>
-    <button type="button" className="zero-stage" onClick={() => void start()} aria-label={canStart ? "Iniciar la secuencia desde el módulo cero" : "Proyección del módulo cero"} aria-disabled={!canStart} tabIndex={canStart ? 0 : -1} style={{background:light ? "#fff" : "#000", cursor:canStart ? "pointer" : "default"}}>
+    <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" style={{background:light ? "#fff" : "#000"}}>
+      {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
       {showObject && <EmptySetScene key={previewRun} durationMs={darkening ? SCENE_ZERO_DARKENING_MS : activeDurationMs} darkening={darkening} />}
       <span aria-hidden={!question} style={{position:"absolute",maxWidth:"min(90%, 900px)",color:"#111",fontFamily:"Georgia, serif",fontSize:"clamp(1.5rem, 3.5vw, 3.6rem)",lineHeight:1.3,fontWeight:400,opacity:question?1:0,transition:"opacity 1.5s ease",pointerEvents:"none"}}>¿Cuál es la entidad mínima capaz de ser imaginada?</span>
       <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",opacity:dots?1:0,transform:`rotate(${stage === "vertical" ? 90 : stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,transition:"opacity 1.2s ease, transform 0.15s linear",pointerEvents:"none"}}>
@@ -860,7 +977,7 @@ function ModuleZero() {
       </span>}
       {stage === "space" && <FrequencySpace />}
       {many && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{stage === "vertical" ? "111 Hz · TONO" : `${pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO`}</span>}
-    </button>
+    </div>
     <aside className="zero-controls" aria-labelledby="zero-controls-title">
       <h2 id="zero-controls-title">Escena 0 · ∅ → 0</h2>
       <div className="zero-time">

@@ -461,7 +461,13 @@ const EMPTY_SET_OUTLINE: GlyphSegment[][] = [
 ];
 
 const SCENE_ZERO_DEFAULT_SECONDS = 8;
-const SCENE_ZERO_DARKENING_MS = 8000;
+const SCENE_ONE_DEFAULT_SECONDS = 22;
+const SCENE_ONE_LIGHT_SHARE = 16 / 22;
+
+function smoothSceneLight(progress: number) {
+  const t = Math.max(0, Math.min(1, progress));
+  return t * t * (3 - 2 * t);
+}
 const SCENE_ZERO_MURMUR_ATTACK = Float32Array.from({ length: 129 }, (_, index) =>
   1 - (1 - index / 128) ** 2,
 );
@@ -598,6 +604,7 @@ in vec3 v_normal;
 in vec3 v_local;
 uniform float u_lamps[8];
 uniform float u_background;
+uniform float u_emission;
 out vec4 fragColor;
 
 const vec3 corners[8] = vec3[8](
@@ -636,17 +643,40 @@ void main() {
     radiance += intensity * diffuse * (vec3(0.29 + gloss) + spectrum * film);
   }
   vec3 mapped = radiance / (1.0 + 0.43 * radiance);
-  fragColor = vec4(pow(clamp(mapped, 0.0, 1.0), vec3(0.4545)), 1);
+  vec3 surface = pow(clamp(mapped, 0.0, 1.0), vec3(0.4545));
+  fragColor = vec4(mix(surface, vec3(1.0), u_emission), 1);
 }`;
 
 type SceneZeroRotation = [yaw: number, pitch: number, roll: number];
 type SceneZeroDrag = { yaw: number; pitch: number };
+type EmptySetLight = { ambient: number; emission: number; wash: number };
 
 function createEmptySetRenderer(canvas: HTMLCanvasElement) {
+  const lampLevels = new Float32Array(8);
+  const paintBackdrop = ({ ambient, emission, wash }: EmptySetLight) => {
+    const spacing = 0.072;
+    const ramp = 1 - spacing * (lampLevels.length - 1);
+    let total = 0;
+    for (let i = 0; i < lampLevels.length; i++) {
+      lampLevels[i] = smoothSceneLight((ambient - i * spacing) / ramp);
+      total += lampLevels[i];
+    }
+    const background = Math.max(total / lampLevels.length, wash);
+    const gray = Math.round(background * 255);
+    const base = `rgb(${gray}, ${gray}, ${gray})`;
+    const halo = (0.11 * emission + 0.5 * wash) * (1 - background);
+    const radius = Math.round(42 + 75 * wash);
+    const gradient = halo > 0.002
+      ? `radial-gradient(ellipse at center, rgba(255,255,255,${halo.toFixed(3)}) 0%, transparent ${radius}%), ${base}`
+      : base;
+    if (canvas.style.background !== gradient) canvas.style.background = gradient;
+    return background;
+  };
+
   const contours = emptySetContours();
-  const gl = canvas.getContext("webgl2", { alpha: false, antialias: true, depth: true });
+  const gl = canvas.getContext("webgl2", { alpha: true, antialias: true, depth: true });
   if (!gl) {
-    const context = canvas.getContext("2d", { alpha: false });
+    const context = canvas.getContext("2d");
     if (!context) return;
     const outline = new Path2D();
     for (const points of contours) {
@@ -655,17 +685,16 @@ function createEmptySetRenderer(canvas: HTMLCanvasElement) {
       outline.closePath();
     }
     return {
-      paint(level: number, [yaw, pitch, roll]: SceneZeroRotation, drag: SceneZeroDrag) {
+      paint(light: EmptySetLight, [yaw, pitch, roll]: SceneZeroRotation, drag: SceneZeroDrag) {
         const { width, height } = canvas;
-        const gray = Math.round(level * 255);
+        paintBackdrop(light);
         context.resetTransform();
-        context.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
-        context.fillRect(0, 0, width, height);
+        context.clearRect(0, 0, width, height);
         const scale = Math.min(width, height) * 0.315;
         context.translate(width / 2, height / 2);
         context.rotate(-roll);
         context.scale(scale * Math.cos(yaw + drag.yaw), scale * Math.cos(pitch + drag.pitch));
-        const silver = Math.round(level * 188);
+        const silver = Math.round(188 * light.ambient * (1 - light.emission) + 255 * light.emission);
         context.fillStyle = `rgb(${silver}, ${silver}, ${silver})`;
         context.fill(outline, "evenodd");
       },
@@ -710,26 +739,17 @@ function createEmptySetRenderer(canvas: HTMLCanvasElement) {
   const projection = gl.getUniformLocation(program, "u_projection");
   const lamps = gl.getUniformLocation(program, "u_lamps[0]");
   const backdrop = gl.getUniformLocation(program, "u_background");
-  const lampLevels = new Float32Array(8);
+  const emission = gl.getUniformLocation(program, "u_emission");
+  gl.clearColor(0, 0, 0, 0);
 
   return {
-    paint(level: number, angles: SceneZeroRotation, drag: SceneZeroDrag) {
+    paint(light: EmptySetLight, angles: SceneZeroRotation, drag: SceneZeroDrag) {
       const { width, height } = canvas;
       const aspect = width / height;
-      // The backdrop brightens as the eight corner lamps come up.
-      let total = 0;
-      const spacing = 0.072;
-      const ramp = 1 - spacing * (lampLevels.length - 1);
-      for (let i = 0; i < lampLevels.length; i++) {
-        const t = Math.min(1, Math.max(0, (level - i * spacing) / ramp));
-        lampLevels[i] = t * t * (3 - 2 * t);
-        total += lampLevels[i];
-      }
-      const background = total / lampLevels.length;
+      const background = paintBackdrop(light);
       gl.viewport(0, 0, width, height);
-      gl.clearColor(background, background, background, 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      if (level === 0) return;
+      if (light.ambient === 0 && light.emission === 0) return;
 
       gl.useProgram(program);
       gl.bindVertexArray(array);
@@ -738,6 +758,7 @@ function createEmptySetRenderer(canvas: HTMLCanvasElement) {
       gl.uniform2f(projection, 2.65 / Math.max(1, aspect), 2.65 * Math.min(1, aspect));
       gl.uniform1fv(lamps, lampLevels);
       gl.uniform1f(backdrop, background);
+      gl.uniform1f(emission, light.emission);
       gl.drawArrays(gl.TRIANGLES, 0, mesh.length / 6);
     },
     dispose() {
@@ -755,13 +776,12 @@ const SCENE_ZERO_DRAG_SCALE = 0.009;
 const SCENE_ZERO_COAST_SECONDS = 0.24;
 const SCENE_ZERO_MAX_DRAG_SPEED = 3.8;
 
-function EmptySetScene({ durationMs, darkening, cue }: {
+function EmptySetScene({ durationMs, beacon, cue }: {
   durationMs: number;
-  darkening: boolean;
-  cue: SceneZeroCue | null;
+  beacon: boolean;
+  cue: SceneZeroCue;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const levelRef = useRef(0);
   const orientation = useRef<SceneZeroDrag>({ yaw: 0, pitch: 0 });
   const movementSeconds = useRef(0);
   const phases = useRef<SceneZeroRotation | null>(null);
@@ -785,19 +805,20 @@ function EmptySetScene({ durationMs, darkening, cue }: {
     const randomPhase = () => Math.random() * Math.PI * 2;
     const [phaseY, phaseX, phaseZ] = phases.current ??= [randomPhase(), randomPhase(), randomPhase()];
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const from = levelRef.current;
-    const target = darkening ? 0 : 1;
     let frame: number | null = null;
     let previousFrame: number | null = null;
     const paint = () => {
-      const elapsedMs = cue ? (cue.context.currentTime - cue.beginsAt) * 1000 : 0;
+      const elapsedMs = (cue.context.currentTime - cue.beginsAt) * 1000;
       const progress = Math.min(1, Math.max(0, elapsedMs / durationMs));
-      const level = from + (target - from) * progress;
-      levelRef.current = level;
+      const dimming = smoothSceneLight(progress * 2);
+      const wash = smoothSceneLight(progress * 2 - 1);
+      const light = beacon
+        ? { ambient: 1 - dimming, emission: 0.5 * (dimming + wash), wash }
+        : { ambient: progress, emission: 0, wash: 0 };
       const seconds = movementSeconds.current;
       // Independent periods make the trajectory vary without jumps or a short repeating cycle.
       const variation = (frequency: number, phase: number) => Math.sin(seconds * frequency + phase) - Math.sin(phase);
-      renderer.paint(level, [
+      renderer.paint(light, [
         -0.29 + 0.40 * seconds + 0.52 * variation(0.41, phaseY),
         0.13 + 0.23 * seconds + 0.57 * variation(0.53, phaseX),
         0.16 * seconds + 0.41 * variation(0.67, phaseZ),
@@ -820,7 +841,7 @@ function EmptySetScene({ durationMs, darkening, cue }: {
       }
       previousFrame = now;
       const progress = paint();
-      if (progress < 1 || (autoRotate && target === 1)) schedulePaint();
+      if (progress < 1 || (autoRotate && !beacon)) schedulePaint();
     };
     const schedulePaint = () => {
       if (frame === null) frame = window.requestAnimationFrame(tick);
@@ -843,7 +864,7 @@ function EmptySetScene({ durationMs, darkening, cue }: {
       if (frame !== null) window.cancelAnimationFrame(frame);
       renderer.dispose();
     };
-  }, [darkening, durationMs, cue, rotate]);
+  }, [beacon, durationMs, cue, rotate]);
 
   return <canvas ref={canvasRef} className="zero-object" role="img" tabIndex={0}
     aria-label="Conjunto vacío tridimensional. Arrastrá o usá las flechas para girarlo."
@@ -895,9 +916,61 @@ function EmptySetScene({ durationMs, darkening, cue }: {
     }} />;
 }
 
+function playSceneOneGong(context: AudioContext, beginsAt: number) {
+  const bus = context.createGain();
+  const room = context.createConvolver();
+  const wet = context.createGain();
+  room.buffer = makeRoomImpulse(context);
+  wet.gain.value = 0.38;
+  bus.connect(context.destination);
+  bus.connect(room).connect(wet).connect(context.destination);
+
+  // The low modes share the sea's 55 Hz reference, with inharmonic metal above them.
+  const modes = [
+    { hz: 110, peak: 0.105, attack: 0.045, decay: 8.1, pan: 0 },
+    { hz: 164.6, peak: 0.054, attack: 0.16, decay: 6.8, pan: -0.27 },
+    { hz: 218.2, peak: 0.037, attack: 0.027, decay: 5.5, pan: 0.32 },
+    { hz: 295, peak: 0.027, attack: 0.012, decay: 4.2, pan: -0.5 },
+    { hz: 417.7, peak: 0.018, attack: 0.008, decay: 3.6, pan: 0.48 },
+    { hz: 592, peak: 0.012, attack: 0.006, decay: 2.5, pan: -0.37 },
+    { hz: 788.5, peak: 0.009, attack: 0.005, decay: 1.3, pan: 0.42 },
+  ];
+
+  for (const { hz, peak, attack, decay, pan } of modes) {
+    const oscillator = context.createOscillator();
+    const envelope = context.createGain();
+    const stereo = context.createStereoPanner();
+    stereo.pan.value = pan;
+    oscillator.frequency.setValueAtTime(hz * 1.012, beginsAt);
+    oscillator.frequency.setTargetAtTime(hz, beginsAt, 0.22);
+    envelope.gain.setValueAtTime(0.0001, beginsAt);
+    envelope.gain.exponentialRampToValueAtTime(peak, beginsAt + attack);
+    envelope.gain.exponentialRampToValueAtTime(peak * 0.28, beginsAt + decay * 0.32);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, beginsAt + decay);
+    oscillator.connect(envelope).connect(stereo).connect(bus);
+    oscillator.onended = () => {
+      oscillator.disconnect();
+      envelope.disconnect();
+      stereo.disconnect();
+    };
+    oscillator.start(beginsAt);
+    oscillator.stop(beginsAt + decay + 0.05);
+  }
+
+  return () => {
+    bus.disconnect();
+    room.disconnect();
+    wet.disconnect();
+  };
+}
+
+type ModuleZeroPlayback = "sequence" | "opening" | "beacon";
+
 function ModuleZero() {
   const [stage, setStage] = useState("ready");
   const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
+  const [oneSeconds, setOneSeconds] = useState(SCENE_ONE_DEFAULT_SECONDS);
+  const [previewMode, setPreviewMode] = useState<Exclude<ModuleZeroPlayback, "sequence"> | null>(null);
   const [cue, setCue] = useState<SceneZeroCue | null>(null);
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
   const [pulseCount, setPulseCount] = useState(0);
@@ -926,6 +999,7 @@ function ModuleZero() {
   const reset = useCallback(() => {
     stop();
     setCue(null);
+    setPreviewMode(null);
     setStage("ready");
   }, [stop]);
 
@@ -937,17 +1011,21 @@ function ModuleZero() {
     };
   }, [reset, stop]);
 
-  const start = async (previewOnly = false) => {
+  const start = async (mode: ModuleZeroPlayback = "sequence") => {
     if (runningRef.current) return;
     stop();
     runningRef.current = true;
     const run = runRef.current;
+    const previewOnly = mode !== "sequence";
     const openingMs = durationSeconds * 1000;
-    const questionMs = 2 * openingMs + SCENE_ZERO_DARKENING_MS;
-    const questionSeconds = questionMs / 1000;
-    const fadeOutAt = questionSeconds + 9.5;
+    const oneMs = oneSeconds * 1000;
+    const lightMs = oneMs * SCENE_ONE_LIGHT_SHARE;
+    const oneStartsAt = mode === "beacon" ? 0 : openingMs;
+    const questionMs = oneStartsAt + lightMs;
+    const pointMs = oneStartsAt + oneMs;
+    const fadeOutAt = pointMs / 1000 + 3.5;
     const waveSeconds = previewOnly ? 16 : fadeOutAt + 2.5;
-    setActiveDurationMs(openingMs);
+    setPreviewMode(previewOnly ? mode : null);
     setStage("preparing");
     try {
       const context = new AudioContext();
@@ -1003,7 +1081,7 @@ function ModuleZero() {
         color.type = "lowpass";
         source.buffer = forward;
         gain.gain.value = 0;
-        gain.gain.setValueCurveAtTime(SCENE_ZERO_MURMUR_ATTACK, beginsAt, durationSeconds);
+        gain.gain.setValueCurveAtTime(SCENE_ZERO_MURMUR_ATTACK, beginsAt, mode === "beacon" ? 0.06 : durationSeconds);
         if (previewOnly) {
           source.loop = true;
           source.loopEnd = loopEnd / forward.sampleRate;
@@ -1013,9 +1091,9 @@ function ModuleZero() {
         }
         color.frequency.setValueAtTime(18000, beginsAt);
         color.Q.setValueAtTime(0.7, beginsAt);
-        if (!previewOnly) {
-          color.frequency.setTargetAtTime(700, beginsAt + questionSeconds, 2);
-          color.Q.setTargetAtTime(1.4, beginsAt + questionSeconds, 2);
+        if (mode !== "opening") {
+          color.frequency.setTargetAtTime(700, beginsAt + questionMs / 1000, 2);
+          color.Q.setTargetAtTime(1.4, beginsAt + questionMs / 1000, 2);
         }
         source.connect(color); color.connect(gain); gain.connect(context.destination);
         source.onended = () => { source.disconnect(); color.disconnect(); gain.disconnect(); };
@@ -1023,21 +1101,51 @@ function ModuleZero() {
         if (!previewOnly) source.stop(beginsAt + waveSeconds);
       };
 
-      if (previewOnly) {
-        const beginsAt = context.currentTime + 0.06;
-        wave(beginsAt);
+      const at = (ms: number, action: () => void) => {
+        timersRef.current.push(window.setTimeout(() => { if (run === runRef.current) action(); }, ms));
+      };
+      const beginsAt = context.currentTime + 0.06;
+      const atOffset = (offsetMs: number, action: (time: number) => void) => {
+        const time = beginsAt + offsetMs / 1000;
+        const onTime = () => {
+          const remaining = time - context.currentTime;
+          if (remaining > 0.005) at(Math.max(8, remaining * 1000), onTime);
+          else action(time);
+        };
+        at(Math.max(0, (time - context.currentTime) * 1000), onTime);
+      };
+      const beginLight = (time: number) => {
+        setActiveDurationMs(lightMs);
+        setCue({ context, beginsAt: time });
+        setStage("beacon");
+      };
+
+      if (mode === "beacon") beginLight(beginsAt);
+      else {
+        setActiveDurationMs(openingMs);
         setCue({ context, beginsAt });
-        setStage("preview");
+        setStage("opening");
+      }
+      wave(beginsAt);
+
+      if (mode !== "opening") {
+        if (mode === "sequence") atOffset(oneStartsAt, beginLight);
+        atOffset(questionMs, () => setStage("question"));
+        const disconnectGong = playSceneOneGong(context, beginsAt + pointMs / 1000);
+        atOffset(pointMs, () => setStage("one"));
+        atOffset(pointMs + 11500, disconnectGong);
+      }
+      if (previewOnly) {
         runningRef.current = false;
         return;
       }
-      const gong = (fifth = false, emphasis = 1) => {
-        const now = context.currentTime, root = fifth ? 220 * 1.5 : 220;
+      const secondGong = () => {
+        const now = context.currentTime, root = 330;
         [1, 1.5, 2.08, 2.76, 4.1].forEach((partial, index) => {
           const oscillator = context.createOscillator(), envelope = context.createGain();
           oscillator.type = index === 0 ? "sine" : "triangle";
           oscillator.frequency.value = root * partial;
-          const amplitude = [0.16, 0.085, 0.045, 0.025, 0.012][index] * emphasis;
+          const amplitude = [0.16, 0.085, 0.045, 0.025, 0.012][index];
           envelope.gain.setValueAtTime(0.0001, now);
           envelope.gain.exponentialRampToValueAtTime(amplitude, now + 0.015);
           envelope.gain.exponentialRampToValueAtTime(0.0001, now + 4.5 - index * 0.45);
@@ -1045,9 +1153,6 @@ function ModuleZero() {
           oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
           oscillator.start(now); oscillator.stop(now + 4.6);
         });
-      };
-      const at = (ms: number, action: () => void) => {
-        timersRef.current.push(window.setTimeout(() => { if (run === runRef.current) action(); }, ms));
       };
       // Las tres voces comparten una salida y permanecen activas juntas.
       const chordBus = context.createGain();
@@ -1118,40 +1223,20 @@ function ModuleZero() {
         };
         frameRef.current = window.requestAnimationFrame(draw);
       };
-      const beginsAt = context.currentTime + 0.06;
-      const atOffset = (offsetMs: number, action: (time: number) => void) => {
-        const time = beginsAt + offsetMs / 1000;
-        at(Math.max(0, (time - context.currentTime) * 1000), () => action(time));
-      };
-      setCue({ context, beginsAt });
-      setStage("opening");
-      wave(beginsAt);
-      atOffset(openingMs, (time) => {
-        setCue({ context, beginsAt: time });
-        setStage("darkening");
-      });
-      atOffset(openingMs + SCENE_ZERO_DARKENING_MS, (time) => {
-        setCue({ context, beginsAt: time });
-        setStage("opening");
-      });
-      atOffset(questionMs, () => setStage("question"));
-      atOffset(questionMs + 6000, () => { setStage("one"); gong(false, 1.3); });
-      atOffset(questionMs + 8500, () => { setStage("two"); gong(true); });
-      atOffset(questionMs + 11500, accelerate);
+      atOffset(pointMs + 2500, () => { setStage("two"); secondGong(); });
+      atOffset(pointMs + 5500, accelerate);
     } catch {
       if (run !== runRef.current) return;
       reset();
     }
   };
 
-  const preview = stage === "preview";
-  const darkening = stage === "darkening";
-  const showObject = preview || stage === "opening" || darkening;
+  const showObject = stage === "opening" || stage === "beacon";
   const preparing = stage === "preparing";
-  const canStart = stage === "ready" || preview;
-  const light = !showObject && !canStart && !preparing;
+  const canStart = stage === "ready" || (previewMode !== null && !preparing);
+  const light = !showObject && stage !== "ready" && !preparing;
   const question = stage === "question";
-  const dots = ["one", "one-again", "two", "multiplying", "vertical"].includes(stage);
+  const dots = ["one-again", "two", "multiplying", "vertical"].includes(stage);
   const many = stage === "multiplying" || stage === "vertical";
   const expression = ["pair", "plus", "equals", "triad", "space"].includes(stage);
   const pointPosition = (index: number) => {
@@ -1176,30 +1261,37 @@ function ModuleZero() {
       .zero-start { border: 0; padding: 0; background: transparent; cursor: pointer; }
       .zero-object { cursor: grab; touch-action: none; }
       .zero-object:active { cursor: grabbing; }
-      .zero-controls { padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
+      .zero-question {
+        position: absolute; width: min(87%, 900px); margin: 0; text-align: center;
+        color: #111; font: 400 clamp(1.5rem, 3.5vw, 3.6rem)/1.3 Georgia, serif;
+        animation: zeroSpaceFade .55s ease both;
+      }
+      .zero-point { width: clamp(8px, 1.05vw, 16px); aspect-ratio: 1; border-radius: 50%; background: #000; }
+      .zero-controls { display: grid; align-content: start; gap: 1.4rem; padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
+      .zero-scene + .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
       .zero-title { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
       .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
-      .zero-controls input { display: block; width: 100%; margin: .85rem 0 1.45rem; accent-color: #adc4ff; }
-      .zero-actions { display: grid; gap: .65rem; }
-      .zero-actions button {
+      .zero-controls input { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
+      .zero-controls button {
         border: 1px solid #424958; border-radius: 6px; min-height: 44px; padding: .55rem .6rem;
         background: #202533; color: #f2f3f7; font: inherit; cursor: pointer;
       }
-      .zero-actions button:first-child { background: #dce6ff; color: #131b2b; border-color: transparent; }
-      .zero-actions button:disabled { opacity: .55; cursor: default; }
+      .zero-controls .zero-play { background: #dce6ff; color: #131b2b; border-color: transparent; width: 100%; }
+      .zero-controls button:disabled { opacity: .55; cursor: default; }
       .zero-layout :focus-visible { outline: 2px solid #a8c3ff; outline-offset: -3px; }
       @media (max-width: 700px) {
         .zero-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(55svh, 1fr) auto; }
         .zero-stage { min-height: 0; }
         .zero-controls { border-left: 0; border-top: 1px solid #30333d; }
-        .zero-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .zero-scene + .zero-scene { padding-top: 1rem; }
       }
     `}</style>
     <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" style={{background:light ? "#fff" : "#000"}}>
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
-      {showObject && <EmptySetScene durationMs={darkening ? SCENE_ZERO_DARKENING_MS : activeDurationMs} darkening={darkening} cue={cue} />}
-      <span aria-hidden={!question} style={{position:"absolute",maxWidth:"min(90%, 900px)",color:"#111",fontFamily:"Georgia, serif",fontSize:"clamp(1.5rem, 3.5vw, 3.6rem)",lineHeight:1.3,fontWeight:400,opacity:question?1:0,transition:"opacity 1.5s ease",pointerEvents:"none"}}>¿Cuál es la entidad mínima capaz de ser imaginada?</span>
+      {showObject && cue && <EmptySetScene durationMs={activeDurationMs} beacon={stage === "beacon"} cue={cue} />}
+      {question && <p className="zero-question">¿Cuál es la entidad mínima capaz de ser imaginada?</p>}
+      {stage === "one" && <span role="img" aria-label="Punto negro" className="zero-point" />}
       <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",opacity:dots?1:0,transform:`rotate(${stage === "vertical" ? 90 : stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,transition:"opacity 1.2s ease, transform 0.15s linear",pointerEvents:"none"}}>
         {stage === "one" || stage === "one-again" ? <circle cx="100" cy="20" r="10" fill="#000" /> : <><circle cx="10" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /><circle cx="190" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /></>}
         {many && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
@@ -1215,22 +1307,34 @@ function ModuleZero() {
       {stage === "space" && <FrequencySpace />}
       {many && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{stage === "vertical" ? "111 Hz · TONO" : `${pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO`}</span>}
     </div>
-    <aside className="zero-controls" aria-labelledby="zero-controls-title">
-      <div className="zero-title">
-        <h2 id="zero-controls-title">Escena ∅ → 0</h2>
-        <output htmlFor="zero-duration">{durationSeconds} {durationSeconds === 1 ? "segundo" : "segundos"}</output>
-      </div>
-      <input id="zero-duration" aria-label="Duración de la transición de luz y sonido" type="range" min={1} max={30} step={1} value={durationSeconds}
-        aria-valuetext={`${durationSeconds} ${durationSeconds === 1 ? "segundo" : "segundos"}`} disabled={!canStart}
-        onChange={(event) => setDurationSeconds(Number(event.currentTarget.value))} />
-      <div className="zero-actions">
-        {preview
-          ? <button type="button" onClick={reset}>Detener prueba</button>
-          : <button type="button" disabled={!canStart} onClick={() => void start(true)}>Probar escena</button>}
-        {canStart
-          ? <button type="button" onClick={() => void start()}>Iniciar secuencia</button>
-          : <button type="button" onClick={reset}>Detener secuencia</button>}
-      </div>
+    <aside className="zero-controls" aria-label="Controles de las escenas">
+      <section className="zero-scene" aria-labelledby="zero-controls-title">
+        <div className="zero-title">
+          <h2 id="zero-controls-title">Escena ∅ → 0</h2>
+          <output htmlFor="zero-duration">{durationSeconds} {durationSeconds === 1 ? "segundo" : "segundos"}</output>
+        </div>
+        <input id="zero-duration" aria-label="Duración de la transición de luz y sonido" type="range" min={1} max={30} step={1} value={durationSeconds}
+          aria-valuetext={`${durationSeconds} ${durationSeconds === 1 ? "segundo" : "segundos"}`} disabled={!canStart}
+          onChange={(event) => setDurationSeconds(Number(event.currentTarget.value))} />
+        {previewMode === "opening" && !preparing
+          ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
+          : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start("opening")}>Probar escena</button>}
+      </section>
+      <section className="zero-scene" aria-labelledby="one-controls-title">
+        <div className="zero-title">
+          <h2 id="one-controls-title">Escena 0 → 1</h2>
+          <output htmlFor="one-duration">{oneSeconds} segundos</output>
+        </div>
+        <input id="one-duration" aria-label="Duración de la escena 0 a 1" type="range" min={6} max={60} step={1} value={oneSeconds}
+          aria-valuetext={`${oneSeconds} segundos`} disabled={!canStart}
+          onChange={(event) => setOneSeconds(Number(event.currentTarget.value))} />
+        {previewMode === "beacon" && !preparing
+          ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
+          : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start("beacon")}>Probar escena</button>}
+      </section>
+      {canStart
+        ? <button type="button" onClick={() => void start()}>Iniciar secuencia</button>
+        : <button type="button" onClick={reset}>{preparing ? "Cancelar" : "Detener secuencia"}</button>}
       {preparing && <p role="status">Preparando audio…</p>}
     </aside>
   </section>;

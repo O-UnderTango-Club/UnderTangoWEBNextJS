@@ -91,7 +91,7 @@ function AgendaList({ items, tasks }: { items: DeadlineItem[]; tasks: Map<string
 
 // The Supabase gateway can briefly reject its generated JWT. Retry only this
 // idempotent read with the same server-side credentials.
-async function fetchPanelSnapshot(url: Parameters<typeof fetch>[0], init?: RequestInit) {
+async function fetchOperations(url: Parameters<typeof fetch>[0], init?: RequestInit) {
   const response = await fetch(url, init);
   if (response.status !== 401 || !response.headers.get("proxy-status")?.includes("PGRST303")) return response;
   await response.body?.cancel().catch(() => {});
@@ -105,8 +105,8 @@ export default async function Chloe() {
   const today = dayKey(new Date());
   const until = dayPlus(today, 30);
   const [snapshot, agenda, calendar] = await Promise.allSettled([
-    readOperationsSnapshot({ fetcher: fetchPanelSnapshot }),
-    readDeadlines(),
+    readOperationsSnapshot({ fetcher: fetchOperations }),
+    readDeadlines({ fetcher: fetchOperations }),
     readClubCalendar(today, until),
   ]);
   const data = snapshot.status === "fulfilled" ? board(snapshot.value) : null;

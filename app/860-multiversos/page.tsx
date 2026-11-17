@@ -567,22 +567,25 @@ const EMPTY_SET_VERTEX_SHADER = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 a_position;
 layout(location=1) in vec3 a_normal;
-uniform vec2 u_rotation;
+uniform vec3 u_rotation;
+uniform vec2 u_drag;
 uniform vec2 u_projection;
 out vec3 v_position;
 out vec3 v_normal;
 out vec3 v_local;
 
-vec3 rotate(vec3 point) {
-  float cy = cos(u_rotation.x), sy = sin(u_rotation.x);
-  float cx = cos(u_rotation.y), sx = sin(u_rotation.y);
+vec3 rotate(vec3 point, vec3 angles) {
+  float cy = cos(angles.x), sy = sin(angles.x);
+  float cx = cos(angles.y), sx = sin(angles.y);
+  float cz = cos(angles.z), sz = sin(angles.z);
   vec3 yawed = vec3(cy * point.x + sy * point.z, point.y, -sy * point.x + cy * point.z);
-  return vec3(yawed.x, cx * yawed.y - sx * yawed.z, sx * yawed.y + cx * yawed.z);
+  vec3 pitched = vec3(yawed.x, cx * yawed.y - sx * yawed.z, sx * yawed.y + cx * yawed.z);
+  return vec3(cz * pitched.x - sz * pitched.y, sz * pitched.x + cz * pitched.y, pitched.z);
 }
 
 void main() {
-  v_position = rotate(a_position);
-  v_normal = rotate(a_normal);
+  v_position = rotate(rotate(a_position, u_rotation), vec3(u_drag, 0.0));
+  v_normal = rotate(rotate(a_normal, u_rotation), vec3(u_drag, 0.0));
   v_local = a_position;
   float depth = 4.3 - v_position.z;
   gl_Position = vec4(v_position.xy * u_projection, 1.004 * depth - 0.2004, depth);
@@ -636,6 +639,9 @@ void main() {
   fragColor = vec4(pow(clamp(mapped, 0.0, 1.0), vec3(0.4545)), 1);
 }`;
 
+type SceneZeroRotation = [yaw: number, pitch: number, roll: number];
+type SceneZeroDrag = { yaw: number; pitch: number };
+
 function createEmptySetRenderer(canvas: HTMLCanvasElement) {
   const contours = emptySetContours();
   const gl = canvas.getContext("webgl2", { alpha: false, antialias: true, depth: true });
@@ -649,14 +655,16 @@ function createEmptySetRenderer(canvas: HTMLCanvasElement) {
       outline.closePath();
     }
     return {
-      paint(level: number, yaw: number, pitch: number) {
+      paint(level: number, [yaw, pitch, roll]: SceneZeroRotation, drag: SceneZeroDrag) {
         const { width, height } = canvas;
         const gray = Math.round(level * 255);
         context.resetTransform();
         context.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
         context.fillRect(0, 0, width, height);
         const scale = Math.min(width, height) * 0.315;
-        context.setTransform(scale * Math.cos(yaw), 0, 0, scale * Math.cos(pitch), width / 2, height / 2);
+        context.translate(width / 2, height / 2);
+        context.rotate(-roll);
+        context.scale(scale * Math.cos(yaw + drag.yaw), scale * Math.cos(pitch + drag.pitch));
         const silver = Math.round(level * 188);
         context.fillStyle = `rgb(${silver}, ${silver}, ${silver})`;
         context.fill(outline, "evenodd");
@@ -698,13 +706,14 @@ function createEmptySetRenderer(canvas: HTMLCanvasElement) {
   gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
   gl.enable(gl.DEPTH_TEST);
   const rotation = gl.getUniformLocation(program, "u_rotation");
+  const dragRotation = gl.getUniformLocation(program, "u_drag");
   const projection = gl.getUniformLocation(program, "u_projection");
   const lamps = gl.getUniformLocation(program, "u_lamps[0]");
   const backdrop = gl.getUniformLocation(program, "u_background");
   const lampLevels = new Float32Array(8);
 
   return {
-    paint(level: number, yaw: number, pitch: number) {
+    paint(level: number, angles: SceneZeroRotation, drag: SceneZeroDrag) {
       const { width, height } = canvas;
       const aspect = width / height;
       // The backdrop brightens as the eight corner lamps come up.
@@ -724,7 +733,8 @@ function createEmptySetRenderer(canvas: HTMLCanvasElement) {
 
       gl.useProgram(program);
       gl.bindVertexArray(array);
-      gl.uniform2f(rotation, yaw, pitch);
+      gl.uniform3fv(rotation, angles);
+      gl.uniform2f(dragRotation, drag.yaw, drag.pitch);
       gl.uniform2f(projection, 2.65 / Math.max(1, aspect), 2.65 * Math.min(1, aspect));
       gl.uniform1fv(lamps, lampLevels);
       gl.uniform1f(backdrop, background);
@@ -747,7 +757,9 @@ function EmptySetScene({ durationMs, darkening, cue }: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const levelRef = useRef(0);
-  const orientation = useRef({ yaw: 0, pitch: 0 });
+  const orientation = useRef<SceneZeroDrag>({ yaw: 0, pitch: 0 });
+  const movementSeconds = useRef(0);
+  const phases = useRef<SceneZeroRotation | null>(null);
   const drag = useRef<{ id: number; x: number; y: number } | null>(null);
   const redrawRef = useRef<() => void>(() => {});
 
@@ -763,24 +775,37 @@ function EmptySetScene({ durationMs, darkening, cue }: {
     const renderer = createEmptySetRenderer(canvas);
     if (!renderer) return;
 
+    const randomPhase = () => Math.random() * Math.PI * 2;
+    const [phaseY, phaseX, phaseZ] = phases.current ??= [randomPhase(), randomPhase(), randomPhase()];
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const from = levelRef.current;
     const target = darkening ? 0 : 1;
     let frame: number | null = null;
+    let previousFrame: number | null = null;
     const paint = () => {
       const elapsedMs = cue ? (cue.context.currentTime - cue.beginsAt) * 1000 : 0;
       const progress = Math.min(1, Math.max(0, elapsedMs / durationMs));
       const level = from + (target - from) * progress;
       levelRef.current = level;
-      renderer.paint(
-        level,
-        -0.29 + 0.63 * level + orientation.current.yaw,
-        0.13 - 0.45 * level + orientation.current.pitch,
-      );
+      const seconds = movementSeconds.current;
+      // Independent periods make the trajectory vary without jumps or a short repeating cycle.
+      const variation = (frequency: number, phase: number) => Math.sin(seconds * frequency + phase) - Math.sin(phase);
+      renderer.paint(level, [
+        -0.29 + 0.40 * seconds + 0.52 * variation(0.41, phaseY),
+        0.13 + 0.23 * seconds + 0.57 * variation(0.53, phaseX),
+        0.16 * seconds + 0.41 * variation(0.67, phaseZ),
+      ], orientation.current);
       return progress;
     };
-    const tick = () => {
+    const tick = (now: number) => {
       frame = null;
-      if (paint() < 1) schedulePaint();
+      const autoRotate = !reduceMotion.matches && !drag.current;
+      if (autoRotate && previousFrame !== null) {
+        movementSeconds.current += Math.min(0.06, (now - previousFrame) / 1000);
+      }
+      previousFrame = now;
+      const progress = paint();
+      if (progress < 1 || (autoRotate && target === 1)) schedulePaint();
     };
     const schedulePaint = () => {
       if (frame === null) frame = window.requestAnimationFrame(tick);
@@ -795,9 +820,11 @@ function EmptySetScene({ durationMs, darkening, cue }: {
     redrawRef.current = schedulePaint;
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
+    reduceMotion.addEventListener("change", schedulePaint);
     schedulePaint();
     return () => {
       observer.disconnect();
+      reduceMotion.removeEventListener("change", schedulePaint);
       if (frame !== null) window.cancelAnimationFrame(frame);
       renderer.dispose();
     };
@@ -817,7 +844,9 @@ function EmptySetScene({ durationMs, darkening, cue }: {
       drag.current = { id: previous.id, x: event.clientX, y: event.clientY };
     }}
     onLostPointerCapture={(event) => {
-      if (drag.current?.id === event.pointerId) drag.current = null;
+      if (drag.current?.id !== event.pointerId) return;
+      drag.current = null;
+      redrawRef.current();
     }}
     onKeyDown={(event) => {
       const direction: Record<string, [number, number]> = {

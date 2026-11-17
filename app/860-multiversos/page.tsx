@@ -749,6 +749,11 @@ function createEmptySetRenderer(canvas: HTMLCanvasElement) {
 }
 
 type SceneZeroCue = { context: AudioContext; beginsAt: number };
+type SceneZeroPointer = { id: number; x: number; y: number; movedAt: number };
+
+const SCENE_ZERO_DRAG_SCALE = 0.009;
+const SCENE_ZERO_COAST_SECONDS = 0.24;
+const SCENE_ZERO_MAX_DRAG_SPEED = 3.8;
 
 function EmptySetScene({ durationMs, darkening, cue }: {
   durationMs: number;
@@ -760,14 +765,16 @@ function EmptySetScene({ durationMs, darkening, cue }: {
   const orientation = useRef<SceneZeroDrag>({ yaw: 0, pitch: 0 });
   const movementSeconds = useRef(0);
   const phases = useRef<SceneZeroRotation | null>(null);
-  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
+  const drag = useRef<SceneZeroPointer | null>(null);
+  const velocity = useRef<SceneZeroDrag>({ yaw: 0, pitch: 0 });
+  const automaticWeight = useRef(1);
   const redrawRef = useRef<() => void>(() => {});
 
-  const rotate = (x: number, y: number) => {
-    orientation.current.yaw += x;
-    orientation.current.pitch = Math.max(-1.15, Math.min(1.15, orientation.current.pitch + y));
-    redrawRef.current();
-  };
+  const rotate = useCallback((yaw: number, pitch: number) => {
+    const turn = Math.PI * 2;
+    orientation.current.yaw = (orientation.current.yaw + yaw) % turn;
+    orientation.current.pitch = (orientation.current.pitch + pitch) % turn;
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -801,7 +808,15 @@ function EmptySetScene({ durationMs, darkening, cue }: {
       frame = null;
       const autoRotate = !reduceMotion.matches && !drag.current;
       if (autoRotate && previousFrame !== null) {
-        movementSeconds.current += Math.min(0.06, (now - previousFrame) / 1000);
+        const elapsed = Math.min(0.06, (now - previousFrame) / 1000);
+        const remaining = Math.exp(-elapsed / SCENE_ZERO_COAST_SECONDS);
+        // Integrate the fading velocity so the coast is consistent at different frame rates.
+        const travel = SCENE_ZERO_COAST_SECONDS * (1 - remaining);
+        rotate(velocity.current.yaw * travel, velocity.current.pitch * travel);
+        velocity.current.yaw *= remaining;
+        velocity.current.pitch *= remaining;
+        automaticWeight.current += (1 - remaining) * (1 - automaticWeight.current);
+        movementSeconds.current += automaticWeight.current * elapsed;
       }
       previousFrame = now;
       const progress = paint();
@@ -828,23 +843,43 @@ function EmptySetScene({ durationMs, darkening, cue }: {
       if (frame !== null) window.cancelAnimationFrame(frame);
       renderer.dispose();
     };
-  }, [darkening, durationMs, cue]);
+  }, [darkening, durationMs, cue, rotate]);
 
   return <canvas ref={canvasRef} className="zero-object" role="img" tabIndex={0}
     aria-label="Conjunto vacío tridimensional. Arrastrá o usá las flechas para girarlo."
     onPointerDown={(event) => {
       if (event.button !== 0 || drag.current) return;
       event.currentTarget.setPointerCapture(event.pointerId);
-      drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, movedAt: event.timeStamp };
+      velocity.current = { yaw: 0, pitch: 0 };
+      automaticWeight.current = 0;
     }}
     onPointerMove={(event) => {
       const previous = drag.current;
       if (previous?.id !== event.pointerId) return;
-      rotate((event.clientX - previous.x) * .009, (event.clientY - previous.y) * .009);
-      drag.current = { id: previous.id, x: event.clientX, y: event.clientY };
+      const yaw = (event.clientX - previous.x) * SCENE_ZERO_DRAG_SCALE;
+      const pitch = (event.clientY - previous.y) * SCENE_ZERO_DRAG_SCALE;
+      const elapsed = Math.max(0.008, (event.timeStamp - previous.movedAt) / 1000);
+      const speed = Math.hypot(yaw, pitch) / elapsed;
+      const scale = Math.min(1, SCENE_ZERO_MAX_DRAG_SPEED / Math.max(speed, 0.001)) / elapsed;
+      const response = 1 - Math.exp(-elapsed / 0.04);
+      velocity.current.yaw += response * (yaw * scale - velocity.current.yaw);
+      velocity.current.pitch += response * (pitch * scale - velocity.current.pitch);
+      rotate(yaw, pitch);
+      drag.current = { id: previous.id, x: event.clientX, y: event.clientY, movedAt: event.timeStamp };
+      redrawRef.current();
+    }}
+    onPointerCancel={(event) => {
+      if (drag.current?.id === event.pointerId) velocity.current = { yaw: 0, pitch: 0 };
     }}
     onLostPointerCapture={(event) => {
-      if (drag.current?.id !== event.pointerId) return;
+      const previous = drag.current;
+      if (previous?.id !== event.pointerId) return;
+      // An impulse dissipates if the pointer pauses before the button is released.
+      const idle = Math.max(0, event.timeStamp - previous.movedAt);
+      const retained = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : Math.exp(-idle / 85);
+      velocity.current.yaw *= retained;
+      velocity.current.pitch *= retained;
       drag.current = null;
       redrawRef.current();
     }}
@@ -856,6 +891,7 @@ function EmptySetScene({ durationMs, darkening, cue }: {
       if (!step) return;
       event.preventDefault();
       rotate(step[0] * .14, step[1] * .14);
+      redrawRef.current();
     }} />;
 }
 

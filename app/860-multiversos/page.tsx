@@ -735,7 +735,13 @@ function createEmptySetRenderer(canvas: HTMLCanvasElement) {
   };
 }
 
-function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkening: boolean }) {
+type SceneZeroCue = { context: AudioContext; beginsAt: number };
+
+function EmptySetScene({ durationMs, darkening, cue }: {
+  durationMs: number;
+  darkening: boolean;
+  cue: SceneZeroCue | null;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const levelRef = useRef(0);
   const orientation = useRef({ yaw: 0, pitch: 0 });
@@ -756,10 +762,10 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
 
     const from = levelRef.current;
     const target = darkening ? 0 : 1;
-    const started = performance.now();
     let frame: number | null = null;
-    const paint = (now: number) => {
-      const progress = Math.min(1, Math.max(0, (now - started) / durationMs));
+    const paint = () => {
+      const elapsedMs = cue ? (cue.context.currentTime - cue.beginsAt) * 1000 : 0;
+      const progress = Math.min(1, Math.max(0, elapsedMs / durationMs));
       const level = from + (target - from) * progress;
       levelRef.current = level;
       renderer.paint(
@@ -769,9 +775,9 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
       );
       return progress;
     };
-    const tick = (now: number) => {
+    const tick = () => {
       frame = null;
-      if (paint(now) < 1) schedulePaint();
+      if (paint() < 1) schedulePaint();
     };
     const schedulePaint = () => {
       if (frame === null) frame = window.requestAnimationFrame(tick);
@@ -780,7 +786,7 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
       const density = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.max(1, Math.round(canvas.clientWidth * density));
       canvas.height = Math.max(1, Math.round(canvas.clientHeight * density));
-      paint(performance.now());
+      paint();
     };
     resize();
     redrawRef.current = schedulePaint;
@@ -792,7 +798,7 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
       if (frame !== null) window.cancelAnimationFrame(frame);
       renderer.dispose();
     };
-  }, [darkening, durationMs]);
+  }, [darkening, durationMs, cue]);
 
   return <canvas ref={canvasRef} className="zero-object" role="img" tabIndex={0}
     aria-label="Conjunto vacío tridimensional. Arrastrá o usá las flechas para girarlo."
@@ -824,7 +830,7 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
 function ModuleZero() {
   const [stage, setStage] = useState("ready");
   const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
-  const [previewRun, setPreviewRun] = useState(0);
+  const [cue, setCue] = useState<SceneZeroCue | null>(null);
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
   const [pulseCount, setPulseCount] = useState(0);
   const [pulseRate, setPulseRate] = useState(2);
@@ -851,6 +857,7 @@ function ModuleZero() {
 
   const reset = useCallback(() => {
     stop();
+    setCue(null);
     setStage("ready");
   }, [stop]);
 
@@ -862,21 +869,26 @@ function ModuleZero() {
     };
   }, [reset, stop]);
 
-  const start = async () => {
+  const start = async (previewOnly = false) => {
     if (runningRef.current) return;
+    stop();
     runningRef.current = true;
-    const run = ++runRef.current;
+    const run = runRef.current;
     const openingMs = durationSeconds * 1000;
     const questionMs = 2 * openingMs + SCENE_ZERO_DARKENING_MS;
     const questionSeconds = questionMs / 1000;
-    const waveSeconds = questionSeconds + 12;
+    const previewHoldSeconds = 0.75;
+    const previewFadeOutSeconds = 0.5;
+    const fadeOutAt = previewOnly ? durationSeconds + previewHoldSeconds : questionSeconds + 9.5;
+    const waveSeconds = fadeOutAt + (previewOnly ? previewFadeOutSeconds : 2.5);
     setActiveDurationMs(openingMs);
     setStage("preparing");
     try {
       const context = new AudioContext();
       audioRef.current = context;
       await context.resume();
-      const render = new OfflineAudioContext(2, context.sampleRate * waveSeconds, context.sampleRate);
+      if (run !== runRef.current || audioRef.current !== context) return;
+      const render = new OfflineAudioContext(2, Math.ceil(context.sampleRate * waveSeconds), context.sampleRate);
       const buffer = render.createBuffer(2, render.sampleRate * 4, render.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const samples = buffer.getChannelData(channel);
@@ -912,24 +924,41 @@ function ModuleZero() {
         const samples = forward.getChannelData(channel);
         for (let i = 0; i < samples.length; i++) samples[i] *= boost;
       }
-      const wave = () => {
+      const wave = (beginsAt: number) => {
         const source = context.createBufferSource(), gain = context.createGain();
         const color = context.createBiquadFilter();
         color.type = "lowpass";
         source.buffer = forward;
-        const now = context.currentTime;
-        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(1, now + 3);
-        gain.gain.setValueAtTime(1, now + waveSeconds - 2.5);
-        gain.gain.linearRampToValueAtTime(0, now + waveSeconds);
-        color.frequency.setValueAtTime(18000, now);
-        color.frequency.setTargetAtTime(700, now + questionSeconds, 2);
-        color.Q.setValueAtTime(0.7, now);
-        color.Q.setTargetAtTime(1.4, now + questionSeconds, 2);
+        gain.gain.setValueAtTime(0, beginsAt);
+        gain.gain.linearRampToValueAtTime(1, beginsAt + durationSeconds);
+        gain.gain.setValueAtTime(1, beginsAt + fadeOutAt);
+        gain.gain.linearRampToValueAtTime(0, beginsAt + waveSeconds);
+        color.frequency.setValueAtTime(18000, beginsAt);
+        color.Q.setValueAtTime(0.7, beginsAt);
+        if (!previewOnly) {
+          color.frequency.setTargetAtTime(700, beginsAt + questionSeconds, 2);
+          color.Q.setTargetAtTime(1.4, beginsAt + questionSeconds, 2);
+        }
         source.connect(color); color.connect(gain); gain.connect(context.destination);
-        source.onended = () => { source.disconnect(); color.disconnect(); gain.disconnect(); };
-        source.start(now);
-        source.stop(now + waveSeconds);
+        source.onended = () => {
+          source.disconnect(); color.disconnect(); gain.disconnect();
+          if (previewOnly && audioRef.current === context) {
+            audioRef.current = null;
+            void context.close();
+          }
+        };
+        source.start(beginsAt);
+        source.stop(beginsAt + waveSeconds);
       };
+
+      if (previewOnly) {
+        const beginsAt = context.currentTime + 0.06;
+        wave(beginsAt);
+        setCue({ context, beginsAt });
+        setStage("preview");
+        runningRef.current = false;
+        return;
+      }
       const gong = (fifth = false, emphasis = 1) => {
         const now = context.currentTime, root = fifth ? 220 * 1.5 : 220;
         [1, 1.5, 2.08, 2.76, 4.1].forEach((partial, index) => {
@@ -1017,17 +1046,29 @@ function ModuleZero() {
         };
         frameRef.current = window.requestAnimationFrame(draw);
       };
-      setStage("opening"); wave();
-      at(openingMs, () => setStage("darkening"));
-      at(openingMs + SCENE_ZERO_DARKENING_MS, () => setStage("opening"));
-      at(questionMs, () => setStage("question"));
-      at(questionMs + 6000, () => { setStage("one"); gong(false, 1.3); });
-      at(questionMs + 8500, () => { setStage("two"); gong(true); });
-      at(questionMs + 11500, accelerate);
+      const beginsAt = context.currentTime + 0.06;
+      const atOffset = (offsetMs: number, action: (time: number) => void) => {
+        const time = beginsAt + offsetMs / 1000;
+        at(Math.max(0, (time - context.currentTime) * 1000), () => action(time));
+      };
+      setCue({ context, beginsAt });
+      setStage("opening");
+      wave(beginsAt);
+      atOffset(openingMs, (time) => {
+        setCue({ context, beginsAt: time });
+        setStage("darkening");
+      });
+      atOffset(openingMs + SCENE_ZERO_DARKENING_MS, (time) => {
+        setCue({ context, beginsAt: time });
+        setStage("opening");
+      });
+      atOffset(questionMs, () => setStage("question"));
+      atOffset(questionMs + 6000, () => { setStage("one"); gong(false, 1.3); });
+      atOffset(questionMs + 8500, () => { setStage("two"); gong(true); });
+      atOffset(questionMs + 11500, accelerate);
     } catch {
       if (run !== runRef.current) return;
-      if (audioRef.current) void audioRef.current.close();
-      audioRef.current = null; runningRef.current = false; setStage("ready");
+      reset();
     }
   };
 
@@ -1037,11 +1078,6 @@ function ModuleZero() {
   const preparing = stage === "preparing";
   const canStart = stage === "ready" || preview;
   const light = !showObject && !canStart && !preparing;
-  const previewScene = () => {
-    setActiveDurationMs(durationSeconds * 1000);
-    setPreviewRun((run) => run + 1);
-    setStage("preview");
-  };
   const question = stage === "question";
   const dots = ["one", "one-again", "two", "multiplying", "vertical"].includes(stage);
   const many = stage === "multiplying" || stage === "vertical";
@@ -1069,10 +1105,9 @@ function ModuleZero() {
       .zero-object { cursor: grab; touch-action: none; }
       .zero-object:active { cursor: grabbing; }
       .zero-controls { padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
-      .zero-controls h2 { margin: 0 0 2rem; font: 400 clamp(1.15rem, 2.1vw, 2rem)/1.15 Georgia, serif; }
-      .zero-controls label, .zero-controls output { font-size: .875rem; }
-      .zero-time { display: flex; justify-content: space-between; gap: .65rem; align-items: center; }
-      .zero-controls output { color: #e5e9f9; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .zero-title { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }
+      .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
+      .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls input { display: block; width: 100%; margin: .85rem 0 1.45rem; accent-color: #adc4ff; }
       .zero-actions { display: grid; gap: .65rem; }
       .zero-actions button {
@@ -1086,13 +1121,12 @@ function ModuleZero() {
         .zero-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(55svh, 1fr) auto; }
         .zero-stage { min-height: 0; }
         .zero-controls { border-left: 0; border-top: 1px solid #30333d; }
-        .zero-controls h2 { margin-bottom: 1rem; }
         .zero-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       }
     `}</style>
     <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" style={{background:light ? "#fff" : "#000"}}>
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
-      {showObject && <EmptySetScene key={previewRun} durationMs={darkening ? SCENE_ZERO_DARKENING_MS : activeDurationMs} darkening={darkening} />}
+      {showObject && <EmptySetScene durationMs={darkening ? SCENE_ZERO_DARKENING_MS : activeDurationMs} darkening={darkening} cue={cue} />}
       <span aria-hidden={!question} style={{position:"absolute",maxWidth:"min(90%, 900px)",color:"#111",fontFamily:"Georgia, serif",fontSize:"clamp(1.5rem, 3.5vw, 3.6rem)",lineHeight:1.3,fontWeight:400,opacity:question?1:0,transition:"opacity 1.5s ease",pointerEvents:"none"}}>¿Cuál es la entidad mínima capaz de ser imaginada?</span>
       <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",opacity:dots?1:0,transform:`rotate(${stage === "vertical" ? 90 : stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,transition:"opacity 1.2s ease, transform 0.15s linear",pointerEvents:"none"}}>
         {stage === "one" || stage === "one-again" ? <circle cx="100" cy="20" r="10" fill="#000" /> : <><circle cx="10" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /><circle cx="190" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /></>}
@@ -1110,16 +1144,15 @@ function ModuleZero() {
       {many && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{stage === "vertical" ? "111 Hz · TONO" : `${pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO`}</span>}
     </div>
     <aside className="zero-controls" aria-labelledby="zero-controls-title">
-      <h2 id="zero-controls-title">Escena 0 · ∅ → 0</h2>
-      <div className="zero-time">
-        <label htmlFor="zero-duration">De negro a blanco</label>
-        <output htmlFor="zero-duration">{durationSeconds} s</output>
+      <div className="zero-title">
+        <h2 id="zero-controls-title">Escena ∅ → 0</h2>
+        <output htmlFor="zero-duration">{durationSeconds} {durationSeconds === 1 ? "segundo" : "segundos"}</output>
       </div>
-      <input id="zero-duration" type="range" min={1} max={30} step={1} value={durationSeconds}
+      <input id="zero-duration" aria-label="Duración de la transición de luz y sonido" type="range" min={1} max={30} step={1} value={durationSeconds}
         aria-valuetext={`${durationSeconds} ${durationSeconds === 1 ? "segundo" : "segundos"}`} disabled={!canStart}
         onChange={(event) => setDurationSeconds(Number(event.currentTarget.value))} />
       <div className="zero-actions">
-        <button type="button" disabled={!canStart} onClick={previewScene}>Probar escena</button>
+        <button type="button" disabled={!canStart} onClick={() => void start(true)}>Probar escena</button>
         {canStart
           ? <button type="button" onClick={() => void start()}>Iniciar secuencia</button>
           : <button type="button" onClick={reset}>Detener secuencia</button>}

@@ -10,7 +10,7 @@ export function middleware(request: NextRequest) {
     .toLowerCase();
   const pathname = request.nextUrl.pathname;
 
-  if (pathname === "/panel-de-control" || pathname.startsWith("/panel-de-control/")) {
+  if (pathname === "/chloe" || pathname === "/panel-de-control" || pathname.startsWith("/panel-de-control/")) {
     const response = NextResponse.next();
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     response.headers.set("Cache-Control", "private, no-store");

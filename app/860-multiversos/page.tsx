@@ -335,95 +335,227 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
   parameter.setTargetAtTime(value, now, time);
 }
 
-function FrequencySpace() {
+type FrequencyVector = [x: number, y: number, z: number];
+type FrequencyPoint = [x: number, y: number];
+
+const FREQUENCY_VIEW = { width: 640, height: 360, x: 320, y: 180, yaw: 0.64, tilt: 0.62, scale: 102 };
+const FREQUENCY_AXES: { hz: number; label: string; color: string; direction: FrequencyVector }[] = [
+  { hz: 111, label: "X", color: "#345a9b", direction: [1, 0, 0] },
+  { hz: 222, label: "Y", color: "#a25d94", direction: [0, 1, 0] },
+  { hz: 333, label: "Z", color: "#26857e", direction: [0, 0, 1] },
+];
+const HARMONIC_CUE = {
+  secondGong: 0.12,
+  trace222: 0.17,
+  crossFormed: 0.35,
+  separate: 0.44,
+  equation: 0.65,
+  equals: 0.69,
+  trace333: 0.75,
+  result: 0.90,
+};
+
+function frequencyProject(x: number, y: number, z: number, yaw: number) {
+  const cs = Math.cos(yaw), sn = Math.sin(yaw);
+  const ct = Math.cos(FREQUENCY_VIEW.tilt), st = Math.sin(FREQUENCY_VIEW.tilt);
+  const horizontal = x * cs - y * sn, far = x * sn + y * cs;
+  const vertical = far * ct + z * st, depth = -far * st + z * ct;
+  const scale = FREQUENCY_VIEW.scale * 4.5 / (4.5 - depth);
+  return { x: FREQUENCY_VIEW.x + horizontal * scale, y: FREQUENCY_VIEW.y - vertical * scale, z: depth };
+}
+
+function frequencyAxis(direction: FrequencyVector, yaw: number) {
+  return [-1.38, 1.38].map((end) => frequencyProject(direction[0] * end, direction[1] * end, direction[2] * end, yaw));
+}
+
+function FrequencySpace({ opacity, moving }: { opacity: number; moving: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const movingRef = useRef(moving);
+  useEffect(() => { movingRef.current = moving; }, [moving]);
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
-    type Vec = {x:number; y:number; z:number};
-    const cross = (a:Vec,b:Vec):Vec => ({x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x});
-    const normalise = (v:Vec):Vec => { const d=Math.hypot(v.x,v.y,v.z)||1; return {x:v.x/d,y:v.y/d,z:v.z/d}; };
-    // Órbita de Lissajous: relaciones de frecuencia 111:222:333 = 1:2:3.
-    const point = (t:number):Vec => ({x:Math.sin(t),y:Math.sin(2*t+0.7),z:Math.sin(3*t+1.2)});
+    type Vec = { x: number; y: number; z: number };
+    const cross = (a: Vec, b: Vec): Vec => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x });
+    const normalise = (v: Vec): Vec => {
+      const length = Math.hypot(v.x, v.y, v.z) || 1;
+      return { x: v.x / length, y: v.y / length, z: v.z / length };
+    };
+    // Each coordinate has the same 1:2:3 relation as the audible frequencies.
+    const point = (t: number): Vec => ({ x: Math.sin(t), y: Math.sin(2 * t + 0.7), z: Math.sin(3 * t + 1.2) });
     const rings: Vec[][] = [];
     const segments = 240, sides = 10, radius = 0.065;
-    for (let i=0;i<=segments;i++) {
-      const t=i/segments*Math.PI*2, p=point(t), prev=point(t-0.002), next=point(t+0.002);
-      const tangent=normalise({x:next.x-prev.x,y:next.y-prev.y,z:next.z-prev.z});
-      const ref = Math.abs(tangent.z)>0.9 ? {x:0,y:1,z:0} : {x:0,y:0,z:1};
-      const n=normalise(cross(tangent,ref)), b=normalise(cross(tangent,n));
-      const ring:Vec[]=[];
-      for(let j=0;j<sides;j++){
-        const a=2*Math.PI*j/sides, c=Math.cos(a)*radius, d=Math.sin(a)*radius;
-        ring.push({x:p.x+n.x*c+b.x*d,y:p.y+n.y*c+b.y*d,z:p.z+n.z*c+b.z*d});
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments * Math.PI * 2, p = point(t), prev = point(t - 0.002), next = point(t + 0.002);
+      const tangent = normalise({ x: next.x - prev.x, y: next.y - prev.y, z: next.z - prev.z });
+      const ref = Math.abs(tangent.z) > 0.9 ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 };
+      const n = normalise(cross(tangent, ref)), b = normalise(cross(tangent, n));
+      const ring: Vec[] = [];
+      for (let j = 0; j < sides; j++) {
+        const a = 2 * Math.PI * j / sides, c = Math.cos(a) * radius, d = Math.sin(a) * radius;
+        ring.push({ x: p.x + n.x * c + b.x * d, y: p.y + n.y * c + b.y * d, z: p.z + n.z * c + b.z * d });
       }
       rings.push(ring);
     }
-    let frame=0, width=0, height=0, last=0;
-    const resize=() => {
-      const box=canvas.getBoundingClientRect(), ratio=Math.min(window.devicePixelRatio||1,2);
-      width=box.width; height=box.height;
-      canvas.width=Math.round(width*ratio); canvas.height=Math.round(height*ratio);
-      context.setTransform(ratio,0,0,ratio,0,0);
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0, last = 0, spinStarted: number | null = null;
+    const resize = () => {
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+      canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+      context.setTransform(canvas.width / FREQUENCY_VIEW.width, 0, 0, canvas.height / FREQUENCY_VIEW.height, 0, 0);
     };
-    resize(); window.addEventListener("resize",resize);
-    const draw=(time:number) => {
-      frame=window.requestAnimationFrame(draw);
-      if(time-last<35) return;
-      last=time;
-      context.clearRect(0,0,width,height);
-      const spin=time*0.00014, cs=Math.cos(spin), sn=Math.sin(spin);
-      const tilt=0.48, ct=Math.cos(tilt), st=Math.sin(tilt);
-      const scale=Math.min(width,height)*0.24;
-      const project=(v:Vec) => {
-        const x=v.x*cs-v.y*sn, y=v.x*sn+v.y*cs;
-        const yy=y*ct-v.z*st, depth=y*st+v.z*ct;
-        const perspective=4.5/(4.5-depth);
-        return {x:width/2+x*scale*perspective,y:height*0.51-yy*scale*perspective,z:depth};
-      };
-      const center=project({x:0,y:0,z:0});
-      const axes=[
-        {v:{x:1.6,y:0,z:0},color:"#345a9b",label:"X · 111 Hz"},
-        {v:{x:0,y:1.6,z:0},color:"#a25d94",label:"Y · 222 Hz"},
-        {v:{x:0,y:0,z:1.6},color:"#26857e",label:"Z · 333 Hz"},
-      ];
-      context.lineWidth=1;
-      for(const axis of axes){
-        const tip=project(axis.v);
-        context.setLineDash([4,6]); context.strokeStyle=axis.color+"77";
-        context.beginPath(); context.moveTo(center.x,center.y); context.lineTo(tip.x,tip.y); context.stroke();
-        context.setLineDash([]); context.fillStyle=axis.color; context.beginPath(); context.arc(tip.x,tip.y,3,0,Math.PI*2); context.fill();
-        context.font="14px Georgia, serif"; context.textAlign=tip.x<center.x?"right":"left";
-        context.fillText(axis.label,tip.x+(tip.x<center.x?-8:8),tip.y-7);
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+
+    const draw = (time: number) => {
+      frame = window.requestAnimationFrame(draw);
+      if (time - last < 35) return;
+      last = time;
+      if (movingRef.current && spinStarted === null) spinStarted = time;
+      const spin = reduceMotion.matches || spinStarted === null ? 0 : (time - spinStarted) * 0.00014;
+      const yaw = FREQUENCY_VIEW.yaw + spin;
+      context.clearRect(0, 0, FREQUENCY_VIEW.width, FREQUENCY_VIEW.height);
+      const project = (v: Vec) => frequencyProject(v.x, v.y, v.z, yaw);
+      context.lineWidth = 1;
+      for (const axis of FREQUENCY_AXES) {
+        const [tail, tip] = frequencyAxis(axis.direction, yaw);
+        context.setLineDash([4, 6]);
+        context.strokeStyle = axis.color + "77";
+        context.beginPath();
+        context.moveTo(tail.x, tail.y);
+        context.lineTo(tip.x, tip.y);
+        context.stroke();
+        context.setLineDash([]);
+        context.fillStyle = axis.color;
+        context.beginPath();
+        context.arc(tip.x, tip.y, 3, 0, Math.PI * 2);
+        context.fill();
+        context.font = "22px Georgia, serif";
+        context.textAlign = tip.x < FREQUENCY_VIEW.x ? "right" : "left";
+        context.fillText(`${axis.label} · ${axis.hz} Hz`, tip.x + (tip.x < FREQUENCY_VIEW.x ? -8 : 8), tip.y - 7);
       }
-      const faces:Array<{points:Array<{x:number;y:number;z:number}>;depth:number;hue:number;light:number}>=[];
-      for(let i=0;i<segments;i++){
-        for(let j=0;j<sides;j++){
-          const k=(j+1)%sides;
-          const pts=[project(rings[i][j]),project(rings[i+1][j]),project(rings[i+1][k]),project(rings[i][k])];
-          const depth=pts.reduce((sum,p)=>sum+p.z,0)/4;
-          const light=Math.max(28,Math.min(74,48+depth*8+Math.cos(j*2*Math.PI/sides)*9));
-          faces.push({points:pts,depth,hue:210+50*i/segments,light});
+
+      const projected = rings.map((ring) => ring.map(project));
+      const faces: Array<{ points: Array<{ x: number; y: number; z: number }>; depth: number; hue: number; light: number }> = [];
+      for (let i = 0; i < segments; i++) {
+        for (let j = 0; j < sides; j++) {
+          const k = (j + 1) % sides;
+          const points = [projected[i][j], projected[i + 1][j], projected[i + 1][k], projected[i][k]];
+          const depth = points.reduce((sum, p) => sum + p.z, 0) / 4;
+          const light = Math.max(28, Math.min(74, 48 + depth * 8 + Math.cos(j * 2 * Math.PI / sides) * 9));
+          faces.push({ points, depth, hue: 210 + 50 * i / segments, light });
         }
       }
-      faces.sort((a,b)=>a.depth-b.depth);
-      context.lineWidth=0.45;
-      for(const face of faces){
-        context.beginPath(); context.moveTo(face.points[0].x,face.points[0].y);
-        for(let i=1;i<face.points.length;i++) context.lineTo(face.points[i].x,face.points[i].y);
+      faces.sort((a, b) => a.depth - b.depth);
+      for (const face of faces) {
+        context.beginPath();
+        context.moveTo(face.points[0].x, face.points[0].y);
+        for (let i = 1; i < face.points.length; i++) context.lineTo(face.points[i].x, face.points[i].y);
         context.closePath();
-        context.fillStyle="hsl("+face.hue+" 48% "+face.light+"%)"; context.fill();
-        context.strokeStyle="rgba(35,44,80,.15)"; context.stroke();
+        context.fillStyle = `hsl(${face.hue} 48% ${face.light}%)`;
+        context.fill();
       }
     };
-    frame=window.requestAnimationFrame(draw);
-    return () => { window.cancelAnimationFrame(frame); window.removeEventListener("resize",resize); };
+    frame = window.requestAnimationFrame(draw);
+    return () => { window.cancelAnimationFrame(frame); observer.disconnect(); };
   }, []);
-  return <span aria-label="Objeto tridimensional formado por las vibraciones de 111, 222 y 333 hercios en los ejes X, Y y Z." style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",opacity:0,animation:"zeroSpaceFade 2s ease forwards",color:"#17191e"}}>
-    <canvas ref={canvasRef} role="img" aria-label="Órbita tridimensional de las tres frecuencias" style={{display:"block",width:"min(92vw, 820px)",height:"min(66vh, 600px)"}} />
-    <span style={{margin:"8px 0 0",fontFamily:"Georgia, serif",fontSize:"clamp(1.2rem, 2.6vw, 2.2rem)",letterSpacing:".02em",textAlign:"center"}}>Cuarta dimensión: el tiempo</span>
-  </span>;
+
+  return <div className="zero-frequency-space" style={{ opacity }} aria-hidden={opacity < 0.5}>
+    <canvas ref={canvasRef} role="img" aria-label="Figura tridimensional de 111, 222 y 333 Hz en los ejes X, Y y Z" />
+    <span>Cuarta dimensión: el tiempo</span>
+  </div>;
+}
+
+type HarmonicStage = "vertical" | "harmonics" | "equation" | "spatial" | "space";
+
+function HarmonicDiagram({ stage, cue, durationMs }: {
+  stage: HarmonicStage; cue: SceneZeroCue | null; durationMs: number;
+}) {
+  const [clock, setClock] = useState(0);
+  useEffect(() => {
+    if (!cue || (stage !== "harmonics" && stage !== "spatial")) return;
+    let frame = 0;
+    const tick = () => {
+      const time = cue.context.currentTime;
+      setClock(time);
+      if ((time - cue.beginsAt) * 1000 < durationMs) frame = window.requestAnimationFrame(tick);
+    };
+    tick();
+    return () => window.cancelAnimationFrame(frame);
+  }, [stage, cue, durationMs]);
+
+  const elapsed = cue ? (clock - cue.beginsAt) * 1000 / durationMs : 0;
+  const progress = Math.max(0, Math.min(1, elapsed));
+  const equation = stage === "vertical" ? 0 : stage === "harmonics" ? progress : 1;
+  const spatial = stage === "spatial" ? progress : stage === "space" ? 1 : 0;
+  const ease = (value: number, start: number, end: number) => smoothSceneLight((value - start) / (end - start));
+  const separate = ease(equation, HARMONIC_CUE.separate, HARMONIC_CUE.equation);
+  const converge = ease(spatial, 0.12, 0.60);
+  const figure = ease(spatial, 0.60, 1);
+  const plus = ease(equation, HARMONIC_CUE.separate, HARMONIC_CUE.equation) * (1 - ease(spatial, 0, 0.2));
+  const equals = ease(equation, HARMONIC_CUE.equals, HARMONIC_CUE.equals + 0.045) * (1 - ease(spatial, 0, 0.2));
+  const trace222 = ease(equation, HARMONIC_CUE.trace222, HARMONIC_CUE.crossFormed);
+  const trace333 = ease(equation, HARMONIC_CUE.trace333, HARMONIC_CUE.result);
+  const showHarmonics = stage !== "vertical";
+  const { x, y } = FREQUENCY_VIEW;
+  const half = 68;
+  const side = 166;
+
+  const distance = half + (94 - half) * (1 - separate);
+  const angle = separate * Math.PI / 2;
+  const dx = Math.cos(angle) * distance, dy = -Math.sin(angle) * distance;
+  const lines: { hz: number; a: FrequencyPoint; b: FrequencyPoint; label: FrequencyPoint; full: number }[] = [
+    { hz: 111, a: [x - side * separate, y + half], b: [x - side * separate, y - half], label: [x - side * separate, y + half + 27], full: 1 },
+    { hz: 222, a: [x - dx, y - dy], b: [x + dx, y + dy], label: [x + (distance + 55) * (1 - separate), y + (half + 27) * separate], full: trace222 },
+    { hz: 333, a: [x + side, y + half], b: [x + side, y - half], label: [x + side, y + half + 27], full: trace333 },
+  ];
+  const lerp = (a: FrequencyPoint, b: FrequencyPoint, amount: number): FrequencyPoint =>
+    [a[0] + (b[0] - a[0]) * amount, a[1] + (b[1] - a[1]) * amount];
+
+  const diagramLabel = stage === "vertical" ? "Línea vertical de 111 Hz"
+    : spatial > 0 ? "Cruce de las tres frecuencias en X, Y y Z"
+    : equation >= HARMONIC_CUE.result ? "111 Hz más 222 Hz igual a 333 Hz"
+    : "De la línea de 111 Hz a los ejes de 111 y 222 Hz";
+
+  return <div className="zero-harmonic-frame">
+    {figure < 1 && <svg className="zero-harmonic-diagram" role="img" aria-label={diagramLabel} viewBox="0 0 640 360"
+      style={{ opacity: 1 - figure }} aria-hidden={figure >= 0.5}>
+      <g fill="#111" stroke="#111" strokeWidth={2.6} strokeLinecap="round">
+        {lines.map(({ hz, a, b, label, full }, index) => {
+          const axis = FREQUENCY_AXES[index];
+          const [tail, tip] = frequencyAxis(axis.direction, FREQUENCY_VIEW.yaw);
+          const start = lerp(a, [tail.x, tail.y], converge);
+          const end = lerp(b, [tip.x, tip.y], converge);
+          const midA = lerp(start, end, full * 0.5);
+          const midB = lerp(end, start, full * 0.5);
+          const color = converge >= 0.98 ? axis.color : "#111";
+          const traced = index === 0 || (showHarmonics && full > 0);
+          const firstDot = index === 1 ? 1 : ease(equation, HARMONIC_CUE.trace333 - 0.03, HARMONIC_CUE.trace333);
+          const secondDot = index === 1 ? ease(equation, HARMONIC_CUE.secondGong, HARMONIC_CUE.secondGong + 0.018) : firstDot;
+          const dotScale = 1 - ease(full, 0.6, 1);
+          const text = index === 0 ? 1 : ease(full, 0.2, 0.84);
+          return <g key={hz}>
+            {traced && <path d={`M ${start.join(" ")} L ${midA.join(" ")} M ${end.join(" ")} L ${midB.join(" ")}`} stroke={color} fill="none" />}
+            {showHarmonics && index > 0 && dotScale > 0 && <>
+              <circle cx={start[0]} cy={start[1]} r={4.5} opacity={firstDot * dotScale} stroke="none" />
+              <circle cx={end[0]} cy={end[1]} r={4.5} opacity={secondDot * dotScale} stroke="none" />
+            </>}
+            {text > 0 && <text x={label[0]} y={label[1]} opacity={text * (1 - converge)} textAnchor="middle"
+              dominantBaseline="middle" stroke="none" fontSize={24} fontFamily="Georgia, serif">{hz} Hz</text>}
+          </g>;
+        })}
+      </g>
+      <g fill="#111" fontSize={42} fontFamily="Georgia, serif" textAnchor="middle" dominantBaseline="central">
+        {plus > 0 && <text x={x - side / 2} y={y} opacity={plus}>+</text>}
+        {equals > 0 && <text x={x + side / 2} y={y} opacity={equals}>=</text>}
+      </g>
+    </svg>}
+    {figure > 0 && <FrequencySpace opacity={figure} moving={stage === "space"} />}
+  </div>;
 }
 
 type GlyphPoint = [number, number];
@@ -463,6 +595,8 @@ const EMPTY_SET_OUTLINE: GlyphSegment[][] = [
 const SCENE_ZERO_DEFAULT_SECONDS = 8;
 const SCENE_ONE_DEFAULT_SECONDS = 22;
 const SCENE_LINE_DEFAULT_SECONDS = 15;
+const SCENE_HARMONIC_DEFAULT_SECONDS = 18;
+const SCENE_SPACE_DEFAULT_SECONDS = 7;
 const SCENE_ONE_LIGHT_SHARE = 16 / 22;
 
 function smoothSceneLight(progress: number) {
@@ -965,13 +1099,32 @@ function playSceneOneGong(context: AudioContext, beginsAt: number) {
   };
 }
 
-type ModuleZeroPlayback = "sequence" | "opening" | "beacon" | "line";
+function playModuleGong(context: AudioContext, time: number, root: number, strength = 1) {
+  const partials = [1, 1.5, 2.08, 2.76, 4.1];
+  const peaks = [0.16, 0.085, 0.045, 0.025, 0.012];
+  partials.forEach((partial, index) => {
+    const oscillator = context.createOscillator(), envelope = context.createGain();
+    oscillator.type = index === 0 ? "sine" : "triangle";
+    oscillator.frequency.value = root * partial;
+    envelope.gain.setValueAtTime(0.0001, time);
+    envelope.gain.exponentialRampToValueAtTime(peaks[index] * strength, time + 0.015);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, time + 4.5 - index * 0.45);
+    oscillator.connect(envelope).connect(context.destination);
+    oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
+    oscillator.start(time);
+    oscillator.stop(time + 4.6);
+  });
+}
+
+type ModuleZeroPlayback = "sequence" | "opening" | "beacon" | "line" | "harmonics" | "space";
 
 function ModuleZero() {
   const [stage, setStage] = useState("ready");
   const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
   const [oneSeconds, setOneSeconds] = useState(SCENE_ONE_DEFAULT_SECONDS);
   const [lineSeconds, setLineSeconds] = useState(SCENE_LINE_DEFAULT_SECONDS);
+  const [harmonicSeconds, setHarmonicSeconds] = useState(SCENE_HARMONIC_DEFAULT_SECONDS);
+  const [spaceSeconds, setSpaceSeconds] = useState(SCENE_SPACE_DEFAULT_SECONDS);
   const [previewMode, setPreviewMode] = useState<Exclude<ModuleZeroPlayback, "sequence"> | null>(null);
   const [cue, setCue] = useState<SceneZeroCue | null>(null);
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
@@ -1038,6 +1191,64 @@ function ModuleZero() {
       audioRef.current = context;
       await context.resume();
       if (run !== runRef.current || audioRef.current !== context) return;
+
+      const atTime = (time: number, action: (time: number) => void) => {
+        const onTime = () => {
+          if (run !== runRef.current) return;
+          const remaining = time - context.currentTime;
+          if (remaining > 0.005) timersRef.current.push(window.setTimeout(onTime, Math.max(8, remaining * 1000)));
+          else action(time);
+        };
+        timersRef.current.push(window.setTimeout(onTime, Math.max(0, (time - context.currentTime) * 1000)));
+      };
+      const createChordBus = () => {
+        const output = context.createGain();
+        output.gain.value = 0.8;
+        output.connect(context.destination);
+        return output;
+      };
+      const addTone = (bus: GainNode, frequency: number, time: number, attack: number) => {
+        const oscillator = context.createOscillator(), gain = context.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(0.12, time + attack);
+        oscillator.connect(gain).connect(bus);
+        oscillator.start(time);
+      };
+      const enterDiagram = (stage: "harmonics" | "spatial", time: number, seconds: number) => {
+        setCue({ context, beginsAt: time });
+        setActiveDurationMs(seconds * 1000);
+        setStage(stage);
+        if (previewOnly) runningRef.current = false;
+      };
+      const playSpatial = (time: number) => {
+        atTime(time, () => enterDiagram("spatial", time, spaceSeconds));
+        atTime(time + spaceSeconds, () => setStage("space"));
+      };
+      const playHarmonics = (bus: GainNode, time: number) => {
+        playModuleGong(context, time, 330, 0.58);
+        playModuleGong(context, time + harmonicSeconds * HARMONIC_CUE.secondGong, 444, 0.55);
+        addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
+        addTone(bus, 333, time + harmonicSeconds * HARMONIC_CUE.trace333, harmonicSeconds * (HARMONIC_CUE.result - HARMONIC_CUE.trace333));
+        atTime(time, () => enterDiagram("harmonics", time, harmonicSeconds));
+        if (mode === "sequence") playSpatial(time + harmonicSeconds);
+        else atTime(time + harmonicSeconds, () => setStage("equation"));
+      };
+
+      if (mode === "harmonics" || mode === "space") {
+        const time = context.currentTime + 0.07;
+        const bus = createChordBus();
+        addTone(bus, 111, time, 0.28);
+        if (mode === "harmonics") playHarmonics(bus, time);
+        else {
+          addTone(bus, 222, time, 0.28);
+          addTone(bus, 333, time, 0.28);
+          playSpatial(time);
+        }
+        return;
+      }
+
       const render = new OfflineAudioContext(2, Math.ceil(context.sampleRate * waveSeconds), context.sampleRate);
       const buffer = render.createBuffer(2, render.sampleRate * 4, render.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
@@ -1108,19 +1319,8 @@ function ModuleZero() {
         if (!sustainMurmur) source.stop(beginsAt + waveSeconds);
       };
 
-      const at = (ms: number, action: () => void) => {
-        timersRef.current.push(window.setTimeout(() => { if (run === runRef.current) action(); }, ms));
-      };
       const beginsAt = context.currentTime + 0.06;
-      const atOffset = (offsetMs: number, action: (time: number) => void) => {
-        const time = beginsAt + offsetMs / 1000;
-        const onTime = () => {
-          const remaining = time - context.currentTime;
-          if (remaining > 0.005) at(Math.max(8, remaining * 1000), onTime);
-          else action(time);
-        };
-        at(Math.max(0, (time - context.currentTime) * 1000), onTime);
-      };
+      const atOffset = (offsetMs: number, action: (time: number) => void) => atTime(beginsAt + offsetMs / 1000, action);
       const beginLight = (time: number) => {
         setActiveDurationMs(lightMs);
         setCue({ context, beginsAt: time });
@@ -1146,35 +1346,7 @@ function ModuleZero() {
         runningRef.current = false;
         return;
       }
-      const secondGong = (now: number) => {
-        const root = 330;
-        [1, 1.5, 2.08, 2.76, 4.1].forEach((partial, index) => {
-          const oscillator = context.createOscillator(), envelope = context.createGain();
-          oscillator.type = index === 0 ? "sine" : "triangle";
-          oscillator.frequency.value = root * partial;
-          const amplitude = [0.16, 0.085, 0.045, 0.025, 0.012][index];
-          envelope.gain.setValueAtTime(0.0001, now);
-          envelope.gain.exponentialRampToValueAtTime(amplitude, now + 0.015);
-          envelope.gain.exponentialRampToValueAtTime(0.0001, now + 4.5 - index * 0.45);
-          oscillator.connect(envelope); envelope.connect(context.destination);
-          oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
-          oscillator.start(now); oscillator.stop(now + 4.6);
-        });
-      };
-      // Las tres voces comparten una salida y permanecen activas juntas.
-      const chordBus = context.createGain();
-      chordBus.gain.value = 0.8;
-      chordBus.connect(context.destination);
-      const addTone = (frequency: number, volume: number) => {
-        const oscillator = context.createOscillator(), gain = context.createGain();
-        oscillator.type = "sine";
-        oscillator.frequency.value = frequency;
-        const now = context.currentTime;
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(volume, now + 1);
-        oscillator.connect(gain); gain.connect(chordBus);
-        oscillator.start(now);
-      };
+      const chordBus = createChordBus();
       const scheduleAcceleration = (beginning: number) => {
         const duration = rampSeconds;
         const percussionGain = context.createGain();
@@ -1219,12 +1391,6 @@ function ModuleZero() {
           setPulseRate(2 * Math.pow(111 / 2, Math.min(1, Math.max(0, elapsed / duration))));
           if (elapsed >= duration) {
             setPulseRate(111); setStage("vertical"); frameRef.current = null;
-            if (mode === "sequence") {
-              at(4000, () => { setStage("pair"); addTone(222, 0.12); });
-              at(9000, () => setStage("plus"));
-              at(11000, () => setStage("equals"));
-              at(13000, () => { setStage("triad"); addTone(333, 0.12); at(7000, () => setStage("space")); });
-            }
             return;
           }
           frameRef.current = window.requestAnimationFrame(draw);
@@ -1235,7 +1401,8 @@ function ModuleZero() {
         });
       };
       const gongAt = beginsAt + lineStartsAt / 1000;
-      secondGong(gongAt);
+      playModuleGong(context, gongAt, 330);
+      if (mode === "sequence") playHarmonics(chordBus, gongAt + lineSeconds + 4);
       atOffset(lineStartsAt, () => {
         setPulseCount(0);
         setPulseRate(2);
@@ -1254,13 +1421,14 @@ function ModuleZero() {
   const canStart = stage === "ready" || (previewMode !== null && !preparing);
   const light = !showObject && stage !== "ready" && !preparing;
   const question = stage === "question";
-  const dots = ["one-again", "two", "multiplying", "vertical"].includes(stage);
-  const many = stage === "multiplying" || stage === "vertical";
-  const expression = ["pair", "plus", "equals", "triad", "space"].includes(stage);
+  const dots = stage === "two" || stage === "multiplying";
+  const expression = stage === "vertical" || stage === "harmonics" || stage === "equation" || stage === "spatial" || stage === "space";
   const sceneControls = [
     { mode: "opening", title: "Escena Ø → {}", id: "zero-duration", label: "Duración de la transición de luz y sonido", duration: durationSeconds, min: 1, max: 30, setDuration: setDurationSeconds },
     { mode: "beacon", title: "Escena {} → 0", id: "one-duration", label: "Duración de la escena de conjunto vacío a cero", duration: oneSeconds, min: 6, max: 60, setDuration: setOneSeconds },
     { mode: "line", title: "Escena 0 → 1", id: "line-duration", label: "Duración de la escena de cero a uno", duration: lineSeconds, min: 6, max: 60, setDuration: setLineSeconds },
+    { mode: "harmonics", title: "Escena 1 → 2", id: "harmonic-duration", label: "Duración de la escena de uno a dos", duration: harmonicSeconds, min: 6, max: 60, setDuration: setHarmonicSeconds },
+    { mode: "space", title: "Escena 3", id: "space-duration", label: "Duración de la escena tres", duration: spaceSeconds, min: 3, max: 30, setDuration: setSpaceSeconds },
   ] as const;
   const pointPosition = (index: number) => {
     let n = index, fraction = 0, scale = 0.5;
@@ -1272,7 +1440,7 @@ function ModuleZero() {
       @keyframes zeroSpaceFade { from { opacity: 0; } to { opacity: 1; } }
       .zero-layout {
         display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
-        min-height: 100svh; background: #11131a; color: #f2f3f7; isolation: isolate;
+        grid-template-rows: 100svh; min-height: 100svh; background: #11131a; color: #f2f3f7; isolation: isolate;
         opacity: 1; transform: none; animation: none;
         font-family: system-ui, sans-serif;
       }
@@ -1290,7 +1458,13 @@ function ModuleZero() {
         animation: zeroSpaceFade .55s ease both;
       }
       .zero-point { width: clamp(8px, 1.05vw, 16px); aspect-ratio: 1; border-radius: 50%; background: #000; }
-      .zero-controls { display: grid; align-content: start; gap: 1.4rem; padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
+      .zero-harmonic-frame { position: relative; width: min(94%, 800px); aspect-ratio: 16 / 9; pointer-events: none; }
+      .zero-harmonic-diagram, .zero-frequency-space, .zero-frequency-space canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .zero-frequency-space span {
+        position: absolute; top: 100%; left: 0; width: 100%; text-align: center; color: #17191e;
+        font: 400 clamp(1rem, 2.4vw, 2.1rem)/1.2 Georgia, serif;
+      }
+      .zero-controls { display: grid; align-content: start; gap: 1.15rem; min-height: 0; overflow-y: auto; padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
       .zero-scene + .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
       .zero-title { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
@@ -1306,7 +1480,7 @@ function ModuleZero() {
       @media (max-width: 700px) {
         .zero-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(55svh, 1fr) auto; }
         .zero-stage { min-height: 0; }
-        .zero-controls { border-left: 0; border-top: 1px solid #30333d; }
+        .zero-controls { border-left: 0; border-top: 1px solid #30333d; overflow: visible; }
         .zero-scene + .zero-scene { padding-top: 1rem; }
       }
     `}</style>
@@ -1315,20 +1489,12 @@ function ModuleZero() {
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} beacon={stage === "beacon"} cue={cue} />}
       {question && <p className="zero-question">¿Cuál es la entidad mínima capaz de ser imaginada?</p>}
       {stage === "one" && <span role="img" aria-label="Punto negro" className="zero-point" />}
-      <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",opacity:dots?1:0,transform:`rotate(${stage === "vertical" ? 90 : stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,transition:"opacity 1.2s ease, transform 0.15s linear",pointerEvents:"none"}}>
-        {stage === "one" || stage === "one-again" ? <circle cx="100" cy="20" r="10" fill="#000" /> : <><circle cx="10" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /><circle cx="190" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /></>}
-        {many && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
-        {stage === "vertical" && <line x1="10" y1="20" x2="190" y2="20" stroke="#000" strokeWidth="3" />}
-      </svg>
-      {expression && <span aria-label={stage === "triad" ? "111 hercios más 222 hercios igual a 333 hercios" : "111 y 222 hercios"} style={{position:"absolute",display:"grid",gridTemplateColumns:"1fr .65fr 1fr .65fr 1fr",alignItems:"center",justifyItems:"center",width:"min(90%, 560px)",color:"#111",pointerEvents:"none",opacity:stage === "space" ? 0 : 1,transition:"opacity 1.5s ease"}}>
-        <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>111 Hz</small></span>
-        <span style={{fontFamily:"serif",fontSize:"clamp(30px, 5vw, 60px)",visibility:stage === "pair"?"hidden":"visible"}}>+</span>
-        <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>222 Hz</small></span>
-        <span style={{fontFamily:"serif",fontSize:"clamp(30px, 5vw, 60px)",visibility:stage === "equals" || stage === "triad"?"visible":"hidden"}}>=</span>
-        <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16,visibility:stage === "triad"?"visible":"hidden"}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>333 Hz</small></span>
-      </span>}
-      {stage === "space" && <FrequencySpace />}
-      {many && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{stage === "vertical" ? "111 Hz · TONO" : `${pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO`}</span>}
+      {dots && <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",transform:`rotate(${stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,transition:"transform 0.15s linear",pointerEvents:"none"}}>
+        <circle cx="10" cy="20" r="10" fill="#000" /><circle cx="190" cy="20" r="10" fill="#000" />
+        {stage === "multiplying" && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
+      </svg>}
+      {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={cue} durationMs={activeDurationMs} />}
+      {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
     </div>
     <aside className="zero-controls" aria-label="Controles de las escenas">
       {sceneControls.map(({ mode, title, id, label, duration, min, max, setDuration }) => {

@@ -426,110 +426,313 @@ function FrequencySpace() {
   </span>;
 }
 
-type SceneZeroVector = [number, number, number];
-type SceneZeroShape = { position: SceneZeroVector; normal: SceneZeroVector };
-type SceneZeroVertex = { curved: SceneZeroShape; angular: SceneZeroShape };
-type SceneZeroFace = [SceneZeroVertex, SceneZeroVertex, SceneZeroVertex, SceneZeroVertex];
+type GlyphPoint = [number, number];
+type GlyphSegment = GlyphPoint | [number, number, number, number, number, number];
+
+// U+2205 from STIX Two Math (STIX Fonts Project, OFL 1.1), converted to Bézier coordinates.
+// https://github.com/stipub/stixfonts/blob/master/source/STIXTwoMath.ufo/glyphs/uni2205.glif
+const EMPTY_SET_OUTLINE: GlyphSegment[][] = [
+  [
+    [722, 597],
+    [651, 597],
+    [592, 529],
+    [533, 570, 467, 597, 390, 597],
+    [204, 597, 51, 443, 51, 258],
+    [51, 168, 88, 82, 147, 21],
+    [58, -81],
+    [129, -81],
+    [188, -14],
+    [247, -57, 316, -81, 390, -81],
+    [575, -81, 729, 71, 729, 258],
+    [729, 347, 693, 430, 632, 493],
+  ],
+  [
+    [589, 444],
+    [635, 393, 661, 328, 661, 259],
+    [661, 108, 539, -14, 390, -14],
+    [333, -14, 278, 4, 232, 37],
+  ],
+  [
+    [192, 72],
+    [145, 121, 119, 188, 119, 259],
+    [119, 408, 239, 529, 390, 529],
+    [446, 529, 515, 507, 547, 477],
+  ],
+];
 
 const SCENE_ZERO_DEFAULT_SECONDS = 8;
 const SCENE_ZERO_DARKENING_MS = 8000;
 
-function sceneZeroMesh(): SceneZeroFace[] {
-  const faces: SceneZeroFace[] = [];
-  const sweep = (
-    facets: number,
-    subdivisions: number,
-    profileSteps: number,
-    vertex: (facet: number, position: number, profile: number) => SceneZeroVertex,
-  ) => {
-    for (let facet = 0; facet < facets; facet++) {
-      for (let i = 0; i < subdivisions; i++) {
-        const a = i / subdivisions;
-        const b = (i + 1) / subdivisions;
-        for (let j = 0; j < profileSteps; j++) {
-          faces.push([vertex(facet, a, j), vertex(facet, b, j), vertex(facet, b, j + 1), vertex(facet, a, j + 1)]);
+function emptySetContours() {
+  const position = (x: number, y: number): GlyphPoint => [(x - 390) / 365, (y - 258) / 365];
+  return EMPTY_SET_OUTLINE.map(([start, ...segments]) => {
+    let [x, y] = start;
+    const points = [position(x, y)];
+    for (const segment of segments) {
+      if (segment.length === 2) {
+        [x, y] = segment;
+        points.push(position(x, y));
+        continue;
+      }
+      const [cx, cy, dx, dy, endX, endY] = segment;
+      for (let step = 1; step <= 24; step++) {
+        const t = step / 24, u = 1 - t;
+        points.push(position(
+          u ** 3 * x + 3 * u * u * t * cx + 3 * u * t * t * dx + t ** 3 * endX,
+          u ** 3 * y + 3 * u * u * t * cy + 3 * u * t * t * dy + t ** 3 * endY,
+        ));
+      }
+      x = endX;
+      y = endY;
+    }
+    return points;
+  });
+}
+
+function emptySetMesh(contours: GlyphPoint[][]) {
+  const vertices: number[] = [];
+  const halfDepth = 0.145;
+  const bevel = 0.012;
+  const put = ([x, y]: GlyphPoint, z: number, nx: number, ny: number, nz: number) =>
+    vertices.push(x, y, z, nx, ny, nz);
+  const quads = [0, 1, 2, 0, 2, 3];
+  const caps = contours.map((points) => {
+    const normals = points.map(([x, y], index): GlyphPoint => {
+      const next = points[(index + 1) % points.length];
+      const dx = next[0] - x, dy = next[1] - y;
+      const length = Math.hypot(dx, dy);
+      return [dy / length, -dx / length];
+    });
+    const inset = points.map(([x, y], index): GlyphPoint => {
+      const [ax, ay] = normals[(index + points.length - 1) % points.length];
+      const [bx, by] = normals[index];
+      const miter = Math.min(2.5, 1 / Math.max(0.1, 1 + ax * bx + ay * by));
+      return [x - bevel * miter * (ax + bx), y - bevel * miter * (ay + by)];
+    });
+    const smoothNormal = (index: number, edge: number): GlyphPoint => {
+      const [x, y] = normals[edge];
+      const [nx, ny] = normals[index];
+      return x * nx + y * ny > 0.94 ? [x + nx, y + ny] : [x, y];
+    };
+
+    points.forEach((point, index) => {
+      const next = (index + 1) % points.length;
+      const left = smoothNormal((index + points.length - 1) % points.length, index);
+      const right = smoothNormal(next, index);
+      const outer = [point, points[next]];
+      const inner = [inset[index], inset[next]];
+      const edgeDepth = halfDepth - bevel;
+      for (const face of [0, -1, 1]) {
+        for (const vertex of quads) {
+          const side = vertex === 0 || vertex === 3 ? 0 : 1;
+          const top = vertex < 2 ? 1 : -1;
+          const [nx, ny] = side === 0 ? left : right;
+          const length = Math.hypot(nx, ny);
+          if (face === 0) {
+            put(outer[side], top * edgeDepth, nx / length, ny / length, 0);
+          } else {
+            put(top === 1 ? inner[side] : outer[side], face * (top === 1 ? halfDepth : edgeDepth), nx / length, ny / length, face * 0.88);
+          }
         }
       }
-    }
-  };
-
-  // The same vertices describe a torus and the bevels of a twelve-sided frame.
-  const turn = Math.PI * 2;
-  const ringSides = 12;
-  const ringProfile = [
-    [0.108, 0.093, 1, 1],
-    [0.064, 0.157, 0, 1],
-    [0, 0.157, 0, 1],
-    [-0.064, 0.157, 0, 1],
-    [-0.108, 0.093, -1, 1],
-    [-0.108, 0, -1, 0],
-    [-0.108, -0.093, -1, -1],
-    [-0.064, -0.157, 0, -1],
-    [0, -0.157, 0, -1],
-    [0.064, -0.157, 0, -1],
-    [0.108, -0.093, 1, -1],
-    [0.108, 0, 1, 0],
-    [0.108, 0.093, 1, 1],
-  ];
-  sweep(ringSides, 8, ringProfile.length - 1, (facet, fraction, profile) => {
-    const a = facet * turn / ringSides;
-    const b = (facet + 1) * turn / ringSides;
-    const angle = a + (b - a) * fraction;
-    const midpoint = (a + b) / 2;
-    const section = (profile + 1) * turn / 12;
-    const radial = Math.cos(section);
-    const depth = Math.sin(section);
-    const radius = 0.78 + 0.116 * radial;
-    const [offset, z, nr, nz] = ringProfile[profile];
-    const flatRadius = 0.81 + offset;
-    return {
-      curved: {
-        position: [radius * Math.cos(angle), radius * Math.sin(angle), 0.116 * depth],
-        normal: [radial * Math.cos(angle), radial * Math.sin(angle), depth],
-      },
-      angular: {
-        position: [
-          flatRadius * (Math.cos(a) * (1 - fraction) + Math.cos(b) * fraction),
-          flatRadius * (Math.sin(a) * (1 - fraction) + Math.sin(b) * fraction),
-          z,
-        ],
-        normal: [nr * Math.cos(midpoint), nr * Math.sin(midpoint), nz],
-      },
-    };
-  });
-
-  // The diagonal changes from a round rod into a chamfered rectangular beam.
-  const barProfile = [
-    { length: -1.08, radius: 0, axial: -1, radial: 0 },
-    { length: -1.08, radius: 0.072, axial: -1, radial: 0 },
-    { length: -1.042, radius: 0.106, axial: -0.65, radial: 0.76 },
-    ...Array.from({ length: 9 }, (_, index) => ({
-      length: -1.008 + index * 0.252, radius: 0.108, axial: 0, radial: 1,
-    })),
-    { length: 1.042, radius: 0.106, axial: 0.65, radial: 0.76 },
-    { length: 1.08, radius: 0.072, axial: 1, radial: 0 },
-    { length: 1.08, radius: 0, axial: 1, radial: 0 },
-  ];
-  const slope = Math.PI * 0.30;
-  const horizontal = Math.cos(slope);
-  const vertical = Math.sin(slope);
-  const corners = [[1, .70], [.70, 1], [-.70, 1], [-1, .70], [-1, -.70], [-.70, -1], [.70, -1], [1, -.70]];
-  sweep(corners.length, 4, barProfile.length - 1, (facet, fraction, profile) => {
-    const { length, radius, axial, radial } = barProfile[profile];
-    const angle = Math.PI / 8 + (facet + fraction) * turn / corners.length;
-    const [ax, ay] = corners[facet];
-    const [bx, by] = corners[(facet + 1) % corners.length];
-    const midpoint = Math.PI / 8 + (facet + 0.5) * turn / corners.length;
-    const crossSection = (cross: number, depth: number, nc: number, nd: number): SceneZeroShape => ({
-      position: [length * horizontal - radius * cross * vertical, length * vertical + radius * cross * horizontal, 0.11 + radius * depth],
-      normal: [axial * horizontal - radial * nc * vertical, axial * vertical + radial * nc * horizontal, radial * nd],
     });
-    return {
-      curved: crossSection(Math.cos(angle), Math.sin(angle), Math.cos(angle), Math.sin(angle)),
-      angular: crossSection(ax + (bx - ax) * fraction, (ay + (by - ay) * fraction) * 1.37, Math.cos(midpoint), Math.sin(midpoint)),
-    };
+    return inset;
   });
-  return faces;
+
+  // Tessellate the front and back in horizontal strips, keeping both counters open.
+  const levels = [...new Set(caps.flat().map(([, y]) => y))].sort((a, b) => a - b);
+  const edges = caps.flatMap((points) => points.map(([x, y], i) => {
+    const [nextX, nextY] = points[(i + 1) % points.length];
+    return { low: Math.min(y, nextY), high: Math.max(y, nextY), xAt: (value: number) => x + (value - y) * (nextX - x) / (nextY - y) };
+  }).filter(({ low, high }) => low < high));
+  for (let i = 1; i < levels.length; i++) {
+    const low = levels[i - 1], high = levels[i], mid = (low + high) * 0.5;
+    const active = edges.filter((edge) => edge.low < mid && mid < edge.high)
+      .sort((a, b) => a.xAt(mid) - b.xAt(mid));
+    for (let edge = 0; edge + 1 < active.length; edge += 2) {
+      const [left, right] = [active[edge], active[edge + 1]];
+      const strip: GlyphPoint[] = [[left.xAt(low), low], [right.xAt(low), low], [right.xAt(high), high], [left.xAt(high), high]];
+      for (const face of [-1, 1]) {
+        for (const vertex of quads) put(strip[vertex], face * halfDepth, 0, 0, face);
+      }
+    }
+  }
+  return new Float32Array(vertices);
+}
+
+const EMPTY_SET_VERTEX_SHADER = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 a_position;
+layout(location=1) in vec3 a_normal;
+uniform vec2 u_rotation;
+uniform vec2 u_projection;
+out vec3 v_position;
+out vec3 v_normal;
+out vec3 v_local;
+
+vec3 rotate(vec3 point) {
+  float cy = cos(u_rotation.x), sy = sin(u_rotation.x);
+  float cx = cos(u_rotation.y), sx = sin(u_rotation.y);
+  vec3 yawed = vec3(cy * point.x + sy * point.z, point.y, -sy * point.x + cy * point.z);
+  return vec3(yawed.x, cx * yawed.y - sx * yawed.z, sx * yawed.y + cx * yawed.z);
+}
+
+void main() {
+  v_position = rotate(a_position);
+  v_normal = rotate(a_normal);
+  v_local = a_position;
+  float depth = 4.3 - v_position.z;
+  gl_Position = vec4(v_position.xy * u_projection, 1.004 * depth - 0.2004, depth);
+}`;
+
+const EMPTY_SET_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+in vec3 v_position;
+in vec3 v_normal;
+in vec3 v_local;
+uniform float u_lamps[8];
+uniform float u_background;
+out vec4 fragColor;
+
+const vec3 corners[8] = vec3[8](
+  vec3(-1,  1,  1), vec3( 1, -1, -1),
+  vec3( 1,  1,  1), vec3(-1, -1, -1),
+  vec3(-1,  1, -1), vec3( 1, -1,  1),
+  vec3( 1,  1, -1), vec3(-1, -1,  1)
+);
+const float power[8] = float[8](1.0, 0.75, 0.72, 0.56, 0.88, 0.64, 0.78, 0.53);
+
+void main() {
+  vec3 normal = normalize(v_normal);
+  vec3 eye = normalize(vec3(0, 0, 4.3) - v_position);
+  vec3 radiance = vec3(0.012 * u_background);
+  for (int i = 0; i < 8; ++i) {
+    vec3 lamp = 2.25 * corners[i];
+    vec3 incoming = lamp - v_position;
+    float distanceSquared = dot(incoming, incoming);
+    vec3 light = normalize(incoming);
+    float beam = smoothstep(0.93, 0.997, dot(light, normalize(lamp)));
+    float intensity = u_lamps[i] * beam * power[i] * (15.2 / distanceSquared);
+    float diffuse = max(0.0, dot(normal, light));
+    vec3 halfway = normalize(light + eye);
+    float highlight = max(0.0, dot(normal, halfway));
+    float gloss = pow(highlight, 17.0) * 0.23 + pow(highlight, 72.0) * 0.31;
+
+    // The spectrum travels across the coating as the viewing angle changes.
+    float angle = dot(normal, eye);
+    float groove = dot(v_local.xy, normalize(vec2(0.9, 0.42)));
+    float phase = 9.0 * (dot(eye, normalize(vec3(-0.51, 0.27, 0.8))) - diffuse)
+        + 4.8 * groove + float(i) * 0.95;
+    vec3 spectrum = 0.52 + 0.48 * cos(phase + vec3(0.0, 2.094, 4.189));
+    float band = pow(max(0.0, cos(phase * 0.38 + float(i) * 0.65)), 6.0);
+    float grazing = 0.55 + 0.45 * (1.0 - angle);
+    float film = grazing * (0.22 * pow(highlight, 13.0) + 1.25 * band * pow(highlight, 25.0));
+    radiance += intensity * diffuse * (vec3(0.29 + gloss) + spectrum * film);
+  }
+  vec3 mapped = radiance / (1.0 + 0.43 * radiance);
+  fragColor = vec4(pow(clamp(mapped, 0.0, 1.0), vec3(0.4545)), 1);
+}`;
+
+function createEmptySetRenderer(canvas: HTMLCanvasElement) {
+  const contours = emptySetContours();
+  const gl = canvas.getContext("webgl2", { alpha: false, antialias: true, depth: true });
+  if (!gl) {
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) return;
+    const outline = new Path2D();
+    for (const points of contours) {
+      outline.moveTo(points[0][0], -points[0][1]);
+      points.slice(1).forEach(([x, y]) => outline.lineTo(x, -y));
+      outline.closePath();
+    }
+    return {
+      paint(level: number, yaw: number, pitch: number) {
+        const { width, height } = canvas;
+        const gray = Math.round(level * 255);
+        context.resetTransform();
+        context.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
+        context.fillRect(0, 0, width, height);
+        const scale = Math.min(width, height) * 0.315;
+        context.setTransform(scale * Math.cos(yaw), 0, 0, scale * Math.cos(pitch), width / 2, height / 2);
+        const silver = Math.round(level * 188);
+        context.fillStyle = `rgb(${silver}, ${silver}, ${silver})`;
+        context.fill(outline, "evenodd");
+      },
+      dispose() {},
+    };
+  }
+
+  const program = gl.createProgram();
+  const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+  const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+  const buffer = gl.createBuffer();
+  const array = gl.createVertexArray();
+  if (!program || !vertexShader || !fragmentShader || !buffer || !array) return;
+  gl.shaderSource(vertexShader, EMPTY_SET_VERTEX_SHADER);
+  gl.shaderSource(fragmentShader, EMPTY_SET_FRAGMENT_SHADER);
+  gl.compileShader(vertexShader);
+  gl.compileShader(fragmentShader);
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.linkProgram(program);
+  gl.deleteShader(vertexShader);
+  gl.deleteShader(fragmentShader);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error("No se pudo crear la iluminación de la escena 0", gl.getProgramInfoLog(program));
+    gl.deleteProgram(program);
+    gl.deleteBuffer(buffer);
+    gl.deleteVertexArray(array);
+    return;
+  }
+
+  const mesh = emptySetMesh(contours);
+  gl.bindVertexArray(array);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, mesh, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.enableVertexAttribArray(1);
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
+  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
+  gl.enable(gl.DEPTH_TEST);
+  const rotation = gl.getUniformLocation(program, "u_rotation");
+  const projection = gl.getUniformLocation(program, "u_projection");
+  const lamps = gl.getUniformLocation(program, "u_lamps[0]");
+  const backdrop = gl.getUniformLocation(program, "u_background");
+  const lampLevels = new Float32Array(8);
+
+  return {
+    paint(level: number, yaw: number, pitch: number) {
+      const { width, height } = canvas;
+      const aspect = width / height;
+      // The backdrop brightens as the eight corner lamps come up.
+      let total = 0;
+      const spacing = 0.072;
+      const ramp = 1 - spacing * (lampLevels.length - 1);
+      for (let i = 0; i < lampLevels.length; i++) {
+        const t = Math.min(1, Math.max(0, (level - i * spacing) / ramp));
+        lampLevels[i] = t * t * (3 - 2 * t);
+        total += lampLevels[i];
+      }
+      const background = total / lampLevels.length;
+      gl.viewport(0, 0, width, height);
+      gl.clearColor(background, background, background, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      if (level === 0) return;
+
+      gl.useProgram(program);
+      gl.bindVertexArray(array);
+      gl.uniform2f(rotation, yaw, pitch);
+      gl.uniform2f(projection, 2.65 / Math.max(1, aspect), 2.65 * Math.min(1, aspect));
+      gl.uniform1fv(lamps, lampLevels);
+      gl.uniform1f(backdrop, background);
+      gl.drawArrays(gl.TRIANGLES, 0, mesh.length / 6);
+    },
+    dispose() {
+      gl.deleteBuffer(buffer);
+      gl.deleteVertexArray(array);
+      gl.deleteProgram(program);
+    },
+  };
 }
 
 function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkening: boolean }) {
@@ -547,96 +750,25 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d", { alpha: false });
-    if (!canvas || !context) return;
+    if (!canvas) return;
+    const renderer = createEmptySetRenderer(canvas);
+    if (!renderer) return;
 
-    const mesh = sceneZeroMesh();
     const from = levelRef.current;
     const target = darkening ? 0 : 1;
     const started = performance.now();
     let frame: number | null = null;
-    let width = 1;
-    let height = 1;
-    let density = 1;
-
     const paint = (now: number) => {
       const progress = Math.min(1, Math.max(0, (now - started) / durationMs));
       const level = from + (target - from) * progress;
       levelRef.current = level;
-      const gray = Math.round(level * 255);
-      context.setTransform(density, 0, 0, density, 0, 0);
-      context.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
-      context.fillRect(0, 0, width, height);
-      if (level === 0) return progress;
-
-      const shape = level * level * (3 - 2 * level);
-      const yaw = -0.37 + 0.67 * level + orientation.current.yaw;
-      const pitch = 0.19 - 0.42 * level + orientation.current.pitch;
-      const cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw);
-      const cosPitch = Math.cos(pitch), sinPitch = Math.sin(pitch);
-      const scale = Math.min(width, height) * 0.29;
-      const camera = ([x, y, z]: SceneZeroVector): SceneZeroVector => {
-        const depth = -x * sinYaw + z * cosYaw;
-        return [x * cosYaw + z * sinYaw, y * cosPitch - depth * sinPitch, y * sinPitch + depth * cosPitch];
-      };
-      const mix = (from: SceneZeroVector, to: SceneZeroVector): SceneZeroVector => [
-        from[0] + (to[0] - from[0]) * shape,
-        from[1] + (to[1] - from[1]) * shape,
-        from[2] + (to[2] - from[2]) * shape,
-      ];
-      const panels = mesh.flatMap((face) => {
-        const vertices = face.map(({ curved, angular }) => camera(mix(curved.position, angular.position)));
-        let nx = 0, ny = 0, nz = 0, depth = 0, centerX = 0, centerY = 0;
-        face.forEach(({ curved, angular }, index) => {
-          const [x, y, z] = camera(mix(curved.normal, angular.normal));
-          nx += x; ny += y; nz += z;
-          centerX += vertices[index][0] / 4;
-          centerY += vertices[index][1] / 4;
-          depth += vertices[index][2] / 4;
-        });
-        const length = Math.hypot(nx, ny, nz);
-        if (length < 1e-5 || nz * (4.8 - depth) - nx * centerX - ny * centerY <= 0) return [];
-        return [{ vertices, normal: [nx / length, ny / length, nz / length], depth, centerX, centerY }];
-      }).sort((a, b) => a.depth - b.depth);
-
-      for (const { vertices, normal: [nx, ny, nz], depth, centerX, centerY } of panels) {
-        // A moving reflection vector samples neutral light boxes and localized diffraction bands.
-        const distance = Math.hypot(centerX, centerY, 4.8 - depth);
-        const vx = -centerX / distance, vy = -centerY / distance, vz = (4.8 - depth) / distance;
-        const incidence = nx * vx + ny * vy + nz * vz;
-        const rx = 2 * incidence * nx - vx, ry = 2 * incidence * ny - vy, rz = 2 * incidence * nz - vz;
-        const softbox = Math.max(0, -.37 * rx + .72 * ry + .58 * rz);
-        const fill = Math.max(0, .83 * rx - .43 * ry + .35 * rz);
-        const streak = Math.exp(-17 * (ry - .44 * rx - .28) ** 2) * (.5 + .5 * Math.max(0, rz));
-        const split = Math.exp(-22 * (rx + .53 * ry + .31) ** 2) * .55;
-        const glint = Math.exp(-125 * (rx - 0.12 * ry + 0.17) ** 2) * Math.max(0, ry) ** 3;
-        const silver = 99 + 78 * softbox ** 3 + 52 * softbox ** 18 + 50 * fill ** 6 + 25 * (1 - incidence) ** 2 + 38 * glint;
-        const spectrum = 103 * Math.min(1, streak + split);
-        const phase = 6.5 * rx + 4.4 * ry + 2.0 * centerY;
-        const channel = (offset: number, tint: number) => {
-          const diffraction = spectrum * (.14 + .86 * (.5 + .5 * Math.cos(phase + offset)) ** 2);
-          const reflected = tint * silver + diffraction * (1 + 0.22 * (1 - level));
-          return Math.round(level * Math.min(251, reflected));
-        };
-
-        context.beginPath();
-        vertices.forEach(([x, y, z], index) => {
-          const perspective = 4.8 / (4.8 - z);
-          const px = width / 2 + x * scale * perspective;
-          const py = height / 2 - y * scale * perspective;
-          if (index === 0) context.moveTo(px, py);
-          else context.lineTo(px, py);
-        });
-        context.closePath();
-        context.fillStyle = `rgb(${channel(0, .96)}, ${channel(2.094, .99)}, ${channel(4.189, 1.04)})`;
-        context.strokeStyle = context.fillStyle;
-        context.lineWidth = 0.8;
-        context.stroke();
-        context.fill();
-      }
+      renderer.paint(
+        level,
+        -0.29 + 0.63 * level + orientation.current.yaw,
+        0.13 - 0.45 * level + orientation.current.pitch,
+      );
       return progress;
     };
-
     const tick = (now: number) => {
       frame = null;
       if (paint(now) < 1) schedulePaint();
@@ -645,11 +777,9 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
       if (frame === null) frame = window.requestAnimationFrame(tick);
     };
     const resize = () => {
-      width = canvas.clientWidth;
-      height = canvas.clientHeight;
-      density = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.max(1, Math.round(width * density));
-      canvas.height = Math.max(1, Math.round(height * density));
+      const density = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(canvas.clientWidth * density));
+      canvas.height = Math.max(1, Math.round(canvas.clientHeight * density));
       paint(performance.now());
     };
     resize();
@@ -660,6 +790,7 @@ function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkenin
     return () => {
       observer.disconnect();
       if (frame !== null) window.cancelAnimationFrame(frame);
+      renderer.dispose();
     };
   }, [darkening, durationMs]);
 

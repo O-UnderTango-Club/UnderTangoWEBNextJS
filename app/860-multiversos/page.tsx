@@ -462,6 +462,7 @@ const EMPTY_SET_OUTLINE: GlyphSegment[][] = [
 
 const SCENE_ZERO_DEFAULT_SECONDS = 8;
 const SCENE_ONE_DEFAULT_SECONDS = 22;
+const SCENE_LINE_DEFAULT_SECONDS = 15;
 const SCENE_ONE_LIGHT_SHARE = 16 / 22;
 
 function smoothSceneLight(progress: number) {
@@ -964,12 +965,13 @@ function playSceneOneGong(context: AudioContext, beginsAt: number) {
   };
 }
 
-type ModuleZeroPlayback = "sequence" | "opening" | "beacon";
+type ModuleZeroPlayback = "sequence" | "opening" | "beacon" | "line";
 
 function ModuleZero() {
   const [stage, setStage] = useState("ready");
   const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
   const [oneSeconds, setOneSeconds] = useState(SCENE_ONE_DEFAULT_SECONDS);
+  const [lineSeconds, setLineSeconds] = useState(SCENE_LINE_DEFAULT_SECONDS);
   const [previewMode, setPreviewMode] = useState<Exclude<ModuleZeroPlayback, "sequence"> | null>(null);
   const [cue, setCue] = useState<SceneZeroCue | null>(null);
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
@@ -1023,8 +1025,12 @@ function ModuleZero() {
     const oneStartsAt = mode === "beacon" ? 0 : openingMs;
     const questionMs = oneStartsAt + lightMs;
     const pointMs = oneStartsAt + oneMs;
-    const fadeOutAt = pointMs / 1000 + 3.5;
-    const waveSeconds = previewOnly ? 16 : fadeOutAt + 2.5;
+    const lineStartsAt = mode === "line" ? 0 : pointMs + 2500;
+    const gongLead = lineSeconds / 5;
+    const rampSeconds = lineSeconds - gongLead;
+    const fadeOutAt = lineStartsAt / 1000 + gongLead / 3;
+    const sustainMurmur = mode === "opening" || mode === "beacon";
+    const waveSeconds = sustainMurmur ? 16 : lineStartsAt / 1000 + gongLead + 0.5;
     setPreviewMode(previewOnly ? mode : null);
     setStage("preparing");
     try {
@@ -1064,7 +1070,7 @@ function ModuleZero() {
       }
       const rms = Math.sqrt(sumSquares / (forward.length * forward.numberOfChannels));
       const boost = rms > 0 ? Math.min(5, 0.06 / rms, peak > 0 ? 0.6 / peak : 5) : 1;
-      const loopBlend = previewOnly ? Math.round(forward.sampleRate * 0.16) : 0;
+      const loopBlend = sustainMurmur ? Math.round(forward.sampleRate * 0.16) : 0;
       const loopEnd = forward.length - loopBlend;
       for (let channel = 0; channel < forward.numberOfChannels; channel++) {
         const samples = forward.getChannelData(channel);
@@ -1081,24 +1087,25 @@ function ModuleZero() {
         color.type = "lowpass";
         source.buffer = forward;
         gain.gain.value = 0;
-        gain.gain.setValueCurveAtTime(SCENE_ZERO_MURMUR_ATTACK, beginsAt, mode === "beacon" ? 0.06 : durationSeconds);
-        if (previewOnly) {
+        const attack = mode === "opening" || mode === "sequence" ? durationSeconds : 0.06;
+        gain.gain.setValueCurveAtTime(SCENE_ZERO_MURMUR_ATTACK, beginsAt, attack);
+        if (sustainMurmur) {
           source.loop = true;
           source.loopEnd = loopEnd / forward.sampleRate;
         } else {
           gain.gain.setValueAtTime(1, beginsAt + fadeOutAt);
           gain.gain.linearRampToValueAtTime(0, beginsAt + waveSeconds);
         }
-        color.frequency.setValueAtTime(18000, beginsAt);
-        color.Q.setValueAtTime(0.7, beginsAt);
-        if (mode !== "opening") {
+        color.frequency.setValueAtTime(mode === "line" ? 700 : 18000, beginsAt);
+        color.Q.setValueAtTime(mode === "line" ? 1.4 : 0.7, beginsAt);
+        if (mode === "beacon" || mode === "sequence") {
           color.frequency.setTargetAtTime(700, beginsAt + questionMs / 1000, 2);
           color.Q.setTargetAtTime(1.4, beginsAt + questionMs / 1000, 2);
         }
         source.connect(color); color.connect(gain); gain.connect(context.destination);
         source.onended = () => { source.disconnect(); color.disconnect(); gain.disconnect(); };
         source.start(beginsAt);
-        if (!previewOnly) source.stop(beginsAt + waveSeconds);
+        if (!sustainMurmur) source.stop(beginsAt + waveSeconds);
       };
 
       const at = (ms: number, action: () => void) => {
@@ -1121,26 +1128,26 @@ function ModuleZero() {
       };
 
       if (mode === "beacon") beginLight(beginsAt);
-      else {
+      else if (mode !== "line") {
         setActiveDurationMs(openingMs);
         setCue({ context, beginsAt });
         setStage("opening");
       }
       wave(beginsAt);
 
-      if (mode !== "opening") {
+      if (mode === "beacon" || mode === "sequence") {
         if (mode === "sequence") atOffset(oneStartsAt, beginLight);
         atOffset(questionMs, () => setStage("question"));
         const disconnectGong = playSceneOneGong(context, beginsAt + pointMs / 1000);
         atOffset(pointMs, () => setStage("one"));
         atOffset(pointMs + 11500, disconnectGong);
       }
-      if (previewOnly) {
+      if (sustainMurmur) {
         runningRef.current = false;
         return;
       }
-      const secondGong = () => {
-        const now = context.currentTime, root = 330;
+      const secondGong = (now: number) => {
+        const root = 330;
         [1, 1.5, 2.08, 2.76, 4.1].forEach((partial, index) => {
           const oscillator = context.createOscillator(), envelope = context.createGain();
           oscillator.type = index === 0 ? "sine" : "triangle";
@@ -1168,12 +1175,11 @@ function ModuleZero() {
         oscillator.connect(gain); gain.connect(chordBus);
         oscillator.start(now);
       };
-      const accelerate = () => {
-        setStage("multiplying");
-        const duration = 12, beginning = context.currentTime + 0.08;
+      const scheduleAcceleration = (beginning: number) => {
+        const duration = rampSeconds;
         const percussionGain = context.createGain();
         percussionGain.gain.setValueAtTime(1, beginning);
-        percussionGain.gain.setValueAtTime(1, beginning + duration - 3);
+        percussionGain.gain.setValueAtTime(1, beginning + duration * 0.75);
         percussionGain.gain.linearRampToValueAtTime(0, beginning + duration + 0.4);
         percussionGain.connect(context.destination);
         const beat = context.createBuffer(1, Math.floor(context.sampleRate * 0.012), context.sampleRate);
@@ -1182,11 +1188,11 @@ function ModuleZero() {
           const time = i / context.sampleRate;
           samples[i] = (Math.sin(2 * Math.PI * 220 * time) * 0.65 + (Math.random() * 2 - 1) * 0.35) * Math.exp(-time * 450);
         }
-        const hits: Array<{time: number; rate: number}> = [];
+        const hits: number[] = [];
         let position = 0;
         while (position < duration) {
           const rate = 2 * Math.pow(111 / 2, position / duration);
-          hits.push({time: position, rate});
+          hits.push(position);
           const source = context.createBufferSource(), gain = context.createGain();
           source.buffer = beat;
           gain.gain.value = 0.22 / Math.sqrt(Math.max(1, rate / 12));
@@ -1197,34 +1203,46 @@ function ModuleZero() {
         }
         const pitch = context.createOscillator(), pitchGain = context.createGain();
         pitch.type = "sine";
-        const pitchStart = beginning + duration - 4;
-        pitch.frequency.setValueAtTime(2 * Math.pow(111 / 2, (duration - 4) / duration), pitchStart);
+        const pitchStart = beginning + duration * (2 / 3);
+        pitch.frequency.setValueAtTime(2 * Math.pow(111 / 2, 2 / 3), pitchStart);
         pitch.frequency.exponentialRampToValueAtTime(111, beginning + duration);
         pitchGain.gain.setValueAtTime(0, pitchStart);
-        pitchGain.gain.linearRampToValueAtTime(0.12, beginning + duration + 0.4);
+        pitchGain.gain.linearRampToValueAtTime(0.12, beginning + duration);
         pitch.connect(pitchGain); pitchGain.connect(chordBus);
         pitch.start(pitchStart);
         const draw = () => {
           if (run !== runRef.current || audioRef.current !== context) return;
           const elapsed = context.currentTime - beginning;
           let count = 0;
-          while (count < hits.length && hits[count].time <= elapsed) count++;
+          while (count < hits.length && hits[count] <= elapsed) count++;
           setPulseCount(count);
-          setPulseRate(count ? hits[count - 1].rate : 2);
+          setPulseRate(2 * Math.pow(111 / 2, Math.min(1, Math.max(0, elapsed / duration))));
           if (elapsed >= duration) {
             setPulseRate(111); setStage("vertical"); frameRef.current = null;
-            at(4000, () => { setStage("pair"); addTone(222, 0.12); });
-            at(9000, () => setStage("plus"));
-            at(11000, () => setStage("equals"));
-            at(13000, () => { setStage("triad"); addTone(333, 0.12); at(7000, () => setStage("space")); });
+            if (mode === "sequence") {
+              at(4000, () => { setStage("pair"); addTone(222, 0.12); });
+              at(9000, () => setStage("plus"));
+              at(11000, () => setStage("equals"));
+              at(13000, () => { setStage("triad"); addTone(333, 0.12); at(7000, () => setStage("space")); });
+            }
             return;
           }
           frameRef.current = window.requestAnimationFrame(draw);
         };
-        frameRef.current = window.requestAnimationFrame(draw);
+        atOffset(lineStartsAt + gongLead * 1000, () => {
+          setStage("multiplying");
+          frameRef.current = window.requestAnimationFrame(draw);
+        });
       };
-      atOffset(pointMs + 2500, () => { setStage("two"); secondGong(); });
-      atOffset(pointMs + 5500, accelerate);
+      const gongAt = beginsAt + lineStartsAt / 1000;
+      secondGong(gongAt);
+      atOffset(lineStartsAt, () => {
+        setPulseCount(0);
+        setPulseRate(2);
+        setStage("two");
+        scheduleAcceleration(gongAt + gongLead);
+        if (previewOnly) runningRef.current = false;
+      });
     } catch {
       if (run !== runRef.current) return;
       reset();
@@ -1239,6 +1257,11 @@ function ModuleZero() {
   const dots = ["one-again", "two", "multiplying", "vertical"].includes(stage);
   const many = stage === "multiplying" || stage === "vertical";
   const expression = ["pair", "plus", "equals", "triad", "space"].includes(stage);
+  const sceneControls = [
+    { mode: "opening", title: "Escena Ø → {}", id: "zero-duration", label: "Duración de la transición de luz y sonido", duration: durationSeconds, min: 1, max: 30, setDuration: setDurationSeconds },
+    { mode: "beacon", title: "Escena {} → 0", id: "one-duration", label: "Duración de la escena de conjunto vacío a cero", duration: oneSeconds, min: 6, max: 60, setDuration: setOneSeconds },
+    { mode: "line", title: "Escena 0 → 1", id: "line-duration", label: "Duración de la escena de cero a uno", duration: lineSeconds, min: 6, max: 60, setDuration: setLineSeconds },
+  ] as const;
   const pointPosition = (index: number) => {
     let n = index, fraction = 0, scale = 0.5;
     while (n > 0) { fraction += (n % 2) * scale; n = Math.floor(n / 2); scale *= 0.5; }
@@ -1308,30 +1331,21 @@ function ModuleZero() {
       {many && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{stage === "vertical" ? "111 Hz · TONO" : `${pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO`}</span>}
     </div>
     <aside className="zero-controls" aria-label="Controles de las escenas">
-      <section className="zero-scene" aria-labelledby="zero-controls-title">
-        <div className="zero-title">
-          <h2 id="zero-controls-title">Escena ∅ → 0</h2>
-          <output htmlFor="zero-duration">{durationSeconds} {durationSeconds === 1 ? "segundo" : "segundos"}</output>
-        </div>
-        <input id="zero-duration" aria-label="Duración de la transición de luz y sonido" type="range" min={1} max={30} step={1} value={durationSeconds}
-          aria-valuetext={`${durationSeconds} ${durationSeconds === 1 ? "segundo" : "segundos"}`} disabled={!canStart}
-          onChange={(event) => setDurationSeconds(Number(event.currentTarget.value))} />
-        {previewMode === "opening" && !preparing
-          ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
-          : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start("opening")}>Probar escena</button>}
-      </section>
-      <section className="zero-scene" aria-labelledby="one-controls-title">
-        <div className="zero-title">
-          <h2 id="one-controls-title">Escena 0 → 1</h2>
-          <output htmlFor="one-duration">{oneSeconds} segundos</output>
-        </div>
-        <input id="one-duration" aria-label="Duración de la escena 0 a 1" type="range" min={6} max={60} step={1} value={oneSeconds}
-          aria-valuetext={`${oneSeconds} segundos`} disabled={!canStart}
-          onChange={(event) => setOneSeconds(Number(event.currentTarget.value))} />
-        {previewMode === "beacon" && !preparing
-          ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
-          : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start("beacon")}>Probar escena</button>}
-      </section>
+      {sceneControls.map(({ mode, title, id, label, duration, min, max, setDuration }) => {
+        const seconds = `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
+        return <section key={mode} className="zero-scene" aria-labelledby={`${id}-title`}>
+          <div className="zero-title">
+            <h2 id={`${id}-title`}>{title}</h2>
+            <output htmlFor={id}>{seconds}</output>
+          </div>
+          <input id={id} aria-label={label} type="range" min={min} max={max} step={1} value={duration}
+            aria-valuetext={seconds} disabled={!canStart}
+            onChange={(event) => setDuration(Number(event.currentTarget.value))} />
+          {previewMode === mode && !preparing
+            ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
+            : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start(mode)}>Probar escena</button>}
+        </section>;
+      })}
       {canStart
         ? <button type="button" onClick={() => void start()}>Iniciar secuencia</button>
         : <button type="button" onClick={reset}>{preparing ? "Cancelar" : "Detener secuencia"}</button>}

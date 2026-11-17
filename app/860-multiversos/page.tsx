@@ -462,6 +462,9 @@ const EMPTY_SET_OUTLINE: GlyphSegment[][] = [
 
 const SCENE_ZERO_DEFAULT_SECONDS = 8;
 const SCENE_ZERO_DARKENING_MS = 8000;
+const SCENE_ZERO_MURMUR_ATTACK = Float32Array.from({ length: 129 }, (_, index) =>
+  1 - (1 - index / 128) ** 2,
+);
 
 function emptySetContours() {
   const position = (x: number, y: number): GlyphPoint => [(x - 390) / 365, (y - 258) / 365];
@@ -877,10 +880,8 @@ function ModuleZero() {
     const openingMs = durationSeconds * 1000;
     const questionMs = 2 * openingMs + SCENE_ZERO_DARKENING_MS;
     const questionSeconds = questionMs / 1000;
-    const previewHoldSeconds = 0.75;
-    const previewFadeOutSeconds = 0.5;
-    const fadeOutAt = previewOnly ? durationSeconds + previewHoldSeconds : questionSeconds + 9.5;
-    const waveSeconds = fadeOutAt + (previewOnly ? previewFadeOutSeconds : 2.5);
+    const fadeOutAt = questionSeconds + 9.5;
+    const waveSeconds = previewOnly ? 16 : fadeOutAt + 2.5;
     setActiveDurationMs(openingMs);
     setStage("preparing");
     try {
@@ -920,19 +921,31 @@ function ModuleZero() {
       }
       const rms = Math.sqrt(sumSquares / (forward.length * forward.numberOfChannels));
       const boost = rms > 0 ? Math.min(5, 0.06 / rms, peak > 0 ? 0.6 / peak : 5) : 1;
+      const loopBlend = previewOnly ? Math.round(forward.sampleRate * 0.16) : 0;
+      const loopEnd = forward.length - loopBlend;
       for (let channel = 0; channel < forward.numberOfChannels; channel++) {
         const samples = forward.getChannelData(channel);
         for (let i = 0; i < samples.length; i++) samples[i] *= boost;
+        // Fold the tail into the head so the preview can sustain without a click at the loop point.
+        for (let i = 0; i < loopBlend; i++) {
+          const mix = 0.5 - 0.5 * Math.cos(Math.PI * i / (loopBlend - 1));
+          samples[i] = samples[loopEnd + i] * (1 - mix) + samples[i] * mix;
+        }
       }
       const wave = (beginsAt: number) => {
         const source = context.createBufferSource(), gain = context.createGain();
         const color = context.createBiquadFilter();
         color.type = "lowpass";
         source.buffer = forward;
-        gain.gain.setValueAtTime(0, beginsAt);
-        gain.gain.linearRampToValueAtTime(1, beginsAt + durationSeconds);
-        gain.gain.setValueAtTime(1, beginsAt + fadeOutAt);
-        gain.gain.linearRampToValueAtTime(0, beginsAt + waveSeconds);
+        gain.gain.value = 0;
+        gain.gain.setValueCurveAtTime(SCENE_ZERO_MURMUR_ATTACK, beginsAt, durationSeconds);
+        if (previewOnly) {
+          source.loop = true;
+          source.loopEnd = loopEnd / forward.sampleRate;
+        } else {
+          gain.gain.setValueAtTime(1, beginsAt + fadeOutAt);
+          gain.gain.linearRampToValueAtTime(0, beginsAt + waveSeconds);
+        }
         color.frequency.setValueAtTime(18000, beginsAt);
         color.Q.setValueAtTime(0.7, beginsAt);
         if (!previewOnly) {
@@ -940,15 +953,9 @@ function ModuleZero() {
           color.Q.setTargetAtTime(1.4, beginsAt + questionSeconds, 2);
         }
         source.connect(color); color.connect(gain); gain.connect(context.destination);
-        source.onended = () => {
-          source.disconnect(); color.disconnect(); gain.disconnect();
-          if (previewOnly && audioRef.current === context) {
-            audioRef.current = null;
-            void context.close();
-          }
-        };
+        source.onended = () => { source.disconnect(); color.disconnect(); gain.disconnect(); };
         source.start(beginsAt);
-        source.stop(beginsAt + waveSeconds);
+        if (!previewOnly) source.stop(beginsAt + waveSeconds);
       };
 
       if (previewOnly) {
@@ -1152,7 +1159,9 @@ function ModuleZero() {
         aria-valuetext={`${durationSeconds} ${durationSeconds === 1 ? "segundo" : "segundos"}`} disabled={!canStart}
         onChange={(event) => setDurationSeconds(Number(event.currentTarget.value))} />
       <div className="zero-actions">
-        <button type="button" disabled={!canStart} onClick={() => void start(true)}>Probar escena</button>
+        {preview
+          ? <button type="button" onClick={reset}>Detener prueba</button>
+          : <button type="button" disabled={!canStart} onClick={() => void start(true)}>Probar escena</button>}
         {canStart
           ? <button type="button" onClick={() => void start()}>Iniciar secuencia</button>
           : <button type="button" onClick={reset}>Detener secuencia</button>}

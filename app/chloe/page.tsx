@@ -89,6 +89,15 @@ function AgendaList({ items, tasks }: { items: DeadlineItem[]; tasks: Map<string
   })}</ul> : <p className={css.empty}>Sin fechas en este período.</p>;
 }
 
+// The Supabase gateway can briefly reject its generated JWT. Retry only this
+// idempotent read with the same server-side credentials.
+async function fetchPanelSnapshot(url: Parameters<typeof fetch>[0], init?: RequestInit) {
+  const response = await fetch(url, init);
+  if (response.status !== 401 || !response.headers.get("proxy-status")?.includes("PGRST303")) return response;
+  await response.body?.cancel().catch(() => {});
+  return fetch(url, init);
+}
+
 export default async function Chloe() {
   const cookie = (await cookies()).get(DEVICE_COOKIE)?.value;
   if (!cookie || !verifyDevice(cookie)) notFound();
@@ -96,7 +105,7 @@ export default async function Chloe() {
   const today = dayKey(new Date());
   const until = dayPlus(today, 30);
   const [snapshot, agenda, calendar] = await Promise.allSettled([
-    readOperationsSnapshot(),
+    readOperationsSnapshot({ fetcher: fetchPanelSnapshot }),
     readDeadlines(),
     readClubCalendar(today, until),
   ]);

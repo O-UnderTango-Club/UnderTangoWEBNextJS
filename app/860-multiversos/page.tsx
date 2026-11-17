@@ -426,8 +426,162 @@ function FrequencySpace() {
   </span>;
 }
 
+type SceneZeroVector = [number, number, number];
+type SceneZeroVertex = { position: SceneZeroVector; normal: SceneZeroVector };
+type SceneZeroFace = [SceneZeroVertex, SceneZeroVertex, SceneZeroVertex, SceneZeroVertex];
+
+const SCENE_ZERO_DEFAULT_SECONDS = 8;
+const SCENE_ZERO_DARKENING_MS = 8000;
+
+function sceneZeroMesh(): SceneZeroFace[] {
+  const faces: SceneZeroFace[] = [];
+  const sweep = (
+    steps: number,
+    profileSteps: number,
+    vertex: (angle: number, profile: number) => SceneZeroVertex,
+  ) => {
+    for (let i = 0; i < steps; i++) {
+      const a = i * Math.PI * 2 / steps;
+      const b = (i + 1) * Math.PI * 2 / steps;
+      for (let j = 0; j < profileSteps; j++) {
+        faces.push([vertex(a, j), vertex(b, j), vertex(b, j + 1), vertex(a, j + 1)]);
+      }
+    }
+  };
+
+  // Torus and a bevelled diagonal bar with end caps.
+  sweep(112, 20, (angle, profile) => {
+    const crossSection = profile * Math.PI * 2 / 20;
+    const radius = 0.78 + 0.118 * Math.cos(crossSection);
+    return {
+      position: [radius * Math.cos(angle), radius * Math.sin(angle), 0.118 * Math.sin(crossSection)],
+      normal: [Math.cos(crossSection) * Math.cos(angle), Math.cos(crossSection) * Math.sin(angle), Math.sin(crossSection)],
+    };
+  });
+  const barProfile = [
+    { length: -1.08, radius: 0, axial: -1, radial: 0 },
+    { length: -1.08, radius: 0.065, axial: -1, radial: 0 },
+    { length: -1.055, radius: 0.102, axial: -0.7, radial: 0.7 },
+    { length: -1.012, radius: 0.106, axial: 0, radial: 1 },
+    { length: 1.012, radius: 0.106, axial: 0, radial: 1 },
+    { length: 1.055, radius: 0.102, axial: 0.7, radial: 0.7 },
+    { length: 1.08, radius: 0.065, axial: 1, radial: 0 },
+    { length: 1.08, radius: 0, axial: 1, radial: 0 },
+  ];
+  const slope = Math.PI * 0.30;
+  const horizontal = Math.cos(slope);
+  const vertical = Math.sin(slope);
+  sweep(40, barProfile.length - 1, (angle, profile) => {
+    const { length, radius, axial, radial } = barProfile[profile];
+    const cross = Math.cos(angle);
+    const depth = Math.sin(angle);
+    return {
+      position: [length * horizontal - radius * cross * vertical, length * vertical + radius * cross * horizontal, 0.09 + radius * depth],
+      normal: [axial * horizontal - radial * cross * vertical, axial * vertical + radial * cross * horizontal, radial * depth],
+    };
+  });
+  return faces;
+}
+
+function EmptySetScene({ durationMs, darkening }: { durationMs: number; darkening: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const levelRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d", { alpha: false });
+    if (!canvas || !context) return;
+
+    const mesh = sceneZeroMesh();
+    const from = levelRef.current;
+    const target = darkening ? 0 : 1;
+    const started = performance.now();
+    let frame = 0;
+    let width = 1;
+    let height = 1;
+    let density = 1;
+
+    const paint = (now: number) => {
+      const progress = Math.min(1, Math.max(0, (now - started) / durationMs));
+      const level = from + (target - from) * progress;
+      levelRef.current = level;
+      const gray = Math.round(level * 255);
+      context.setTransform(density, 0, 0, density, 0, 0);
+      context.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
+      context.fillRect(0, 0, width, height);
+      if (level === 0) return progress;
+
+      const yaw = -0.41 + 0.69 * level;
+      const pitch = 0.27 - 0.43 * level;
+      const cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw);
+      const cosPitch = Math.cos(pitch), sinPitch = Math.sin(pitch);
+      const scale = Math.min(width, height) * 0.29;
+      const camera = ([x, y, z]: SceneZeroVector): SceneZeroVector => {
+        const depth = -x * sinYaw + z * cosYaw;
+        return [x * cosYaw + z * sinYaw, y * cosPitch - depth * sinPitch, y * sinPitch + depth * cosPitch];
+      };
+      const panels = mesh.flatMap((face) => {
+        const normals = face.map(({ normal }) => camera(normal));
+        const normal = normals.reduce(([x, y, z], [nx, ny, nz]) => [x + nx / 4, y + ny / 4, z + nz / 4] as SceneZeroVector, [0, 0, 0] as SceneZeroVector);
+        if (normal[2] <= 0) return [];
+        const vertices = face.map(({ position }) => camera(position));
+        const depth = vertices.reduce((sum, vertex) => sum + vertex[2], 0) / 4;
+        return [{ vertices, normal, depth }];
+      }).sort((a, b) => a.depth - b.depth);
+
+      for (const { vertices, normal: [nx, ny, nz] } of panels) {
+        // Sample broad and narrow reflected light sources from the surface normal.
+        const softbox = Math.max(0, -0.42 * nx + 0.57 * ny + 0.70 * nz);
+        const rim = Math.max(0, 0.89 * nx - 0.21 * ny + 0.38 * nz);
+        const reflection = Math.min(1, 0.12 + 0.43 * softbox ** 3 + 0.53 * softbox ** 24 + 0.6 * rim ** 15);
+        const metal = Math.round(255 * level * reflection);
+        context.beginPath();
+        vertices.forEach(([x, y, z], index) => {
+          const perspective = 4.8 / (4.8 - z);
+          const px = width / 2 + x * scale * perspective;
+          const py = height / 2 - y * scale * perspective;
+          if (index === 0) context.moveTo(px, py);
+          else context.lineTo(px, py);
+        });
+        context.closePath();
+        context.fillStyle = `rgb(${Math.round(metal * 0.92)}, ${Math.round(metal * 0.97)}, ${metal})`;
+        context.strokeStyle = context.fillStyle;
+        context.lineWidth = 0.8;
+        context.stroke();
+        context.fill();
+      }
+      return progress;
+    };
+
+    const resize = () => {
+      width = canvas.clientWidth;
+      height = canvas.clientHeight;
+      density = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(width * density));
+      canvas.height = Math.max(1, Math.round(height * density));
+      paint(performance.now());
+    };
+    const tick = (now: number) => {
+      if (paint(now) < 1) frame = window.requestAnimationFrame(tick);
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    frame = window.requestAnimationFrame(tick);
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+    };
+  }, [darkening, durationMs]);
+
+  return <canvas ref={canvasRef} aria-hidden="true" className="zero-object" />;
+}
+
 function ModuleZero() {
   const [stage, setStage] = useState("ready");
+  const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
+  const [previewRun, setPreviewRun] = useState(0);
+  const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
   const [pulseCount, setPulseCount] = useState(0);
   const [pulseRate, setPulseRate] = useState(2);
   const audioRef = useRef<AudioContext | null>(null);
@@ -436,28 +590,49 @@ function ModuleZero() {
   const runRef = useRef(0);
   const frameRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    const stop = () => {
-      runRef.current++;
-      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
-      timersRef.current.forEach(window.clearTimeout);
-      timersRef.current = [];
-      runningRef.current = false;
-      if (audioRef.current) { void audioRef.current.close(); audioRef.current = null; }
-    };
-    window.addEventListener("multiversos-instrument-start", stop);
-    return () => { window.removeEventListener("multiversos-instrument-start", stop); stop(); };
+  const stop = useCallback(() => {
+    runRef.current++;
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    timersRef.current.forEach(window.clearTimeout);
+    timersRef.current = [];
+    runningRef.current = false;
+    if (audioRef.current) {
+      void audioRef.current.close();
+      audioRef.current = null;
+    }
   }, []);
+
+  const reset = useCallback(() => {
+    stop();
+    setStage("ready");
+  }, [stop]);
+
+  useEffect(() => {
+    window.addEventListener("multiversos-instrument-start", reset);
+    return () => {
+      window.removeEventListener("multiversos-instrument-start", reset);
+      stop();
+    };
+  }, [reset, stop]);
 
   const start = async () => {
     if (runningRef.current) return;
     runningRef.current = true;
     const run = ++runRef.current;
+    const openingMs = durationSeconds * 1000;
+    const questionMs = 2 * openingMs + SCENE_ZERO_DARKENING_MS;
+    const questionSeconds = questionMs / 1000;
+    const waveSeconds = questionSeconds + 12;
+    setActiveDurationMs(openingMs);
+    setStage("preparing");
     try {
       const context = new AudioContext();
       audioRef.current = context;
       await context.resume();
-      const render = new OfflineAudioContext(2, context.sampleRate * 36, context.sampleRate);
+      const render = new OfflineAudioContext(2, context.sampleRate * waveSeconds, context.sampleRate);
       const buffer = render.createBuffer(2, render.sampleRate * 4, render.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const samples = buffer.getChannelData(channel);
@@ -500,16 +675,16 @@ function ModuleZero() {
         source.buffer = forward;
         const now = context.currentTime;
         gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(1, now + 3);
-        gain.gain.setValueAtTime(1, now + 33.5);
-        gain.gain.linearRampToValueAtTime(0, now + 36);
+        gain.gain.setValueAtTime(1, now + waveSeconds - 2.5);
+        gain.gain.linearRampToValueAtTime(0, now + waveSeconds);
         color.frequency.setValueAtTime(18000, now);
-        color.frequency.setTargetAtTime(700, now + 24, 2);
+        color.frequency.setTargetAtTime(700, now + questionSeconds, 2);
         color.Q.setValueAtTime(0.7, now);
-        color.Q.setTargetAtTime(1.4, now + 24, 2);
+        color.Q.setTargetAtTime(1.4, now + questionSeconds, 2);
         source.connect(color); color.connect(gain); gain.connect(context.destination);
         source.onended = () => { source.disconnect(); color.disconnect(); gain.disconnect(); };
         source.start(now);
-        source.stop(now + 36);
+        source.stop(now + waveSeconds);
       };
       const gong = (fifth = false, emphasis = 1) => {
         const now = context.currentTime, root = fifth ? 220 * 1.5 : 220;
@@ -599,21 +774,30 @@ function ModuleZero() {
         frameRef.current = window.requestAnimationFrame(draw);
       };
       setStage("opening"); wave();
-      at(8000, () => setStage("darkening"));
-      at(16000, () => setStage("opening"));
-      at(24000, () => setStage("question"));
-      at(30000, () => { setStage("one"); gong(false, 1.3); });
-      at(32500, () => { setStage("two"); gong(true); });
-      at(35500, accelerate);
+      at(openingMs, () => setStage("darkening"));
+      at(openingMs + SCENE_ZERO_DARKENING_MS, () => setStage("opening"));
+      at(questionMs, () => setStage("question"));
+      at(questionMs + 6000, () => { setStage("one"); gong(false, 1.3); });
+      at(questionMs + 8500, () => { setStage("two"); gong(true); });
+      at(questionMs + 11500, accelerate);
     } catch {
+      if (run !== runRef.current) return;
       if (audioRef.current) void audioRef.current.close();
       audioRef.current = null; runningRef.current = false; setStage("ready");
     }
   };
 
-  const light = ["opening", "fast-opening", "question", "one", "one-again", "two", "multiplying", "vertical", "pair", "plus", "equals", "triad", "space"].includes(stage);
-  const symbol = ["opening", "darkening", "fast-opening", "fast-darkening"].includes(stage);
-  const fast = stage === "fast-opening" || stage === "fast-darkening" || stage === "one-again";
+  const preview = stage === "preview";
+  const darkening = stage === "darkening";
+  const showObject = preview || stage === "opening" || darkening;
+  const preparing = stage === "preparing";
+  const canStart = stage === "ready" || preview;
+  const light = !showObject && !canStart && !preparing;
+  const previewScene = () => {
+    setActiveDurationMs(durationSeconds * 1000);
+    setPreviewRun((run) => run + 1);
+    setStage("preview");
+  };
   const question = stage === "question";
   const dots = ["one", "one-again", "two", "multiplying", "vertical"].includes(stage);
   const many = stage === "multiplying" || stage === "vertical";
@@ -623,19 +807,51 @@ function ModuleZero() {
     while (n > 0) { fraction += (n % 2) * scale; n = Math.floor(n / 2); scale *= 0.5; }
     return 10 + 180 * fraction;
   };
-  return <section aria-label="Módulo cero: el vacío" style={{background:"#000",height:"100svh",position:"relative",opacity:1,transform:"none",animation:"none"}}>
-    <style>{`@keyframes zeroSpaceFade { from { opacity: 0; } to { opacity: 1; } } @keyframes zeroDrift { 0% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } 50% { transform:translate(5%, -4%) rotate(8deg) scale(1.15); } 100% { transform:translate(-4%, 3%) rotate(-8deg) scale(1); } } @keyframes zeroGrain { 0% { transform:translate(0,0); } 25% { transform:translate(-2%,1%); } 50% { transform:translate(1%,-2%); } 75% { transform:translate(2%,2%); } 100% { transform:translate(0,0); } }`}</style>
-    <button type="button" onClick={() => void start()} aria-label={stage === "ready" ? "Iniciar el módulo cero" : "Módulo cero en desarrollo"} style={{position:"absolute",inset:0,width:"100%",height:"100%",border:0,background:light?"#fff":"#000",transition:`background-color ${fast ? 2 : 8}s cubic-bezier(.63,.02,.93,.38)`,cursor:stage === "ready"?"pointer":"default",display:"grid",placeItems:"center",overflow:"hidden",isolation:"isolate"}}>
-      <span aria-hidden="true" style={{position:"absolute",inset:"-60%",pointerEvents:"none",opacity:symbol?0.82:0,transition:"opacity 4s ease",mixBlendMode:"screen",filter:"blur(25px)",animation:"zeroDrift 18s ease-in-out infinite",background:"radial-gradient(ellipse at 47% 48%, rgba(255,255,255,.85) 0%, rgba(153,180,222,.45) 8%, transparent 25%), radial-gradient(ellipse at 38% 60%, rgba(91,115,154,.55), transparent 24%), radial-gradient(ellipse at 62% 39%, rgba(139,120,156,.45), transparent 22%), repeating-conic-gradient(from 27deg at 50% 50%, rgba(179,199,231,.12) 0deg, transparent 9deg, rgba(117,134,160,.08) 18deg, transparent 29deg)"}} />
-      <span aria-hidden="true" style={{position:"absolute",inset:"-20%",pointerEvents:"none",opacity:symbol?0.16:0,transition:"opacity 4s",mixBlendMode:"screen",animation:"zeroGrain 1.2s steps(3) infinite",backgroundImage:"repeating-radial-gradient(ellipse at 42% 47%, transparent 0 2px, rgba(255,255,255,.22) 3px, transparent 4px 7px), repeating-linear-gradient(127deg, transparent 0 5px, rgba(255,255,255,.15) 6px, transparent 7px 13px)"}} />
-      <span aria-hidden="true" style={{position:"relative",fontFamily:"serif",fontSize:"clamp(8rem, 22vw, 18rem)",fontWeight:400,color:"#fff",opacity:symbol?1:0,textShadow:"0 0 8px #fff, 0 0 32px #fff, 0 0 100px rgba(194,216,255,.8)",transition:"opacity 3s ease",lineHeight:1}}>∅</span>
-      <span aria-hidden={!question} style={{position:"absolute",maxWidth:"min(85vw, 900px)",color:"#111",fontFamily:"Georgia, serif",fontSize:"clamp(1.5rem, 3.5vw, 3.6rem)",lineHeight:1.3,fontWeight:400,opacity:question?1:0,transition:"opacity 1.5s ease",pointerEvents:"none"}}>¿Cuál es la entidad mínima capaz de ser imaginada?</span>
+  return <section aria-label="Módulo cero" className="zero-layout">
+    <style>{`
+      @keyframes zeroSpaceFade { from { opacity: 0; } to { opacity: 1; } }
+      .zero-layout {
+        display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+        min-height: 100svh; background: #11131a; color: #f2f3f7; isolation: isolate;
+        opacity: 1; transform: none; animation: none;
+        font-family: system-ui, sans-serif;
+      }
+      .zero-stage {
+        position: relative; display: grid; place-items: center; min-height: 100svh;
+        width: 100%; padding: 0; border: 0; overflow: hidden; isolation: isolate;
+      }
+      .zero-object { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+      .zero-controls { padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
+      .zero-controls h2 { margin: 0 0 2rem; font: 400 clamp(1.15rem, 2.1vw, 2rem)/1.15 Georgia, serif; }
+      .zero-controls label, .zero-controls output { font-size: .875rem; }
+      .zero-time { display: flex; justify-content: space-between; gap: .65rem; align-items: center; }
+      .zero-controls output { color: #e5e9f9; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .zero-controls input { display: block; width: 100%; margin: .85rem 0 1.45rem; accent-color: #adc4ff; }
+      .zero-actions { display: grid; gap: .65rem; }
+      .zero-actions button {
+        border: 1px solid #424958; border-radius: 6px; min-height: 44px; padding: .55rem .6rem;
+        background: #202533; color: #f2f3f7; font: inherit; cursor: pointer;
+      }
+      .zero-actions button:first-child { background: #dce6ff; color: #131b2b; border-color: transparent; }
+      .zero-actions button:disabled { opacity: .55; cursor: default; }
+      .zero-layout :focus-visible { outline: 2px solid #a8c3ff; outline-offset: -3px; }
+      @media (max-width: 700px) {
+        .zero-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(55svh, 1fr) auto; }
+        .zero-stage { min-height: 0; }
+        .zero-controls { border-left: 0; border-top: 1px solid #30333d; }
+        .zero-controls h2 { margin-bottom: 1rem; }
+        .zero-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+    `}</style>
+    <button type="button" className="zero-stage" onClick={() => void start()} aria-label={canStart ? "Iniciar la secuencia desde el módulo cero" : "Proyección del módulo cero"} aria-disabled={!canStart} tabIndex={canStart ? 0 : -1} style={{background:light ? "#fff" : "#000", cursor:canStart ? "pointer" : "default"}}>
+      {showObject && <EmptySetScene key={previewRun} durationMs={darkening ? SCENE_ZERO_DARKENING_MS : activeDurationMs} darkening={darkening} />}
+      <span aria-hidden={!question} style={{position:"absolute",maxWidth:"min(90%, 900px)",color:"#111",fontFamily:"Georgia, serif",fontSize:"clamp(1.5rem, 3.5vw, 3.6rem)",lineHeight:1.3,fontWeight:400,opacity:question?1:0,transition:"opacity 1.5s ease",pointerEvents:"none"}}>¿Cuál es la entidad mínima capaz de ser imaginada?</span>
       <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",opacity:dots?1:0,transform:`rotate(${stage === "vertical" ? 90 : stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,transition:"opacity 1.2s ease, transform 0.15s linear",pointerEvents:"none"}}>
         {stage === "one" || stage === "one-again" ? <circle cx="100" cy="20" r="10" fill="#000" /> : <><circle cx="10" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /><circle cx="190" cy="20" r={stage === "vertical" ? 1.5 : 10} fill="#000" /></>}
         {many && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
         {stage === "vertical" && <line x1="10" y1="20" x2="190" y2="20" stroke="#000" strokeWidth="3" />}
       </svg>
-      {expression && <span aria-label={stage === "triad" ? "111 hercios más 222 hercios igual a 333 hercios" : "111 y 222 hercios"} style={{position:"absolute",display:"grid",gridTemplateColumns:"1fr .65fr 1fr .65fr 1fr",alignItems:"center",justifyItems:"center",width:"min(85vw, 560px)",color:"#111",pointerEvents:"none",opacity:stage === "space" ? 0 : 1,transition:"opacity 1.5s ease"}}>
+      {expression && <span aria-label={stage === "triad" ? "111 hercios más 222 hercios igual a 333 hercios" : "111 y 222 hercios"} style={{position:"absolute",display:"grid",gridTemplateColumns:"1fr .65fr 1fr .65fr 1fr",alignItems:"center",justifyItems:"center",width:"min(90%, 560px)",color:"#111",pointerEvents:"none",opacity:stage === "space" ? 0 : 1,transition:"opacity 1.5s ease"}}>
         <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>111 Hz</small></span>
         <span style={{fontFamily:"serif",fontSize:"clamp(30px, 5vw, 60px)",visibility:stage === "pair"?"hidden":"visible"}}>+</span>
         <span style={{display:"flex",alignItems:"center",flexDirection:"column",gap:16}}><i style={{display:"block",width:3,height:"clamp(80px, 10vw, 160px)",background:"#000"}} /><small style={{fontFamily:"monospace",fontSize:"clamp(11px, 1vw, 15px)"}}>222 Hz</small></span>
@@ -645,6 +861,23 @@ function ModuleZero() {
       {stage === "space" && <FrequencySpace />}
       {many && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{stage === "vertical" ? "111 Hz · TONO" : `${pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO`}</span>}
     </button>
+    <aside className="zero-controls" aria-labelledby="zero-controls-title">
+      <h2 id="zero-controls-title">Escena 0 · ∅ → 0</h2>
+      <div className="zero-time">
+        <label htmlFor="zero-duration">De negro a blanco</label>
+        <output htmlFor="zero-duration">{durationSeconds} s</output>
+      </div>
+      <input id="zero-duration" type="range" min={1} max={30} step={1} value={durationSeconds}
+        aria-valuetext={`${durationSeconds} ${durationSeconds === 1 ? "segundo" : "segundos"}`} disabled={!canStart}
+        onChange={(event) => setDurationSeconds(Number(event.currentTarget.value))} />
+      <div className="zero-actions">
+        <button type="button" disabled={!canStart} onClick={previewScene}>Probar escena</button>
+        {canStart
+          ? <button type="button" onClick={() => void start()}>Iniciar secuencia</button>
+          : <button type="button" onClick={reset}>Detener secuencia</button>}
+      </div>
+      {preparing && <p role="status">Preparando audio…</p>}
+    </aside>
   </section>;
 }
 

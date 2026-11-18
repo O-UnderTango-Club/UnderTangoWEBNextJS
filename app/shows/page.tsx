@@ -3,7 +3,6 @@ import Link from "next/link";
 import Header from "../components/header";
 import Footer from "../components/footer";
 import styles from "../produccion-artistica/produccion-artistica.module.css";
-import CatalogoShows from "./catalogo-shows";
 
 const WHATSAPP_NUMBER = "5493757618270";
 const HERO_VIDEO = "https://www.youtube.com/embed/ONRopDSKkro?rel=0&playsinline=1";
@@ -42,52 +41,6 @@ export const metadata: Metadata = {
     type: "website",
   },
 };
-
-const capabilities = [
-  {
-    eyebrow: "ARGENTINA",
-    title: "Tango",
-    text: "Parejas de tango, músicos, saxofonistas, banda y formatos tradicionales, contemporáneos o creados especialmente para el evento.",
-  },
-  {
-    eyebrow: "BRASIL",
-    title: "Samba",
-    text: "Passistas, bailarines, percusión y cuerpos de samba para recepciones, intervenciones y momentos de gran impacto escénico.",
-  },
-  {
-    eyebrow: "PARAGUAY",
-    title: "Danza + arpa",
-    text: "Danzas paraguayas, arpistas, músicos y formaciones que pueden integrarse a una puesta regional o funcionar como espectáculo propio.",
-  },
-  {
-    eyebrow: "MÚSICA",
-    title: "Música en vivo",
-    text: "Solistas, instrumentistas, bandas y formaciones diseñadas según el espacio, el público, el repertorio y el objetivo de la producción.",
-  },
-  {
-    eyebrow: "PERFORMANCE",
-    title: "Fuego + zancos",
-    text: "Intervenciones visuales, manipulación de fuego, zancos, personajes y acciones especiales para recibir, sorprender o transformar un espacio.",
-  },
-  {
-    eyebrow: "A MEDIDA",
-    title: "Producciones híbridas",
-    text: "Cuando un solo lenguaje no alcanza, combinamos música, danza, performers y recursos escénicos dentro de una misma narrativa.",
-  },
-];
-
-const eventTypes = [
-  "Hoteles",
-  "Eventos corporativos",
-  "Congresos",
-  "Turismo",
-  "Gastronomía",
-  "Inauguraciones",
-  "Bodas",
-  "Festivales",
-  "Activaciones de marca",
-  "Eventos privados",
-];
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -144,7 +97,7 @@ export default function ProduccionArtisticaPage() {
                 Diseñar mi espectáculo
               </a>
               <Link className={styles.secondaryCta} href="#catalogo">
-                Ver shows listos
+                Ver propuestas
               </Link>
             </div>
             <div className={styles.heroProof} aria-label="Cobertura y alcance de producción">
@@ -173,7 +126,7 @@ export default function ProduccionArtisticaPage() {
           </div>
         </section>
 
-        <section className={styles.section} aria-labelledby="videos-produccion-title">
+        <section id="catalogo" className={styles.section} aria-labelledby="videos-produccion-title">
           <div className={styles.sectionHeading}>
             <p className={styles.eyebrow}>MÚSICA Y DANZA · TRIPLE FRONTERA</p>
             <h2 id="videos-produccion-title">Tres formas de vivir el espectáculo.</h2>
@@ -201,115 +154,30 @@ export default function ProduccionArtisticaPage() {
           </div>
         </section>
 
-        <CatalogoShows />
-
-        <section id="produccion" className={styles.statement}>
-          <p className={styles.eyebrow}>NO NECESITÁS LLEGAR CON EL SHOW RESUELTO</p>
-          <h2>Necesitamos entender qué querés provocar.</h2>
-          <p>
-            Elegancia. Impacto. Energía. Identidad regional. Fiesta. Sorpresa. Una apertura. Un momento central. Un cierre. A partir del evento, el espacio y el público, armamos la combinación artística que mejor funciona.
-          </p>
-        </section>
-
-        <section className={styles.section} aria-labelledby="capacidades-title">
-          <div className={styles.sectionHeading}>
-            <p className={styles.eyebrow}>UN TERRITORIO · TRES PAÍSES · MUCHAS POSIBILIDADES</p>
-            <h2 id="capacidades-title">La producción se diseña alrededor del evento.</h2>
-            <p>
-              Podemos trabajar con un lenguaje único o integrar distintas disciplinas. La selección de artistas, duración y escala se define según el contexto y el presupuesto.
-            </p>
-          </div>
-
-          <div className={styles.capabilityGrid}>
-            {capabilities.map((item) => (
-              <article key={item.title} className={styles.capabilityCard}>
-                <span>{item.eyebrow}</span>
-                <h3>{item.title}</h3>
-                <p>{item.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className={`${styles.section} ${styles.processSection}`}>
-          <div className={styles.sectionHeading}>
-            <p className={styles.eyebrow}>PRODUCCIÓN A MEDIDA</p>
-            <h2>De una necesidad abierta a una puesta que funciona.</h2>
-          </div>
-
-          <ol className={styles.processGrid}>
-            <li>
-              <span>01</span>
-              <h3>Nos contás el evento</h3>
-              <p>Fecha, ciudad, espacio, público, objetivo y presupuesto de referencia.</p>
-            </li>
-            <li>
-              <span>02</span>
-              <h3>Diseñamos la propuesta</h3>
-              <p>Concepto, lenguajes, formación, cantidad de artistas, duración y dinámica.</p>
-            </li>
-            <li>
-              <span>03</span>
-              <h3>Armamos el equipo</h3>
-              <p>Curaduría, convocatoria y coordinación de artistas de la red regional.</p>
-            </li>
-            <li>
-              <span>04</span>
-              <h3>Producimos</h3>
-              <p>Dirección artística, ensayos, tiempos, logística y articulación con la producción técnica.</p>
-            </li>
-            <li>
-              <span>05</span>
-              <h3>Llegamos con una solución</h3>
-              <p>Un espectáculo pensado para destacar, integrarse al evento y dejar una buena experiencia.</p>
-            </li>
-          </ol>
-        </section>
-
-        <section className={`${styles.section} ${styles.networkSection}`}>
-          <div className={styles.networkCopy}>
-            <p className={styles.eyebrow}>RED UNDERTANGO</p>
-            <h2>La Triple Frontera no se resuelve desde un solo lado.</h2>
-            <p>
-              Trabajamos desde Puerto Iguazú con una red regional de artistas, productores, marcas, espacios y relaciones institucionales en Foz do Iguaçu y Ciudad del Este. Esa proximidad nos permite pensar el espectáculo desde el territorio y convocar el equipo adecuado para cada proyecto.
-            </p>
-            <p className={styles.networkNote}>
-              Entre nuestras relaciones institucionales regionales se encuentra Not Only Wine, junto a otros aliados que forman parte del desarrollo de la Red UnderTango.
-            </p>
-          </div>
-
-          <div className={styles.cities} aria-label="Cobertura regional">
-            <div><strong>Argentina</strong><span>Puerto Iguazú</span></div>
-            <div><strong>Brasil</strong><span>Foz do Iguaçu</span></div>
-            <div><strong>Paraguay</strong><span>Ciudad del Este</span></div>
-          </div>
-        </section>
-
-        <section className={styles.section}>
-          <div className={styles.sectionHeading}>
-            <p className={styles.eyebrow}>DÓNDE PUEDE FUNCIONAR</p>
-            <h2>Producciones para contextos muy distintos.</h2>
-          </div>
-          <div className={styles.eventTags}>
-            {eventTypes.map((eventType) => <span key={eventType}>{eventType}</span>)}
-          </div>
-        </section>
-
-        <section className={styles.splitDecision}>
+        <section id="produccion" className={styles.splitDecision}>
           <div>
-            <p className={styles.eyebrow}>SI YA SABÉS QUÉ QUERÉS</p>
-            <h2>Tenemos formatos más simples y rápidos.</h2>
-            <p>Pareja de tango, tango + saxo, banda y otros productos modulares con una contratación más directa.</p>
-            <Link className={styles.secondaryCta} href="#catalogo">Ver catálogo de shows</Link>
+            <p className={styles.eyebrow}>SHOWS PARA TU EVENTO</p>
+            <h2>Desde un formato íntimo hasta un gran espectáculo.</h2>
+            <p>Contamos con propuestas simples, como una pareja de tango o músicos en vivo, y shows completos que combinan música, danza y puesta escénica. Adaptamos la formación y la duración a tu evento.</p>
           </div>
           <div className={styles.splitPrimary}>
-            <p className={styles.eyebrow}>SI TODAVÍA NO SABÉS QUÉ SHOW QUERÉS</p>
-            <h2>Éste es el lugar correcto.</h2>
-            <p>Contanos dónde es, cuándo es, cuánta gente habrá y qué querés que el público sienta. Nosotros empezamos desde ahí.</p>
-            <a className={styles.primaryCta} href={whatsappFor("una producción artística")} target="_blank" rel="noopener noreferrer">
-              Contarnos el evento
-            </a>
+            <p className={styles.eyebrow}>PRODUCCIÓN A MEDIDA</p>
+            <h2>¿Te imaginás algo y querés hacerlo realidad?</h2>
+            <p>Contanos tu idea. Podemos crear una propuesta con artistas, música y danza de la Triple Frontera, pensada para tu espacio y tu público.</p>
+            <a className={styles.primaryCta} href={whatsappFor("un evento")} target="_blank" rel="noopener noreferrer">Conversemos sobre tu idea</a>
           </div>
+        </section>
+
+        <section className={`${styles.section} ${styles.processSection}`} aria-labelledby="pasos-title">
+          <div className={styles.sectionHeading}>
+            <p className={styles.eyebrow}>ASÍ EMPEZAMOS</p>
+            <h2 id="pasos-title">Hagamos realidad tu idea.</h2>
+          </div>
+          <ol className={styles.processGrid}>
+            <li><span>01</span><h3>Compartinos el contexto</h3><p>Ciudad, fecha, espacio, público y objetivo de la presentación.</p></li>
+            <li><span>02</span><h3>Definimos el formato</h3><p>Conversamos sobre artistas, duración y puesta.</p></li>
+            <li><span>03</span><h3>Armamos la propuesta</h3><p>Confirmamos disponibilidad y presupuesto.</p></li>
+          </ol>
         </section>
       </main>
 

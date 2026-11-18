@@ -37,6 +37,11 @@ await check('lectura completa conserva todos los campos y revisiones grandes',()
   assert.equal(Object.keys(s.obligations[0].fields).length,16);assert.equal(Object.keys(s.movements[0].fields).length,14);
   for(const status of ['staged','validated']){assert.throws(()=>model.parseFinanceSnapshot({...fixture(),status}));assert.equal(model.parseFinanceSnapshot({...fixture(),status},true).status,status);}
 });
+await check('lectura admite transferencias internas sin habilitar su creación',()=>{
+  const s=fixture();s.movements[0].fields[F.movements.type.id]='Transferencia interna';
+  assert.equal(model.parseFinanceSnapshot(s).movements[0].fields[F.movements.type.id],'Transferencia interna');
+  assert.throws(()=>server.validateFinanceChange({record:{table:'movements',id:null,create:true,fields:{[F.movements.type.id]:'Transferencia interna'}}}));
+});
 await check('rechaza datos truncados, tipos y relaciones inconsistentes',()=>{
   for(const mutate of [s=>delete s.movements,s=>delete s.obligations[0].fields[F.obligations.notes.id],
     s=>s.movements.push(s.movements[0]),s=>s.movements[0].fields[F.movements.amount.id]=0.30,

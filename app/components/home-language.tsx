@@ -247,6 +247,10 @@ const dictionary: Record<string, {en:string;pt:string}> = {
     "en": "Follow us",
     "pt": "Siga-nos"
   },
+  "Todos los derechos reservados.": {
+    en: "All rights reserved.",
+    pt: "Todos os direitos reservados.",
+  },
   "Un lugar para encontrarnos en el tango.": {
     "en": "A place to meet through tango.",
     "pt": "Um lugar para nos encontrarmos no tango."

@@ -11,7 +11,7 @@ export default function Footer() {
         <div className="footer-logo">
           <img
             src="/assets/images/Under-logo-transparente.png"
-            alt="UnderTango Logo"
+            alt={t("Logotipo UnderTango")}
           />
         </div>
 

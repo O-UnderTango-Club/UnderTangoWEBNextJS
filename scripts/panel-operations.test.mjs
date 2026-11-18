@@ -128,6 +128,40 @@ try {
     assert.equal(response.snapshotRevision, '0'); assert.equal(response.migrationAvailable, false);
     db.status = 'staged'; await assert.rejects(server.snapshot(), e => e.status === 503); db.status = 'active';
   });
+  await check('edita la lista de compras y conserva vínculos hasta desbloquear la limpieza', async () => {
+    const saved = db;
+    const list = '- Guantes\\n- Detergente\\n' + 'Toallas y bolsas\\n'.repeat(100).trimEnd();
+    const fields = { [F.tasks.status]:'Pendiente', [F.tasks.gate]:'Acción inmediata', [F.tasks.front]:'Primario' };
+    db = {...saved,contract:3,cases:[row('case',{[F.cases.name]:'Caso conservado',[F.cases.projects]:['q']})],events:[row('e',{[F.events.name]:'Confirmación',[F.events.status]:'Ocurrido',[F.events.occurred]:'2026-09-07',[F.events.evidence]:'Confirmado'})],tasks:[
+      row('purchase',{...fields,[F.tasks.name]:'Comprar artículos de limpieza',[F.tasks.description]:list,[F.tasks.rank]:1,[F.tasks.projects]:['p'],[F.tasks.cases]:['case'],[F.tasks.events]:['e']}),
+      row('clean',{...fields,[F.tasks.name]:'Limpiar el baño',[F.tasks.rank]:2,[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera',[F.tasks.dependencies]:['purchase']}),
+    ]};
+    const tasks = async () => server.responseBoard(await server.snapshot(true)).tasks;
+    const initial = await tasks();
+    assert.equal(initial.find(t=>t.id==='purchase').description,list);
+    assert.equal(initial.find(t=>t.id==='clean').stage,'waiting');
+    const edited = list + '\\n- Esponjas';
+    await server.mutate(await intent('task','purchase',{description:edited}),'test-actor');
+    assert.deepEqual(lastPatches,[{table:'follow_ups',id:'purchase',create:false,fields:{[F.tasks.description]:edited}}]);
+    const after = await tasks();
+    const purchase = after.find(t=>t.id==='purchase');
+    assert.equal(purchase.description,edited);
+    assert.deepEqual(purchase.directProjectIds,['p']);
+    assert.deepEqual(purchase.caseIds,['case']);
+    assert.deepEqual(purchase.eventIds,['e']);
+    assert.equal(after.find(t=>t.id==='clean').stage,'waiting');
+    await server.mutate(await intent('task','clean',{description:'Limpiar cuando lleguen los artículos.'}),'test-actor');
+    assert.deepEqual(lastPatches[0].fields,{[F.tasks.description]:'Limpiar cuando lleguen los artículos.'});
+    assert.deepEqual((await tasks()).find(t=>t.id==='clean').projectIds,[]);
+    await server.mutate(await intent('task','purchase',{stage:'done'}),'test-actor');
+    const final = await tasks();
+    assert.equal(final.find(t=>t.id==='purchase').status,'Hecho');
+    assert.equal(final.find(t=>t.id==='purchase').description,edited);
+    assert.equal(final.find(t=>t.id==='clean').stage,'ready');
+    assert.deepEqual(final.find(t=>t.id==='clean').dependencies,['purchase']);
+    db = saved;
+    revision = 0;
+  });
   await check('una edición ajena invalida el formulario antes de escribir', async () => {
     const input = await intent('task', 't', { owner: 'Pablo' }); revision++;
     const before = commitCalls; await assert.rejects(server.mutate(input, 'test-actor'), e => e.status === 409);

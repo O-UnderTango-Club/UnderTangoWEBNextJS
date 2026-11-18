@@ -10,7 +10,7 @@ function load(relative, replacements = {}) {
   const mod = new Module(filename, module);
   mod.filename = filename; mod.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalRequire = mod.require.bind(mod);
-  mod.require = id => id in replacements ? replacements[id] : ['./ActionGroup','./GroupForm','./WeekdayPicker'].includes(id) ? {default:()=>null} : originalRequire(id);
+  mod.require = id => id in replacements ? replacements[id] : ['./ActionGroup','./Deadlines','./GroupForm','./WeekdayPicker'].includes(id) ? {default:()=>null} : originalRequire(id);
   const source = fs.readFileSync(filename, 'utf8').replace('function EditForm(', 'export function EditForm(').replace('function QuickForm(', 'export function QuickForm(');
   mod._compile(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename);
   return mod.exports;
@@ -20,7 +20,9 @@ const grouping = load('../src/lib/panel-dependencies.ts');
 const dependencies = load('../app/panel-de-control/Dependencies.tsx', {'../../src/lib/panel-model':model,'../../src/lib/panel-dependencies':grouping,'./panel.module.css':{default:{}}});
 const projectGroups = load('../src/lib/panel-project-groups.ts');
 const frontProjects = load('../app/panel-de-control/FrontProjects.tsx', {'../../src/lib/panel-model':model,'../../src/lib/panel-project-groups':projectGroups,'./panel.module.css':{default:{}}});
-const { EditForm } = load('../app/panel-de-control/Panel.tsx', { '../../src/lib/panel-model': model, './Dependencies': dependencies, './FrontProjects':frontProjects, './WeekdayPicker':{default:()=>null}, './panel.module.css': {default:{}} });
+const weekdayPicker = load('../app/panel-de-control/WeekdayPicker.tsx', {'../../src/lib/panel-model':model,'./panel.module.css':{default:{}}});
+const panelModules = {'../../src/lib/panel-model':model,'./Dependencies':dependencies,'./WeekdayPicker':weekdayPicker,'./panel.module.css':{default:{}}};
+const { EditForm } = load('../app/panel-de-control/Panel.tsx', panelModules);
 const data = { rankingMode:'action',source:'supabase',projects:[],tasks:[],events:[],cases:[] };
 const front = {name:'Primario',tasks:['a']};
 const projectBoard = {...data,projects:[{id:'p',name:'Proyecto compartido'}],tasks:[{id:'a',stage:'ready',projectIds:['p','q'],front:'Primario',rank:1}]};
@@ -40,14 +42,24 @@ assert.match(task, /Borrador intacto/); assert.match(task, /Crear proyecto y sel
 assert.match(task, /Proyectos vinculados/); assert.match(task, /la acción se guarda por separado/);
 const readOnly = render({kind:'project',initial:{name:'Prueba',status:'Activo'}},{data:{...data,readOnly:true}});
 assert.match(readOnly, /fieldset disabled/);
-const contextual = render({kind:'task',id:'action',initial:{name:'Pagar factura',stage:'ready',order:21,projects:['independent'],cases:['case'],dependencies:[],events:[]}}, {data:{...data,projects:[{id:'independent',name:'Tareas independientes',open:true},{id:'inherited',name:'Proyecto del caso',open:true}],cases:[{id:'case',name:'Caso',projectIds:['inherited']} ]}});
-assert.ok(contextual.indexOf('Tareas independientes') < contextual.indexOf('Acción concreta'));
-assert.ok(contextual.indexOf('Proyecto del caso') < contextual.indexOf('Acción concreta'));
-assert.doesNotMatch(contextual, /Paso en el plan|id="edit-order"/);
-assert.match(contextual, /Número registrado: 21/);
-assert.match(contextual, /<details><summary>Referencia de orden anterior/);
 assert.match(task, /Sin proyecto vinculado/);
-console.log('Project/action rendering checks passed: context, inherited links, empty state and historical order');
+const purchaseName = 'Comprar artículos de limpieza';
+const shoppingList = '- Detergente\n- Guantes\n- Bolsas';
+const purchase = {kind:'task',id:'purchase',initial:{name:purchaseName,description:shoppingList,stage:'ready',order:21,projects:['direct'],cases:['case'],dependencies:['earlier'],events:['event']}};
+const linkedData = {...data,projects:[{id:'direct',name:'Proyecto directo',open:true},{id:'inherited',name:'Proyecto del caso',open:true}],cases:[{id:'case',name:'Caso',projectIds:['inherited']}]};
+const unlinked = {...purchase,initial:{...purchase.initial,description:'',projects:[],cases:[],dependencies:[],events:[]}};
+const contextual = render(purchase,{embedded:true,data:linkedData});
+for (const markup of [contextual,render(unlinked,{embedded:true})]) {
+  assert.doesNotMatch(markup, /<h2|>Acción<|Descripción registrada|Sin proyecto vinculado|Proyecto directo|Proyecto del caso|Proyectos vinculados|Crear proyecto|Caso relacionado|Qué falta para poder empezar/);
+  for (const label of ['Acción concreta','Estado de la acción','Contexto del proyecto','Vencimiento','Activar en','Prioridad','Qué días aparece en Frentes','Frente de la acción','Posición','Agregar comentario','Documento de apoyo en Drive / Docs','Responsable','Cancelar','Guardar']) assert.ok(markup.includes(label),label);
+  assert.ok(markup.indexOf('Documento de apoyo') < markup.indexOf('Responsable'));
+  assert.match(markup, /<footer>.*>Cerrar<.*>Cancelar<.*>Guardar en/);
+}
+assert.equal(contextual.split(purchaseName).length,2,'El título solo aparece en el campo editable');
+assert.ok(contextual.includes(shoppingList));
+assert.doesNotMatch(contextual, /Paso en el plan|id="edit-order"/);
+assert.match(contextual, /<details><summary>Referencia de orden anterior/);
+console.log('Project/action rendering checks passed: existing actions with and without project links and creation controls');
 
 // Exercise the form submission without a browser or any production writes.
 let availabilityMode="now", quickEvidence, stateIndex=0;
@@ -64,6 +76,21 @@ function findElement(node,predicate){
 }
 (async()=>{
  let submitted;
+ let draft = purchase.initial;
+ const { EditForm: EditableForm } = load('../app/panel-de-control/Panel.tsx', {
+  ...panelModules,
+  react:{...React,useState:initial=>initial===purchase.initial?[draft,update=>{draft=update(draft);}]:[initial,()=>{}]},
+ });
+ const edit = () => EditableForm({editor:purchase,data:linkedData,onSave:async changes=>{submitted=changes;}});
+ await findElement(edit(),n=>n.type==='form').props.onSubmit({preventDefault(){}});
+ assert.deepEqual(submitted,{},'Una descripción intacta y los vínculos ocultos no se envían');
+ const context = findElement(edit(),n=>n.props?.id==='edit-description');
+ assert.equal(context.props.value,shoppingList);
+ const updatedList = shoppingList+'\n- Esponjas';
+ context.props.onChange({target:{value:updatedList}});
+ await findElement(edit(),n=>n.type==='form').props.onSubmit({preventDefault(){}});
+ assert.deepEqual(submitted,{description:updatedList});
+
  const tree=QuickForm({editor:quickEditor,data:{...data,tasks:[scheduledTask]},busy:false,onSave:async changes=>{submitted=changes;}});
  const button=findElement(tree,n=>n.type==='button'&&n.props.children==='Guardar estado');
  assert.equal(button.props.disabled,false,'Same recurring state can still be reactivated');

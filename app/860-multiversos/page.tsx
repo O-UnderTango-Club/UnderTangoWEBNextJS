@@ -340,7 +340,14 @@ type FrequencyPoint = [x: number, y: number];
 
 const FREQUENCY_VIEW = { width: 640, height: 360, x: 320, y: 180, yaw: 0.64, tilt: 0.62, scale: 102 };
 const FREQUENCY_STOP_YAW = FREQUENCY_VIEW.yaw + 1.72;
-const FREQUENCY_TRAIL_TRAVEL = 141;
+const FREQUENCY_TRAIL_TRAVEL = 380;
+
+function temporalTrailFrame(progress: number, roll: number) {
+  const halfSpan = FREQUENCY_TRAIL_TRAVEL * progress / 2;
+  const horizontalFit = (FREQUENCY_VIEW.width / 2 - 28) / (180 + halfSpan * Math.cos(roll));
+  const verticalFit = 170 / (170 + halfSpan * Math.sin(roll));
+  return { halfSpan, zoom: Math.min(1, horizontalFit, verticalFit) };
+}
 const ORIGINAL_NOTES: FrequencyVector = [111, 222, 333];
 const CONCERT_A_HZ = 440;
 const OCTAVE_NOTES: FrequencyVector = [CONCERT_A_HZ / 2, CONCERT_A_HZ, CONCERT_A_HZ * 2];
@@ -509,7 +516,7 @@ layout(location=1) in vec4 a_sample;
 uniform vec4 u_camera;
 uniform vec4 u_rotation;
 uniform vec2 u_projection;
-uniform vec2 u_pivot;
+uniform float u_pivot;
 out vec3 v_normal;
 out float v_hue;
 
@@ -535,9 +542,8 @@ void main() {
   vec3 point = camera(sin(phase) + 0.065 * normal);
   // Bake the capture perspective before translating the frame along the time axis.
   point.xy *= 4.5 / (4.5 - point.z);
-  point.x += a_sample.w - u_pivot.x;
+  point.x += a_sample.w - u_pivot;
   point = rotate(point);
-  point.x += u_pivot.y;
   gl_Position = vec4(point.xy * u_projection, -0.13 * point.z, 1.0);
   v_normal = rotate(camera(normal));
   v_hue = clamp(a_path.x / 6.2831853 * 0.86 + a_sample.w * 0.1, 0.0, 1.0);
@@ -627,22 +633,21 @@ function createTemporalTrailRenderer(canvas: HTMLCanvasElement, sampleCount: num
   const rotation = gl.getUniformLocation(program, "u_rotation");
   const projection = gl.getUniformLocation(program, "u_projection");
   const pivot = gl.getUniformLocation(program, "u_pivot");
-  const halfTravel = FREQUENCY_TRAIL_TRAVEL / (2 * FREQUENCY_VIEW.scale);
 
   return {
     upload(instances: Float32Array, from: number, to: number) {
       gl.bindBuffer(gl.ARRAY_BUFFER, samples);
       gl.bufferSubData(gl.ARRAY_BUFFER, from * 16, instances.subarray(from * 4, to * 4));
     },
-    paint(count: number, lift: number, spin: number) {
+    paint(count: number, progress: number, lift: number, spin: number) {
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.useProgram(program);
       gl.bindVertexArray(vao);
       const roll = lift * Math.PI / 2;
-      const zoom = 1 / (1 + 0.65 * Math.sin(roll));
+      const { halfSpan, zoom } = temporalTrailFrame(progress, roll);
       gl.uniform4f(rotation, Math.cos(roll), Math.sin(roll), Math.cos(spin), Math.sin(spin));
-      gl.uniform2f(pivot, halfTravel, halfTravel * (1 - lift));
+      gl.uniform1f(pivot, halfSpan / FREQUENCY_VIEW.scale);
       gl.uniform2f(projection,
         FREQUENCY_VIEW.scale * zoom * 2 / FREQUENCY_VIEW.width,
         FREQUENCY_VIEW.scale * zoom * 2 / FREQUENCY_VIEW.height);
@@ -711,7 +716,7 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs }: {
       const seconds = raisedAt === null ? 0 : (now - raisedAt) / 1000;
       const lift = current < 1 ? 0 : reduceMotion.matches ? 1 : smoothSceneLight(seconds / 3);
       const spin = lift * 0.26 + (reduceMotion.matches ? 0 : Math.max(0, seconds - 3) * 0.34);
-      renderer.paint(visibleCount, lift, spin);
+      renderer.paint(visibleCount, current, lift, spin);
     };
     frame = window.requestAnimationFrame(draw);
     return () => {
@@ -722,15 +727,21 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs }: {
   }, [durationMs, intervalMs]);
 
   const notes = tuningAt(progress).map((value) => FREQUENCY_FORMAT.format(value) + " Hz").join(" · ");
+  const { halfSpan, zoom } = temporalTrailFrame(progress, 0);
+  const elapsed = Math.floor(progress * durationMs / 1000);
+  const axisHalfWidth = halfSpan * zoom * 100 / FREQUENCY_VIEW.width;
   return <div className="zero-frequency-space">
     {unavailable
       ? <><FrequencySpace opacity={1} yaw={FREQUENCY_STOP_YAW} /><p className="zero-trail-fallback" role="status">La estela rotatoria requiere WebGL 2.</p></>
       : <canvas ref={canvasRef} role="img" aria-label="Estela tridimensional de fotogramas opacos que se eleva y gira al completarse" />}
-    {progress < 1 && <div className="zero-trail-axis" aria-hidden="true"><span>0 s</span><span>{durationMs / 1000} s</span></div>}
+    {progress < 1 && axisHalfWidth >= 3 && <div className="zero-trail-axis" aria-hidden="true"
+      style={{ left: `${50 - axisHalfWidth}%`, width: `${2 * axisHalfWidth}%` }}>
+      <span>0 s</span><span>{elapsed} s</span>
+    </div>}
     <div className="zero-time-caption">
       <span>Cuarta dimensión: el tiempo</span>
       <small>{progress === 1 ? "La en tres octavas · " : ""}{notes}</small>
-      <small>{Math.floor(progress * durationMs / 1000)} / {durationMs / 1000} s · {intervalMs} ms por muestra</small>
+      <small>{elapsed} / {durationMs / 1000} s · {intervalMs} ms por muestra</small>
     </div>
   </div>;
 }
@@ -1749,7 +1760,7 @@ function ModuleZero() {
       .zero-harmonic-frame { position: relative; width: min(94%, 800px, 116svh); aspect-ratio: 16 / 9; pointer-events: none; }
       .zero-harmonic-diagram, .zero-frequency-space, .zero-frequency-space canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
       .zero-trail-axis {
-        position: absolute; left: 50%; bottom: 4%; width: 22.03%; display: flex; justify-content: space-between;
+        position: absolute; bottom: 4%; display: flex; justify-content: space-between;
         border-top: 1px solid #abb7cd; color: #46516b; padding-top: .3rem;
         font: .73rem/1.25 system-ui, sans-serif;
       }

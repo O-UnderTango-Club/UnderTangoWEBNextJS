@@ -56,8 +56,8 @@ export default function CatalogoShows() {
           </div>
 
           <figure className={styles.heroVisual}>
-            <Image src="/assets/images/tango-rave-elenco.jpg" alt="Elenco de Ø Tango Rave" width={2048} height={1365} priority sizes="(max-width: 900px) 100vw, 55vw" />
-            <figcaption>Ø Tango Rave · elenco</figcaption>
+            <Image src="/images/rave/hacemos-la-fiesta-share-v1.jpg" alt="Los cinco músicos de UnderTango Rave" width={1200} height={630} priority sizes="(max-width: 900px) 100vw, 55vw" />
+            <figcaption>Ø UnderTango Rave · banda en vivo</figcaption>
           </figure>
         </section>
 

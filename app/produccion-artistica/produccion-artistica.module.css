@@ -624,3 +624,5 @@
 .portraitVideo { width: 100%; aspect-ratio: 9 / 16; max-height: 620px; overflow: hidden; border-radius: 12px; background: #000; }
 .portraitVideo iframe { display: block; border: 0; width: 100%; height: 100%; }
 @media (max-width: 720px) { .showVideoGrid { grid-template-columns: 1fr; } .showVideoCard { padding: 16px; } .showVideoCard p { min-height: 0; } .portraitVideo { max-height: none; } }
+
+@media (min-width: 721px) { .processGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

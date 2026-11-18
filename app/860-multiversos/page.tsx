@@ -340,6 +340,7 @@ type FrequencyPoint = [x: number, y: number];
 
 const FREQUENCY_VIEW = { width: 640, height: 360, x: 320, y: 180, yaw: 0.64, tilt: 0.62, scale: 102 };
 const FREQUENCY_STOP_YAW = FREQUENCY_VIEW.yaw + 1.72;
+const FREQUENCY_TRAIL_TRAVEL = 141;
 const ORIGINAL_NOTES: FrequencyVector = [111, 222, 333];
 const CONCERT_A_HZ = 440;
 const OCTAVE_NOTES: FrequencyVector = [CONCERT_A_HZ / 2, CONCERT_A_HZ, CONCERT_A_HZ * 2];
@@ -420,21 +421,41 @@ function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: 
       return rings;
     };
     const original = makeRings(ORIGINAL_NOTES);
-    const sampleAngles = Array.from({ length: 96 }, (_, index) => index * Math.PI * 2 / 96);
-    const projectedShape = (notes: FrequencyVector) => sampleAngles.map((angle) => {
-      const { x, y, z } = frequencyPoint(angle, notes);
-      return frequencyProject(x, y, z, FREQUENCY_STOP_YAW);
-    });
-    const initialProjection = projectedShape(ORIGINAL_NOTES);
-    const trace: { at: number; displacement: number }[] = [];
-    const sampleShape = (at: number, duration: number) => {
-      const image = projectedShape(tuningAt(at / duration));
-      const distanceSquared = image.reduce((sum, point, index) => {
-        const reference = initialProjection[index];
-        return sum + (point.x - reference.x) ** 2 + (point.y - reference.y) ** 2;
-      }, 0);
-      trace.push({ at, displacement: Math.sqrt(distanceSquared / image.length) });
+    const paintTube = (ink: CanvasRenderingContext2D, rings: Vec[][], yaw: number) => {
+      const projected = rings.map((ring) => ring.map((v) => frequencyProject(v.x, v.y, v.z, yaw)));
+      const faces: Array<{ points: Array<{ x: number; y: number; z: number }>; depth: number; hue: number; light: number }> = [];
+      for (let i = 0; i < segments; i++) {
+        for (let j = 0; j < sides; j++) {
+          const k = (j + 1) % sides;
+          const points = [projected[i][j], projected[i + 1][j], projected[i + 1][k], projected[i][k]];
+          const depth = points.reduce((sum, p) => sum + p.z, 0) / 4;
+          const light = Math.max(28, Math.min(74, 48 + depth * 8 + Math.cos(j * 2 * Math.PI / sides) * 9));
+          faces.push({ points, depth, hue: 210 + 50 * i / segments, light });
+        }
+      }
+      faces.sort((a, b) => a.depth - b.depth);
+      for (const face of faces) {
+        ink.beginPath();
+        ink.moveTo(face.points[0].x, face.points[0].y);
+        for (let i = 1; i < face.points.length; i++) ink.lineTo(face.points[i].x, face.points[i].y);
+        ink.closePath();
+        ink.fillStyle = `hsl(${face.hue} 48% ${face.light}%)`;
+        ink.fill();
+      }
     };
+
+    const makeLayer = () => {
+      const surface = document.createElement("canvas");
+      surface.width = FREQUENCY_VIEW.width * 2;
+      surface.height = FREQUENCY_VIEW.height * 2;
+      const ink = surface.getContext("2d");
+      ink?.setTransform(2, 0, 0, 2, 0, 0);
+      return { surface, ink };
+    };
+    // Only two surfaces are kept. Every sample is composited into the same trail.
+    let trail: { accumulated: ReturnType<typeof makeLayer>; photo: ReturnType<typeof makeLayer> } | null = null;
+    let sampleIndex = 0;
+    let lastSampleAt = -1;
 
     let frame = 0, last = 0, needsDraw = true;
     let previousYaw = NaN, previousTuning: number | null = null;
@@ -452,13 +473,41 @@ function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: 
     const draw = (time: number) => {
       frame = window.requestAnimationFrame(draw);
       const { yaw, tuning, durationMs, sampleIntervalMs } = viewRef.current;
-      if (!needsDraw && (time - last < 34 || (yaw === previousYaw && tuning === previousTuning))) return;
+      const elapsed = (tuning ?? 0) * durationMs;
+      const nextSampleAt = () => Math.min(durationMs, sampleIndex * sampleIntervalMs);
+      const sampleDue = () => tuning !== null && lastSampleAt < durationMs && nextSampleAt() <= elapsed;
+      if (!needsDraw && (time - last < 34 || (yaw === previousYaw && tuning === previousTuning && !sampleDue()))) return;
       last = time;
       previousYaw = yaw;
       previousTuning = tuning;
       needsDraw = false;
-      context.clearRect(0, 0, FREQUENCY_VIEW.width, FREQUENCY_VIEW.height);
-      const project = (v: Vec) => frequencyProject(v.x, v.y, v.z, yaw);
+      const { width, height } = FREQUENCY_VIEW;
+      context.clearRect(0, 0, width, height);
+      if (tuning !== null) {
+        trail ??= { accumulated: makeLayer(), photo: makeLayer() };
+        const { accumulated, photo } = trail;
+        if (accumulated.ink && photo.ink) {
+          const totalSamples = Math.ceil(durationMs / sampleIntervalMs) + 1;
+          // Bound catch-up per animation frame after a hidden tab resumes.
+          for (let rendered = 0; rendered < 3 && sampleDue(); rendered++) {
+            const at = nextSampleAt();
+            const phase = at / durationMs;
+            const shift = phase * FREQUENCY_TRAIL_TRAVEL;
+            photo.ink.clearRect(0, 0, width, height);
+            paintTube(photo.ink, at === 0 ? original : makeRings(tuningAt(phase)), FREQUENCY_STOP_YAW);
+            accumulated.ink.globalAlpha = Math.min(0.4, 4 / totalSamples);
+            accumulated.ink.drawImage(photo.surface, shift, 0, width, height);
+            lastSampleAt = at;
+            sampleIndex++;
+          }
+          context.drawImage(accumulated.surface, 0, 0, width, height);
+          if (lastSampleAt > 0) {
+            context.globalAlpha = 0.34;
+            context.drawImage(photo.surface, FREQUENCY_TRAIL_TRAVEL * lastSampleAt / durationMs, 0, width, height);
+            context.globalAlpha = 1;
+          }
+        }
+      }
       context.lineWidth = 1;
       for (const axis of FREQUENCY_AXES) {
         const [tail, tip] = frequencyAxis(axis.direction, yaw);
@@ -471,27 +520,7 @@ function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: 
         context.setLineDash([]);
       }
 
-      const rings = tuning ? makeRings(tuningAt(tuning)) : original;
-      const projected = rings.map((ring) => ring.map(project));
-      const faces: Array<{ points: Array<{ x: number; y: number; z: number }>; depth: number; hue: number; light: number }> = [];
-      for (let i = 0; i < segments; i++) {
-        for (let j = 0; j < sides; j++) {
-          const k = (j + 1) % sides;
-          const points = [projected[i][j], projected[i + 1][j], projected[i + 1][k], projected[i][k]];
-          const depth = points.reduce((sum, p) => sum + p.z, 0) / 4;
-          const light = Math.max(28, Math.min(74, 48 + depth * 8 + Math.cos(j * 2 * Math.PI / sides) * 9));
-          faces.push({ points, depth, hue: 210 + 50 * i / segments, light });
-        }
-      }
-      faces.sort((a, b) => a.depth - b.depth);
-      for (const face of faces) {
-        context.beginPath();
-        context.moveTo(face.points[0].x, face.points[0].y);
-        for (let i = 1; i < face.points.length; i++) context.lineTo(face.points[i].x, face.points[i].y);
-        context.closePath();
-        context.fillStyle = `hsl(${face.hue} 48% ${face.light}%)`;
-        context.fill();
-      }
+      paintTube(context, tuning ? makeRings(tuningAt(tuning)) : original, yaw);
 
       if (tuning === null) {
         for (const axis of FREQUENCY_AXES) {
@@ -511,40 +540,25 @@ function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: 
           context.fillText(label, x, y);
         }
       } else {
-        const elapsed = tuning * durationMs;
-        for (let at = trace.length * sampleIntervalMs; at <= elapsed; at += sampleIntervalMs) sampleShape(at, durationMs);
-        if (tuning === 1 && trace[trace.length - 1].at < durationMs) sampleShape(durationMs, durationMs);
-
-        const { x, y } = FREQUENCY_VIEW;
-        const traceStart = x + 125, traceEnd = 609, baseline = y + 112;
-        const traceX = (at: number) => traceStart + (traceEnd - traceStart) * at / durationMs;
-        const traceY = (displacement: number) => baseline - displacement * 0.71;
-        context.strokeStyle = "#b6c1d6";
+        const startX = FREQUENCY_VIEW.x;
+        const endX = startX + FREQUENCY_TRAIL_TRAVEL;
+        const baseline = FREQUENCY_VIEW.height - 27;
+        context.strokeStyle = "#aab5cb";
         context.lineWidth = 1.25;
         context.beginPath();
-        context.moveTo(traceStart, baseline);
-        context.lineTo(traceEnd, baseline);
-        context.stroke();
-        context.fillStyle = "#46516b";
-        context.font = "18px system-ui, sans-serif";
-        context.textAlign = "left";
-        context.fillText("0 s", traceStart, baseline + 23);
-        context.textAlign = "right";
-        context.fillText(`${durationMs / 1000} s`, traceEnd, baseline + 23);
-
-        context.strokeStyle = "#345a9b";
-        context.lineWidth = 2.4;
-        context.lineJoin = "round";
-        context.beginPath();
-        context.moveTo(traceStart, baseline);
-        for (const sample of trace) context.lineTo(traceX(sample.at), traceY(sample.displacement));
+        context.moveTo(startX, baseline);
+        context.lineTo(endX, baseline);
         context.stroke();
 
-        const current = trace[trace.length - 1];
         context.fillStyle = "#345a9b";
         context.beginPath();
-        context.arc(traceX(current.at), traceY(current.displacement), 3.2, 0, Math.PI * 2);
+        context.arc(startX + FREQUENCY_TRAIL_TRAVEL * Math.max(0, lastSampleAt) / durationMs, baseline, 3, 0, Math.PI * 2);
         context.fill();
+        context.fillStyle = "#46516b";
+        context.font = "18px system-ui, sans-serif";
+        context.textAlign = "center";
+        context.fillText("0 s", startX, baseline + 21);
+        context.fillText(`${durationMs / 1000} s`, endX, baseline + 21);
       }
     };
     frame = window.requestAnimationFrame(draw);
@@ -558,7 +572,7 @@ function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: 
   return <div className="zero-frequency-space" style={{ opacity }} aria-hidden={opacity < 0.5}>
     <canvas ref={canvasRef} role="img" aria-label={tuning === null
       ? "Figura tridimensional de 111, 222 y 333 Hz en los ejes X, Y y Z"
-      : "Figura tridimensional fija y línea temporal de su deformación, muestreada a intervalos regulares"} />
+      : "Figura tridimensional fija y estela de imágenes superpuestas a escala real sobre el eje del tiempo"} />
     {tuning !== null && <div className="zero-time-caption">
       <span>Cuarta dimensión: el tiempo</span>
       <small>{tuning === 1 ? "La en tres octavas · " : ""}{noteReadout}</small>

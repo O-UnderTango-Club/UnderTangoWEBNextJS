@@ -341,11 +341,12 @@ type FrequencyPoint = [x: number, y: number];
 const FREQUENCY_VIEW = { width: 640, height: 360, x: 320, y: 180, yaw: 0.64, tilt: 0.62, scale: 102 };
 const FREQUENCY_STOP_YAW = FREQUENCY_VIEW.yaw + 1.72;
 const ORIGINAL_NOTES: FrequencyVector = [111, 222, 333];
-const MAJOR_NOTES: FrequencyVector = [440 * 2 ** (-12 / 12), 440 * 2 ** (-8 / 12), 440 * 2 ** (-5 / 12)];
+const CONCERT_A_HZ = 440;
+const OCTAVE_NOTES: FrequencyVector = [CONCERT_A_HZ / 2, CONCERT_A_HZ, CONCERT_A_HZ * 2];
 const FREQUENCY_FORMAT = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 
 function tuningAt(progress: number): FrequencyVector {
-  return ORIGINAL_NOTES.map((hz, index) => hz * (MAJOR_NOTES[index] / hz) ** progress) as FrequencyVector;
+  return ORIGINAL_NOTES.map((hz, index) => hz * (OCTAVE_NOTES[index] / hz) ** progress) as FrequencyVector;
 }
 
 function frequencyPoint(t: number, notes: FrequencyVector) {
@@ -384,12 +385,12 @@ function frequencyAxis(direction: FrequencyVector, yaw: number) {
   return [-1.38, 1.38].map((end) => frequencyProject(direction[0] * end, direction[1] * end, direction[2] * end, yaw));
 }
 
-function FrequencySpace({ opacity, yaw, tuning, timeSeconds }: {
-  opacity: number; yaw: number; tuning: number | null; timeSeconds: number;
+function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: {
+  opacity: number; yaw: number; tuning: number | null; durationMs: number; sampleIntervalMs: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const viewRef = useRef({ yaw, tuning });
-  useEffect(() => { viewRef.current = { yaw, tuning }; }, [yaw, tuning]);
+  const viewRef = useRef({ yaw, tuning, durationMs, sampleIntervalMs });
+  useEffect(() => { viewRef.current = { yaw, tuning, durationMs, sampleIntervalMs }; }, [yaw, tuning, durationMs, sampleIntervalMs]);
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
@@ -419,6 +420,21 @@ function FrequencySpace({ opacity, yaw, tuning, timeSeconds }: {
       return rings;
     };
     const original = makeRings(ORIGINAL_NOTES);
+    const sampleAngles = Array.from({ length: 96 }, (_, index) => index * Math.PI * 2 / 96);
+    const projectedShape = (notes: FrequencyVector) => sampleAngles.map((angle) => {
+      const { x, y, z } = frequencyPoint(angle, notes);
+      return frequencyProject(x, y, z, FREQUENCY_STOP_YAW);
+    });
+    const initialProjection = projectedShape(ORIGINAL_NOTES);
+    const trace: { at: number; displacement: number }[] = [];
+    const sampleShape = (at: number, duration: number) => {
+      const image = projectedShape(tuningAt(at / duration));
+      const distanceSquared = image.reduce((sum, point, index) => {
+        const reference = initialProjection[index];
+        return sum + (point.x - reference.x) ** 2 + (point.y - reference.y) ** 2;
+      }, 0);
+      trace.push({ at, displacement: Math.sqrt(distanceSquared / image.length) });
+    };
 
     let frame = 0, last = 0, needsDraw = true;
     let previousYaw = NaN, previousTuning: number | null = null;
@@ -435,7 +451,7 @@ function FrequencySpace({ opacity, yaw, tuning, timeSeconds }: {
 
     const draw = (time: number) => {
       frame = window.requestAnimationFrame(draw);
-      const { yaw, tuning } = viewRef.current;
+      const { yaw, tuning, durationMs, sampleIntervalMs } = viewRef.current;
       if (!needsDraw && (time - last < 34 || (yaw === previousYaw && tuning === previousTuning))) return;
       last = time;
       previousYaw = yaw;
@@ -495,37 +511,40 @@ function FrequencySpace({ opacity, yaw, tuning, timeSeconds }: {
           context.fillText(label, x, y);
         }
       } else {
+        const elapsed = tuning * durationMs;
+        for (let at = trace.length * sampleIntervalMs; at <= elapsed; at += sampleIntervalMs) sampleShape(at, durationMs);
+        if (tuning === 1 && trace[trace.length - 1].at < durationMs) sampleShape(durationMs, durationMs);
+
         const { x, y } = FREQUENCY_VIEW;
         const traceStart = x + 125, traceEnd = 609, baseline = y + 112;
-        const traceX = (phase: number) => traceStart + (traceEnd - traceStart) * phase;
+        const traceX = (at: number) => traceStart + (traceEnd - traceStart) * at / durationMs;
+        const traceY = (displacement: number) => baseline - displacement * 0.71;
         context.strokeStyle = "#b6c1d6";
         context.lineWidth = 1.25;
         context.beginPath();
         context.moveTo(traceStart, baseline);
-        context.lineTo(traceX(tuning), baseline);
+        context.lineTo(traceEnd, baseline);
         context.stroke();
+        context.fillStyle = "#46516b";
+        context.font = "18px system-ui, sans-serif";
+        context.textAlign = "left";
+        context.fillText("0 s", traceStart, baseline + 23);
+        context.textAlign = "right";
+        context.fillText(`${durationMs / 1000} s`, traceEnd, baseline + 23);
+
+        context.strokeStyle = "#345a9b";
+        context.lineWidth = 2.4;
+        context.lineJoin = "round";
+        context.beginPath();
+        context.moveTo(traceStart, baseline);
+        for (const sample of trace) context.lineTo(traceX(sample.at), traceY(sample.displacement));
+        context.stroke();
+
+        const current = trace[trace.length - 1];
         context.fillStyle = "#345a9b";
         context.beginPath();
-        context.arc(traceX(tuning), baseline, 3.1, 0, Math.PI * 2);
+        context.arc(traceX(current.at), traceY(current.displacement), 3.2, 0, Math.PI * 2);
         context.fill();
-
-        const snapshots = [0, 0.25, 0.5, 0.75].filter((phase) => phase < tuning);
-        snapshots.push(tuning);
-        for (const phase of snapshots) {
-          const live = phase === tuning;
-          const notes = tuningAt(phase);
-          context.strokeStyle = live ? "#345a9b" : "#687da788";
-          context.lineWidth = live ? 2 : 1.4;
-          context.beginPath();
-          for (let i = 0; i <= 128; i++) {
-            const p = project(frequencyPoint(i / 128 * Math.PI * 2, notes));
-            const px = traceX(phase) + (p.x - x) * 0.21;
-            const py = baseline - 41 + (p.y - y) * 0.21;
-            if (i === 0) context.moveTo(px, py);
-            else context.lineTo(px, py);
-          }
-          context.stroke();
-        }
       }
     };
     frame = window.requestAnimationFrame(draw);
@@ -539,19 +558,19 @@ function FrequencySpace({ opacity, yaw, tuning, timeSeconds }: {
   return <div className="zero-frequency-space" style={{ opacity }} aria-hidden={opacity < 0.5}>
     <canvas ref={canvasRef} role="img" aria-label={tuning === null
       ? "Figura tridimensional de 111, 222 y 333 Hz en los ejes X, Y y Z"
-      : "Figura tridimensional fija en el centro y rastro de su deformación hacia la derecha"} />
+      : "Figura tridimensional fija y línea temporal de su deformación, muestreada a intervalos regulares"} />
     {tuning !== null && <div className="zero-time-caption">
       <span>Cuarta dimensión: el tiempo</span>
-      <small>{tuning === 1 ? "La mayor · " : ""}{noteReadout}</small>
-      <small>{Math.round(tuning * timeSeconds)} / {timeSeconds} s</small>
+      <small>{tuning === 1 ? "La en tres octavas · " : ""}{noteReadout}</small>
+      <small>{Math.floor(tuning * durationMs / 1000)} / {durationMs / 1000} s · {sampleIntervalMs} ms por muestra</small>
     </div>}
   </div>;
 }
 
 type HarmonicStage = "vertical" | "harmonics" | "equation" | "spatial" | "space" | "temporal" | "time";
 
-function HarmonicDiagram({ stage, cue, durationMs }: {
-  stage: HarmonicStage; cue: SceneZeroCue | null; durationMs: number;
+function HarmonicDiagram({ stage, cue, durationMs, sampleIntervalMs }: {
+  stage: HarmonicStage; cue: SceneZeroCue | null; durationMs: number; sampleIntervalMs: number;
 }) {
   const [clock, setClock] = useState(0);
   useEffect(() => {
@@ -635,7 +654,7 @@ function HarmonicDiagram({ stage, cue, durationMs }: {
       </g>
     </svg>}
     {figure > 0 && <FrequencySpace opacity={figure}
-      yaw={yaw} tuning={temporal} timeSeconds={durationMs / 1000} />}
+      yaw={yaw} tuning={temporal} durationMs={durationMs} sampleIntervalMs={sampleIntervalMs} />}
   </div>;
 }
 
@@ -679,6 +698,7 @@ const SCENE_LINE_DEFAULT_SECONDS = 15;
 const SCENE_HARMONIC_DEFAULT_SECONDS = 18;
 const SCENE_SPACE_DEFAULT_SECONDS = 7;
 const SCENE_TIME_DEFAULT_SECONDS = 16;
+const SCENE_TIME_DEFAULT_SAMPLE_MS = 250;
 const SCENE_ONE_LIGHT_SHARE = 16 / 22;
 
 function smoothSceneLight(progress: number) {
@@ -1208,6 +1228,8 @@ function ModuleZero() {
   const [harmonicSeconds, setHarmonicSeconds] = useState(SCENE_HARMONIC_DEFAULT_SECONDS);
   const [spaceSeconds, setSpaceSeconds] = useState(SCENE_SPACE_DEFAULT_SECONDS);
   const [timeSeconds, setTimeSeconds] = useState(SCENE_TIME_DEFAULT_SECONDS);
+  const [timeSamplingMs, setTimeSamplingMs] = useState(SCENE_TIME_DEFAULT_SAMPLE_MS);
+  const [activeSamplingMs, setActiveSamplingMs] = useState(SCENE_TIME_DEFAULT_SAMPLE_MS);
   const [previewMode, setPreviewMode] = useState<Exclude<ModuleZeroPlayback, "sequence"> | null>(null);
   const [cue, setCue] = useState<SceneZeroCue | null>(null);
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
@@ -1309,9 +1331,12 @@ function ModuleZero() {
       const playTime = (time: number, voices: OscillatorNode[]) => {
         voices.forEach((voice, index) => {
           voice.frequency.setValueAtTime(ORIGINAL_NOTES[index], time);
-          voice.frequency.exponentialRampToValueAtTime(MAJOR_NOTES[index], time + timeSeconds);
+          voice.frequency.exponentialRampToValueAtTime(OCTAVE_NOTES[index], time + timeSeconds);
         });
-        atTime(time, () => enterDiagram("temporal", time, timeSeconds));
+        atTime(time, () => {
+          setActiveSamplingMs(timeSamplingMs);
+          enterDiagram("temporal", time, timeSeconds);
+        });
         atTime(time + timeSeconds, () => setStage("time"));
       };
       const playSpatial = (time: number, voices: OscillatorNode[]) => {
@@ -1566,6 +1591,8 @@ function ModuleZero() {
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
       .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls input { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
+      .zero-sampling { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; font-size: .75rem; }
+      .zero-sampling output { color: #e5e9f9; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls button {
         border: 1px solid #424958; border-radius: 6px; min-height: 44px; padding: .55rem .6rem;
         background: #202533; color: #f2f3f7; font: inherit; cursor: pointer;
@@ -1594,7 +1621,8 @@ function ModuleZero() {
         <circle cx="10" cy="20" r="10" fill="#000" /><circle cx="190" cy="20" r="10" fill="#000" />
         {stage === "multiplying" && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
       </svg>}
-      {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={cue} durationMs={activeDurationMs} />}
+      {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={cue} durationMs={activeDurationMs}
+        sampleIntervalMs={activeSamplingMs} />}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
     </div>
     <aside className="zero-controls" aria-label="Controles de las escenas">
@@ -1608,6 +1636,15 @@ function ModuleZero() {
           <input id={id} aria-label={label} type="range" min={min} max={max} step={1} value={duration}
             aria-valuetext={seconds} disabled={!canStart}
             onChange={(event) => setDuration(Number(event.currentTarget.value))} />
+          {mode === "time" && <>
+            <div className="zero-sampling">
+              <label htmlFor="time-sampling">Intervalo de muestreo</label>
+              <output htmlFor="time-sampling">{timeSamplingMs} ms</output>
+            </div>
+            <input id="time-sampling" type="range" min={50} max={1000} step={25} value={timeSamplingMs}
+              aria-valuetext={`${timeSamplingMs} milisegundos`} disabled={!canStart || previewMode === "time"}
+              onChange={(event) => setTimeSamplingMs(Number(event.currentTarget.value))} />
+          </>}
           {previewMode === mode && !preparing
             ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
             : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start(mode)}>Probar escena</button>}

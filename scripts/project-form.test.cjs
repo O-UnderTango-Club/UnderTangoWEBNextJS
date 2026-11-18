@@ -43,15 +43,16 @@ assert.match(task, /Proyectos vinculados/); assert.match(task, /la acción se gu
 const readOnly = render({kind:'project',initial:{name:'Prueba',status:'Activo'}},{data:{...data,readOnly:true}});
 assert.match(readOnly, /fieldset disabled/);
 assert.match(task, /Sin proyecto vinculado/);
+for (const control of ["edit-front","edit-rank","edit-comment"]) assert.ok(task.includes(`id="${control}"`),control);
 const purchaseName = 'Comprar artículos de limpieza';
 const shoppingList = '- Detergente\n- Guantes\n- Bolsas';
-const purchase = {kind:'task',id:'purchase',initial:{name:purchaseName,description:shoppingList,stage:'ready',order:21,projects:['direct'],cases:['case'],dependencies:['earlier'],events:['event']}};
+const purchase = {kind:'task',id:'purchase',initial:{name:purchaseName,description:shoppingList,front:"Primario",rank:2,stage:'ready',order:21,projects:['direct'],cases:['case'],dependencies:['earlier'],events:['event']}};
 const linkedData = {...data,projects:[{id:'direct',name:'Proyecto directo',open:true},{id:'inherited',name:'Proyecto del caso',open:true}],cases:[{id:'case',name:'Caso',projectIds:['inherited']}]};
 const unlinked = {...purchase,initial:{...purchase.initial,description:'',projects:[],cases:[],dependencies:[],events:[]}};
 const contextual = render(purchase,{embedded:true,data:linkedData});
 for (const markup of [contextual,render(unlinked,{embedded:true})]) {
-  assert.doesNotMatch(markup, /<h2|>Acción<|Descripción registrada|Sin proyecto vinculado|Proyecto directo|Proyecto del caso|Proyectos vinculados|Crear proyecto|Caso relacionado|Qué falta para poder empezar/);
-  for (const label of ['Acción concreta','Estado de la acción','Contexto del proyecto','Vencimiento','Activar en','Prioridad','Qué días aparece en Frentes','Frente de la acción','Posición','Agregar comentario','Documento de apoyo en Drive / Docs','Responsable','Cancelar','Guardar']) assert.ok(markup.includes(label),label);
+  assert.doesNotMatch(markup, /<h2|>Acción<|Descripción registrada|Sin proyecto vinculado|Proyecto directo|Proyecto del caso|Proyectos vinculados|Crear proyecto|Caso relacionado|Qué falta para poder empezar|Frente de la acción|Posición \(0: al final\)|Agregar comentario|id="edit-(?:front|rank|comment)"/);
+  for (const label of ['Acción concreta','Estado de la acción','Contexto del proyecto','Vencimiento','Activar en','Prioridad','Qué días aparece en Frentes','Documento de apoyo en Drive / Docs','Responsable','Cancelar','Guardar']) assert.ok(markup.includes(label),label);
   assert.ok(markup.indexOf('Documento de apoyo') < markup.indexOf('Responsable'));
   assert.match(markup, /<footer>.*>Cerrar<.*>Cancelar<.*>Guardar en/);
 }

@@ -386,12 +386,10 @@ function frequencyAxis(direction: FrequencyVector, yaw: number) {
   return [-1.38, 1.38].map((end) => frequencyProject(direction[0] * end, direction[1] * end, direction[2] * end, yaw));
 }
 
-function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: {
-  opacity: number; yaw: number; tuning: number | null; durationMs: number; sampleIntervalMs: number;
-}) {
+function FrequencySpace({ opacity, yaw }: { opacity: number; yaw: number }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const viewRef = useRef({ yaw, tuning, durationMs, sampleIntervalMs });
-  useEffect(() => { viewRef.current = { yaw, tuning, durationMs, sampleIntervalMs }; }, [yaw, tuning, durationMs, sampleIntervalMs]);
+  const yawRef = useRef(yaw);
+  useEffect(() => { yawRef.current = yaw; }, [yaw]);
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
@@ -444,21 +442,8 @@ function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: 
       }
     };
 
-    const makeLayer = () => {
-      const surface = document.createElement("canvas");
-      surface.width = FREQUENCY_VIEW.width * 2;
-      surface.height = FREQUENCY_VIEW.height * 2;
-      const ink = surface.getContext("2d");
-      ink?.setTransform(2, 0, 0, 2, 0, 0);
-      return { surface, ink };
-    };
-    // Only two surfaces are kept. Every sample is composited into the same trail.
-    let trail: { accumulated: ReturnType<typeof makeLayer>; photo: ReturnType<typeof makeLayer> } | null = null;
-    let sampleIndex = 0;
-    let lastSampleAt = -1;
-
     let frame = 0, last = 0, needsDraw = true;
-    let previousYaw = NaN, previousTuning: number | null = null;
+    let previousYaw = NaN;
     const resize = () => {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
@@ -472,47 +457,17 @@ function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: 
 
     const draw = (time: number) => {
       frame = window.requestAnimationFrame(draw);
-      const { yaw, tuning, durationMs, sampleIntervalMs } = viewRef.current;
-      const elapsed = (tuning ?? 0) * durationMs;
-      const nextSampleAt = () => Math.min(durationMs, sampleIndex * sampleIntervalMs);
-      const sampleDue = () => tuning !== null && lastSampleAt < durationMs && nextSampleAt() <= elapsed;
-      if (!needsDraw && (time - last < 34 || (yaw === previousYaw && tuning === previousTuning && !sampleDue()))) return;
+      const yaw = yawRef.current;
+      if (!needsDraw && (time - last < 34 || yaw === previousYaw)) return;
       last = time;
       previousYaw = yaw;
-      previousTuning = tuning;
       needsDraw = false;
-      const { width, height } = FREQUENCY_VIEW;
-      context.clearRect(0, 0, width, height);
-      if (tuning !== null) {
-        trail ??= { accumulated: makeLayer(), photo: makeLayer() };
-        const { accumulated, photo } = trail;
-        if (accumulated.ink && photo.ink) {
-          const totalSamples = Math.ceil(durationMs / sampleIntervalMs) + 1;
-          // Bound catch-up per animation frame after a hidden tab resumes.
-          for (let rendered = 0; rendered < 3 && sampleDue(); rendered++) {
-            const at = nextSampleAt();
-            const phase = at / durationMs;
-            const shift = phase * FREQUENCY_TRAIL_TRAVEL;
-            photo.ink.clearRect(0, 0, width, height);
-            paintTube(photo.ink, at === 0 ? original : makeRings(tuningAt(phase)), FREQUENCY_STOP_YAW);
-            accumulated.ink.globalAlpha = Math.min(0.4, 4 / totalSamples);
-            accumulated.ink.drawImage(photo.surface, shift, 0, width, height);
-            lastSampleAt = at;
-            sampleIndex++;
-          }
-          context.drawImage(accumulated.surface, 0, 0, width, height);
-          if (lastSampleAt > 0) {
-            context.globalAlpha = 0.34;
-            context.drawImage(photo.surface, FREQUENCY_TRAIL_TRAVEL * lastSampleAt / durationMs, 0, width, height);
-            context.globalAlpha = 1;
-          }
-        }
-      }
+      context.clearRect(0, 0, FREQUENCY_VIEW.width, FREQUENCY_VIEW.height);
       context.lineWidth = 1;
       for (const axis of FREQUENCY_AXES) {
         const [tail, tip] = frequencyAxis(axis.direction, yaw);
         context.setLineDash([4, 6]);
-        context.strokeStyle = axis.color + (tuning === null ? "77" : "45");
+        context.strokeStyle = axis.color + "77";
         context.beginPath();
         context.moveTo(tail.x, tail.y);
         context.lineTo(tip.x, tip.y);
@@ -520,64 +475,263 @@ function FrequencySpace({ opacity, yaw, tuning, durationMs, sampleIntervalMs }: 
         context.setLineDash([]);
       }
 
-      paintTube(context, tuning ? makeRings(tuningAt(tuning)) : original, yaw);
-
-      if (tuning === null) {
-        for (const axis of FREQUENCY_AXES) {
-          const [, tip] = frequencyAxis(axis.direction, yaw);
-          const left = tip.x < FREQUENCY_VIEW.x;
-          const label = `${axis.label} · ${axis.hz} Hz`;
-          const x = tip.x + (left ? -8 : 8), y = tip.y - 9;
-          context.fillStyle = axis.color;
-          context.beginPath();
-          context.arc(tip.x, tip.y, 2.5, 0, Math.PI * 2);
-          context.fill();
-          context.font = "22px Georgia, serif";
-          context.textAlign = left ? "right" : "left";
-          context.lineWidth = 3;
-          context.strokeStyle = "#fff";
-          context.strokeText(label, x, y);
-          context.fillText(label, x, y);
-        }
-      } else {
-        const startX = FREQUENCY_VIEW.x;
-        const endX = startX + FREQUENCY_TRAIL_TRAVEL;
-        const baseline = FREQUENCY_VIEW.height - 27;
-        context.strokeStyle = "#aab5cb";
-        context.lineWidth = 1.25;
+      paintTube(context, original, yaw);
+      for (const axis of FREQUENCY_AXES) {
+        const [, tip] = frequencyAxis(axis.direction, yaw);
+        const left = tip.x < FREQUENCY_VIEW.x;
+        const label = `${axis.label} · ${axis.hz} Hz`;
+        const x = tip.x + (left ? -8 : 8), y = tip.y - 9;
+        context.fillStyle = axis.color;
         context.beginPath();
-        context.moveTo(startX, baseline);
-        context.lineTo(endX, baseline);
-        context.stroke();
-
-        context.fillStyle = "#345a9b";
-        context.beginPath();
-        context.arc(startX + FREQUENCY_TRAIL_TRAVEL * Math.max(0, lastSampleAt) / durationMs, baseline, 3, 0, Math.PI * 2);
+        context.arc(tip.x, tip.y, 2.5, 0, Math.PI * 2);
         context.fill();
-        context.fillStyle = "#46516b";
-        context.font = "18px system-ui, sans-serif";
-        context.textAlign = "center";
-        context.fillText("0 s", startX, baseline + 21);
-        context.fillText(`${durationMs / 1000} s`, endX, baseline + 21);
+        context.font = "22px Georgia, serif";
+        context.textAlign = left ? "right" : "left";
+        context.lineWidth = 3;
+        context.strokeStyle = "#fff";
+        context.strokeText(label, x, y);
+        context.fillText(label, x, y);
       }
     };
     frame = window.requestAnimationFrame(draw);
     return () => { window.cancelAnimationFrame(frame); observer.disconnect(); };
   }, []);
 
-  const noteReadout = tuning !== null && tuningAt(tuning).map((value) =>
-    FREQUENCY_FORMAT.format(value) + " Hz",
-  ).join(" · ");
-
   return <div className="zero-frequency-space" style={{ opacity }} aria-hidden={opacity < 0.5}>
-    <canvas ref={canvasRef} role="img" aria-label={tuning === null
-      ? "Figura tridimensional de 111, 222 y 333 Hz en los ejes X, Y y Z"
-      : "Figura tridimensional fija y estela de imágenes superpuestas a escala real sobre el eje del tiempo"} />
-    {tuning !== null && <div className="zero-time-caption">
+    <canvas ref={canvasRef} role="img" aria-label="Figura tridimensional de 111, 222 y 333 Hz en los ejes X, Y y Z" />
+  </div>;
+}
+
+const TEMPORAL_TRAIL_VERTEX_SHADER = `#version 300 es
+precision highp float;
+layout(location=0) in vec2 a_path;
+layout(location=1) in vec4 a_sample;
+uniform vec4 u_camera;
+uniform vec4 u_rotation;
+uniform vec2 u_projection;
+uniform vec2 u_pivot;
+out vec3 v_normal;
+out float v_hue;
+
+vec3 rotate(vec3 p) {
+  float cr = u_rotation.x, sr = u_rotation.y;
+  float cy = u_rotation.z, sy = u_rotation.w;
+  vec3 upright = vec3(cr * p.x - sr * p.y, sr * p.x + cr * p.y, p.z);
+  return vec3(cy * upright.x + sy * upright.z, upright.y, -sy * upright.x + cy * upright.z);
+}
+
+vec3 camera(vec3 p) {
+  float yawed = p.x * u_camera.y + p.y * u_camera.x;
+  return vec3(p.x * u_camera.x - p.y * u_camera.y,
+    yawed * u_camera.z + p.z * u_camera.w, -yawed * u_camera.w + p.z * u_camera.z);
+}
+
+void main() {
+  vec3 phase = a_sample.xyz * a_path.x + vec3(0.0, 0.7, 1.2);
+  vec3 tangent = normalize(a_sample.xyz * cos(phase));
+  vec3 ref = abs(tangent.z) > 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0);
+  vec3 left = normalize(cross(tangent, ref));
+  vec3 normal = left * cos(a_path.y) + cross(tangent, left) * sin(a_path.y);
+  vec3 point = camera(sin(phase) + 0.065 * normal);
+  // Bake the capture perspective before translating the frame along the time axis.
+  point.xy *= 4.5 / (4.5 - point.z);
+  point.x += a_sample.w - u_pivot.x;
+  point = rotate(point);
+  point.x += u_pivot.y;
+  gl_Position = vec4(point.xy * u_projection, -0.13 * point.z, 1.0);
+  v_normal = rotate(camera(normal));
+  v_hue = clamp(a_path.x / 6.2831853 * 0.86 + a_sample.w * 0.1, 0.0, 1.0);
+}`;
+
+const TEMPORAL_TRAIL_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+in vec3 v_normal;
+in float v_hue;
+out vec4 fragColor;
+
+void main() {
+  vec3 normal = normalize(v_normal);
+  vec3 key = normalize(vec3(-0.55, 0.74, 0.65));
+  float diffuse = max(0.0, dot(normal, key));
+  float fill = max(0.0, dot(normal, normalize(vec3(0.6, -0.45, 0.35))));
+  float shine = pow(max(0.0, dot(normal, normalize(key + vec3(0, 0, 1)))), 28.0);
+  vec3 pigment = mix(vec3(0.18, 0.39, 0.69), vec3(0.38, 0.27, 0.68), v_hue);
+  fragColor = vec4(pigment * (0.58 + diffuse * 0.57 + fill * 0.15) + vec3(0.21 * shine), 1.0);
+}`;
+
+function createTemporalTrailRenderer(canvas: HTMLCanvasElement, sampleCount: number) {
+  const gl = canvas.getContext("webgl2", { alpha: true, antialias: true, depth: true });
+  if (!gl) return;
+  const program = gl.createProgram();
+  const vertex = gl.createShader(gl.VERTEX_SHADER);
+  const fragment = gl.createShader(gl.FRAGMENT_SHADER);
+  const vao = gl.createVertexArray();
+  const points = gl.createBuffer(), indices = gl.createBuffer(), samples = gl.createBuffer();
+  if (!program || !vertex || !fragment || !vao || !points || !indices || !samples) return;
+  gl.shaderSource(vertex, TEMPORAL_TRAIL_VERTEX_SHADER);
+  gl.shaderSource(fragment, TEMPORAL_TRAIL_FRAGMENT_SHADER);
+  gl.compileShader(vertex);
+  gl.compileShader(fragment);
+  gl.attachShader(program, vertex);
+  gl.attachShader(program, fragment);
+  gl.linkProgram(program);
+  gl.deleteShader(vertex);
+  gl.deleteShader(fragment);
+
+  const dispose = () => {
+    gl.deleteVertexArray(vao);
+    gl.deleteBuffer(points);
+    gl.deleteBuffer(indices);
+    gl.deleteBuffer(samples);
+    gl.deleteProgram(program);
+  };
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error("No se pudo crear la estela tridimensional", gl.getProgramInfoLog(program));
+    dispose();
+    return;
+  }
+
+  const sides = sampleCount > 150 ? 5 : 8;
+  // Keep every temporal sample. Dense settings use fewer surface facets per sample.
+  const segments = Math.max(48, Math.min(180, Math.floor(210000 / (sampleCount * sides)) - 1));
+  const grid = new Float32Array((segments + 1) * sides * 2);
+  const triangles = new Uint16Array(segments * sides * 6);
+  for (let i = 0; i <= segments; i++) {
+    for (let side = 0; side < sides; side++) {
+      const j = i * sides + side;
+      grid[j * 2] = i / segments * 2 * Math.PI;
+      grid[j * 2 + 1] = side / sides * 2 * Math.PI;
+      if (i === segments) continue;
+      const next = i * sides + (side + 1) % sides;
+      triangles.set([j, j + sides, next, next, j + sides, next + sides], j * 6);
+    }
+  }
+
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, points);
+  gl.bufferData(gl.ARRAY_BUFFER, grid, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, triangles, gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, samples);
+  gl.bufferData(gl.ARRAY_BUFFER, (sampleCount + 1) * 16, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(1);
+  gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(1, 1);
+  gl.enable(gl.DEPTH_TEST);
+  gl.clearColor(0, 0, 0, 0);
+  gl.useProgram(program);
+  gl.uniform4f(gl.getUniformLocation(program, "u_camera"),
+    Math.cos(FREQUENCY_STOP_YAW), Math.sin(FREQUENCY_STOP_YAW), Math.cos(FREQUENCY_VIEW.tilt), Math.sin(FREQUENCY_VIEW.tilt));
+  const rotation = gl.getUniformLocation(program, "u_rotation");
+  const projection = gl.getUniformLocation(program, "u_projection");
+  const pivot = gl.getUniformLocation(program, "u_pivot");
+  const halfTravel = FREQUENCY_TRAIL_TRAVEL / (2 * FREQUENCY_VIEW.scale);
+
+  return {
+    upload(instances: Float32Array, from: number, to: number) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, samples);
+      gl.bufferSubData(gl.ARRAY_BUFFER, from * 16, instances.subarray(from * 4, to * 4));
+    },
+    paint(count: number, lift: number, spin: number) {
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+      const roll = lift * Math.PI / 2;
+      const zoom = 1 / (1 + 0.65 * Math.sin(roll));
+      gl.uniform4f(rotation, Math.cos(roll), Math.sin(roll), Math.cos(spin), Math.sin(spin));
+      gl.uniform2f(pivot, halfTravel, halfTravel * (1 - lift));
+      gl.uniform2f(projection,
+        FREQUENCY_VIEW.scale * zoom * 2 / FREQUENCY_VIEW.width,
+        FREQUENCY_VIEW.scale * zoom * 2 / FREQUENCY_VIEW.height);
+      gl.drawElementsInstanced(gl.TRIANGLES, triangles.length, gl.UNSIGNED_SHORT, 0, count);
+    },
+    dispose,
+  };
+}
+
+function TemporalFrequencyTrail({ progress, durationMs, intervalMs }: {
+  progress: number; durationMs: number; intervalMs: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const progressRef = useRef(progress);
+  const [unavailable, setUnavailable] = useState(false);
+  useEffect(() => { progressRef.current = progress; }, [progress]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const sampleCount = Math.ceil(durationMs / intervalMs) + 1;
+    const renderer = createTemporalTrailRenderer(canvas, sampleCount);
+    if (!renderer) {
+      setUnavailable(true);
+      return;
+    }
+    const instances = new Float32Array((sampleCount + 1) * 4);
+    const write = (index: number, phase: number) => {
+      const [x, y, z] = tuningAt(phase);
+      const shift = FREQUENCY_TRAIL_TRAVEL * phase / FREQUENCY_VIEW.scale;
+      instances.set([x / 111, y / 111, z / 111, shift], index * 4);
+    };
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0, nextStamp = 0, raisedAt: number | null = null;
+    let last = -Infinity, previousProgress = -1, resized = true;
+    const resize = () => {
+      const density = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(canvas.clientWidth * density));
+      canvas.height = Math.max(1, Math.round(canvas.clientHeight * density));
+      resized = true;
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    const draw = (now: number) => {
+      frame = window.requestAnimationFrame(draw);
+      const current = progressRef.current;
+      if (!resized && now - last < 32) return;
+      if (!resized && current === previousProgress && (current === 0 || (current === 1 && reduceMotion.matches))) return;
+      resized = false;
+      last = now;
+      previousProgress = current;
+      const elapsed = current * durationMs;
+      const firstWrite = nextStamp;
+      while (nextStamp < sampleCount) {
+        const at = Math.min(durationMs, nextStamp * intervalMs);
+        if (at > elapsed) break;
+        write(nextStamp++, at / durationMs);
+      }
+      const sampledAt = Math.min(durationMs, (nextStamp - 1) * intervalMs);
+      const live = elapsed - sampledAt > 0.5;
+      if (live) write(nextStamp, current);
+      const visibleCount = nextStamp + Number(live);
+      if (visibleCount > firstWrite) renderer.upload(instances, firstWrite, visibleCount);
+
+      if (current === 1 && raisedAt === null) raisedAt = now;
+      const seconds = raisedAt === null ? 0 : (now - raisedAt) / 1000;
+      const lift = current < 1 ? 0 : reduceMotion.matches ? 1 : smoothSceneLight(seconds / 3);
+      const spin = lift * 0.26 + (reduceMotion.matches ? 0 : Math.max(0, seconds - 3) * 0.34);
+      renderer.paint(visibleCount, lift, spin);
+    };
+    frame = window.requestAnimationFrame(draw);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      renderer.dispose();
+    };
+  }, [durationMs, intervalMs]);
+
+  const notes = tuningAt(progress).map((value) => FREQUENCY_FORMAT.format(value) + " Hz").join(" · ");
+  return <div className="zero-frequency-space">
+    {unavailable
+      ? <><FrequencySpace opacity={1} yaw={FREQUENCY_STOP_YAW} /><p className="zero-trail-fallback" role="status">La estela rotatoria requiere WebGL 2.</p></>
+      : <canvas ref={canvasRef} role="img" aria-label="Estela tridimensional de fotogramas opacos que se eleva y gira al completarse" />}
+    {progress < 1 && <div className="zero-trail-axis" aria-hidden="true"><span>0 s</span><span>{durationMs / 1000} s</span></div>}
+    <div className="zero-time-caption">
       <span>Cuarta dimensión: el tiempo</span>
-      <small>{tuning === 1 ? "La en tres octavas · " : ""}{noteReadout}</small>
-      <small>{Math.floor(tuning * durationMs / 1000)} / {durationMs / 1000} s · {sampleIntervalMs} ms por muestra</small>
-    </div>}
+      <small>{progress === 1 ? "La en tres octavas · " : ""}{notes}</small>
+      <small>{Math.floor(progress * durationMs / 1000)} / {durationMs / 1000} s · {intervalMs} ms por muestra</small>
+    </div>
   </div>;
 }
 
@@ -667,8 +821,9 @@ function HarmonicDiagram({ stage, cue, durationMs, sampleIntervalMs }: {
         {equals > 0 && <text x={x + side / 2} y={y} opacity={equals}>=</text>}
       </g>
     </svg>}
-    {figure > 0 && <FrequencySpace opacity={figure}
-      yaw={yaw} tuning={temporal} durationMs={durationMs} sampleIntervalMs={sampleIntervalMs} />}
+    {temporal !== null
+      ? <TemporalFrequencyTrail progress={temporal} durationMs={durationMs} intervalMs={sampleIntervalMs} />
+      : figure > 0 && <FrequencySpace opacity={figure} yaw={yaw} />}
   </div>;
 }
 
@@ -1593,6 +1748,14 @@ function ModuleZero() {
       .zero-point { width: clamp(8px, 1.05vw, 16px); aspect-ratio: 1; border-radius: 50%; background: #000; }
       .zero-harmonic-frame { position: relative; width: min(94%, 800px, 116svh); aspect-ratio: 16 / 9; pointer-events: none; }
       .zero-harmonic-diagram, .zero-frequency-space, .zero-frequency-space canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .zero-trail-axis {
+        position: absolute; left: 50%; bottom: 4%; width: 22.03%; display: flex; justify-content: space-between;
+        border-top: 1px solid #abb7cd; color: #46516b; padding-top: .3rem;
+        font: .73rem/1.25 system-ui, sans-serif;
+      }
+      .zero-trail-axis span:first-child { transform: translateX(-50%); }
+      .zero-trail-axis span:last-child { transform: translateX(50%); }
+      .zero-trail-fallback { position: absolute; inset: auto 0 0; text-align: center; color: #46516b; }
       .zero-time-caption {
         position: absolute; top: 104%; left: 0; width: 100%; display: grid; gap: .35rem;
         text-align: center; color: #17191e; font: 400 clamp(1rem, 2.4vw, 2.1rem)/1.2 Georgia, serif;

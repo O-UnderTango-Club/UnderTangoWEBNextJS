@@ -166,9 +166,10 @@ async function performMutation(input: any, actor: string) {
   const rankChanges: {id:string;fields:Record<string,any>}[]=[];
   const memberChanges: OperationsPatch[]=[];
   if(kind==="task") {
-    const allowed=["weekdays","front","rank","activateAt","name","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence","comment"];
+    const allowed=["weekdays","front","rank","activateAt","name","description","owner","priority","due","stage","reason","doc","order","projects","cases","dependencies","events","evidence","comment"];
     if(Object.keys(change).some(k=>!allowed.includes(k))) throw new PanelError("Campo no editable.");
     for(const k of ["name","owner","reason"] as const) if(k in change) fields[F.tasks[k]]=text(change[k],k==="reason"?1000:250);
+    if("description" in change) fields[F.tasks.description]=text(change.description,10000);
     if("doc" in change) fields[F.tasks.doc]=doc(change.doc);
     if("priority" in change) {if(!["Alta","Media","Baja"].includes(change.priority)) throw new PanelError("Prioridad inválida."); fields[F.tasks.priority]=change.priority;}
     if("due" in change){const d=text(change.due,10); if(d&&(!/^\d{4}-\d{2}-\d{2}$/.test(d)||new Date(d).toISOString().slice(0,10)!==d))throw new PanelError("Fecha inválida.");fields[F.tasks.due]=d||null;}

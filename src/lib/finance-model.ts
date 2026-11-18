@@ -39,7 +39,7 @@ export const FINANCE_FIELDS: Record<FinanceTable, Record<string, Field>> = {
   movements: {
     name: { id: "fldkd2PPDuXuKn2HL", label: "Movimiento", type: "text" },
     date: { id: "fldZbgKdtogC67t7r", label: "Fecha", type: "date" },
-    type: { id: "fldYHPt7kcADT5nWs", label: "Tipo", type: "select", choices: ["Ingreso", "Egreso"] },
+    type: { id: "fldYHPt7kcADT5nWs", label: "Tipo", type: "select", choices: ["Ingreso", "Egreso"], readChoices: ["Transferencia interna"] },
     amount: { id: "fldkN6UyUgdCmu7EU", label: "Importe", type: "amount" },
     currency: { id: "fldDINOVhxRdLRAtX", label: "Moneda", type: "select", choices: ["BRL", "ARS", "USD", "PYG"] },
     status: { id: "fldDb8usr8F6nWmnm", label: "Estado", type: "select", choices: ["Confirmado", "Pendiente"] },

@@ -439,6 +439,14 @@ const dictionary: Record<string, {en:string;pt:string}> = {
     "en": "Home",
     "pt": "Início"
   },
+  "Galería": { en: "Gallery", pt: "Galeria" },
+  "Proyectos activos": { en: "Active projects", pt: "Projetos ativos" },
+  "Historia": { en: "Our story", pt: "História" },
+  "Iniciar Sesión": { en: "Sign in", pt: "Entrar" },
+  "Cerrar Sesión": { en: "Sign out", pt: "Sair" },
+  "Registrarse": { en: "Register", pt: "Cadastrar-se" },
+  "Abrir o cerrar el menú": { en: "Toggle menu", pt: "Abrir ou fechar o menu" },
+  "Logotipo UnderTango": { en: "UnderTango logo", pt: "Logotipo UnderTango" },
   "Descubrí las experiencias": {
     "en": "Discover our experiences",
     "pt": "Descubra nossas experiências"
@@ -473,6 +481,9 @@ const dictionary: Record<string, {en:string;pt:string}> = {
   }
 };
 const Context = createContext<{language:SiteLanguage;change:(value:SiteLanguage)=>void}>({language:"es",change:()=>{}});
+export function FixedSiteLanguage({language,children}:{language:SiteLanguage;children:ReactNode}) {
+  return <Context.Provider value={{language,change:()=>{}}}>{children}</Context.Provider>;
+}
 export function HomeLanguageProvider({children}:{children:ReactNode}) {
   const [language,setLanguage]=useState<SiteLanguage>("es");
   useEffect(()=>{ const saved=window.localStorage.getItem("undertango-language"); if(saved==="es"||saved==="en"||saved==="pt") setLanguage(saved); },[]);

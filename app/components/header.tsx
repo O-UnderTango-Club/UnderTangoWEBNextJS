@@ -5,11 +5,15 @@ import Image from "next/image";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
+import { useHomeLanguage } from "./home-language";
 import "../styles/navbar.css";
 
-export default function Header() {
+export default function Header({ showsHref }: { showsHref?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { t: localize } = useHomeLanguage();
+  const t = showsHref ? localize : (label: string) => label;
+  const showsPath = showsHref ?? "/shows";
 
   const { user, logout } = useAuth();
 
@@ -26,7 +30,7 @@ export default function Header() {
         <Link href="/">
           <Image
             src="/assets/images/Under-logo-transparente.png"
-            alt="Logotipo UnderTango"
+            alt={t("Logotipo UnderTango")}
             width={160}
             height={60}
             priority
@@ -36,7 +40,9 @@ export default function Header() {
 
       <button
         id="menu-toggle"
-        aria-label="Toggle menu"
+        aria-label={showsHref ? t("Abrir o cerrar el menú") : "Toggle menu"}
+        aria-expanded={menuOpen}
+        aria-controls="navbar-menu"
         onClick={toggleMenu}
         className={menuOpen ? "active" : ""}
       >
@@ -46,7 +52,7 @@ export default function Header() {
       <ul id="navbar-menu" className={menuOpen ? "active" : ""}>
         <li>
           <Link href="/" className={pathname === "/" ? "active" : ""}>
-            Inicio
+            {t("Inicio")}
           </Link>
         </li>
         <li>
@@ -55,31 +61,31 @@ export default function Header() {
           </Link>
         </li>
         <li>
-          <Link href="/shows" className={pathname === "/shows" ? "active" : ""}>
+          <Link href={showsPath} className={pathname === showsPath ? "active" : ""}>
             Shows
           </Link>
         </li>
         <li>
           <Link href="/galeria" className={pathname === "/galeria" ? "active" : ""}>
-            Galería
+            {t("Galería")}
           </Link>
         </li>
         <li>
           <Link href="/proyectos" className={pathname === "/proyectos" ? "active" : ""}>
-            Proyectos activos
+            {t("Proyectos activos")}
           </Link>
         </li>
         <li>
-          <Link href="/#historia">Historia</Link>
+          <Link href="/#historia">{t("Historia")}</Link>
         </li>
         <li>
           <Link href="/reservas" className={pathname === "/reservas" ? "active" : ""}>
-            Contacto
+            {t("Contacto")}
           </Link>
         </li>
         <li>
           <Link href="/faq" className={pathname === "/faq" ? "active" : ""}>
-            Preguntas Frecuentes
+            {t("Preguntas Frecuentes")}
           </Link>
         </li>
 
@@ -96,7 +102,7 @@ export default function Header() {
                 padding: "10px 15px",
               }}
             >
-              Cerrar Sesión
+              {t("Cerrar Sesión")}
             </button>
           </li>
         ) : (
@@ -106,7 +112,7 @@ export default function Header() {
                 href="https://sprightly-griffin-33f04f.netlify.app/login/login"
                 className="login-link"
               >
-                Iniciar Sesión
+                {t("Iniciar Sesión")}
               </a>
             </li>
             <li style={{ marginLeft: "10px" }}>
@@ -114,7 +120,7 @@ export default function Header() {
                 href="https://sprightly-griffin-33f04f.netlify.app/"
                 className="register-link"
               >
-                Registrarse
+                {t("Registrarse")}
               </a>
             </li>
           </>

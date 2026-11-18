@@ -339,6 +339,22 @@ type FrequencyVector = [x: number, y: number, z: number];
 type FrequencyPoint = [x: number, y: number];
 
 const FREQUENCY_VIEW = { width: 640, height: 360, x: 320, y: 180, yaw: 0.64, tilt: 0.62, scale: 102 };
+const FREQUENCY_STOP_YAW = FREQUENCY_VIEW.yaw + 1.72;
+const ORIGINAL_NOTES: FrequencyVector = [111, 222, 333];
+const MAJOR_NOTES: FrequencyVector = [440 * 2 ** (-12 / 12), 440 * 2 ** (-8 / 12), 440 * 2 ** (-5 / 12)];
+const FREQUENCY_FORMAT = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
+
+function tuningAt(progress: number): FrequencyVector {
+  return ORIGINAL_NOTES.map((hz, index) => hz * (MAJOR_NOTES[index] / hz) ** progress) as FrequencyVector;
+}
+
+function frequencyPoint(t: number, notes: FrequencyVector) {
+  return {
+    x: Math.sin(t * notes[0] / 111),
+    y: Math.sin(t * notes[1] / 111 + 0.7),
+    z: Math.sin(t * notes[2] / 111 + 1.2),
+  };
+}
 const FREQUENCY_AXES: { hz: number; label: string; color: string; direction: FrequencyVector }[] = [
   { hz: 111, label: "X", color: "#345a9b", direction: [1, 0, 0] },
   { hz: 222, label: "Y", color: "#a25d94", direction: [0, 1, 0] },
@@ -368,10 +384,12 @@ function frequencyAxis(direction: FrequencyVector, yaw: number) {
   return [-1.38, 1.38].map((end) => frequencyProject(direction[0] * end, direction[1] * end, direction[2] * end, yaw));
 }
 
-function FrequencySpace({ opacity, moving }: { opacity: number; moving: boolean }) {
+function FrequencySpace({ opacity, yaw, tuning, timeSeconds }: {
+  opacity: number; yaw: number; tuning: number | null; timeSeconds: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const movingRef = useRef(moving);
-  useEffect(() => { movingRef.current = moving; }, [moving]);
+  const viewRef = useRef({ yaw, tuning });
+  useEffect(() => { viewRef.current = { yaw, tuning }; }, [yaw, tuning]);
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
@@ -382,30 +400,34 @@ function FrequencySpace({ opacity, moving }: { opacity: number; moving: boolean 
       const length = Math.hypot(v.x, v.y, v.z) || 1;
       return { x: v.x / length, y: v.y / length, z: v.z / length };
     };
-    // Each coordinate has the same 1:2:3 relation as the audible frequencies.
-    const point = (t: number): Vec => ({ x: Math.sin(t), y: Math.sin(2 * t + 0.7), z: Math.sin(3 * t + 1.2) });
-    const rings: Vec[][] = [];
-    const segments = 240, sides = 10, radius = 0.065;
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments * Math.PI * 2, p = point(t), prev = point(t - 0.002), next = point(t + 0.002);
-      const tangent = normalise({ x: next.x - prev.x, y: next.y - prev.y, z: next.z - prev.z });
-      const ref = Math.abs(tangent.z) > 0.9 ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 };
-      const n = normalise(cross(tangent, ref)), b = normalise(cross(tangent, n));
-      const ring: Vec[] = [];
-      for (let j = 0; j < sides; j++) {
-        const a = 2 * Math.PI * j / sides, c = Math.cos(a) * radius, d = Math.sin(a) * radius;
-        ring.push({ x: p.x + n.x * c + b.x * d, y: p.y + n.y * c + b.y * d, z: p.z + n.z * c + b.z * d });
+    const segments = 180, sides = 8, radius = 0.065;
+    const makeRings = (notes: FrequencyVector) => {
+      const rings: Vec[][] = [];
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments * Math.PI * 2;
+        const p = frequencyPoint(t, notes), prev = frequencyPoint(t - 0.002, notes), next = frequencyPoint(t + 0.002, notes);
+        const tangent = normalise({ x: next.x - prev.x, y: next.y - prev.y, z: next.z - prev.z });
+        const ref = Math.abs(tangent.z) > 0.9 ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 };
+        const n = normalise(cross(tangent, ref)), b = normalise(cross(tangent, n));
+        const ring: Vec[] = [];
+        for (let j = 0; j < sides; j++) {
+          const a = 2 * Math.PI * j / sides, c = Math.cos(a) * radius, d = Math.sin(a) * radius;
+          ring.push({ x: p.x + n.x * c + b.x * d, y: p.y + n.y * c + b.y * d, z: p.z + n.z * c + b.z * d });
+        }
+        rings.push(ring);
       }
-      rings.push(ring);
-    }
+      return rings;
+    };
+    const original = makeRings(ORIGINAL_NOTES);
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let frame = 0, last = 0, spinStarted: number | null = null;
+    let frame = 0, last = 0, needsDraw = true;
+    let previousYaw = NaN, previousTuning: number | null = null;
     const resize = () => {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
       canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
       context.setTransform(canvas.width / FREQUENCY_VIEW.width, 0, 0, canvas.height / FREQUENCY_VIEW.height, 0, 0);
+      needsDraw = true;
     };
     resize();
     const observer = new ResizeObserver(resize);
@@ -413,32 +435,27 @@ function FrequencySpace({ opacity, moving }: { opacity: number; moving: boolean 
 
     const draw = (time: number) => {
       frame = window.requestAnimationFrame(draw);
-      if (time - last < 35) return;
+      const { yaw, tuning } = viewRef.current;
+      if (!needsDraw && (time - last < 34 || (yaw === previousYaw && tuning === previousTuning))) return;
       last = time;
-      if (movingRef.current && spinStarted === null) spinStarted = time;
-      const spin = reduceMotion.matches || spinStarted === null ? 0 : (time - spinStarted) * 0.00014;
-      const yaw = FREQUENCY_VIEW.yaw + spin;
+      previousYaw = yaw;
+      previousTuning = tuning;
+      needsDraw = false;
       context.clearRect(0, 0, FREQUENCY_VIEW.width, FREQUENCY_VIEW.height);
       const project = (v: Vec) => frequencyProject(v.x, v.y, v.z, yaw);
       context.lineWidth = 1;
       for (const axis of FREQUENCY_AXES) {
         const [tail, tip] = frequencyAxis(axis.direction, yaw);
         context.setLineDash([4, 6]);
-        context.strokeStyle = axis.color + "77";
+        context.strokeStyle = axis.color + (tuning === null ? "77" : "45");
         context.beginPath();
         context.moveTo(tail.x, tail.y);
         context.lineTo(tip.x, tip.y);
         context.stroke();
         context.setLineDash([]);
-        context.fillStyle = axis.color;
-        context.beginPath();
-        context.arc(tip.x, tip.y, 3, 0, Math.PI * 2);
-        context.fill();
-        context.font = "22px Georgia, serif";
-        context.textAlign = tip.x < FREQUENCY_VIEW.x ? "right" : "left";
-        context.fillText(`${axis.label} · ${axis.hz} Hz`, tip.x + (tip.x < FREQUENCY_VIEW.x ? -8 : 8), tip.y - 7);
       }
 
+      const rings = tuning ? makeRings(tuningAt(tuning)) : original;
       const projected = rings.map((ring) => ring.map(project));
       const faces: Array<{ points: Array<{ x: number; y: number; z: number }>; depth: number; hue: number; light: number }> = [];
       for (let i = 0; i < segments; i++) {
@@ -459,25 +476,86 @@ function FrequencySpace({ opacity, moving }: { opacity: number; moving: boolean 
         context.fillStyle = `hsl(${face.hue} 48% ${face.light}%)`;
         context.fill();
       }
+
+      if (tuning === null) {
+        for (const axis of FREQUENCY_AXES) {
+          const [, tip] = frequencyAxis(axis.direction, yaw);
+          const left = tip.x < FREQUENCY_VIEW.x;
+          const label = `${axis.label} · ${axis.hz} Hz`;
+          const x = tip.x + (left ? -8 : 8), y = tip.y - 9;
+          context.fillStyle = axis.color;
+          context.beginPath();
+          context.arc(tip.x, tip.y, 2.5, 0, Math.PI * 2);
+          context.fill();
+          context.font = "22px Georgia, serif";
+          context.textAlign = left ? "right" : "left";
+          context.lineWidth = 3;
+          context.strokeStyle = "#fff";
+          context.strokeText(label, x, y);
+          context.fillText(label, x, y);
+        }
+      } else {
+        const { x, y } = FREQUENCY_VIEW;
+        const traceStart = x + 125, traceEnd = 609, baseline = y + 112;
+        const traceX = (phase: number) => traceStart + (traceEnd - traceStart) * phase;
+        context.strokeStyle = "#b6c1d6";
+        context.lineWidth = 1.25;
+        context.beginPath();
+        context.moveTo(traceStart, baseline);
+        context.lineTo(traceX(tuning), baseline);
+        context.stroke();
+        context.fillStyle = "#345a9b";
+        context.beginPath();
+        context.arc(traceX(tuning), baseline, 3.1, 0, Math.PI * 2);
+        context.fill();
+
+        const snapshots = [0, 0.25, 0.5, 0.75].filter((phase) => phase < tuning);
+        snapshots.push(tuning);
+        for (const phase of snapshots) {
+          const live = phase === tuning;
+          const notes = tuningAt(phase);
+          context.strokeStyle = live ? "#345a9b" : "#687da788";
+          context.lineWidth = live ? 2 : 1.4;
+          context.beginPath();
+          for (let i = 0; i <= 128; i++) {
+            const p = project(frequencyPoint(i / 128 * Math.PI * 2, notes));
+            const px = traceX(phase) + (p.x - x) * 0.21;
+            const py = baseline - 41 + (p.y - y) * 0.21;
+            if (i === 0) context.moveTo(px, py);
+            else context.lineTo(px, py);
+          }
+          context.stroke();
+        }
+      }
     };
     frame = window.requestAnimationFrame(draw);
     return () => { window.cancelAnimationFrame(frame); observer.disconnect(); };
   }, []);
 
+  const noteReadout = tuning !== null && tuningAt(tuning).map((value) =>
+    FREQUENCY_FORMAT.format(value) + " Hz",
+  ).join(" · ");
+
   return <div className="zero-frequency-space" style={{ opacity }} aria-hidden={opacity < 0.5}>
-    <canvas ref={canvasRef} role="img" aria-label="Figura tridimensional de 111, 222 y 333 Hz en los ejes X, Y y Z" />
-    <span>Cuarta dimensión: el tiempo</span>
+    <canvas ref={canvasRef} role="img" aria-label={tuning === null
+      ? "Figura tridimensional de 111, 222 y 333 Hz en los ejes X, Y y Z"
+      : "Figura tridimensional fija en el centro y rastro de su deformación hacia la derecha"} />
+    {tuning !== null && <div className="zero-time-caption">
+      <span>Cuarta dimensión: el tiempo</span>
+      <small>{tuning === 1 ? "La mayor · " : ""}{noteReadout}</small>
+      <small>{Math.round(tuning * timeSeconds)} / {timeSeconds} s</small>
+    </div>}
   </div>;
 }
 
-type HarmonicStage = "vertical" | "harmonics" | "equation" | "spatial" | "space";
+type HarmonicStage = "vertical" | "harmonics" | "equation" | "spatial" | "space" | "temporal" | "time";
 
 function HarmonicDiagram({ stage, cue, durationMs }: {
   stage: HarmonicStage; cue: SceneZeroCue | null; durationMs: number;
 }) {
   const [clock, setClock] = useState(0);
   useEffect(() => {
-    if (!cue || (stage !== "harmonics" && stage !== "spatial")) return;
+    if (!cue || (stage !== "harmonics" && stage !== "spatial" && stage !== "temporal")) return;
     let frame = 0;
     const tick = () => {
       const time = cue.context.currentTime;
@@ -491,11 +569,13 @@ function HarmonicDiagram({ stage, cue, durationMs }: {
   const elapsed = cue ? (clock - cue.beginsAt) * 1000 / durationMs : 0;
   const progress = Math.max(0, Math.min(1, elapsed));
   const equation = stage === "vertical" ? 0 : stage === "harmonics" ? progress : 1;
-  const spatial = stage === "spatial" ? progress : stage === "space" ? 1 : 0;
+  const temporal = stage === "temporal" ? progress : stage === "time" ? 1 : null;
+  const spatial = stage === "spatial" ? progress : stage === "space" || temporal !== null ? 1 : 0;
   const ease = (value: number, start: number, end: number) => smoothSceneLight((value - start) / (end - start));
   const separate = ease(equation, HARMONIC_CUE.separate, HARMONIC_CUE.equation);
   const converge = ease(spatial, 0.12, 0.60);
   const figure = ease(spatial, 0.60, 1);
+  const yaw = FREQUENCY_VIEW.yaw + (FREQUENCY_STOP_YAW - FREQUENCY_VIEW.yaw) * ease(spatial, 0.6, 1);
   const plus = ease(equation, HARMONIC_CUE.separate, HARMONIC_CUE.equation) * (1 - ease(spatial, 0, 0.2));
   const equals = ease(equation, HARMONIC_CUE.equals, HARMONIC_CUE.equals + 0.045) * (1 - ease(spatial, 0, 0.2));
   const trace222 = ease(equation, HARMONIC_CUE.trace222, HARMONIC_CUE.crossFormed);
@@ -527,7 +607,7 @@ function HarmonicDiagram({ stage, cue, durationMs }: {
       <g fill="#111" stroke="#111" strokeWidth={2.6} strokeLinecap="round">
         {lines.map(({ hz, a, b, label, full }, index) => {
           const axis = FREQUENCY_AXES[index];
-          const [tail, tip] = frequencyAxis(axis.direction, FREQUENCY_VIEW.yaw);
+          const [tail, tip] = frequencyAxis(axis.direction, yaw);
           const start = lerp(a, [tail.x, tail.y], converge);
           const end = lerp(b, [tip.x, tip.y], converge);
           const midA = lerp(start, end, full * 0.5);
@@ -554,7 +634,8 @@ function HarmonicDiagram({ stage, cue, durationMs }: {
         {equals > 0 && <text x={x + side / 2} y={y} opacity={equals}>=</text>}
       </g>
     </svg>}
-    {figure > 0 && <FrequencySpace opacity={figure} moving={stage === "space"} />}
+    {figure > 0 && <FrequencySpace opacity={figure}
+      yaw={yaw} tuning={temporal} timeSeconds={durationMs / 1000} />}
   </div>;
 }
 
@@ -597,6 +678,7 @@ const SCENE_ONE_DEFAULT_SECONDS = 22;
 const SCENE_LINE_DEFAULT_SECONDS = 15;
 const SCENE_HARMONIC_DEFAULT_SECONDS = 18;
 const SCENE_SPACE_DEFAULT_SECONDS = 7;
+const SCENE_TIME_DEFAULT_SECONDS = 16;
 const SCENE_ONE_LIGHT_SHARE = 16 / 22;
 
 function smoothSceneLight(progress: number) {
@@ -1116,7 +1198,7 @@ function playModuleGong(context: AudioContext, time: number, root: number, stren
   });
 }
 
-type ModuleZeroPlayback = "sequence" | "opening" | "beacon" | "line" | "harmonics" | "space";
+type ModuleZeroPlayback = "sequence" | "opening" | "beacon" | "line" | "harmonics" | "space" | "time";
 
 function ModuleZero() {
   const [stage, setStage] = useState("ready");
@@ -1125,6 +1207,7 @@ function ModuleZero() {
   const [lineSeconds, setLineSeconds] = useState(SCENE_LINE_DEFAULT_SECONDS);
   const [harmonicSeconds, setHarmonicSeconds] = useState(SCENE_HARMONIC_DEFAULT_SECONDS);
   const [spaceSeconds, setSpaceSeconds] = useState(SCENE_SPACE_DEFAULT_SECONDS);
+  const [timeSeconds, setTimeSeconds] = useState(SCENE_TIME_DEFAULT_SECONDS);
   const [previewMode, setPreviewMode] = useState<Exclude<ModuleZeroPlayback, "sequence"> | null>(null);
   const [cue, setCue] = useState<SceneZeroCue | null>(null);
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
@@ -1215,36 +1298,45 @@ function ModuleZero() {
         gain.gain.linearRampToValueAtTime(0.12, time + attack);
         oscillator.connect(gain).connect(bus);
         oscillator.start(time);
+        return oscillator;
       };
-      const enterDiagram = (stage: "harmonics" | "spatial", time: number, seconds: number) => {
+      const enterDiagram = (stage: "harmonics" | "spatial" | "temporal", time: number, seconds: number) => {
         setCue({ context, beginsAt: time });
         setActiveDurationMs(seconds * 1000);
         setStage(stage);
         if (previewOnly) runningRef.current = false;
       };
-      const playSpatial = (time: number) => {
-        atTime(time, () => enterDiagram("spatial", time, spaceSeconds));
-        atTime(time + spaceSeconds, () => setStage("space"));
+      const playTime = (time: number, voices: OscillatorNode[]) => {
+        voices.forEach((voice, index) => {
+          voice.frequency.setValueAtTime(ORIGINAL_NOTES[index], time);
+          voice.frequency.exponentialRampToValueAtTime(MAJOR_NOTES[index], time + timeSeconds);
+        });
+        atTime(time, () => enterDiagram("temporal", time, timeSeconds));
+        atTime(time + timeSeconds, () => setStage("time"));
       };
-      const playHarmonics = (bus: GainNode, time: number) => {
+      const playSpatial = (time: number, voices: OscillatorNode[]) => {
+        atTime(time, () => enterDiagram("spatial", time, spaceSeconds));
+        if (mode === "sequence") playTime(time + spaceSeconds, voices);
+        else atTime(time + spaceSeconds, () => setStage("space"));
+      };
+      const playHarmonics = (bus: GainNode, time: number, root: OscillatorNode) => {
         playModuleGong(context, time, 330, 0.58);
         playModuleGong(context, time + harmonicSeconds * HARMONIC_CUE.secondGong, 444, 0.55);
-        addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
-        addTone(bus, 333, time + harmonicSeconds * HARMONIC_CUE.trace333, harmonicSeconds * (HARMONIC_CUE.result - HARMONIC_CUE.trace333));
+        const second = addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
+        const third = addTone(bus, 333, time + harmonicSeconds * HARMONIC_CUE.trace333, harmonicSeconds * (HARMONIC_CUE.result - HARMONIC_CUE.trace333));
         atTime(time, () => enterDiagram("harmonics", time, harmonicSeconds));
-        if (mode === "sequence") playSpatial(time + harmonicSeconds);
+        if (mode === "sequence") playSpatial(time + harmonicSeconds, [root, second, third]);
         else atTime(time + harmonicSeconds, () => setStage("equation"));
       };
 
-      if (mode === "harmonics" || mode === "space") {
+      if (mode === "harmonics" || mode === "space" || mode === "time") {
         const time = context.currentTime + 0.07;
         const bus = createChordBus();
-        addTone(bus, 111, time, 0.28);
-        if (mode === "harmonics") playHarmonics(bus, time);
+        if (mode === "harmonics") playHarmonics(bus, time, addTone(bus, 111, time, 0.28));
         else {
-          addTone(bus, 222, time, 0.28);
-          addTone(bus, 333, time, 0.28);
-          playSpatial(time);
+          const voices = ORIGINAL_NOTES.map((hz) => addTone(bus, hz, time, 0.28));
+          if (mode === "space") playSpatial(time, voices);
+          else playTime(time, voices);
         }
         return;
       }
@@ -1382,6 +1474,7 @@ function ModuleZero() {
         pitchGain.gain.linearRampToValueAtTime(0.12, beginning + duration);
         pitch.connect(pitchGain); pitchGain.connect(chordBus);
         pitch.start(pitchStart);
+        if (mode === "sequence") playHarmonics(chordBus, beginning + duration + 4, pitch);
         const draw = () => {
           if (run !== runRef.current || audioRef.current !== context) return;
           const elapsed = context.currentTime - beginning;
@@ -1402,7 +1495,6 @@ function ModuleZero() {
       };
       const gongAt = beginsAt + lineStartsAt / 1000;
       playModuleGong(context, gongAt, 330);
-      if (mode === "sequence") playHarmonics(chordBus, gongAt + lineSeconds + 4);
       atOffset(lineStartsAt, () => {
         setPulseCount(0);
         setPulseRate(2);
@@ -1422,13 +1514,15 @@ function ModuleZero() {
   const light = !showObject && stage !== "ready" && !preparing;
   const question = stage === "question";
   const dots = stage === "two" || stage === "multiplying";
-  const expression = stage === "vertical" || stage === "harmonics" || stage === "equation" || stage === "spatial" || stage === "space";
+  const expression = stage === "vertical" || stage === "harmonics" || stage === "equation" || stage === "spatial" ||
+    stage === "space" || stage === "temporal" || stage === "time";
   const sceneControls = [
     { mode: "opening", title: "Escena Ø → {}", id: "zero-duration", label: "Duración de la transición de luz y sonido", duration: durationSeconds, min: 1, max: 30, setDuration: setDurationSeconds },
     { mode: "beacon", title: "Escena {} → 0", id: "one-duration", label: "Duración de la escena de conjunto vacío a cero", duration: oneSeconds, min: 6, max: 60, setDuration: setOneSeconds },
     { mode: "line", title: "Escena 0 → 1", id: "line-duration", label: "Duración de la escena de cero a uno", duration: lineSeconds, min: 6, max: 60, setDuration: setLineSeconds },
     { mode: "harmonics", title: "Escena 1 → 2", id: "harmonic-duration", label: "Duración de la escena de uno a dos", duration: harmonicSeconds, min: 6, max: 60, setDuration: setHarmonicSeconds },
-    { mode: "space", title: "Escena 3", id: "space-duration", label: "Duración de la escena tres", duration: spaceSeconds, min: 3, max: 30, setDuration: setSpaceSeconds },
+    { mode: "space", title: "Escena 2 → 3", id: "space-duration", label: "Duración de la escena de dos a tres", duration: spaceSeconds, min: 3, max: 30, setDuration: setSpaceSeconds },
+    { mode: "time", title: "Escena 3 → 4", id: "time-duration", label: "Duración de la escena de tres a cuatro", duration: timeSeconds, min: 4, max: 60, setDuration: setTimeSeconds },
   ] as const;
   const pointPosition = (index: number) => {
     let n = index, fraction = 0, scale = 0.5;
@@ -1458,13 +1552,15 @@ function ModuleZero() {
         animation: zeroSpaceFade .55s ease both;
       }
       .zero-point { width: clamp(8px, 1.05vw, 16px); aspect-ratio: 1; border-radius: 50%; background: #000; }
-      .zero-harmonic-frame { position: relative; width: min(94%, 800px); aspect-ratio: 16 / 9; pointer-events: none; }
+      .zero-harmonic-frame { position: relative; width: min(94%, 800px, 116svh); aspect-ratio: 16 / 9; pointer-events: none; }
       .zero-harmonic-diagram, .zero-frequency-space, .zero-frequency-space canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-      .zero-frequency-space span {
-        position: absolute; top: 100%; left: 0; width: 100%; text-align: center; color: #17191e;
-        font: 400 clamp(1rem, 2.4vw, 2.1rem)/1.2 Georgia, serif;
+      .zero-time-caption {
+        position: absolute; top: 104%; left: 0; width: 100%; display: grid; gap: .35rem;
+        text-align: center; color: #17191e; font: 400 clamp(1rem, 2.4vw, 2.1rem)/1.2 Georgia, serif;
       }
-      .zero-controls { display: grid; align-content: start; gap: 1.15rem; min-height: 0; overflow-y: auto; padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
+      .zero-time-caption small { font: 400 clamp(.68rem, 1.35vw, .95rem)/1.3 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+      .zero-time-caption small:last-child { color: #46516b; }
+      .zero-controls { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.15rem; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
       .zero-scene + .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
       .zero-title { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
@@ -1477,7 +1573,12 @@ function ModuleZero() {
       .zero-controls .zero-play { background: #dce6ff; color: #131b2b; border-color: transparent; width: 100%; }
       .zero-controls button:disabled { opacity: .55; cursor: default; }
       .zero-layout :focus-visible { outline: 2px solid #a8c3ff; outline-offset: -3px; }
-      @media (max-width: 700px) {
+      @media (min-width: 761px) and (max-width: 950px) {
+        .zero-controls { padding-inline: .75rem; }
+        .zero-title h2 { font-size: .96rem; }
+        .zero-title output { font-size: .69rem; }
+      }
+      @media (max-width: 760px) {
         .zero-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(55svh, 1fr) auto; }
         .zero-stage { min-height: 0; }
         .zero-controls { border-left: 0; border-top: 1px solid #30333d; overflow: visible; }

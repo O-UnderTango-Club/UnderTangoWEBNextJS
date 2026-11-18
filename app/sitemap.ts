@@ -25,11 +25,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/produccion-artistica`,
-      changeFrequency: "weekly",
-      priority: 0.95,
-    },
-    {
       url: `${baseUrl}/reservas`,
       changeFrequency: "monthly",
       priority: 0.8,

@@ -615,3 +615,12 @@
     line-height: 1.5;
   }
 }
+
+.showVideoGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.showVideoCard { min-width: 0; padding: 24px; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; background: rgba(255,255,255,.035); }
+.showVideoCard h3 { margin: 0 0 8px; font-size: 1.55rem; line-height: 1.15; }
+.showVideoCard p { margin: 0 0 18px; color: rgba(244,242,237,.7); line-height: 1.5; min-height: 3em; }
+.showVideoCard a { display: inline-block; margin-top: 14px; color: #e2c37d; font-weight: 700; }
+.portraitVideo { width: 100%; aspect-ratio: 9 / 16; max-height: 620px; overflow: hidden; border-radius: 12px; background: #000; }
+.portraitVideo iframe { display: block; border: 0; width: 100%; height: 100%; }
+@media (max-width: 720px) { .showVideoGrid { grid-template-columns: 1fr; } .showVideoCard { padding: 16px; } .showVideoCard p { min-height: 0; } .portraitVideo { max-height: none; } }

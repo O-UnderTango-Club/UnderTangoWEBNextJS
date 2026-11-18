@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "../components/header";
 import Footer from "../components/footer";
-import styles from "../shows/shows.module.css";
+import styles from "../produccion-artistica/produccion-artistica.module.css";
 import CatalogoShows from "./catalogo-shows";
 
 const WHATSAPP_NUMBER = "5493757618270";

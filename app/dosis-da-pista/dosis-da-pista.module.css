@@ -1,0 +1,163 @@
+.page {
+  --dosis-gold: #f1c776;
+  --dosis-ink: #150d10;
+  --dosis-paper: #faf1e5;
+  --dosis-muted: #d6c4ba;
+  color: var(--dosis-paper);
+  background:
+    radial-gradient(ellipse at 75% 5%, #503024 0%, transparent 48rem),
+    linear-gradient(#26131b, var(--dosis-ink) 34rem);
+  padding: 114px 28px 84px;
+  font-family: var(--font-undertango-sans), Arial, sans-serif;
+}
+
+.page section {
+  opacity: 1;
+  transform: none;
+  padding: 0;
+}
+
+.shell {
+  width: min(100%, 1120px);
+  margin-inline: auto;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+  align-items: center;
+  gap: clamp(26px, 5vw, 68px);
+}
+
+.page h1,
+.page h2 {
+  margin: 0;
+  color: var(--dosis-paper);
+  font-family: var(--font-undertango-editorial), Georgia, serif;
+  position: static;
+  text-align: left;
+}
+
+.page h2::after { content: none; }
+
+.page h1 {
+  font-size: clamp(3.1rem, 6.9vw, 6.5rem);
+  font-weight: 700;
+  line-height: 1.03;
+  letter-spacing: -.06em;
+}
+
+.page h2 {
+  font-size: clamp(1.75rem, 3.2vw, 2.65rem);
+  line-height: 1.16;
+  letter-spacing: -.035em;
+}
+
+.page p {
+  max-width: 54ch;
+  margin: 12px 0 0;
+  color: var(--dosis-muted);
+  line-height: 1.65;
+}
+
+.page .label {
+  margin: 0 0 13px;
+  color: var(--dosis-gold);
+  font-size: .73rem;
+  font-weight: 750;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.page .lead {
+  color: var(--dosis-paper);
+  font-size: clamp(1.18rem, 2.3vw, 1.6rem);
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.bookingLink {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 48px;
+  margin-top: 22px;
+  padding: 10px 19px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--dosis-gold);
+  color: #221208;
+  font-size: .94rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.bookingLink:hover { background: #ffdaa0; }
+
+.page a:focus-visible,
+.page button:focus-visible {
+  outline: 2px solid var(--dosis-gold);
+  outline-offset: 4px;
+}
+
+.feature,
+.secondVideo {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #f1c77638;
+  border-radius: 18px;
+  background: #1b1216;
+}
+
+.feature figure > div,
+.secondVideo figure > div {
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.feature figcaption a,
+.secondVideo figcaption a {
+  padding: 0 3px 2px;
+  color: var(--dosis-paper);
+  font-size: .86rem;
+}
+
+.page .details,
+.page .more,
+.page .contact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .82fr);
+  align-items: center;
+  gap: 26px;
+  margin-top: 56px;
+  padding-top: 29px;
+  border-top: 1px solid #f1c77638;
+}
+
+.facts {
+  display: grid;
+  gap: 13px;
+  margin: 0;
+  padding: 15px 18px;
+  border-left: 2px solid var(--dosis-gold);
+  background: #f1c7760c;
+}
+
+.facts dt { color: var(--dosis-muted); font-size: .83rem; }
+.facts dd { margin: 5px 0 0; color: var(--dosis-paper); font-weight: 750; }
+
+.page .more { grid-template-columns: minmax(0, 1fr) minmax(0, 320px); }
+.secondVideo { box-sizing: border-box; width: min(100%, 290px); justify-self: end; }
+.contact .bookingLink { justify-self: end; margin: 0; }
+
+@media (max-width: 760px) {
+  .page { padding: 100px 16px 54px; }
+  .hero, .page .details, .page .more, .page .contact { grid-template-columns: minmax(0, 1fr); }
+  .hero { gap: 20px; }
+  .page h1 { font-size: clamp(2.6rem, 11vw, 4.15rem); }
+  .intro .bookingLink { margin-top: 15px; }
+  .page .details, .page .more, .page .contact { gap: 18px; margin-top: 34px; padding-top: 23px; }
+  .secondVideo, .contact .bookingLink { justify-self: start; }
+}

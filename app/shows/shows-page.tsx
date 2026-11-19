@@ -174,18 +174,6 @@ export default function ShowsPage({ language }: { language: SiteLanguage }) {
             </div>
           </section>
 
-          <section className={`${styles.section} ${styles.processSection}`} aria-labelledby="pasos-title">
-            <div className={styles.sectionHeading}>
-              <p className={styles.eyebrow}>{copy.processLabel}</p>
-              <h2 id="pasos-title">{copy.processTitle}</h2>
-            </div>
-            <ol className={styles.processGrid}>
-              {copy.steps.map(({ title, text }, index) => (
-                <li key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{text}</p></li>
-              ))}
-            </ol>
-          </section>
-
           <div className={local.bandDiscovery}>
             <Link className={styles.secondaryCta} href="/banda" hrefLang="es-AR">
               {copy.bandLink} <span aria-hidden="true">→</span>

@@ -41,6 +41,7 @@ const es = {
   customContact: "Conversemos sobre tu idea",
   processLabel: "Así empezamos",
   processTitle: "Hagamos realidad tu idea.",
+  bandLink: "Conocé más de cerca nuestra propuesta musical",
   steps: [
     { title: "Compartinos el contexto", text: "Ciudad, fecha, espacio, público y objetivo de la presentación." },
     { title: "Definimos el formato", text: "Conversamos sobre artistas, duración y puesta." },
@@ -86,6 +87,7 @@ export const showsCopy: Record<SiteLanguage, typeof es> = {
     customContact: "Vamos conversar sobre sua ideia",
     processLabel: "Como começamos",
     processTitle: "Vamos transformar sua ideia em realidade.",
+    bandLink: "Conheça de perto a nossa proposta musical",
     steps: [
       { title: "Conte sobre o evento", text: "Cidade, data, local, público e objetivo da apresentação." },
       { title: "Definimos o formato", text: "Conversamos sobre os artistas, a duração e a montagem." },
@@ -128,6 +130,7 @@ export const showsCopy: Record<SiteLanguage, typeof es> = {
     customContact: "Let's talk about your idea",
     processLabel: "How we get started",
     processTitle: "Let's bring your idea to life.",
+    bandLink: "Explore our live music in more depth",
     steps: [
       { title: "Tell us about your event", text: "Share the city, date, venue, audience and purpose of the performance." },
       { title: "Choose the format together", text: "We discuss the performers, running time and staging." },

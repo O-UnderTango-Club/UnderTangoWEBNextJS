@@ -166,6 +166,10 @@
 
 @media (max-width: 760px) {
   .page { padding: 100px 16px 54px; }
+  .feature, .videoCard { padding: 0; overflow: hidden; }
+  .feature figure > div, .videoCard figure > div { border-radius: 0; }
+  .feature figcaption, .videoCard figcaption, .videoCard > p { padding-inline: 12px; }
+  .feature figcaption, .videoCard figcaption:last-child, .videoCard > p { padding-bottom: 10px; }
   .hero, .page .details, .page .contact { grid-template-columns: minmax(0, 1fr); }
   .hero { gap: 20px; }
   .page h1 { font-size: clamp(2.6rem, 11vw, 4.15rem); }
@@ -175,5 +179,5 @@
 }
 
 @media (max-width: 520px) {
-  .videoGrid { grid-template-columns: minmax(0, 300px); }
+  .videoGrid { grid-template-columns: minmax(0, 1fr); }
 }

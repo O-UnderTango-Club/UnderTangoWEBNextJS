@@ -185,6 +185,12 @@ export default function ShowsPage({ language }: { language: SiteLanguage }) {
               ))}
             </ol>
           </section>
+
+          <div className={local.bandDiscovery}>
+            <Link className={styles.secondaryCta} href="/banda" hrefLang="es-AR">
+              {copy.bandLink} <span aria-hidden="true">→</span>
+            </Link>
+          </div>
         </main>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <Footer />

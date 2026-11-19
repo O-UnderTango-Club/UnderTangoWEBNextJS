@@ -6,9 +6,9 @@ import styles from "./banda.module.css";
 
 const path = "/banda";
 const headline = "Música en vivo para sentir";
-const lead = "Un recorrido por diversas intensidades que culminan en el baile";
+const lead = "Un recorrido que culmina en baile";
 const title = `${headline} | Ø UnderTango Club`;
-const description = `${lead}. Quinteto de la Triple Frontera para bares, salas y eventos, con shows de 90 minutos a 3 horas a convenir.`;
+const description = `${lead}. El quinteto de Ø UnderTango Club cruza soul, funk, samba y clásicos latinos. De 90 minutos a 3 horas, a convenir.`;
 const mainVideo = "jKjgHl4xL0A";
 const bookingMessage = "Hola, me interesa contratar a la banda de Ø UnderTango Club. Quisiera consultar disponibilidad y formato para mi espacio.";
 const bookingUrl = `https://wa.me/5493757618270?text=${encodeURIComponent(bookingMessage)}`;
@@ -56,7 +56,7 @@ export default function BandaPage() {
               <p className={styles.label}>Ø UnderTango Club · Triple Frontera</p>
               <h1 id="band-title">{headline}</h1>
               <p className={styles.lead}>{lead}</p>
-              <p>Un quinteto para bares, salas y eventos, con un show que se adapta a tu espacio y a tu público.</p>
+              <p>El quinteto de Ø UnderTango Club cruza soul, funk, samba y clásicos latinos en un show que empieza para escuchar y va ganando ritmo hasta abrir la pista. Armamos la presentación de principio a fin: adaptamos el repertorio y la duración a tu público y coordinamos la puesta con el espacio para darle a la noche el clima que buscás.</p>
               <BookingLink />
             </header>
             <div className={styles.feature}>

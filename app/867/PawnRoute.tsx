@@ -116,7 +116,7 @@ export default function PawnRoute() {
             </div>
             <figcaption><span><i aria-hidden="true" /> E1 · Punto de partida</span><span>Elegí una casilla</span></figcaption>
           </figure>
-          <section className="peon867-stage" aria-label="Etapa seleccionada">
+          <div className="peon867-stage" role="region" aria-label="Etapa seleccionada">
             <div className="peon867-stage-copy" aria-live="polite" aria-atomic="true">
               <p className="peon867-coordinate">{stage.code}</p>
               <p className="peon867-meta">{stage.place}</p>
@@ -128,7 +128,7 @@ export default function PawnRoute() {
               <div>{previous && <a href={"#" + previous.id} onClick={(event) => selectStage(event, previous.id)}><span aria-hidden="true">←</span> {previous.code}</a>}</div>
               <div>{next && <a href={"#" + next.id} onClick={(event) => selectStage(event, next.id)}>{next.code} <span aria-hidden="true">→</span></a>}</div>
             </nav>
-          </section>
+          </div>
         </div>
       </div>
     </div>

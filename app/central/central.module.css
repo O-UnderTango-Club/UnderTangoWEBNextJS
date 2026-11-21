@@ -3,6 +3,8 @@
 .mapHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
 .mapHeader h1 { margin: 0; font-family: var(--font-undertango-editorial), Georgia, serif; font-size: clamp(25px, 3vw, 43px); font-weight: 400; line-height: 1; letter-spacing: -.04em; }
 .mapHeader h1 span { color: #a50d29; }
+.logLink { color: #e2c477; font-size: clamp(.72rem, 1.4vw, .9rem); text-align: right; text-underline-offset: 4px; }
+.logLink:focus-visible { outline: 2px solid #d1a844; outline-offset: 4px; }
 .mapHeader p, .hint { margin: 0; color: #8f8a82; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .mapFrame { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) clamp(44px, 7vh, 66px); gap: 1px; border: 1px solid #433c32; background: #433c32; }
 .grid { min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 1px; background: #433c32; }

@@ -108,7 +108,7 @@ export default function CentralMap() {
       <section className={styles.map} aria-labelledby="central-title">
         <header className={styles.mapHeader}>
           <h1 id="central-title"><span>Ø</span> Central</h1>
-          <p>Diez departamentos. Una estructura.</p>
+          <a className={styles.logLink} href="/log-de-undertango">Log de UnderTango <span aria-hidden="true">↗</span></a>
         </header>
         <div className={styles.mapFrame}>
           <div className={styles.grid}>

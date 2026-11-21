@@ -1400,8 +1400,27 @@ function playModuleGong(context: AudioContext, time: number, root: number, stren
 
 type ModuleZeroPlayback = "sequence" | "opening" | "beacon" | "line" | "harmonics" | "space" | "time";
 
+const MODULE_ZERO_SCENE_BY_STAGE = {
+  ready: null,
+  preparing: null,
+  opening: "opening",
+  beacon: "beacon",
+  question: "beacon",
+  one: "beacon",
+  two: "line",
+  multiplying: "line",
+  vertical: "line",
+  harmonics: "harmonics",
+  equation: "harmonics",
+  spatial: "space",
+  space: "space",
+  temporal: "time",
+  time: "time",
+} satisfies Record<string, Exclude<ModuleZeroPlayback, "sequence"> | null>;
+
 function ModuleZero() {
-  const [stage, setStage] = useState("ready");
+  const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE>("ready");
+  const [showSubtitles, setShowSubtitles] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
   const [oneSeconds, setOneSeconds] = useState(SCENE_ONE_DEFAULT_SECONDS);
   const [lineSeconds, setLineSeconds] = useState(SCENE_LINE_DEFAULT_SECONDS);
@@ -1729,6 +1748,7 @@ function ModuleZero() {
     { mode: "space", title: "Escena 2 → 3", id: "space-duration", label: "Duración de la escena de dos a tres", duration: spaceSeconds, min: 3, max: 30, setDuration: setSpaceSeconds },
     { mode: "time", title: "Escena 3 → 4", id: "time-duration", label: "Duración de la escena de tres a cuatro", duration: timeSeconds, min: 4, max: 60, setDuration: setTimeSeconds },
   ] as const;
+  const sceneTitle = sceneControls.find(({ mode }) => mode === MODULE_ZERO_SCENE_BY_STAGE[stage])?.title;
   const pointPosition = (index: number) => {
     let n = index, fraction = 0, scale = 0.5;
     while (n > 0) { fraction += (n % 2) * scale; n = Math.floor(n / 2); scale *= 0.5; }
@@ -1751,6 +1771,18 @@ function ModuleZero() {
       .zero-start { border: 0; padding: 0; background: transparent; cursor: pointer; }
       .zero-object { cursor: grab; touch-action: none; }
       .zero-object:active { cursor: grabbing; }
+      .zero-subtitle {
+        position: absolute; inset-inline: 0; bottom: .5rem; z-index: 2;
+        display: flex; justify-content: center; padding-inline: .5rem; pointer-events: none;
+      }
+      .zero-subtitle span {
+        border: 1px solid #687184; border-radius: 4px; padding: .23rem .65rem;
+        background: #191d25; color: #f2f3f7; font: 600 .75rem/1.25 system-ui, sans-serif;
+        text-align: center;
+      }
+      .zero-stage:has(.zero-subtitle span) .zero-harmonic-frame:has(.zero-time-caption) {
+        translate: 0 clamp(-4rem, calc((100svh - 880px) / 5), 0px);
+      }
       .zero-question {
         position: absolute; width: min(87%, 900px); margin: 0; text-align: center;
         color: #111; font: 400 clamp(1.5rem, 3.5vw, 3.6rem)/1.3 Georgia, serif;
@@ -1774,11 +1806,27 @@ function ModuleZero() {
       .zero-time-caption small { font: 400 clamp(.68rem, 1.35vw, .95rem)/1.3 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
       .zero-time-caption small:last-child { color: #46516b; }
       .zero-controls { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.15rem; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
-      .zero-scene + .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
+      .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
+      .zero-subtitle-toggle {
+        display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+        min-height: 44px; font-size: .875rem; cursor: pointer;
+      }
+      .zero-subtitle-toggle input {
+        appearance: none; display: grid; align-items: center; flex: none; margin: 0;
+        width: 2.25rem; height: 1.25rem; border: 1px solid #8991a4; border-radius: 1rem;
+        background: #303542; cursor: pointer;
+      }
+      .zero-subtitle-toggle input::before {
+        content: ""; width: .75rem; height: .75rem; margin-left: .1875rem;
+        border-radius: 50%; background: #f2f3f7;
+      }
+      .zero-subtitle-toggle input:checked { background: #adc4ff; }
+      .zero-subtitle-toggle input:checked::before { transform: translateX(1rem); background: #131b2b; }
+      .zero-layout .zero-subtitle-toggle input:focus-visible { outline-offset: 3px; }
       .zero-title { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
       .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
-      .zero-controls input { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
+      .zero-controls input[type="range"] { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
       .zero-sampling { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; font-size: .75rem; }
       .zero-sampling output { color: #e5e9f9; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls button {
@@ -1797,7 +1845,7 @@ function ModuleZero() {
         .zero-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(55svh, 1fr) auto; }
         .zero-stage { min-height: 0; }
         .zero-controls { border-left: 0; border-top: 1px solid #30333d; overflow: visible; }
-        .zero-scene + .zero-scene { padding-top: 1rem; }
+        .zero-scene { padding-top: 1rem; }
       }
     `}</style>
     <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" style={{background:light ? "#fff" : "#000"}}>
@@ -1811,9 +1859,17 @@ function ModuleZero() {
       </svg>}
       {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={cue} durationMs={activeDurationMs}
         sampleIntervalMs={activeSamplingMs} />}
-      {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:"8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
+      {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
+      <div className="zero-subtitle" role="status">
+        {showSubtitles && sceneTitle && <span>{sceneTitle}</span>}
+      </div>
     </div>
     <aside className="zero-controls" aria-label="Controles de las escenas">
+      <label className="zero-subtitle-toggle">
+        Activar subtítulos
+        <input type="checkbox" role="switch" checked={showSubtitles}
+          onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
+      </label>
       {sceneControls.map(({ mode, title, id, label, duration, min, max, setDuration }) => {
         const seconds = `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
         return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}>

@@ -63,7 +63,7 @@ export default function PublicationPanel() {
     <main className={styles.panel}>
       <div className={styles.shell}>
         <nav className={styles.navigation} aria-label="Ubicación">
-          <a href="/central">← Central UnderTango</a>
+          <a href="/central-de-control">← Central de control</a>
           <a href="/protocolo-84-publicaciones.md" target="_blank" rel="noopener noreferrer">Protocolo para Codex y Clo ↗</a>
         </nav>
         <header className={styles.heading}>

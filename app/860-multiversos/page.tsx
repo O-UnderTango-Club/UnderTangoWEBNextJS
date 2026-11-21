@@ -657,8 +657,8 @@ function createTemporalTrailRenderer(canvas: HTMLCanvasElement, sampleCount: num
   };
 }
 
-function TemporalFrequencyTrail({ progress, durationMs, intervalMs }: {
-  progress: number; durationMs: number; intervalMs: number;
+function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock }: {
+  progress: number; durationMs: number; intervalMs: number; clock: AudioContext;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const progressRef = useRef(progress);
@@ -681,7 +681,7 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs }: {
     };
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0, nextStamp = 0, raisedAt: number | null = null;
-    let last = -Infinity, previousProgress = -1, resized = true;
+    let last = -Infinity, previousProgress = -1, previousTime = -1, resized = true;
     const resize = () => {
       const density = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.max(1, Math.round(canvas.clientWidth * density));
@@ -694,11 +694,14 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs }: {
     const draw = (now: number) => {
       frame = window.requestAnimationFrame(draw);
       const current = progressRef.current;
+      const time = clock.currentTime;
       if (!resized && now - last < 32) return;
-      if (!resized && current === previousProgress && (current === 0 || (current === 1 && reduceMotion.matches))) return;
+      if (!resized && current === previousProgress &&
+        (current === 0 || time === previousTime || (current === 1 && reduceMotion.matches))) return;
       resized = false;
       last = now;
       previousProgress = current;
+      previousTime = time;
       const elapsed = current * durationMs;
       const firstWrite = nextStamp;
       while (nextStamp < sampleCount) {
@@ -712,8 +715,8 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs }: {
       const visibleCount = nextStamp + Number(live);
       if (visibleCount > firstWrite) renderer.upload(instances, firstWrite, visibleCount);
 
-      if (current === 1 && raisedAt === null) raisedAt = now;
-      const seconds = raisedAt === null ? 0 : (now - raisedAt) / 1000;
+      if (current === 1 && raisedAt === null) raisedAt = time;
+      const seconds = raisedAt === null ? 0 : time - raisedAt;
       const lift = current < 1 ? 0 : reduceMotion.matches ? 1 : smoothSceneLight(seconds / 3);
       const spin = lift * 0.26 + (reduceMotion.matches ? 0 : Math.max(0, seconds - 3) * 0.34);
       renderer.paint(visibleCount, current, lift, spin);
@@ -724,7 +727,7 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs }: {
       observer.disconnect();
       renderer.dispose();
     };
-  }, [durationMs, intervalMs]);
+  }, [clock, durationMs, intervalMs]);
 
   const notes = tuningAt(progress).map((value) => FREQUENCY_FORMAT.format(value) + " Hz").join(" · ");
   const { halfSpan, zoom } = temporalTrailFrame(progress, 0);
@@ -832,8 +835,8 @@ function HarmonicDiagram({ stage, cue, durationMs, sampleIntervalMs }: {
         {equals > 0 && <text x={x + side / 2} y={y} opacity={equals}>=</text>}
       </g>
     </svg>}
-    {temporal !== null
-      ? <TemporalFrequencyTrail progress={temporal} durationMs={durationMs} intervalMs={sampleIntervalMs} />
+    {temporal !== null && cue
+      ? <TemporalFrequencyTrail progress={temporal} durationMs={durationMs} intervalMs={sampleIntervalMs} clock={cue.context} />
       : figure > 0 && <FrequencySpace opacity={figure} yaw={yaw} />}
   </div>;
 }
@@ -1193,10 +1196,11 @@ const SCENE_ZERO_DRAG_SCALE = 0.009;
 const SCENE_ZERO_COAST_SECONDS = 0.24;
 const SCENE_ZERO_MAX_DRAG_SPEED = 3.8;
 
-function EmptySetScene({ durationMs, beacon, cue }: {
+function EmptySetScene({ durationMs, beacon, cue, paused }: {
   durationMs: number;
   beacon: boolean;
   cue: SceneZeroCue;
+  paused: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const orientation = useRef<SceneZeroDrag>({ yaw: 0, pitch: 0 });
@@ -1242,11 +1246,12 @@ function EmptySetScene({ durationMs, beacon, cue }: {
       ], orientation.current);
       return progress;
     };
-    const tick = (now: number) => {
+    const tick = () => {
       frame = null;
+      const now = cue.context.currentTime;
       const autoRotate = !reduceMotion.matches && !drag.current;
-      if (autoRotate && previousFrame !== null) {
-        const elapsed = Math.min(0.06, (now - previousFrame) / 1000);
+      if (autoRotate && previousFrame !== null && now > previousFrame) {
+        const elapsed = Math.min(0.06, now - previousFrame);
         const remaining = Math.exp(-elapsed / SCENE_ZERO_COAST_SECONDS);
         // Integrate the fading velocity so the coast is consistent at different frame rates.
         const travel = SCENE_ZERO_COAST_SECONDS * (1 - remaining);
@@ -1286,7 +1291,7 @@ function EmptySetScene({ durationMs, beacon, cue }: {
   return <canvas ref={canvasRef} className="zero-object" role="img" tabIndex={0}
     aria-label="Conjunto vacío tridimensional. Arrastrá o usá las flechas para girarlo."
     onPointerDown={(event) => {
-      if (event.button !== 0 || drag.current) return;
+      if (paused || event.button !== 0 || drag.current) return;
       event.currentTarget.setPointerCapture(event.pointerId);
       drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, movedAt: event.timeStamp };
       velocity.current = { yaw: 0, pitch: 0 };
@@ -1294,7 +1299,7 @@ function EmptySetScene({ durationMs, beacon, cue }: {
     }}
     onPointerMove={(event) => {
       const previous = drag.current;
-      if (previous?.id !== event.pointerId) return;
+      if (paused || previous?.id !== event.pointerId) return;
       const yaw = (event.clientX - previous.x) * SCENE_ZERO_DRAG_SCALE;
       const pitch = (event.clientY - previous.y) * SCENE_ZERO_DRAG_SCALE;
       const elapsed = Math.max(0.008, (event.timeStamp - previous.movedAt) / 1000);
@@ -1326,7 +1331,7 @@ function EmptySetScene({ durationMs, beacon, cue }: {
         ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
       };
       const step = direction[event.key];
-      if (!step) return;
+      if (paused || !step) return;
       event.preventDefault();
       rotate(step[0] * .14, step[1] * .14);
       redrawRef.current();
@@ -1398,7 +1403,7 @@ function playModuleGong(context: AudioContext, time: number, root: number, stren
   });
 }
 
-type ModuleZeroPlayback = "sequence" | "opening" | "beacon" | "line" | "harmonics" | "space" | "time";
+type ModuleZeroScene = "opening" | "beacon" | "line" | "harmonics" | "space" | "time";
 
 const MODULE_ZERO_SCENE_BY_STAGE = {
   ready: null,
@@ -1416,7 +1421,7 @@ const MODULE_ZERO_SCENE_BY_STAGE = {
   space: "space",
   temporal: "time",
   time: "time",
-} satisfies Record<string, Exclude<ModuleZeroPlayback, "sequence"> | null>;
+} satisfies Record<string, ModuleZeroScene | null>;
 
 function ModuleZero() {
   const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE>("ready");
@@ -1429,14 +1434,17 @@ function ModuleZero() {
   const [timeSeconds, setTimeSeconds] = useState(SCENE_TIME_DEFAULT_SECONDS);
   const [timeSamplingMs, setTimeSamplingMs] = useState(SCENE_TIME_DEFAULT_SAMPLE_MS);
   const [activeSamplingMs, setActiveSamplingMs] = useState(SCENE_TIME_DEFAULT_SAMPLE_MS);
-  const [previewMode, setPreviewMode] = useState<Exclude<ModuleZeroPlayback, "sequence"> | null>(null);
+  const [previewMode, setPreviewMode] = useState<ModuleZeroScene | null>(null);
+  const [paused, setPaused] = useState(false);
+  const [transportBusy, setTransportBusy] = useState(false);
   const [cue, setCue] = useState<SceneZeroCue | null>(null);
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
   const [pulseCount, setPulseCount] = useState(0);
   const [pulseRate, setPulseRate] = useState(2);
   const audioRef = useRef<AudioContext | null>(null);
-  const timersRef = useRef<number[]>([]);
-  const runningRef = useRef(false);
+  const timersRef = useRef(new Set<number>());
+  const waitingCues = useRef(new Set<() => void>());
+  const pausedRef = useRef(false);
   const runRef = useRef(0);
   const frameRef = useRef<number | null>(null);
 
@@ -1447,17 +1455,19 @@ function ModuleZero() {
       frameRef.current = null;
     }
     timersRef.current.forEach(window.clearTimeout);
-    timersRef.current = [];
-    runningRef.current = false;
-    if (audioRef.current) {
-      void audioRef.current.close();
-      audioRef.current = null;
-    }
+    timersRef.current.clear();
+    waitingCues.current.clear();
+    const context = audioRef.current;
+    audioRef.current = null;
+    if (context && context.state !== "closed") void context.close();
   }, []);
 
   const reset = useCallback(() => {
     stop();
     setCue(null);
+    pausedRef.current = false;
+    setPaused(false);
+    setTransportBusy(false);
     setPreviewMode(null);
     setStage("ready");
   }, [stop]);
@@ -1470,40 +1480,82 @@ function ModuleZero() {
     };
   }, [reset, stop]);
 
-  const start = async (mode: ModuleZeroPlayback = "sequence") => {
-    if (runningRef.current) return;
-    stop();
-    runningRef.current = true;
+  const changePaused = async (next: boolean) => {
+    const context = audioRef.current;
+    if (!context || pausedRef.current === next || transportBusy) return;
     const run = runRef.current;
-    const previewOnly = mode !== "sequence";
+    pausedRef.current = next;
+    setTransportBusy(true);
+    try {
+      if (next) await context.suspend();
+      else await context.resume();
+      if (run === runRef.current) setPaused(next);
+    } catch {
+      if (run === runRef.current) pausedRef.current = !next;
+    } finally {
+      if (run === runRef.current) {
+        setTransportBusy(false);
+        if (!pausedRef.current) {
+          const ready = [...waitingCues.current];
+          waitingCues.current.clear();
+          ready.forEach((cue) => cue());
+        }
+      }
+    }
+  };
+
+  const start = async (mode: ModuleZeroScene = "opening", previewOnly = false, startPaused = false) => {
+    stop();
+    const run = runRef.current;
+    pausedRef.current = startPaused;
+    setPaused(startPaused);
+    setTransportBusy(false);
+    setCue(null);
     const openingMs = durationSeconds * 1000;
     const oneMs = oneSeconds * 1000;
     const lightMs = oneMs * SCENE_ONE_LIGHT_SHARE;
-    const oneStartsAt = mode === "beacon" ? 0 : openingMs;
+    const oneStartsAt = mode === "opening" ? openingMs : 0;
     const questionMs = oneStartsAt + lightMs;
     const pointMs = oneStartsAt + oneMs;
     const lineStartsAt = mode === "line" ? 0 : pointMs + 2500;
     const gongLead = lineSeconds / 5;
     const rampSeconds = lineSeconds - gongLead;
     const fadeOutAt = lineStartsAt / 1000 + gongLead / 3;
-    const sustainMurmur = mode === "opening" || mode === "beacon";
+    const sustainMurmur = previewOnly && (mode === "opening" || mode === "beacon");
+    const showBeacon = mode === "beacon" || (mode === "opening" && !previewOnly);
     const waveSeconds = sustainMurmur ? 16 : lineStartsAt / 1000 + gongLead + 0.5;
     setPreviewMode(previewOnly ? mode : null);
     setStage("preparing");
     try {
       const context = new AudioContext();
       audioRef.current = context;
-      await context.resume();
+      if (startPaused) await context.suspend();
+      else await context.resume();
       if (run !== runRef.current || audioRef.current !== context) return;
 
       const atTime = (time: number, action: (time: number) => void) => {
+        const schedule = (delay: number) => {
+          const timer = window.setTimeout(() => {
+            timersRef.current.delete(timer);
+            onTime();
+          }, delay);
+          timersRef.current.add(timer);
+        };
         const onTime = () => {
           if (run !== runRef.current) return;
+          if (pausedRef.current) {
+            waitingCues.current.add(onTime);
+            return;
+          }
           const remaining = time - context.currentTime;
-          if (remaining > 0.005) timersRef.current.push(window.setTimeout(onTime, Math.max(8, remaining * 1000)));
+          if (remaining > 0.005) schedule(Math.max(8, remaining * 1000));
           else action(time);
         };
-        timersRef.current.push(window.setTimeout(onTime, Math.max(0, (time - context.currentTime) * 1000)));
+        onTime();
+      };
+      const showAt = (scene: ModuleZeroScene, time: number, show: (time: number) => void) => {
+        if (mode === scene) show(time);
+        else atTime(time, show);
       };
       const createChordBus = () => {
         const output = context.createGain();
@@ -1525,22 +1577,21 @@ function ModuleZero() {
         setCue({ context, beginsAt: time });
         setActiveDurationMs(seconds * 1000);
         setStage(stage);
-        if (previewOnly) runningRef.current = false;
       };
       const playTime = (time: number, voices: OscillatorNode[]) => {
         voices.forEach((voice, index) => {
           voice.frequency.setValueAtTime(ORIGINAL_NOTES[index], time);
           voice.frequency.exponentialRampToValueAtTime(OCTAVE_NOTES[index], time + timeSeconds);
         });
-        atTime(time, () => {
+        showAt("time", time, () => {
           setActiveSamplingMs(timeSamplingMs);
           enterDiagram("temporal", time, timeSeconds);
         });
         atTime(time + timeSeconds, () => setStage("time"));
       };
       const playSpatial = (time: number, voices: OscillatorNode[]) => {
-        atTime(time, () => enterDiagram("spatial", time, spaceSeconds));
-        if (mode === "sequence") playTime(time + spaceSeconds, voices);
+        showAt("space", time, () => enterDiagram("spatial", time, spaceSeconds));
+        if (!previewOnly) playTime(time + spaceSeconds, voices);
         else atTime(time + spaceSeconds, () => setStage("space"));
       };
       const playHarmonics = (bus: GainNode, time: number, root: OscillatorNode) => {
@@ -1548,8 +1599,8 @@ function ModuleZero() {
         playModuleGong(context, time + harmonicSeconds * HARMONIC_CUE.secondGong, 444, 0.55);
         const second = addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
         const third = addTone(bus, 333, time + harmonicSeconds * HARMONIC_CUE.trace333, harmonicSeconds * (HARMONIC_CUE.result - HARMONIC_CUE.trace333));
-        atTime(time, () => enterDiagram("harmonics", time, harmonicSeconds));
-        if (mode === "sequence") playSpatial(time + harmonicSeconds, [root, second, third]);
+        showAt("harmonics", time, () => enterDiagram("harmonics", time, harmonicSeconds));
+        if (!previewOnly) playSpatial(time + harmonicSeconds, [root, second, third]);
         else atTime(time + harmonicSeconds, () => setStage("equation"));
       };
 
@@ -1614,7 +1665,7 @@ function ModuleZero() {
         color.type = "lowpass";
         source.buffer = forward;
         gain.gain.value = 0;
-        const attack = mode === "opening" || mode === "sequence" ? durationSeconds : 0.06;
+        const attack = mode === "opening" ? durationSeconds : 0.06;
         gain.gain.setValueCurveAtTime(SCENE_ZERO_MURMUR_ATTACK, beginsAt, attack);
         if (sustainMurmur) {
           source.loop = true;
@@ -1625,7 +1676,7 @@ function ModuleZero() {
         }
         color.frequency.setValueAtTime(mode === "line" ? 700 : 18000, beginsAt);
         color.Q.setValueAtTime(mode === "line" ? 1.4 : 0.7, beginsAt);
-        if (mode === "beacon" || mode === "sequence") {
+        if (showBeacon) {
           color.frequency.setTargetAtTime(700, beginsAt + questionMs / 1000, 2);
           color.Q.setTargetAtTime(1.4, beginsAt + questionMs / 1000, 2);
         }
@@ -1651,17 +1702,14 @@ function ModuleZero() {
       }
       wave(beginsAt);
 
-      if (mode === "beacon" || mode === "sequence") {
-        if (mode === "sequence") atOffset(oneStartsAt, beginLight);
+      if (showBeacon) {
+        if (mode === "opening") atOffset(oneStartsAt, beginLight);
         atOffset(questionMs, () => setStage("question"));
         const disconnectGong = playSceneOneGong(context, beginsAt + pointMs / 1000);
         atOffset(pointMs, () => setStage("one"));
         atOffset(pointMs + 11500, disconnectGong);
       }
-      if (sustainMurmur) {
-        runningRef.current = false;
-        return;
-      }
+      if (sustainMurmur) return;
       const chordBus = createChordBus();
       const scheduleAcceleration = (beginning: number) => {
         const duration = rampSeconds;
@@ -1698,7 +1746,7 @@ function ModuleZero() {
         pitchGain.gain.linearRampToValueAtTime(0.12, beginning + duration);
         pitch.connect(pitchGain); pitchGain.connect(chordBus);
         pitch.start(pitchStart);
-        if (mode === "sequence") playHarmonics(chordBus, beginning + duration + 4, pitch);
+        if (!previewOnly) playHarmonics(chordBus, beginning + duration + 4, pitch);
         const draw = () => {
           if (run !== runRef.current || audioRef.current !== context) return;
           const elapsed = context.currentTime - beginning;
@@ -1719,12 +1767,11 @@ function ModuleZero() {
       };
       const gongAt = beginsAt + lineStartsAt / 1000;
       playModuleGong(context, gongAt, 330);
-      atOffset(lineStartsAt, () => {
+      showAt("line", gongAt, () => {
         setPulseCount(0);
         setPulseRate(2);
         setStage("two");
         scheduleAcceleration(gongAt + gongLead);
-        if (previewOnly) runningRef.current = false;
       });
     } catch {
       if (run !== runRef.current) return;
@@ -1734,6 +1781,7 @@ function ModuleZero() {
 
   const showObject = stage === "opening" || stage === "beacon";
   const preparing = stage === "preparing";
+  const ready = stage === "ready";
   const canStart = stage === "ready" || (previewMode !== null && !preparing);
   const light = !showObject && stage !== "ready" && !preparing;
   const question = stage === "question";
@@ -1748,23 +1796,28 @@ function ModuleZero() {
     { mode: "space", title: "Escena 2 → 3", id: "space-duration", label: "Duración de la escena de dos a tres", duration: spaceSeconds, min: 3, max: 30, setDuration: setSpaceSeconds },
     { mode: "time", title: "Escena 3 → 4", id: "time-duration", label: "Duración de la escena de tres a cuatro", duration: timeSeconds, min: 4, max: 60, setDuration: setTimeSeconds },
   ] as const;
-  const sceneTitle = sceneControls.find(({ mode }) => mode === MODULE_ZERO_SCENE_BY_STAGE[stage])?.title;
+  const sceneIndex = sceneControls.findIndex(({ mode }) => mode === MODULE_ZERO_SCENE_BY_STAGE[stage]);
+  const sceneTitle = sceneControls[sceneIndex]?.title;
+  const moveScene = (offset: number) => {
+    const scene = sceneControls[Math.max(0, sceneIndex) + offset];
+    if (scene) void start(scene.mode, previewMode !== null, paused);
+  };
   const pointPosition = (index: number) => {
     let n = index, fraction = 0, scale = 0.5;
     while (n > 0) { fraction += (n % 2) * scale; n = Math.floor(n / 2); scale *= 0.5; }
     return 10 + 180 * fraction;
   };
-  return <section aria-label="Módulo cero" className="zero-layout">
+  return <div role="region" aria-label="Módulo cero" className="zero-layout">
     <style>{`
       @keyframes zeroSpaceFade { from { opacity: 0; } to { opacity: 1; } }
       .zero-layout {
         display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
-        grid-template-rows: 100svh; min-height: 100svh; background: #11131a; color: #f2f3f7; isolation: isolate;
-        opacity: 1; transform: none; animation: none;
+        grid-template-rows: minmax(0, 1fr); width: 100%; height: 100dvh; margin: 0; padding: 0;
+        background: #11131a; color: #f2f3f7; isolation: isolate;
         font-family: system-ui, sans-serif;
       }
       .zero-stage {
-        position: relative; display: grid; place-items: center; min-height: 100svh;
+        position: relative; display: grid; place-items: center; min-width: 0; min-height: 0;
         width: 100%; padding: 0; border: 0; overflow: hidden; isolation: isolate;
       }
       .zero-start, .zero-object { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -1781,7 +1834,7 @@ function ModuleZero() {
         text-align: center;
       }
       .zero-stage:has(.zero-subtitle span) .zero-harmonic-frame:has(.zero-time-caption) {
-        translate: 0 clamp(-4rem, calc((100svh - 880px) / 5), 0px);
+        translate: 0 clamp(-4rem, calc((100dvh - 880px) / 5), 0px);
       }
       .zero-question {
         position: absolute; width: min(87%, 900px); margin: 0; text-align: center;
@@ -1789,7 +1842,7 @@ function ModuleZero() {
         animation: zeroSpaceFade .55s ease both;
       }
       .zero-point { width: clamp(8px, 1.05vw, 16px); aspect-ratio: 1; border-radius: 50%; background: #000; }
-      .zero-harmonic-frame { position: relative; width: min(94%, 800px, 116svh); aspect-ratio: 16 / 9; pointer-events: none; }
+      .zero-harmonic-frame { position: relative; width: min(94%, 800px, 116dvh); aspect-ratio: 16 / 9; pointer-events: none; }
       .zero-harmonic-diagram, .zero-frequency-space, .zero-frequency-space canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
       .zero-trail-axis {
         position: absolute; bottom: 4%; display: flex; justify-content: space-between;
@@ -1805,8 +1858,22 @@ function ModuleZero() {
       }
       .zero-time-caption small { font: 400 clamp(.68rem, 1.35vw, .95rem)/1.3 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
       .zero-time-caption small:last-child { color: #46516b; }
-      .zero-controls { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.15rem; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: clamp(1rem, 2.6vw, 2.75rem); border-left: 1px solid #30333d; }
+      .zero-controls {
+        --zero-controls-padding: clamp(.75rem, 2.2vw, 2.5rem);
+        display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr);
+        min-height: 0; overflow: hidden; padding: 0; border-left: 1px solid #30333d;
+      }
+      .zero-control-bar { padding: .85rem var(--zero-controls-padding) .4rem; border-bottom: 1px solid #30333d; }
+      .zero-transport { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .25rem; }
+      .zero-controls .zero-transport button { display: grid; place-items: center; min-width: 0; padding: 0; }
+      .zero-transport svg { width: min(70%, 1.2rem); height: auto; fill: currentColor; }
+      .zero-settings {
+        display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.15rem;
+        min-height: 0; overflow: auto; overscroll-behavior: contain;
+        padding: 1rem var(--zero-controls-padding); scrollbar-color: #5d6476 #11131a;
+      }
       .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
+      .zero-settings .zero-scene:first-child { padding-top: 0; border-top: 0; }
       .zero-subtitle-toggle {
         display: flex; justify-content: space-between; align-items: center; gap: .5rem;
         min-height: 44px; font-size: .875rem; cursor: pointer;
@@ -1832,26 +1899,28 @@ function ModuleZero() {
         background: #202533; color: #f2f3f7; font: inherit; cursor: pointer;
       }
       .zero-controls .zero-play { background: #dce6ff; color: #131b2b; border-color: transparent; width: 100%; }
+      .zero-controls .zero-transport button:enabled:hover { background: #3b4660; }
       .zero-controls button:disabled { opacity: .55; cursor: default; }
+      .zero-playback-status { display: block; color: #dce6ff; font-size: .75rem; margin: 0 0 .4rem; }
       .zero-layout :focus-visible { outline: 2px solid #a8c3ff; outline-offset: -3px; }
       @media (min-width: 761px) and (max-width: 950px) {
-        .zero-controls { padding-inline: .75rem; }
+        .zero-controls { --zero-controls-padding: .75rem; }
         .zero-title h2 { font-size: .96rem; }
         .zero-title output { font-size: .69rem; }
       }
       @media (max-width: 760px) {
-        .zero-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(55svh, 1fr) auto; }
-        .zero-stage { min-height: 0; }
-        .zero-controls { border-left: 0; border-top: 1px solid #30333d; overflow: visible; }
+        .zero-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); }
+        .zero-harmonic-frame { width: min(94%, 800px, 76dvh); }
+        .zero-controls { --zero-controls-padding: .75rem; border-left: 0; border-top: 1px solid #30333d; }
         .zero-scene { padding-top: 1rem; }
       }
     `}</style>
     <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" style={{background:light ? "#fff" : "#000"}}>
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
-      {showObject && cue && <EmptySetScene durationMs={activeDurationMs} beacon={stage === "beacon"} cue={cue} />}
-      {question && <p className="zero-question">¿Cuál es la entidad mínima capaz de ser imaginada?</p>}
+      {showObject && cue && <EmptySetScene durationMs={activeDurationMs} beacon={stage === "beacon"} cue={cue} paused={paused} />}
+      {question && <p className="zero-question" style={{ animationPlayState: paused ? "paused" : "running" }}>¿Cuál es la entidad mínima capaz de ser imaginada?</p>}
       {stage === "one" && <span role="img" aria-label="Punto negro" className="zero-point" />}
-      {dots && <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",transform:`rotate(${stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,transition:"transform 0.15s linear",pointerEvents:"none"}}>
+      {dots && <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",transform:`rotate(${stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,pointerEvents:"none"}}>
         <circle cx="10" cy="20" r="10" fill="#000" /><circle cx="190" cy="20" r="10" fill="#000" />
         {stage === "multiplying" && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
       </svg>}
@@ -1863,41 +1932,64 @@ function ModuleZero() {
       </div>
     </div>
     <aside className="zero-controls" aria-label="Controles de las escenas">
-      <label className="zero-subtitle-toggle">
-        Activar subtítulos
-        <input type="checkbox" role="switch" checked={showSubtitles}
-          onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
-      </label>
-      {sceneControls.map(({ mode, title, id, label, duration, min, max, setDuration }) => {
-        const seconds = `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
-        return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}>
-          <div className="zero-title">
-            <h2 id={`${id}-title`}>{title}</h2>
-            <output htmlFor={id}>{seconds}</output>
-          </div>
-          <input id={id} aria-label={label} type="range" min={min} max={max} step={1} value={duration}
-            aria-valuetext={seconds} disabled={!canStart}
-            onChange={(event) => setDuration(Number(event.currentTarget.value))} />
-          {mode === "time" && <>
-            <div className="zero-sampling">
-              <label htmlFor="time-sampling">Intervalo de muestreo</label>
-              <output htmlFor="time-sampling">{timeSamplingMs} ms</output>
+      <div className="zero-control-bar">
+        <div className="zero-transport" role="group" aria-label="Reproducción">
+          <button type="button" aria-label="Escena anterior" title="Escena anterior"
+            disabled={sceneIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(-1)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h2v14H5zM19 5v14L8 12z" /></svg>
+          </button>
+          <button type="button" aria-label={paused ? "Reanudar" : "Reproducir"} title={paused ? "Reanudar" : "Reproducir"}
+            disabled={preparing || transportBusy || (!ready && !paused)}
+            onClick={() => ready ? void start() : void changePaused(false)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z" /></svg>
+          </button>
+          <button type="button" aria-label="Pausar" title="Pausar"
+            disabled={ready || preparing || paused || transportBusy} onClick={() => void changePaused(true)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
+          </button>
+          <button type="button" aria-label="Detener" title="Detener" disabled={ready} onClick={reset}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
+          </button>
+          <button type="button" aria-label="Escena siguiente" title="Escena siguiente"
+            disabled={sceneIndex === sceneControls.length - 1 || preparing || transportBusy} onClick={() => moveScene(1)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
+          </button>
+        </div>
+        <label className="zero-subtitle-toggle">
+          Activar subtítulos
+          <input type="checkbox" role="switch" checked={showSubtitles}
+            onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
+        </label>
+        {(preparing || paused) && <span className="zero-playback-status" role="status">{preparing ? "Preparando audio…" : "En pausa"}</span>}
+      </div>
+      <div className="zero-settings">
+        {sceneControls.map(({ mode, title, id, label, duration, min, max, setDuration }) => {
+          const seconds = `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
+          return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}>
+            <div className="zero-title">
+              <h2 id={`${id}-title`}>{title}</h2>
+              <output htmlFor={id}>{seconds}</output>
             </div>
-            <input id="time-sampling" type="range" min={50} max={1000} step={25} value={timeSamplingMs}
-              aria-valuetext={`${timeSamplingMs} milisegundos`} disabled={!canStart || previewMode === "time"}
-              onChange={(event) => setTimeSamplingMs(Number(event.currentTarget.value))} />
-          </>}
-          {previewMode === mode && !preparing
-            ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
-            : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start(mode)}>Probar escena</button>}
-        </div>;
-      })}
-      {canStart
-        ? <button type="button" onClick={() => void start()}>Iniciar secuencia</button>
-        : <button type="button" onClick={reset}>{preparing ? "Cancelar" : "Detener secuencia"}</button>}
-      {preparing && <p role="status">Preparando audio…</p>}
+            <input id={id} aria-label={label} type="range" min={min} max={max} step={1} value={duration}
+              aria-valuetext={seconds} disabled={!canStart}
+              onChange={(event) => setDuration(Number(event.currentTarget.value))} />
+            {mode === "time" && <>
+              <div className="zero-sampling">
+                <label htmlFor="time-sampling">Intervalo de muestreo</label>
+                <output htmlFor="time-sampling">{timeSamplingMs} ms</output>
+              </div>
+              <input id="time-sampling" type="range" min={50} max={1000} step={25} value={timeSamplingMs}
+                aria-valuetext={`${timeSamplingMs} milisegundos`} disabled={!canStart || previewMode === "time"}
+                onChange={(event) => setTimeSamplingMs(Number(event.currentTarget.value))} />
+            </>}
+            {previewMode === mode && !preparing
+              ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
+              : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start(mode, true)}>Probar escena</button>}
+          </div>;
+        })}
+      </div>
     </aside>
-  </section>;
+  </div>;
 }
 
 function playRhythm(engine: SoundEngine, step: number, cycle: number, section: number) {

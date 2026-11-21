@@ -23,6 +23,7 @@ export default function ChatRobot() {
     hostname !== 'rave.undertangoclub.com' &&
     pathname !== '/rave' &&
     !pathname?.startsWith('/panel-de-control') &&
+    !pathname?.startsWith('/central-de-control') &&
     !pathname?.startsWith('/rave/') &&
     !pathname?.startsWith('/la-cava') &&
     !pathname?.startsWith('/tropcalia') &&
@@ -37,7 +38,7 @@ export default function ChatRobot() {
 
   // The vendor iframe survives client-side navigation after its script loads.
   // Keep it hidden on home and the private Chloe page after client-side navigation.
-  if (pathname === '/' || pathname === '/chloe') return <style>{'#___cr-iframe { display: none !important; }'}</style>;
+  if (pathname === '/' || pathname === '/chloe' || pathname?.startsWith('/central-de-control')) return <style>{'#___cr-iframe { display: none !important; }'}</style>;
 
   if (!enabled) return null;
 

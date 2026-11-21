@@ -29,7 +29,19 @@
 }
 .heading h1 { max-width: 21ch; font-size: clamp(2.25rem, 6vw, 4.8rem); }
 .heading p, .muted { color: #dfc7ce; margin: .65rem 0 0; }
-.panel h2 { font-size: 1.65rem; }
+.panel h2 {
+  font-size: 1.65rem;
+  text-align: left;
+}
+
+.panel h2::after { content: none; }
+
+/* The site-wide section reveal is only initialized on the home page. */
+.panel section {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
 
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 1rem; }
 

@@ -10,7 +10,7 @@ const steps = [
     name: "Página 860",
     place: "Punto de partida",
     description: "La página 860 de Multiversos es lo que nos permite salir adelante y lo que protegemos desde el inicio.",
-    record: { title: "860 · Multiversos", href: "/860-multiversos" },
+    record: { title: "860 · Multiversos", href: "https://www.undertangoclub.com/860-multiversos" },
   },
   {
     id: "e2",
@@ -71,6 +71,81 @@ const beyond = steps[steps.length - 1];
 
 type Step = (typeof steps)[number];
 type StepId = Step["id"];
+
+type LogEntry = {
+  date: string;
+  label: string;
+  title: string;
+  body: string;
+  source?: { href: string; label: string };
+};
+
+const originLog: LogEntry[] = [
+  {
+    date: "2026-11-21",
+    label: "21 de noviembre de 2026",
+    title: "La escena cero se integró a la página 860",
+    body: "Se incorporaron el espacio de proyección, el panel de controles y la apertura con el conjunto vacío tridimensional. La transición de negro a blanco quedó ajustable.",
+    source: {
+      href: "https://github.com/O-UnderTango-Club/UnderTangoWEBNextJS/pull/75",
+      label: "Ver integración de la escena cero"
+    }
+  },
+  {
+    date: "2026-11-17",
+    label: "17 de noviembre de 2026",
+    title: "Primera versión de la nueva escena cero",
+    body: "Se abrió la revisión de una escena con la proyección en el 75 % de la pantalla y los controles en el 25 % restante. Se probaron la transición y el arranque y la detención de la secuencia.",
+    source: {
+      href: "https://github.com/O-UnderTango-Club/UnderTangoWEBNextJS/pull/75",
+      label: "Ver revisión de la escena cero"
+    }
+  },
+  {
+    date: "2026-11-13",
+    label: "13 de noviembre de 2026",
+    title: "Tres frecuencias toman forma",
+    body: "La secuencia audiovisual de 860 incorporó 111, 222 y 333 Hz. Sus ondas se combinaron en un objeto tridimensional que gira en pantalla.",
+    source: {
+      href: "https://github.com/O-UnderTango-Club/UnderTangoWEBNextJS/commit/e489c3ae8ce2c595de411dd35d9a0cc32161231d",
+      label: "Ver el cambio en 860"
+    }
+  },
+  {
+    date: "2026-10-12",
+    label: "12 de octubre de 2026",
+    title: "La performance se presentó a la convocatoria",
+    body: "Se envió la postulación de «Ø Primera voluntad» a la convocatoria de Performance y Tecnologías y se conservó el comprobante de recepción."
+  },
+  {
+    date: "2026-09-27",
+    label: "27 de septiembre de 2026",
+    title: "Resonancia poética · Justicia de frente",
+    body: "Se publicó el registro de la selección oficial del videoclip «Justicia de frente — Øid Mortales» en el Festival Multiversos. El cruce con 860 está en el diálogo entre sonido, imagen y tecnología.",
+    source: {
+      href: "https://www.undertangoclub.com/central#84-multiversos",
+      label: "Ver el registro del videoclip"
+    }
+  }
+];
+
+function SquareLog() {
+  return (
+    <div className="peon867-log" role="region" aria-labelledby="peon867-log-title">
+      <h2 id="peon867-log-title">Log de la casilla</h2>
+      <ol>
+        {originLog.map((entry) => (
+          <li key={entry.date}>
+            <time dateTime={entry.date}>{entry.label}</time>
+            <h3>{entry.title}</h3>
+            <p>{entry.body}</p>
+            {entry.source && <a href={entry.source.href}>{entry.source.label} <span aria-hidden="true">↗</span></a>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 function Pawn() {
   return (
@@ -166,23 +241,26 @@ export default function PawnRoute() {
             </div>
             <figcaption><span><i aria-hidden="true" /> E1 · Punto de partida</span><span>Elegí una casilla</span></figcaption>
           </figure>
-          <div className="peon867-stage" role="region" aria-label="Etapa seleccionada">
-            <div className="peon867-stage-copy" aria-live="polite" aria-atomic="true">
-              <p className="peon867-coordinate">{stage.code}</p>
-              <p className="peon867-meta">{stage.place}</p>
-              <h2>{stage.name}</h2>
-              {"description" in stage && <p>{stage.description}</p>}
-              <div className="peon867-record">
-                <h3>{"record" in stage ? "Primer registro" : "Registro de la etapa"}</h3>
-                {"record" in stage
-                  ? <Link href={stage.record.href}>{stage.record.title} <span aria-hidden="true">↗</span></Link>
-                  : <p>Pendiente de registro.</p>}
+          <div className="peon867-details">
+            <div className="peon867-stage" role="region" aria-label="Etapa seleccionada">
+              <div className="peon867-stage-copy" aria-live="polite" aria-atomic="true">
+                <p className="peon867-coordinate">{stage.code}</p>
+                <p className="peon867-meta">{stage.place}</p>
+                <h2>{stage.name}</h2>
+                {"description" in stage && <p>{stage.description}</p>}
+                <div className="peon867-record">
+                  <h3>{"record" in stage ? "Primer registro" : "Registro de la etapa"}</h3>
+                  {"record" in stage
+                    ? <Link href={stage.record.href}>{stage.record.title} <span aria-hidden="true">↗</span></Link>
+                    : <p>Pendiente de registro.</p>}
+                </div>
               </div>
+              <nav className="peon867-stage-nav" aria-label="Recorrer las etapas">
+                <div>{previous && <a href={"#" + previous.id} onClick={(event) => selectStage(event, previous.id)}><span aria-hidden="true">←</span> {previous.code}</a>}</div>
+                <div>{next && <a href={"#" + next.id} onClick={(event) => selectStage(event, next.id)}>{next.code} <span aria-hidden="true">→</span></a>}</div>
+              </nav>
             </div>
-            <nav className="peon867-stage-nav" aria-label="Recorrer las etapas">
-              <div>{previous && <a href={"#" + previous.id} onClick={(event) => selectStage(event, previous.id)}><span aria-hidden="true">←</span> {previous.code}</a>}</div>
-              <div>{next && <a href={"#" + next.id} onClick={(event) => selectStage(event, next.id)}>{next.code} <span aria-hidden="true">→</span></a>}</div>
-            </nav>
+            {selectedId === "e1" && <SquareLog />}
           </div>
         </div>
       </div>
@@ -250,6 +328,15 @@ const styles = `
   }
   .peon867-cell.is-current .peon867-square-label,.peon867-cell.is-origin .peon867-square-label{position:absolute;bottom:7%;right:4%}
   .peon867-empty{font-family:system-ui,sans-serif;font-size:clamp(.9rem,2.2vw,1.6rem);line-height:1;align-self:start;margin-top:10%}
+  .peon867-details{min-width:0}
+  .peon867-log{padding:22px 0 0;margin-top:24px;border-top:1px solid var(--line)}
+  .peon867-log h2{font-size:clamp(1.65rem,2.6vw,2.15rem);line-height:1.1;margin:0 0 18px}
+  .peon867-log ol{padding:0;margin:0;list-style:none}
+  .peon867-log li{padding:14px 0;border-top:1px solid var(--line)}
+  .peon867-log time{color:var(--amber);font-family:ui-monospace,monospace;font-size:.75rem}
+  .peon867-log h3{font-size:1.3rem;line-height:1.2;margin:5px 0 6px}
+  .peon867-log p{margin:0;color:var(--muted)}
+  .peon867-log a{display:inline-block;margin-top:6px;color:var(--amber);text-underline-offset:4px}
   .peon867-stage{display:flex;flex-direction:column;justify-content:space-between;min-width:0;min-height:340px;padding:clamp(18px,3vw,34px);border:1px solid var(--line);background:linear-gradient(135deg,#352621,#211917 75%)}
   .peon867-stage-copy p{margin:0 0 14px;color:var(--muted)}
   .peon867-stage-copy .peon867-coordinate{font-size:clamp(1.8rem,4vw,3rem);line-height:1;color:var(--amber);margin-bottom:12px}

@@ -15,16 +15,19 @@
 }
 .actionTitle:hover { color: #e1c58a; }
 .actionTitle > span:last-child { color: #d0ac6c; }
-.actionControls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.actionTools {
   margin-top: 14px;
   padding-top: 13px;
   border-top: 1px solid #ffffff22;
 }
-.actionControls[hidden] { display: none; }
-.actionControls button, .undo {
+.actionToolsRow, .actionControls {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.actionTools[hidden], .actionControls[hidden], .actionDetails[hidden] { display: none; }
+.actionControls button, .detailsButton, .undo {
   padding: 9px 14px;
   min-height: 44px;
   border: 1px solid #ffffff44;
@@ -34,6 +37,28 @@
   font-size: 14px;
 }
 .actionControls button:hover:not(:disabled), .undo:hover:not(:disabled) { border-color: #e1c58a; }
+.detailsButton {
+  flex: 0 0 auto;
+  color: #f1d19a;
+  border-color: #d0ac6c75;
+}
+.detailsButton:hover, .detailsButton[aria-expanded="true"] {
+  background: #d0ac6c1a;
+  border-color: #d0ac6c;
+}
+.actionDetails {
+  padding: 12px 14px;
+  margin-top: 10px;
+  border-radius: 10px;
+  background: #191b1b;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.actionDetails > div + div { margin-top: 12px; }
+.actionDetails p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
 .actionControls button[data-confirming="true"] {
   background: #e1c58a;
   color: #171816;

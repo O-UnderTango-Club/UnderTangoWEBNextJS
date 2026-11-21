@@ -1816,7 +1816,7 @@ function ModuleZero() {
     <aside className="zero-controls" aria-label="Controles de las escenas">
       {sceneControls.map(({ mode, title, id, label, duration, min, max, setDuration }) => {
         const seconds = `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
-        return <section key={mode} className="zero-scene" aria-labelledby={`${id}-title`}>
+        return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}>
           <div className="zero-title">
             <h2 id={`${id}-title`}>{title}</h2>
             <output htmlFor={id}>{seconds}</output>
@@ -1836,7 +1836,7 @@ function ModuleZero() {
           {previewMode === mode && !preparing
             ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
             : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start(mode)}>Probar escena</button>}
-        </section>;
+        </div>;
       })}
       {canStart
         ? <button type="button" onClick={() => void start()}>Iniciar secuencia</button>

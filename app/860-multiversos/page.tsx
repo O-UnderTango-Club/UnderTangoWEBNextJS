@@ -1826,7 +1826,7 @@ function ModuleZero() {
       .zero-title { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
       .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
-      .zero-controls input[type="range"] { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
+      .zero-controls input[type=range] { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
       .zero-sampling { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; font-size: .75rem; }
       .zero-sampling output { color: #e5e9f9; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls button {

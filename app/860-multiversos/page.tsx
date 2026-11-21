@@ -1812,16 +1812,14 @@ function ModuleZero() {
         min-height: 44px; font-size: .875rem; cursor: pointer;
       }
       .zero-subtitle-toggle input {
-        appearance: none; display: grid; align-items: center; flex: none; margin: 0;
+        appearance: none; flex: none; margin: 0;
         width: 2.25rem; height: 1.25rem; border: 1px solid #8991a4; border-radius: 1rem;
-        background: #303542; cursor: pointer;
+        background: radial-gradient(circle at .5625rem 50%, #f2f3f7 .35rem, transparent .4rem), #303542;
+        cursor: pointer;
       }
-      .zero-subtitle-toggle input::before {
-        content: ""; width: .75rem; height: .75rem; margin-left: .1875rem;
-        border-radius: 50%; background: #f2f3f7;
+      .zero-subtitle-toggle input:checked {
+        background: radial-gradient(circle at calc(100% - .5625rem) 50%, #131b2b .35rem, transparent .4rem), #adc4ff;
       }
-      .zero-subtitle-toggle input:checked { background: #adc4ff; }
-      .zero-subtitle-toggle input:checked::before { transform: translateX(1rem); background: #131b2b; }
       .zero-layout .zero-subtitle-toggle input:focus-visible { outline-offset: 3px; }
       .zero-title { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }

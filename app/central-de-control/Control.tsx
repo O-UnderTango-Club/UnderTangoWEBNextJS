@@ -103,6 +103,7 @@ export default function Control() {
   const [mode, setMode] = useState<Mode>("overview");
   const [showRest, setShowRest] = useState(false);
   const [opened, setOpened] = useState<string | null>(null);
+  const [detailsOpened, setDetailsOpened] = useState<string | null>(null);
   const [armed, setArmed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
@@ -202,6 +203,12 @@ export default function Control() {
   const card = (task: typeof actions[number]) => {
     const expanded = opened === task.id;
     const confirming = armed === task.id;
+    const description = task.description?.trim();
+    const comment = task.comment?.trim();
+    const distinctComment = comment && comment !== description ? comment : "";
+    const hasDetails = Boolean(description || distinctComment);
+    const showingDetails = detailsOpened === task.id;
+    const detailsId = `details-${task.id}`;
     const recurring = task.baseStage === "recurring";
     const eligibleToday = ["ready", "recurring", "doing"].includes(task.stage)
       && !task.issues.length && !task.blockers.length;
@@ -226,16 +233,37 @@ export default function Control() {
         {task.owner && <p className={styles.owner}>{task.owner}</p>}
         {task.stage === "waiting" && task.blockers.length > 0 && <p className={styles.owner}>Espera: {task.blockers.join(", ")}</p>}
         {task.issues.length > 0 && <p className={styles.warn}>Revisar: {task.issues.join(" · ")}</p>}
-        <div className={styles.actionControls} id={`controls-${task.id}`} hidden={!expanded}>
-          <button type="button" disabled={locked || !eligibleToday} onClick={() => void save("doneToday", task)}>
-            Por hoy ya estamos
-          </button>
-          {!recurring && <button type="button" disabled={locked} data-confirming={confirming}
-            onClick={() => confirming ? void save("finish", task) : setArmed(task.id)}>
-            {confirming ? "Confirmar finalización" : "Finalizada"}
-          </button>}
-          {!eligibleToday && <p>El cierre por hoy está disponible para acciones que podés ejecutar ahora.</p>}
-          {confirming && <p role="status">Tocá de nuevo para finalizar esta acción.</p>}
+        <div className={styles.actionTools} hidden={!expanded && !hasDetails}>
+          <div className={styles.actionToolsRow}>
+            {hasDetails && (
+              <button className={styles.detailsButton} type="button" aria-label={`Detalles de ${task.name}`}
+                aria-expanded={showingDetails} aria-controls={detailsId}
+                onClick={() => setDetailsOpened(current => current === task.id ? null : task.id)}>
+                Detalles <span aria-hidden="true">{showingDetails ? "▴" : "▾"}</span>
+              </button>
+            )}
+            <div className={styles.actionControls} id={`controls-${task.id}`} hidden={!expanded}>
+              <button type="button" disabled={locked || !eligibleToday} onClick={() => void save("doneToday", task)}>
+                Por hoy ya estamos
+              </button>
+              {!recurring && <button type="button" disabled={locked} data-confirming={confirming}
+                onClick={() => confirming ? void save("finish", task) : setArmed(task.id)}>
+                {confirming ? "Confirmar finalización" : "Finalizada"}
+              </button>}
+              {!eligibleToday && <p>El cierre por hoy está disponible para acciones que podés ejecutar ahora.</p>}
+              {confirming && <p role="status">Tocá de nuevo para finalizar esta acción.</p>}
+            </div>
+          </div>
+          {hasDetails && <div className={styles.actionDetails} id={detailsId} hidden={!showingDetails}>
+            {description && <div>
+              <strong>Contexto del proyecto</strong>
+              <p>{description}</p>
+            </div>}
+            {distinctComment && <div>
+              <strong>Comentario</strong>
+              <p>{distinctComment}</p>
+            </div>}
+          </div>}
         </div>
       </article>
     );

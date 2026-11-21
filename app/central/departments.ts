@@ -37,7 +37,8 @@ export const departments: Department[] = [
     ],
   },
   {
-    number: "84", keyword: "Marketing", title: "Marketing, audiovisual y medios",
+    number: "84", keyword: "Marketing", title: "Marketing, Comunicación y Audiovisuales",
+    link: { href: "/84", label: "Abrir panel de publicaciones" },
     emptyLabel: "Vacante al momento",
     description: "Comunicación, prensa, campañas, redes y producción audiovisual. Convierte la actividad real del sistema en presencia, relato, difusión y demanda.",
     members: [],

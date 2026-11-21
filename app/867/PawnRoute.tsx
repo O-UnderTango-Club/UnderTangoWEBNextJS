@@ -4,15 +4,65 @@ import Link from "next/link";
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 
 const steps = [
-  { id: "e1", code: "E1", name: "La llamada", place: "Iguazú · Punto de partida", description: "Encontrar el corazón de Multiversos: qué le pasa al público cuando la música electrónica en vivo, la imagen y la escena empiezan a hablar entre sí.", proof: "Una idea clara, un arco y una primera versión que se pueda ensayar." },
-  { id: "e2", code: "E2", name: "El ensayo con cámara", place: "Iguazú · Ensayo con cámara", description: "Probar el comienzo, las transiciones y el final frente a una cámara. Ver qué se entiende y qué se pierde cuando la obra pasa a pantalla.", proof: "Una toma de prueba y una lista breve de ajustes para Posadas." },
-  { id: "e3", code: "E3", name: "El registro principal", place: "Posadas · Registro principal", description: "Capturar un recorrido completo de la obra, con sonido e imagen que dejen sentir lo que pasa en escena.", proof: "Un registro legible y un fragmento que muestre por qué vale la pena verla en vivo." },
-  { id: "e4", code: "E4", name: "La obra viaja en un enlace", place: "Video · Dossier", description: "Hacer que alguien que nunca vio Multiversos pueda entender la propuesta, imaginarla en su sala y saber qué hace falta para montarla.", proof: "Un video, una presentación breve y una ficha técnica." },
-  { id: "e5", code: "E5", name: "Aliados en la frontera", place: "Triple Frontera · Primera prueba", description: "Llevar la pieza a otro espacio cercano. Probar cómo cambia cuando entran un público y una sala distintos.", proof: "Una función piloto, una devolución del espacio y aprendizajes de montaje." },
-  { id: "e6", code: "E6", name: "El circuito regional", place: "Argentina · Brasil · Paraguay", description: "Encontrar un formato que se pueda montar en más de un lugar, sin perder la intensidad ni la identidad de la obra.", proof: "Una versión portátil que funcione en otra sala y deje referencias para la próxima." },
-  { id: "e7", code: "E7", name: "El puente", place: "Europa · Ruta por construir", description: "Buscar salas y festivales afines, y unir fechas que tengan sentido artístico y logístico.", proof: "Interés concreto de un espacio y un itinerario viable." },
-  { id: "e8", code: "E8", name: "La primera función", place: "Europa · Meta", description: "Llegar al otro lado con la obra completa: tocar, encontrarse con otro público y dejar material para el próximo movimiento.", proof: "Una primera función realizada y una referencia para seguir circulando." },
-  { id: "e9", code: "E9", name: "Más allá del tablero", place: "Multiverso · Trascendencia", description: "El peón cruza el borde del tablero. Multiversos se abre a otras dimensiones: el sonido, la imagen y la escena pueden volver a encontrarse en formas que este recorrido todavía no alcanza a dibujar." },
+  {
+    id: "e1",
+    code: "E1",
+    name: "Página 860",
+    place: "Punto de partida",
+    description: "La página 860 de Multiversos es lo que nos permite salir adelante y lo que protegemos desde el inicio.",
+    record: { title: "860 · Multiversos", href: "/860-multiversos" },
+  },
+  {
+    id: "e2",
+    code: "E2",
+    name: "Primera ejecución en vivo",
+    place: "Puerto Iguazú · 2 de diciembre de 2026",
+  },
+  {
+    id: "e3",
+    code: "E3",
+    name: "Presentación en Posadas",
+    place: "Posadas · 12 de diciembre de 2026",
+  },
+  {
+    id: "e4",
+    code: "E4",
+    name: "Primera presentación independiente",
+    place: "Sede por definir",
+    description: "La primera presentación independiente de Multiversos podría realizarse en Foz de Iguazú o en Ciudad del Este.",
+  },
+  {
+    id: "e5",
+    code: "E5",
+    name: "Buenos Aires",
+    place: "Argentina",
+  },
+  {
+    id: "e6",
+    code: "E6",
+    name: "Gran Bretaña",
+    place: "Europa",
+  },
+  {
+    id: "e7",
+    code: "E7",
+    name: "Polonia",
+    place: "Europa",
+  },
+  {
+    id: "e8",
+    code: "E8",
+    name: "Hacerse conocido",
+    place: "Reconocimiento",
+    description: "Que Multiversos empiece a ser conocido más allá de los lugares donde se presentó.",
+  },
+  {
+    id: "e9",
+    code: "E9",
+    name: "Más allá del tablero",
+    place: "Multiverso · Trascendencia",
+    description: "El recorrido se abre a otras dimensiones, más allá del tablero.",
+  },
 ] as const;
 
 const letters = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -68,14 +118,14 @@ export default function PawnRoute() {
     return (
       <a
         key={step.code}
-        className={className + " is-stop" + (active ? " is-current" : "")}
+        className={className + " is-stop" + (active ? " is-current" : "") + (step.id === "e1" ? " is-origin" : "")}
         href={"#" + step.id}
-        aria-label={step.code + ": " + step.name}
+        aria-label={step.code + ": " + step.name + (step.id === "e1" ? ", conjunto vacío" : "")}
         aria-current={active ? "step" : undefined}
         onClick={(event) => selectStage(event, step.id)}
       >
         {axes}
-        {active && <Pawn />}
+        {step.id === "e1" ? <span className="peon867-empty" aria-hidden="true">∅</span> : active && <Pawn />}
         <span className="peon867-square-label" aria-hidden="true">{step.code}</span>
       </a>
     );
@@ -89,7 +139,7 @@ export default function PawnRoute() {
         <header className="peon867-intro">
           <p className="peon867-index"><span>867</span> <span>UNA RUTA PARA MULTIVERSOS</span></p>
           <h1 id="peon867-title">El camino del <em>peón</em><span aria-hidden="true">.</span></h1>
-          <p className="peon867-lead">Una performance de electrónica en vivo, visuales y escena. Empieza en Iguazú y se abre paso, casilla a casilla, hacia Europa.</p>
+          <p className="peon867-lead">El recorrido de Multiversos desde la página 860, con un registro de lo que pasó en cada etapa.</p>
         </header>
         <div className="peon867-hero">
           <figure className="peon867-figure peon867-frame">
@@ -121,8 +171,13 @@ export default function PawnRoute() {
               <p className="peon867-coordinate">{stage.code}</p>
               <p className="peon867-meta">{stage.place}</p>
               <h2>{stage.name}</h2>
-              <p>{stage.description}</p>
-              {"proof" in stage && <p className="peon867-proof"><b>La prueba:</b> {stage.proof}</p>}
+              {"description" in stage && <p>{stage.description}</p>}
+              <div className="peon867-record">
+                <h3>{"record" in stage ? "Primer registro" : "Registro de la etapa"}</h3>
+                {"record" in stage
+                  ? <Link href={stage.record.href}>{stage.record.title} <span aria-hidden="true">↗</span></Link>
+                  : <p>Pendiente de registro.</p>}
+              </div>
             </div>
             <nav className="peon867-stage-nav" aria-label="Recorrer las etapas">
               <div>{previous && <a href={"#" + previous.id} onClick={(event) => selectStage(event, previous.id)}><span aria-hidden="true">←</span> {previous.code}</a>}</div>
@@ -173,19 +228,37 @@ const styles = `
   .peon867-figure figcaption{padding:10px 2px 0;color:#ffead0;font-size:clamp(.65rem,1.2vw,.8rem)}
   .peon867-figure figcaption i{display:inline-block;width:8px;height:8px;margin-right:4px;border-radius:50%;background:var(--amber)}
   .peon867 h2{font-size:clamp(2.5rem,5vw,4.5rem);line-height:1.05;letter-spacing:-.045em;margin:0 0 24px}
-  .peon867 .peon867-proof b{color:var(--paper)}
   .peon867-intro{max-width:940px;margin:20px auto 22px}
   .peon867-meta,.peon867-index,.peon867-coordinate{font-family:ui-monospace,monospace;letter-spacing:.12em}
   .peon867-index,.peon867-meta{font-size:.75rem}
   .peon867-beyond{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));margin:0 1px}
-  .peon867-cell.is-beyond{grid-column:5;aspect-ratio:1.6;background:#5f405d;color:#ffecf6;box-shadow:inset 0 0 0 1px #dbb6dd}
-  .peon867-cell.is-current.is-beyond{background:#e1bee5;color:#2c1632}
-  .peon867-cell.is-current .peon867-square-label{position:absolute;bottom:7%;right:4%}
+  .peon867-cell.is-beyond{
+    grid-column:5;
+    aspect-ratio:1;
+    margin-bottom:5px;
+    border:2px dashed #a6e5ff;
+    background:linear-gradient(145deg,#5d91b0 1%,#2d5577 26%,#a0d2e7 46%,#5292b4 50%,#204267 74%,#426b89 100%) padding-box;
+    color:#fff;
+    box-shadow:inset 0 0 8px #b5ecff75;
+  }
+  .peon867-cell.is-beyond .peon867-square-label{background:#112c43;color:#f2fbff}
+  .peon867-cell.is-beyond:hover,.peon867-cell.is-current.is-beyond{
+    border-color:#e2f9ff;
+    background:linear-gradient(145deg,#35688e 1%,#79adc6 28%,#def6ff 47%,#6eacce 51%,#2a547d 77%,#79a9c3 100%) padding-box;
+    color:#102c47;
+    box-shadow:0 0 12px #9bdfff8c,inset 0 0 8px #def6ff95;
+  }
+  .peon867-cell.is-current .peon867-square-label,.peon867-cell.is-origin .peon867-square-label{position:absolute;bottom:7%;right:4%}
+  .peon867-empty{font-family:system-ui,sans-serif;font-size:clamp(.9rem,2.2vw,1.6rem);line-height:1;align-self:start;margin-top:10%}
   .peon867-stage{display:flex;flex-direction:column;justify-content:space-between;min-width:0;min-height:340px;padding:clamp(18px,3vw,34px);border:1px solid var(--line);background:linear-gradient(135deg,#352621,#211917 75%)}
   .peon867-stage-copy p{margin:0 0 14px;color:var(--muted)}
   .peon867-stage-copy .peon867-coordinate{font-size:clamp(1.8rem,4vw,3rem);line-height:1;color:var(--amber);margin-bottom:12px}
   .peon867-stage-copy .peon867-meta{color:var(--amber);font-weight:700;margin-bottom:6px}
   .peon867-stage h2{font-size:clamp(1.8rem,3.1vw,2.7rem);line-height:1.05;margin:0 0 12px}
+  .peon867-record{border-top:1px solid var(--line);padding-top:12px;margin-top:16px}
+  .peon867-record h3{font-family:inherit;font-size:.92rem;font-weight:700;margin:0 0 4px}
+  .peon867-record a{color:var(--amber);text-underline-offset:4px}
+  .peon867-record p{margin-bottom:0}
   .peon867-stage-nav{display:flex;justify-content:space-between;border-top:1px solid var(--line);margin-top:14px}
   .peon867-stage-nav a{display:inline-flex;gap:.6rem;align-items:center;min-height:44px;color:var(--paper);text-underline-offset:4px}
   @media(max-width:720px){

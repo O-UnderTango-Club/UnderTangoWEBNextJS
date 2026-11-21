@@ -1425,6 +1425,7 @@ const MODULE_ZERO_SCENE_BY_STAGE = {
 
 function ModuleZero() {
   const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE>("ready");
+  const activeScene = MODULE_ZERO_SCENE_BY_STAGE[stage];
   const [showSubtitles, setShowSubtitles] = useState(false);
   const [masterVolume, setMasterVolume] = useState(100);
   const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
@@ -1443,6 +1444,8 @@ function ModuleZero() {
   const [pulseCount, setPulseCount] = useState(0);
   const [pulseRate, setPulseRate] = useState(2);
   const audioRef = useRef<AudioContext | null>(null);
+  const settingsRef = useRef<HTMLDivElement | null>(null);
+  const activeSceneRef = useRef<HTMLDivElement | null>(null);
   const outputRef = useRef<GainNode | null>(null);
   const masterVolumeRef = useRef(100);
   const audibleVolumeRef = useRef(100);
@@ -1484,6 +1487,31 @@ function ModuleZero() {
       stop();
     };
   }, [reset, stop]);
+
+  useEffect(() => {
+    const settings = settingsRef.current;
+    const current = activeSceneRef.current;
+    if (!activeScene || !settings || !current) return;
+
+    const revealScene = () => {
+      const bounds = settings.getBoundingClientRect();
+      const row = current.getBoundingClientRect();
+      const inset = 10;
+      const top = bounds.top + settings.clientTop + inset;
+      const bottom = top + settings.clientHeight - 2 * inset;
+      if (row.top >= top && row.bottom <= bottom) return;
+
+      const alignTop = row.top < top || row.height > bottom - top;
+      const offset = alignTop ? row.top - top : row.bottom - bottom;
+      if (Math.abs(offset) < 1) return;
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      settings.scrollTo({ top: settings.scrollTop + offset, behavior: reduceMotion ? "auto" : "smooth" });
+    };
+
+    const observer = new ResizeObserver(revealScene);
+    observer.observe(settings);
+    return () => observer.disconnect();
+  }, [activeScene]);
 
   const changeMasterVolume = (volume: number) => {
     masterVolumeRef.current = volume;
@@ -1826,7 +1854,7 @@ function ModuleZero() {
     { mode: "space", title: "Escena 2 → 3", id: "space-duration", label: "Duración de la escena de dos a tres", duration: spaceSeconds, min: 3, max: 30, setDuration: setSpaceSeconds },
     { mode: "time", title: "Escena 3 → 4", id: "time-duration", label: "Duración de la escena de tres a cuatro", duration: timeSeconds, min: 4, max: 60, setDuration: setTimeSeconds },
   ] as const;
-  const sceneIndex = sceneControls.findIndex(({ mode }) => mode === MODULE_ZERO_SCENE_BY_STAGE[stage]);
+  const sceneIndex = sceneControls.findIndex(({ mode }) => mode === activeScene);
   const sceneTitle = sceneControls[sceneIndex]?.title;
   const moveScene = (offset: number) => {
     const scene = sceneControls[Math.max(0, sceneIndex) + offset];
@@ -1916,6 +1944,11 @@ function ModuleZero() {
       }
       .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
       .zero-settings .zero-scene:first-child { padding-top: 0; border-top: 0; }
+      .zero-scene[aria-current=step] {
+        border-radius: .35rem; border-top-color: transparent; background: #25324c;
+        box-shadow: 0 0 0 .42rem #25324c, 0 0 0 calc(.42rem + 1px) #819bd6,
+          0 0 1rem rgba(142, 169, 233, .23);
+      }
       .zero-subtitle-toggle {
         display: flex; justify-content: space-between; align-items: center; gap: .5rem;
         min-height: 44px; font-size: .875rem; cursor: pointer;
@@ -2024,10 +2057,12 @@ function ModuleZero() {
         </label>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
-      <div className="zero-settings">
+      <div className="zero-settings" ref={settingsRef}>
         {sceneControls.map(({ mode, title, id, label, duration, min, max, setDuration }) => {
           const seconds = `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
-          return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}>
+          const isActive = mode === activeScene;
+          return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}
+            ref={isActive ? activeSceneRef : undefined} aria-current={isActive ? "step" : undefined}>
             <div className="zero-title">
               <h2 id={`${id}-title`}>{title}</h2>
               <output htmlFor={id}>{seconds}</output>

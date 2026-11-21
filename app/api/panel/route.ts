@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sameOrigin } from "../../../src/lib/panel-access";
+import { sameOrigin, deviceActor, issueDevice, DEVICE_COOKIE, DEVICE_MAX_AGE } from "../../../src/lib/panel-access";
 import { authorize, PanelError, mutate, responseBoard, snapshot } from "../../../src/lib/panel-server";
 import { readDeadlines } from "../../../src/lib/panel-deadlines-server";
 export const dynamic="force-dynamic";
@@ -16,7 +16,10 @@ export async function GET(request: Request) {
       snapshot(new URL(request.url).searchParams.get("refresh")==="1"),
       readDeadlines().then(deadlines=>({deadlines,deadlinesError:""})).catch(()=>({deadlines:undefined,deadlinesError:"No se pudieron actualizar las fechas de Supabase."})),
     ]);
-    return NextResponse.json({...responseBoard(data),...agenda,actor},{headers});
+    const response = NextResponse.json({...responseBoard(data),...agenda,actor},{headers});
+    // Renew only an already valid device session; bearer authorization cannot enroll a browser.
+    if (deviceActor(request)) response.cookies.set(DEVICE_COOKIE, issueDevice(), { httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: DEVICE_MAX_AGE });
+    return response;
   } catch(error) { return failure(error); }
 }
 export async function POST(request: Request) {

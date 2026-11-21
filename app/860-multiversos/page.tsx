@@ -1338,14 +1338,14 @@ function EmptySetScene({ durationMs, beacon, cue, paused }: {
     }} />;
 }
 
-function playSceneOneGong(context: AudioContext, beginsAt: number) {
+function playSceneOneGong(context: AudioContext, output: AudioNode, beginsAt: number) {
   const bus = context.createGain();
   const room = context.createConvolver();
   const wet = context.createGain();
   room.buffer = makeRoomImpulse(context);
   wet.gain.value = 0.38;
-  bus.connect(context.destination);
-  bus.connect(room).connect(wet).connect(context.destination);
+  bus.connect(output);
+  bus.connect(room).connect(wet).connect(output);
 
   // The low modes share the sea's 55 Hz reference, with inharmonic metal above them.
   const modes = [
@@ -1386,7 +1386,7 @@ function playSceneOneGong(context: AudioContext, beginsAt: number) {
   };
 }
 
-function playModuleGong(context: AudioContext, time: number, root: number, strength = 1) {
+function playModuleGong(context: AudioContext, output: AudioNode, time: number, root: number, strength = 1) {
   const partials = [1, 1.5, 2.08, 2.76, 4.1];
   const peaks = [0.16, 0.085, 0.045, 0.025, 0.012];
   partials.forEach((partial, index) => {
@@ -1396,7 +1396,7 @@ function playModuleGong(context: AudioContext, time: number, root: number, stren
     envelope.gain.setValueAtTime(0.0001, time);
     envelope.gain.exponentialRampToValueAtTime(peaks[index] * strength, time + 0.015);
     envelope.gain.exponentialRampToValueAtTime(0.0001, time + 4.5 - index * 0.45);
-    oscillator.connect(envelope).connect(context.destination);
+    oscillator.connect(envelope).connect(output);
     oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
     oscillator.start(time);
     oscillator.stop(time + 4.6);
@@ -1426,6 +1426,7 @@ const MODULE_ZERO_SCENE_BY_STAGE = {
 function ModuleZero() {
   const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE>("ready");
   const [showSubtitles, setShowSubtitles] = useState(false);
+  const [masterVolume, setMasterVolume] = useState(100);
   const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
   const [oneSeconds, setOneSeconds] = useState(SCENE_ONE_DEFAULT_SECONDS);
   const [lineSeconds, setLineSeconds] = useState(SCENE_LINE_DEFAULT_SECONDS);
@@ -1442,6 +1443,9 @@ function ModuleZero() {
   const [pulseCount, setPulseCount] = useState(0);
   const [pulseRate, setPulseRate] = useState(2);
   const audioRef = useRef<AudioContext | null>(null);
+  const outputRef = useRef<GainNode | null>(null);
+  const masterVolumeRef = useRef(100);
+  const audibleVolumeRef = useRef(100);
   const timersRef = useRef(new Set<number>());
   const waitingCues = useRef(new Set<() => void>());
   const pausedRef = useRef(false);
@@ -1459,6 +1463,7 @@ function ModuleZero() {
     waitingCues.current.clear();
     const context = audioRef.current;
     audioRef.current = null;
+    outputRef.current = null;
     if (context && context.state !== "closed") void context.close();
   }, []);
 
@@ -1479,6 +1484,25 @@ function ModuleZero() {
       stop();
     };
   }, [reset, stop]);
+
+  const changeMasterVolume = (volume: number) => {
+    masterVolumeRef.current = volume;
+    if (volume > 0) audibleVolumeRef.current = volume;
+    setMasterVolume(volume);
+
+    const output = outputRef.current;
+    if (!output) return;
+    const now = output.context.currentTime;
+    const gain = output.gain;
+    const previousGain = gain.value;
+    gain.cancelScheduledValues(now);
+    if (output.context.state === "running") {
+      gain.setValueAtTime(previousGain, now);
+      gain.linearRampToValueAtTime(volume / 100, now + 0.025);
+    } else {
+      gain.setValueAtTime(volume / 100, now);
+    }
+  };
 
   const changePaused = async (next: boolean) => {
     const context = audioRef.current;
@@ -1529,6 +1553,10 @@ function ModuleZero() {
     try {
       const context = new AudioContext();
       audioRef.current = context;
+      const masterOutput = context.createGain();
+      masterOutput.gain.value = masterVolumeRef.current / 100;
+      masterOutput.connect(context.destination);
+      outputRef.current = masterOutput;
       if (startPaused) await context.suspend();
       else await context.resume();
       if (run !== runRef.current || audioRef.current !== context) return;
@@ -1560,7 +1588,7 @@ function ModuleZero() {
       const createChordBus = () => {
         const output = context.createGain();
         output.gain.value = 0.8;
-        output.connect(context.destination);
+        output.connect(masterOutput);
         return output;
       };
       const addTone = (bus: GainNode, frequency: number, time: number, attack: number) => {
@@ -1595,8 +1623,8 @@ function ModuleZero() {
         else atTime(time + spaceSeconds, () => setStage("space"));
       };
       const playHarmonics = (bus: GainNode, time: number, root: OscillatorNode) => {
-        playModuleGong(context, time, 330, 0.58);
-        playModuleGong(context, time + harmonicSeconds * HARMONIC_CUE.secondGong, 444, 0.55);
+        playModuleGong(context, masterOutput, time, 330, 0.58);
+        playModuleGong(context, masterOutput, time + harmonicSeconds * HARMONIC_CUE.secondGong, 444, 0.55);
         const second = addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
         const third = addTone(bus, 333, time + harmonicSeconds * HARMONIC_CUE.trace333, harmonicSeconds * (HARMONIC_CUE.result - HARMONIC_CUE.trace333));
         showAt("harmonics", time, () => enterDiagram("harmonics", time, harmonicSeconds));
@@ -1680,7 +1708,7 @@ function ModuleZero() {
           color.frequency.setTargetAtTime(700, beginsAt + questionMs / 1000, 2);
           color.Q.setTargetAtTime(1.4, beginsAt + questionMs / 1000, 2);
         }
-        source.connect(color); color.connect(gain); gain.connect(context.destination);
+        source.connect(color); color.connect(gain); gain.connect(masterOutput);
         source.onended = () => { source.disconnect(); color.disconnect(); gain.disconnect(); };
         source.start(beginsAt);
         if (!sustainMurmur) source.stop(beginsAt + waveSeconds);
@@ -1705,7 +1733,7 @@ function ModuleZero() {
       if (showBeacon) {
         if (mode === "opening") atOffset(oneStartsAt, beginLight);
         atOffset(questionMs, () => setStage("question"));
-        const disconnectGong = playSceneOneGong(context, beginsAt + pointMs / 1000);
+        const disconnectGong = playSceneOneGong(context, masterOutput, beginsAt + pointMs / 1000);
         atOffset(pointMs, () => setStage("one"));
         atOffset(pointMs + 11500, disconnectGong);
       }
@@ -1717,7 +1745,7 @@ function ModuleZero() {
         percussionGain.gain.setValueAtTime(1, beginning);
         percussionGain.gain.setValueAtTime(1, beginning + duration * 0.75);
         percussionGain.gain.linearRampToValueAtTime(0, beginning + duration + 0.4);
-        percussionGain.connect(context.destination);
+        percussionGain.connect(masterOutput);
         const beat = context.createBuffer(1, Math.floor(context.sampleRate * 0.012), context.sampleRate);
         const samples = beat.getChannelData(0);
         for (let i = 0; i < samples.length; i++) {
@@ -1766,7 +1794,7 @@ function ModuleZero() {
         });
       };
       const gongAt = beginsAt + lineStartsAt / 1000;
-      playModuleGong(context, gongAt, 330);
+      playModuleGong(context, masterOutput, gongAt, 330);
       showAt("line", gongAt, () => {
         setPulseCount(0);
         setPulseRate(2);
@@ -1780,6 +1808,8 @@ function ModuleZero() {
   };
 
   const showObject = stage === "opening" || stage === "beacon";
+  const muted = masterVolume === 0;
+  const soundAction = muted ? "Restaurar sonido" : "Silenciar sonido";
   const preparing = stage === "preparing";
   const ready = stage === "ready";
   const canStart = stage === "ready" || (previewMode !== null && !preparing);
@@ -1867,6 +1897,18 @@ function ModuleZero() {
       .zero-transport { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .25rem; }
       .zero-controls .zero-transport button { display: grid; place-items: center; min-width: 0; padding: 0; }
       .zero-transport svg { width: min(70%, 1.2rem); height: auto; fill: currentColor; }
+      .zero-master {
+        display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+        gap: .6rem; margin-top: .65rem;
+      }
+      .zero-controls .zero-master button { display: grid; place-items: center; width: 2.5rem; padding: 0; }
+      .zero-controls .zero-master button:hover { background: #3b4660; }
+      .zero-master button svg { width: 1.2rem; height: 1.2rem; }
+      .zero-master-label {
+        display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap;
+        gap: .1rem .35rem; font-size: .8rem;
+      }
+      .zero-master-label output { color: #dce6ff; font-variant-numeric: tabular-nums; }
       .zero-settings {
         display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.15rem;
         min-height: 0; overflow: auto; overscroll-behavior: contain;
@@ -1892,6 +1934,7 @@ function ModuleZero() {
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
       .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls input[type=range] { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
+      .zero-controls .zero-master input { margin: .35rem 0 0; }
       .zero-sampling { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; font-size: .75rem; }
       .zero-sampling output { color: #e5e9f9; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls button {
@@ -1954,6 +1997,25 @@ function ModuleZero() {
             disabled={sceneIndex === sceneControls.length - 1 || preparing || transportBusy} onClick={() => moveScene(1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
           </button>
+        </div>
+        <div className="zero-master">
+          <button type="button" aria-label={soundAction} title={soundAction}
+            onClick={() => changeMasterVolume(muted ? audibleVolumeRef.current : 0)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M3 9h4l5-4v14l-5-4H3z" />
+              <path fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"
+                d={muted ? "m16 9 5 6m0-6-5 6" : "M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12"} />
+            </svg>
+          </button>
+          <div>
+            <div className="zero-master-label">
+              <label htmlFor="zero-master-volume">Volumen master</label>
+              <output htmlFor="zero-master-volume">{masterVolume}%</output>
+            </div>
+            <input id="zero-master-volume" type="range" min={0} max={100} step={1}
+              value={masterVolume} aria-valuetext={`${masterVolume}%`}
+              onChange={(event) => changeMasterVolume(Number(event.currentTarget.value))} />
+          </div>
         </div>
         <label className="zero-subtitle-toggle">
           Activar subtítulos

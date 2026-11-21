@@ -41,6 +41,25 @@
 }
 .actionControls button:disabled, .undo:disabled { cursor: default; opacity: .5; }
 .actionControls p { flex-basis: 100%; margin: 0; font-size: 14px; color: #d5d6cf; }
+.actionDetails {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+.actionDetails summary {
+  padding: 12px 0;
+  cursor: pointer;
+  color: #e5c892;
+  font-size: 14px;
+}
+.actionDetails summary:focus-visible {
+  outline: 3px solid #efce8f;
+  outline-offset: 3px;
+}
+.actionControls .actionDetails p {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .main .footer {
   position: sticky;
   bottom: 0;

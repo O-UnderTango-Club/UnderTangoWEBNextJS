@@ -203,6 +203,7 @@ export default function Control() {
     const expanded = opened === task.id;
     const confirming = armed === task.id;
     const recurring = task.baseStage === "recurring";
+    const description = task.description.trim();
     const eligibleToday = ["ready", "recurring", "doing"].includes(task.stage)
       && !task.issues.length && !task.blockers.length;
     const department = departments.find(item => item.number === task.department);
@@ -227,6 +228,12 @@ export default function Control() {
         {task.stage === "waiting" && task.blockers.length > 0 && <p className={styles.owner}>Espera: {task.blockers.join(", ")}</p>}
         {task.issues.length > 0 && <p className={styles.warn}>Revisar: {task.issues.join(" · ")}</p>}
         <div className={styles.actionControls} id={`controls-${task.id}`} hidden={!expanded}>
+          {expanded && description && (
+            <details className={styles.actionDetails}>
+              <summary>Más información</summary>
+              <p>{description.replace(/(?:\\r)?\\n/g, "\n")}</p>
+            </details>
+          )}
           <button type="button" disabled={locked || !eligibleToday} onClick={() => void save("doneToday", task)}>
             Por hoy ya estamos
           </button>

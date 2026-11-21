@@ -151,7 +151,7 @@ export default function Control() {
       intent = retry?.operation === "undo" && retry.originalId === last.requestId
         ? retry : { operation, originalId: last.requestId, requestId: crypto.randomUUID() };
     } else {
-      if (!task || !data.revisions[task.id]) return;
+      if (!task || !data.revisions[task.id] || (operation === "finish" && task.baseStage === "recurring")) return;
       intent = retry?.operation === operation && retry.taskId === task.id
         ? retry : { operation, taskId: task.id, revision: data.revisions[task.id], snapshotRevision: data.snapshotRevision, requestId: crypto.randomUUID() };
     }
@@ -202,6 +202,7 @@ export default function Control() {
   const card = (task: typeof actions[number]) => {
     const expanded = opened === task.id;
     const confirming = armed === task.id;
+    const recurring = task.baseStage === "recurring";
     const eligibleToday = ["ready", "recurring", "doing"].includes(task.stage)
       && !task.issues.length && !task.blockers.length;
     const department = departments.find(item => item.number === task.department);
@@ -209,7 +210,7 @@ export default function Control() {
       <article className={styles.card} key={task.id}>
         <div className={styles.cardTop}>
           <span>{department ? `${department.number} · ${department.keyword}` : "Sin departamento"}</span>
-          <span>{stages[task.stage] || task.stage}</span>
+          <span>{stages[task.stage] || task.stage}{recurring && task.stage !== "recurring" ? " · recurrente" : ""}</span>
         </div>
         <h3>
           <button className={styles.actionTitle} type="button" aria-expanded={expanded} aria-controls={`controls-${task.id}`}
@@ -229,10 +230,10 @@ export default function Control() {
           <button type="button" disabled={locked || !eligibleToday} onClick={() => void save("doneToday", task)}>
             Por hoy ya estamos
           </button>
-          <button type="button" disabled={locked} data-confirming={confirming}
+          {!recurring && <button type="button" disabled={locked} data-confirming={confirming}
             onClick={() => confirming ? void save("finish", task) : setArmed(task.id)}>
             {confirming ? "Confirmar finalización" : "Finalizada"}
-          </button>
+          </button>}
           {!eligibleToday && <p>El cierre por hoy está disponible para acciones que podés ejecutar ahora.</p>}
           {confirming && <p role="status">Tocá de nuevo para finalizar esta acción.</p>}
         </div>

@@ -2,7 +2,7 @@ import { planGroup, isMember, isGroup } from "./action-groups";
 import { createHash } from "node:crypto";
 import { deviceActor } from "./panel-access";
 import { operationsSelected, readOperationsSnapshot, operationsReceipt, commitOperations, OperationsError, type OperationsSnapshot, type OperationsPatch } from "./panel-operations";
-import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, EditableStage, board, closed, classify, projectOpen, taskProjects, validateTask, finishTodayChanges, nextPanelDay, validWeekdays } from "./panel-model";
+import { BASE, TABLES, F, FRONTS, Snapshot, Raw, Stage, EditableStage, board, closed, classify, projectOpen, taskProjects, validateTask, finishTodayChanges, nextPanelDay, storedStage, validWeekdays } from "./panel-model";
 
 export class PanelError extends Error { constructor(message: string, public status=400) { super(message); } }
 export async function authorize(request: Request) {
@@ -179,6 +179,12 @@ async function performMutation(input: any, actor: string) {
     for(const [key,records] of [["projects",data.projects],["cases",data.cases],["dependencies",data.tasks],["events",data.events]] as const) if(key in change)fields[F.tasks[key]]=refs(change[key],records);
     let stage:EditableStage|undefined=change.stage;
     if(stage&&!states[stage])throw new PanelError("Estado inválido.");
+    // Central closes individual, non-recurring actions only. Use the stored
+    // stage: an explicit recurring action can look scheduled or blocked today.
+    if(current && stage==="done" && input.origin==="central-control"){
+      if(isGroup(current)) throw new PanelError("Los grupos se finalizan desde el Panel de control.",409);
+      if(storedStage(current)==="recurring") throw new PanelError("Una acción recurrente no se finaliza desde la Central. Usá «Por hoy ya estamos» cuando esté disponible.",409);
+    }
     if(!current&&!stage) stage="ready";
     if(!current&&!["ready","recurring"].includes(stage || "")) throw new PanelError("Toda acción nueva debe comenzar activa.");
     if(stage){[fields[F.tasks.status],fields[F.tasks.gate]]=states[stage];}

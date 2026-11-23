@@ -29,6 +29,8 @@ type MidiInputLike = {
   onmidimessage: ((event: { data: ArrayLike<number> }) => void) | null;
 };
 
+const MASTER_FADER = -1;
+
 type CcBinding = { inputId: string; cc: number };
 type RecordedPattern = Array<number | null>;
 type SceneSnapshot = {
@@ -72,6 +74,7 @@ type NoteVoice = {
 };
 
 type SoundEngine = {
+  output: GainNode;
   context: AudioContext;
   noteVoices: Map<number, NoteVoice>;
   sequenceOscillator: OscillatorNode;
@@ -315,6 +318,7 @@ function createSoundEngine(): SoundEngine {
 
   return {
     context,
+    output,
     noteVoices: new Map<number, NoteVoice>(),
     sequenceOscillator,
     sequenceSub,
@@ -1443,7 +1447,8 @@ const MODULE_ZERO_SCENE_BY_STAGE = {
 
 const MIDI_PITCH_NAMES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "Sol", "La♭", "La", "Si♭", "Si"];
 
-function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
+function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, pianoRouting, connectMidi, midiConnection, midiInputs }: {
+  masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding;
   pianoRouting: { current: PerformanceInput | null };
   connectMidi: () => Promise<void>;
   midiConnection: MidiConnection;
@@ -1455,7 +1460,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
   const extendedScene = typeof stage === "number" ? stage : null;
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
-  const [masterVolume, setMasterVolume] = useSavedSetting("masterVolume", 100);
+
   const [durationSeconds, setDurationSeconds] = useSavedSetting("durationSeconds", SCENE_ZERO_DEFAULT_SECONDS);
   const [oneSeconds, setOneSeconds] = useSavedSetting("oneSeconds", SCENE_ONE_DEFAULT_SECONDS);
   const [lineSeconds, setLineSeconds] = useSavedSetting("lineSeconds", SCENE_LINE_DEFAULT_SECONDS);
@@ -1598,10 +1603,11 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
     return () => observer.disconnect();
   }, [activeScene]);
 
-  const changeMasterVolume = (volume: number) => {
+  useEffect(() => {
+    const volume = masterVolume;
     masterVolumeRef.current = volume;
     if (volume > 0) audibleVolumeRef.current = volume;
-    setMasterVolume(volume);
+
 
     const output = outputRef.current;
     if (!output) return;
@@ -1615,7 +1621,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
     } else {
       gain.setValueAtTime(volume / 100, now);
     }
-  };
+  }, [masterVolume]);
 
   const changePaused = async (next: boolean) => {
     const context = audioRef.current;
@@ -2420,7 +2426,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
         </div>
         <div className="zero-master">
           <button type="button" aria-label={soundAction} title={soundAction}
-            onClick={() => changeMasterVolume(muted ? audibleVolumeRef.current : 0)}>
+            onClick={() => setMasterVolume(muted ? audibleVolumeRef.current : 0)}>
             <svg aria-hidden="true" viewBox="0 0 24 24">
               <path fill="currentColor" d="M3 9h4l5-4v14l-5-4H3z" />
               <path fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"
@@ -2434,9 +2440,10 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
             </div>
             <input id="zero-master-volume" type="range" min={0} max={100} step={1}
               value={masterVolume} aria-valuetext={`${masterVolume}%`}
-              onChange={(event) => changeMasterVolume(Number(event.currentTarget.value))} />
+              onChange={(event) => setMasterVolume(Number(event.currentTarget.value))} />
           </div>
         </div>
+        <button type="button" onClick={learnFader} aria-pressed={learningFader}>{learningFader ? "Mové el fader · Cancelar" : faderBinding ? "Reasignar fader · CC " + faderBinding.cc : "Asignar fader al volumen"}</button>
         <label className="zero-subtitle-toggle">
           Activar subtítulos
           <input type="checkbox" role="switch" checked={showSubtitles}
@@ -2563,6 +2570,9 @@ export default function Multiversos860Page() {
   const [midiConnection, setMidiConnection] = useState<MidiConnection>("checking");
   const [midiMessage, setMidiMessage] = useState("BUSCANDO MIDI");
   const [midiLearnFor, setMidiLearnFor] = useState<number | null>(null);
+  const [masterVolume, setMasterVolume] = useSavedSetting("masterVolume", 100);
+  const volumeRef = useRef(masterVolume);
+  volumeRef.current = masterVolume;
   const [ccMap, setCcMap] = useSavedSetting<Record<number, CcBinding>>("ccMap", {});
   const [activeNote, setActiveNote] = useState<number | null>(null);
   const [heldNotes, setHeldNotes] = useState<number[]>([]);
@@ -2610,6 +2620,7 @@ export default function Multiversos860Page() {
     let engine = engineRef.current;
     if (!engine) {
       engine = createSoundEngine();
+      engine.output.gain.value = 0.56 * volumeRef.current / 100;
       engineRef.current = engine;
       valuesRef.current.forEach((value, index) => applyControl(engine as SoundEngine, index, value, bpmRef.current));
     }
@@ -2895,6 +2906,7 @@ export default function Multiversos860Page() {
         }
         if (kind === 0xb0) {
           if (first === 120 || first === 123) piano?.releaseMidi(input.id, channel);
+          if (first >= 120) return;
           const waitingFor = midiLearnRef.current;
           if (waitingFor !== null) {
             setCcMap((current) => {
@@ -2909,14 +2921,15 @@ export default function Multiversos860Page() {
             });
             midiLearnRef.current = null;
             setMidiLearnFor(null);
-            setMidiMessage("FADER " + CONTROLS[waitingFor].number + " · " + (input.name || "ENTRADA MIDI") + " · CC " + first);
+            setMidiMessage("FADER " + (waitingFor === MASTER_FADER ? "MASTER" : CONTROLS[waitingFor].number) + " · " + (input.name || "ENTRADA MIDI") + " · CC " + first);
             return;
           }
           const mappedIndex = Object.keys(ccMapRef.current).find((key) => {
             const binding = ccMapRef.current[Number(key)];
             return binding?.inputId === input.id && binding.cc === first;
           });
-          if (mappedIndex !== undefined) updateControl(Number(mappedIndex), second / 127);
+          if (mappedIndex === String(MASTER_FADER)) setMasterVolume(Math.round(second * 100 / 127));
+          else if (mappedIndex !== undefined) updateControl(Number(mappedIndex), second / 127);
         }
       };
       input.onmidimessage = onMessage;
@@ -3222,10 +3235,15 @@ export default function Multiversos860Page() {
     }
   }, []);
 
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (engine) engine.output.gain.setTargetAtTime(0.56 * masterVolume / 100, engine.context.currentTime, 0.01);
+  }, [masterVolume]);
+
   const beginMidiLearn = (index: number) => {
     midiLearnRef.current = index;
     setMidiLearnFor(index);
-    setMidiMessage("MOVÉ EL FADER PARA ASIGNAR " + CONTROLS[index].number);
+    setMidiMessage("MOVÉ EL FADER PARA ASIGNAR " + (index === MASTER_FADER ? "VOLUMEN MASTER" : CONTROLS[index].number));
   };
 
   const toggleStep = (index: number) => {
@@ -3325,7 +3343,7 @@ export default function Multiversos860Page() {
 
   return (
     <main className={styles.console}>
-      <ModuleZero pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} />
+      <ModuleZero masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else beginMidiLearn(MASTER_FADER); }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} />
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
           <span className={styles.brandMark}>&#9670;</span>

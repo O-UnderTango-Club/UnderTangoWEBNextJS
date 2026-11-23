@@ -2048,6 +2048,8 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
       .scene-mixer-tools { position:sticky; top:0; background:#15151d; z-index:1; }
       .sample-bank {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,auto);grid-auto-flow:column;}
       .sample-bank > div {border:1px solid #44444f;min-width:0;}
+      .sample-bank > [data-selected=true] {box-shadow:inset 0 0 0 2px #fbd27d;background:#332d25;}
+      .sample-bank button.sample-empty {text-align:left;min-width:0;}
       .sample-empty {padding:.1rem .5rem;color:#92929e;font-variant-numeric:tabular-nums;}
       .sample-bank .scene-mixer-row {gap:.22rem;padding:.25rem;}
       .sample-bank .scene-mixer-row span {width:100%;}

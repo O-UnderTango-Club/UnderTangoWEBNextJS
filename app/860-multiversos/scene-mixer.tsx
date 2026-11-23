@@ -24,6 +24,16 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
   const [bars,setBars] = useSavedSetting("mixerBars",4);
   const [room,setRoom] = useState(false);
   const [bankMap,setBankMap]=useSavedSetting<Record<string,Assignment>>("sampleBankMidi",{});
+  const target=useRef<number|null>(null);
+  const [selected,setSelected]=useState<number|null>(null);
+  const reservedSlots=useRef(new Set<number>());
+  const previous=useRef(new Map<number,Clip>());
+  const currentClips=useRef(clips);
+  currentClips.current=clips;
+  function selectSlot(slot:number|null){
+    target.current=slot;setSelected(slot);
+    if(slot!==null)setBankSlot(slot);
+  }
   const [bankSlot,setBankSlot]=useState(0);
   const [bankLearn,setBankLearn]=useState<BankAction|null>(null);
   const downControls=useRef(new Set<string>());
@@ -51,7 +61,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
   const [shared,setShared] = useState(false);
   const [requesting,setRequesting] = useState(false);
   const alive=useRef(true);
-  const queued=useRef<Mode[]>([]);
+  const queued=useRef<{kind:Mode;slot:number}[]>([]);
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
   useEffect(()=>{if(input)warmRecorder(input.context as AudioContext);},[input]);
   // The scene and the lower synth own different AudioContexts. Bridge the synth
@@ -155,25 +165,29 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
     if(matrix && !pending.current.has("matrix"))modes.push("matrix");
     if(live && !pending.current.has("live"))modes.push("live");
     if(!modes.length)return;
-    if(occupied.current.size+modes.length>9){
-      setMessage(modes.length===2?"Matriz y En vivo necesitan dos espacios libres.":"Los nueve espacios están ocupados.");
+    const first=target.current;
+    if(first!==null && reservedSlots.current.has(first)){
+      setMessage(`S${first+1} está grabando.`);return;
+    }
+    const slots=Array.from({length:9},(_,i)=>((first??0)+i)%9)
+      .filter(slot=>!reservedSlots.current.has(slot) && (slot===first || !occupied.current.has(slot)));
+    if(slots.length<modes.length){
+      setMessage(modes.length===2?"Elegí un canal y dejá otro libre para la segunda toma.":"Elegí el canal que querés volver a grabar.");
       return;
     }
+    const plan=modes.map((kind,i)=>({kind,slot:slots[i]}));
     if(!scene || !input || !master){
-      if(ready){queued.current=modes;startScene();}
+      if(ready){queued.current=plan;startScene();}
       return;
     }
-    for(const kind of modes)record(kind);
+    for(const {kind,slot} of plan)record(kind,slot);
   }
-  function record(kind:Mode) {
-    if(!scene || !input || !master || pending.current.has(kind))return;
+  function record(kind:Mode,slot:number) {
+    if(!scene || !input || !master || pending.current.has(kind) || reservedSlots.current.has(slot))return;
     if(paused || requesting)return;
-
     const ctx=input.context as AudioContext;
     if(cycle>180){setMessage("Para grabar hasta 3 minutos a este tempo, elegí menos compases.");return;}
-    const slot=Array.from({length:9},(_,i)=>i).find(i=>!occupied.current.has(i)) ?? -1;
-    if(slot<0)return;
-    occupied.current.add(slot);
+    reservedSlots.current.add(slot);
     const stopAtStart=stopGeneration.current;
     const attempt=generation.current;
     setMessage("");
@@ -209,7 +223,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
         for(const source of sources)source.disconnect(gate);
         gate.disconnect();protectedTake.disconnect();capture.stop();gain.disconnect();
       };
-      pending.current.set(kind,{silence:()=>{gate.gain.setValueAtTime(0,ctx.currentTime);capture.finish(Math.round(ctx.currentTime*ctx.sampleRate));},cancel:()=>{occupied.current.delete(slot);dispose();}});
+      pending.current.set(kind,{silence:()=>{gate.gain.setValueAtTime(0,ctx.currentTime);capture.finish(Math.round(ctx.currentTime*ctx.sampleRate));},cancel:()=>{reservedSlots.current.delete(slot);dispose();}});
       const label=scene;
       function onLoop(channels:Float32Array[]){
         if(released || attempt!==generation.current)return;
@@ -219,16 +233,19 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
         const id=++serial.current;
         launchContext.current.set(buffer,ctx);
         const stopped=stopAtStart!==stopGeneration.current;
-        setClips(all=>[...all,{id,slot,stopped,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:bankVolumes.current.get(slot) ?? 75,muted:false}]);if(!pending.current.size)setState("idle");
+        const old=currentClips.current.find(c=>c.slot===slot);
+        if(old)previous.current.set(slot,old);
+        reservedSlots.current.delete(slot);occupied.current.add(slot);
+        setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:old?.volume ?? bankVolumes.current.get(slot) ?? 75,muted:false}]);if(!pending.current.size)setState("idle");
       };
       setState("recording");
     } catch {
       if(attempt!==generation.current)return;
-      occupied.current.delete(slot);cancel();setMessage(room ? "Revisá el permiso de micrófono. Para grabar solo el instrumento, desactivá Sala." : "No se pudo iniciar la captura de audio.");
+      reservedSlots.current.delete(slot);cancel();setMessage(room ? "Revisá el permiso de micrófono. Para grabar solo el instrumento, desactivá Sala." : "No se pudo iniciar la captura de audio.");
     }
   }
   function releaseLive(){
-    queued.current=queued.current.filter(kind=>kind!=="live");
+    queued.current=queued.current.filter(take=>take.kind!=="live");
     pending.current.get("live")?.silence();
   }
   useEffect(()=>{
@@ -236,7 +253,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
     return ()=>window.removeEventListener("blur",releaseLive);
   },[]);
   useEffect(()=>{
-    if(queued.current.length && scene && input && master){const modes=queued.current;queued.current=[];for(const kind of modes)record(kind);}
+    if(queued.current.length && scene && input && master){const modes=queued.current;queued.current=[];for(const {kind,slot} of modes)record(kind,slot);}
   },[scene,input,master]);
   const pressed=useRef(new Set<string>());
   useEffect(()=>{
@@ -346,6 +363,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
       const {slot,action}=assignment;
       const clip=clips.find(c=>c.slot===slot);
       if(action==="volume"){
+        selectSlot(slot);
         const volume=Math.round(value*100);
         bankVolumes.current.set(slot,volume);
         if(clip)setClips(all=>all.map(c=>c.id===clip.id?{...c,volume}:c));
@@ -354,6 +372,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
       if(!value){downControls.current.delete(id);return;}
       if(downControls.current.has(id))return;
       downControls.current.add(id);
+      selectSlot(slot);
       if(!clip)return;
       if(action==="stop" || (action==="toggle" && !clip.stopped))stopClip(clip.id);
       else launch(clip.id,action==="next");
@@ -369,6 +388,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
         onKeyDown={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();if(!e.repeat)pressRecord();}}}
         onKeyUp={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();releaseLive();}}}>●</button>
       <button aria-label="Detener todos los clips" title="Detener todos los clips" onClick={stopAll}>■</button>
+      <button title="Usar el próximo espacio libre" aria-label="Destino automático" onClick={()=>selectSlot(null)}>{selected===null?"Auto":`Destino S${selected+1}`}</button>
       <label title="Grabar los compases configurados desde el próximo tiempo 1"><input type="checkbox" checked={matrix} disabled={state!=="idle"} onChange={e=>setMatrix(e.target.checked)}/> Matriz</label>
       <label title="Grabar desde que apretás hasta que soltás"><input type="checkbox" checked={live} disabled={state!=="idle"} onChange={e=>setLive(e.target.checked)}/> En vivo</label>
       <output>{state==="recording" ? [pending.current.has("live")?"En vivo grabando":"",pending.current.has("matrix")?(waiting?"Matriz espera el 1":"Matriz grabando"):""].filter(Boolean).join(" · ") : shared?"Audio compartido":"Estéreo de 860"}</output>
@@ -406,17 +426,25 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
     <div className="sample-bank" aria-label="Banco de nueve samples">
     {Array.from({length:9},(_,slot)=>{
       const clip=clips.find(c=>c.slot===slot);
-      if(!clip)return <div className="sample-empty" aria-label={`Espacio ${slot+1} libre`} key={slot}>{slot+1}</div>;
+      if(!clip)return <button className="sample-empty" aria-label={`Espacio ${slot+1} libre`} aria-pressed={selected===slot}
+        data-selected={selected===slot} onClick={()=>selectSlot(slot)} key={slot}>S{slot+1}</button>;
       const waitingForPlay=master && launchContext.current.get(clip.buffer)===master.context && clip.launchBeat!==undefined && master.context.currentTime<clock(master.context)+clip.launchBeat*beat;
-      return <div className="scene-mixer-row" role="group" aria-label={`Sample ${slot+1}`} key={slot}>
-      <span>{slot+1} · {clip.mode==="matrix"?"Matriz":"En vivo"} · {clip.scene} · {clip.buffer.duration.toFixed(1)} s · {clip.stopped?"Detenido":waitingForPlay?"Espera del 1":"En marcha"}</span>
+      return <div className="scene-mixer-row" role="group" aria-label={`Sample ${slot+1}`} key={slot}
+        data-selected={selected===slot} onPointerDownCapture={()=>selectSlot(slot)} onClickCapture={()=>selectSlot(slot)} onFocusCapture={()=>selectSlot(slot)}>
+      <button aria-label={`Seleccionar S${slot+1}`} aria-pressed={selected===slot} onClick={()=>selectSlot(slot)}>S{slot+1}</button>
+      <span>{clip.mode==="matrix"?"Matriz":"En vivo"} · {clip.scene} · {clip.buffer.duration.toFixed(1)} s · {clip.stopped?"Detenido":waitingForPlay?"Espera del 1":"En marcha"}</span>
       <button title="Detener sample" aria-label="Detener sample" onClick={()=>stopClip(clip.id)}>■</button>
       <button title="Reproducir ahora" aria-label="Reproducir ahora" disabled={!master||paused} onClick={()=>launch(clip.id,false)}>▶</button>
       <button title="Reproducir en el próximo tiempo 1" aria-label="Reproducir en el próximo tiempo 1" disabled={!master||paused} onClick={()=>launch(clip.id,true)}>▶ 1</button>
       <button aria-pressed={clip.muted} onClick={() => setClips(all => all.map(c => c.id === clip.id ? {...c,muted:!c.muted} : c))}>{clip.muted ? "Activar" : "Mutear"}</button>
       <input aria-label={"Volumen del sonido " + clip.id} type="range" min="0" max="100" value={clip.volume}
-        onChange={e => { const volume = Number(e.target.value); setClips(all => all.map(c => c.id === clip.id ? {...c,volume} : c)); }} />
-      <button aria-label={"Eliminar sonido " + clip.id} onClick={() => {halt(clip.id);occupied.current.delete(slot);setMessage("");setClips(all => all.filter(c => c.id !== clip.id));}}>×</button>
+        onChange={e => { selectSlot(slot);const volume = Number(e.target.value); setClips(all => all.map(c => c.id === clip.id ? {...c,volume} : c)); }} />
+      {previous.current.has(slot) && <button disabled={reservedSlots.current.has(slot)} onClick={()=>{
+        const old=previous.current.get(slot);if(!old)return;
+        previous.current.delete(slot);halt(clip.id);
+        setClips(all=>all.map(c=>c.id===clip.id?{...old,stopped:true}:c));
+      }}>Deshacer toma</button>}
+      <button disabled={reservedSlots.current.has(slot)} aria-label={"Eliminar sonido " + clip.id} onClick={() => {halt(clip.id);previous.current.delete(slot);occupied.current.delete(slot);setMessage("");setClips(all => all.filter(c => c.id !== clip.id));}}>×</button>
     </div>;})}</div>
   </div>;
 }

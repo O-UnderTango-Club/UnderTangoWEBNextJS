@@ -8,7 +8,7 @@ const path = "/banda";
 const headline = "Música en vivo para sentir";
 const lead = "Un recorrido que culmina en baile";
 const title = `${headline} | Ø UnderTango Club`;
-const description = `${lead}. El quinteto de Ø UnderTango Club cruza soul, funk, samba y clásicos latinos. De 90 minutos a 3 horas, a convenir.`;
+const description = `${lead}. La banda de Ø UnderTango Club cruza soul, funk, samba y clásicos latinos. De 90 minutos a 3 horas, a convenir.`;
 const mainVideo = "jKjgHl4xL0A";
 const bookingMessage = "Hola, me interesa contratar a la banda de Ø UnderTango Club. Quisiera consultar disponibilidad y formato para mi espacio.";
 const bookingUrl = `https://wa.me/5493757618270?text=${encodeURIComponent(bookingMessage)}`;
@@ -56,7 +56,7 @@ export default function BandaPage() {
               <p className={styles.label}>Ø UnderTango Club · Triple Frontera</p>
               <h1 id="band-title">{headline}</h1>
               <p className={styles.lead}>{lead}</p>
-              <p>El quinteto de Ø UnderTango Club cruza soul, funk, samba y clásicos latinos en un show que empieza para escuchar y va ganando ritmo hasta abrir la pista. Armamos la presentación de principio a fin: adaptamos el repertorio y la duración a tu público y coordinamos la puesta con el espacio para darle a la noche el clima que buscás.</p>
+              <p>La banda de Ø UnderTango Club cruza soul, funk, samba y clásicos latinos en un show que empieza para escuchar y va ganando ritmo hasta abrir la pista. Armamos la presentación de principio a fin: adaptamos el repertorio y la duración a tu público y coordinamos la puesta con el espacio para darle a la noche el clima que buscás.</p>
               <BookingLink />
             </header>
             <div className={styles.feature}>
@@ -70,19 +70,19 @@ export default function BandaPage() {
               <p>Podemos empezar con un set para escuchar y llevar la noche hacia la pista. Acordamos el repertorio, la cantidad de sets y las pausas según el espacio, el público y el horario.</p>
             </div>
             <dl className={styles.facts}>
-              <div><dt>Formación</dt><dd>Quinteto de la Triple Frontera</dd></div>
+              <div><dt>Formación</dt><dd>5 instrumentistas + voz</dd></div>
               <div><dt>Duración</dt><dd>De 90 minutos a 3 horas, a convenir</dd></div>
             </dl>
           </section>
 
           <section className={styles.more} aria-labelledby="band-live">
-            <h2 id="band-live">El quinteto en escena</h2>
+            <h2 id="band-live">La banda en escena</h2>
             <div className={styles.videoGrid}>
               <div className={styles.videoCard}>
                 <GalleryVideo id="iQOyq6xWdcc" title="Fragmento Bailongo en Foz do Iguaçú" portrait />
               </div>
               <div className={styles.videoCard}>
-                <GalleryVideo id="Rv-paFARbME" title="Banda Musical ø Undertango" portrait />
+                <GalleryVideo id="7yVf96vjurQ" title="Tango Rave · Banda en vivo" portrait />
                 <p>Registro de la banda en otro formato de Ø UnderTango Club.</p>
               </div>
             </div>

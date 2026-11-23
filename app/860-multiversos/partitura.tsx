@@ -12,6 +12,7 @@ import { PerformanceProjection, usePerformanceInput } from "./performance-view";
 import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isTimbreScene, type ExtendedScene } from "./extended-scenes";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
+import { TypeProjection } from "./type-projection";
 import { AudienceProjection } from "./audience-projection";
 import { HardstyleTrack, PrimeraVoluntad } from "./primera-voluntad";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
@@ -27,16 +28,11 @@ type ControlDefinition = {
   unit: string;
 };
 
-type MidiInputLike = {
-  id: string;
-  name?: string;
-  state?: string;
-  onmidimessage: ((event: { data: ArrayLike<number> }) => void) | null;
-};
+import { monitorMidiInputs, type MidiInputLike, type MidiDevice } from "./midi-inputs";
 
 const MASTER_FADER = -1;
 
-type CcBinding = { inputId: string; cc: number; bendChannel?: number };
+type CcBinding = { inputId: string; inputName?: string; cc: number; bendChannel?: number };
 type RecordedPattern = Array<number | null>;
 type SceneSnapshot = {
   values?: number[];
@@ -69,7 +65,7 @@ type MidiNavigator = Navigator & {
 };
 
 type MidiConnection = "checking" | "ready" | "blocked" | "unavailable";
-type MidiDevice = { id: string; name: string };
+
 
 type NoteVoice = {
   oscillator: OscillatorNode;
@@ -1570,7 +1566,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
   }, [stop]);
 
   useEffect(() => {
-    if ((!nextTimedScene && extendedScene !== 61) || nextAfterSeconds === 0 || !cue || paused) return;
+    if ((!nextTimedScene && extendedScene !== 62) || nextAfterSeconds === 0 || !cue || paused) return;
     const deadline = cue.beginsAt + nextAfterSeconds;
     let timer: number | undefined;
     const advance = () => {
@@ -2358,8 +2354,10 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
         input={chordLoop.frame ? { ...noteInput, sounding: [...noteInput.sounding, ...chordLoop.frame.sounding] } : noteInput}
         beginsAt={cue?.beginsAt ?? 0} />}
       {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
-      {(extendedScene === 60 || extendedScene === 61) && cue && <HardstyleTrack clock={cue.context} output={outputRef.current} paused={paused} />}
-      {extendedScene && cue && (extendedScene === 61
+      {(extendedScene === 60 || extendedScene === 61 || extendedScene === 62) && cue && <HardstyleTrack clock={cue.context} output={outputRef.current} paused={paused} />}
+      {extendedScene && cue && (extendedScene === 42 || extendedScene === 62
+        ? <TypeProjection scene={extendedScene} beginsAt={cue.beginsAt} clock={cue.context} paused={paused} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} />
+        : extendedScene === 61
         ? <AudienceProjection analyser={spiralAnalyser} attack={extended.attack} paused={paused} />
         : extendedScene === 60
         ? <PrimeraVoluntad key={cue.beginsAt} clock={cue.context} analyser={spiralAnalyser} attack={extended.attack} paused={paused}
@@ -2368,7 +2366,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer analyser={extendedScene === 45 || extendedScene === 60 || extendedScene === 61 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      <SceneMixer connectMidi={connectMidi} analyser={extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null ? <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>
         : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>
@@ -2376,7 +2374,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
       <div className="zero-settings" ref={settingsRef}>
         {sceneControls.map((control) => {
           const { mode, title, id, duration } = control;
-          const seconds = duration === 0 ? (mode === 61 ? "Hasta detener" : "Hasta avanzar") : `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
+          const seconds = duration === 0 ? (mode === 62 ? "Hasta detener" : "Hasta avanzar") : `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
           const isActive = mode === activeScene;
           return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}
             ref={isActive ? activeSceneRef : undefined} aria-current={isActive ? "step" : undefined}>
@@ -2447,9 +2445,10 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
       </div>
       <div className="zero-control-bar" role="group" aria-label="Panel de control">
         <div id="zero-midi" className="zero-midi">
-          <p role="status">{midiInputs.length ? `MIDI activo · ${midiInputs.map(({ name }) => name).join(", ")}`
+          <p role="status">{midiInputs.length ? `MIDI · ${midiInputs.map(({ name, status, signal }) => name + " · " + (status === "failed" ? "no se pudo abrir" : status === "opening" ? "abriendo…" : signal || "abierto, esperando señal")).join(" / ")}`
             : midiConnection === "checking" ? "Buscando piano MIDI… Podés usar el teclado."
-              : "Teclado de la computadora listo"}</p>
+              : midiConnection === "blocked" ? "Permiso MIDI bloqueado. Habilitá MIDI para este sitio y actualizá las entradas."
+              : midiConnection === "unavailable" ? "MIDI no disponible en este navegador." : "Sin entradas MIDI · Teclado de la computadora listo"}</p>
           <button className="zero-midi-icon" type="button" title="Actualizar dispositivos MIDI" aria-label="Actualizar dispositivos MIDI" disabled={scanState === "busy"} onClick={async () => {
             setScanState("busy");
             try { await connectMidi(true); } finally { setScanState("done"); }
@@ -2655,7 +2654,7 @@ export default function Multiversos860Page() {
   const midiAccessRef = useRef<MidiAccessLike | null>(null);
   const midiRequestRef = useRef<Promise<void> | null>(null);
   const midiMountedRef = useRef(false);
-  const connectedMidiIds = useRef(new Set<string>());
+
   const pianoRouting = useRef<PerformanceInput | null>(null);
   const midiLearnRef = useRef<number | null>(null);
   const ccMapRef = useRef(ccMap);
@@ -2875,28 +2874,23 @@ export default function Multiversos860Page() {
     }).catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
   }, [ensureAudio, stopRecording]);
 
-  const refreshMidiInputs = useCallback(() => {
+  const onMidiData = useRef<(port: MidiInputLike, data: ArrayLike<number>) => void>(() => {});
+  const [portMonitor] = useState(() => monitorMidiInputs(setMidiInputs,
+    (port, data) => onMidiData.current(port, data),
+    id => { pianoRouting.current?.releaseMidi(id); window.dispatchEvent(new Event("860-midi-disconnect")); }));
+  const refreshMidiInputs = useCallback((retry = false) => {
     const access = midiAccessRef.current;
     if (!access || !midiMountedRef.current) return;
-    const inputs = Array.from(access.inputs.values()).filter((input) => input.state !== "disconnected").map((input) => ({
-      id: input.id,
-      name: input.name || "Entrada MIDI",
-    }));
-    const ids = new Set(inputs.map(({ id }) => id));
-    for (const id of connectedMidiIds.current) {
-      if (!ids.has(id)) pianoRouting.current?.releaseMidi(id);
-    }
-    connectedMidiIds.current = ids;
-    setMidiInputs(inputs);
+    portMonitor.refresh(access.inputs.values(), retry);
+    setMidiMessage(Array.from(access.inputs.values()).some(p => p.state !== "disconnected") ? "ENTRADAS MIDI DETECTADAS" : "CONECTÁ EL CASIO O LOS FADERS USB");
     setMidiConnection("ready");
-    setMidiMessage(inputs.length > 0 ? "MIDI LISTO · " + inputs.length + " ENTRADA(S)" : "CONECTÁ EL CASIO O LOS FADERS USB");
-  }, []);
+  }, [portMonitor]);
 
   const connectMidi = useCallback(async (rescan = false) => {
     const active = midiAccessRef.current;
-    if (active && !rescan) {
-      active.onstatechange = refreshMidiInputs;
-      refreshMidiInputs();
+    if (active) {
+      active.onstatechange = () => refreshMidiInputs();
+      refreshMidiInputs(rescan);
       return;
     }
     if (midiRequestRef.current) return midiRequestRef.current;
@@ -2914,9 +2908,9 @@ export default function Multiversos860Page() {
     setMidiConnection("checking");
     const request = Promise.resolve().then(() => requestAccess.call(navigator, { sysex: false })).then((access) => {
       if (midiMountedRef.current) {
-        if (active && active !== access) active.onstatechange = null;
+
         midiAccessRef.current = access;
-        access.onstatechange = refreshMidiInputs;
+        access.onstatechange = () => refreshMidiInputs();
         refreshMidiInputs();
       }
     }).catch(() => {
@@ -2936,40 +2930,41 @@ export default function Multiversos860Page() {
     void connectMidi();
     return () => {
       midiMountedRef.current = false;
+      portMonitor.close();
       if (midiAccessRef.current) {
         midiAccessRef.current.onstatechange = null;
       }
     };
   }, [connectMidi]);
 
-  useEffect(() => {
-    const access = midiAccessRef.current;
-    if (!access || midiInputs.length === 0) return;
-    const inputs = Array.from(access.inputs.values()).filter((input) => input.state !== "disconnected");
-    const handlers = inputs.map((input) => {
-      const onMessage = (event: { data: ArrayLike<number> }) => {
-        const status = event.data[0] || 0;
-        const first = event.data[1] || 0;
-        const second = event.data[2] || 0;
+  onMidiData.current = (input, data) => {
+        const status = data[0] || 0;
+        const first = data[1] || 0;
+        const second = data[2] || 0;
         const kind = status & 0xf0;
         const piano = pianoRouting.current;
         const channel = status & 0x0f;
         const controlType = kind === 0xe0 ? "bend" : kind === 0xb0 && first < 120 ? "cc" :
           kind === 0x90 || kind === 0x80 ? "note" : null;
+        const uniqueName = input.name && midiInputs.filter(p => p.name === input.name).length === 1 ? input.name : null;
+        const fromPort = (binding?: CcBinding) => !!binding && (binding.inputId === input.id ||
+          (uniqueName === binding.inputName && !midiInputs.some(port => port.id === binding.inputId)));
+        const alias = uniqueName ? JSON.stringify(["name",uniqueName,channel,controlType,first]) : "";
         if (controlType && midiLearnRef.current === null) {
           const id = JSON.stringify([input.id,channel,controlType,controlType==="bend"?0:first]);
-          const reserved = Object.values(ccMapRef.current).some(b=>b.inputId===input.id &&
+          const reserved = Object.values(ccMapRef.current).some(b=>fromPort(b) &&
             (controlType==="bend"?b.bendChannel===channel:controlType==="cc" && b.cc===first));
           const value = controlType==="bend"?(first+128*second)/16383:kind===0x80?0:second/127;
           if(!window.dispatchEvent(new CustomEvent("860-bank-midi",{cancelable:true,
-            detail:{id,value,type:controlType,reserved,label:(input.name||"MIDI")+" · "+(controlType==="bend"?"Pitch Bend":(controlType==="cc"?"CC ":"Nota ")+first)+" · canal "+(channel+1)}})))return;
+            detail:{id,alias,value,type:controlType,reserved,label:(input.name||"MIDI")+" · "+(controlType==="bend"?"Pitch Bend":(controlType==="cc"?"CC ":"Nota ")+first)+" · canal "+(channel+1)}})))return;
         }
-        if (kind === 0x90 || kind === 0x80 || (kind === 0xb0 && first < 120)) {
+        if (midiLearnRef.current === null && (kind === 0x90 || kind === 0x80 || (kind === 0xb0 && first < 120))) {
           const id = JSON.stringify([input.id,channel,kind===0xb0?"cc":"note",first]);
-          const event = new CustomEvent("860-record-midi",{cancelable:true,detail:{id,on:kind!==0x80 && second>0}});
+          const event = new CustomEvent("860-record-midi",{cancelable:true,detail:{id,alias,on:kind!==0x80 && second>0}});
           if(!window.dispatchEvent(event)) return;
         }
         if (kind === 0x90 && second > 0) {
+          if (midiLearnRef.current === MASTER_FADER) setFaderSignal((input.name || "MIDI") + " · Nota " + first + " recibida. Para volumen, mové un fader o Pitch Bend.");
           if (piano) piano.midiNote(input.id, channel, first, second / 127);
           else {
             captureNote(first);
@@ -2984,9 +2979,9 @@ export default function Multiversos860Page() {
         }
         const master = ccMapRef.current[MASTER_FADER];
         const learning = midiLearnRef.current === MASTER_FADER;
-        if (kind === 0xe0 && (learning || (master?.inputId === input.id && master.bendChannel === channel))) {
+        if (kind === 0xe0 && (learning || (fromPort(master) && master?.bendChannel === channel))) {
           if (learning) {
-            setCcMap(current => ({ ...current, [MASTER_FADER]: {inputId: input.id, cc: -1, bendChannel: channel} }));
+            setCcMap(current => ({ ...current, [MASTER_FADER]: {inputId: input.id, inputName: input.name, cc: -1, bendChannel: channel} }));
             midiLearnRef.current = null;
             setMidiLearnFor(null);
           }
@@ -2999,7 +2994,7 @@ export default function Multiversos860Page() {
           if (first === 120 || first === 123) piano?.releaseMidi(input.id, channel);
           if (first >= 120) return;
           const waitingFor = midiLearnRef.current;
-          if (learning || (master?.inputId === input.id && master.cc === first)) {
+          if (learning || (fromPort(master) && master?.cc === first)) {
             setMasterVolume(Math.round(second * 100 / 127));
             setFaderSignal(input.name + " · CC " + first + " · " + second + "/127");
           }
@@ -3008,9 +3003,9 @@ export default function Multiversos860Page() {
               const next = { ...current };
               Object.keys(next).forEach((key) => {
                 const binding = next[Number(key)];
-                if (binding && binding.inputId === input.id && binding.cc === first) delete next[Number(key)];
+                if (binding && fromPort(binding) && binding.cc === first) delete next[Number(key)];
               });
-              next[waitingFor] = { inputId: input.id, cc: first };
+              next[waitingFor] = { inputId: input.id, inputName: input.name, cc: first };
               ccMapRef.current = next;
               return next;
             });
@@ -3021,21 +3016,13 @@ export default function Multiversos860Page() {
           }
           const mappedIndex = Object.keys(ccMapRef.current).find((key) => {
             const binding = ccMapRef.current[Number(key)];
-            return binding?.inputId === input.id && binding.cc === first;
+            return fromPort(binding) && binding?.cc === first;
           });
           if (mappedIndex === String(MASTER_FADER)) setMasterVolume(Math.round(second * 100 / 127));
           else if (mappedIndex !== undefined) updateControl(Number(mappedIndex), second / 127);
         }
       };
-      input.onmidimessage = onMessage;
-      return { input, onMessage };
-    });
-    return () => {
-      handlers.forEach(({ input, onMessage }) => {
-        if (input.onmidimessage === onMessage) input.onmidimessage = null;
-      });
-    };
-  }, [captureNote, midiInputs, releaseNote, startNote, updateControl]);
+
 
   useEffect(() => {
     const keyMap: Record<string, number> = {
@@ -3336,7 +3323,14 @@ export default function Multiversos860Page() {
     if (engine) engine.output.gain.setTargetAtTime(0.56 * masterVolume / 100, engine.context.currentTime, 0.01);
   }, [masterVolume]);
 
+  useEffect(() => {
+    const reset = (event: Event) => { if ((event as CustomEvent).detail === "mixer") { midiLearnRef.current = null; setMidiLearnFor(null); } };
+    window.addEventListener("860-midi-learn", reset);
+    return () => window.removeEventListener("860-midi-learn", reset);
+  }, []);
   const beginMidiLearn = (index: number) => {
+    window.dispatchEvent(new CustomEvent("860-midi-learn",{detail:"synth"}));
+    void connectMidi(true);
     midiLearnRef.current = index;
     setMidiLearnFor(index);
     setMidiMessage("MOVÉ EL FADER PARA ASIGNAR " + (index === MASTER_FADER ? "VOLUMEN MASTER" : CONTROLS[index].number));
@@ -3439,7 +3433,7 @@ export default function Multiversos860Page() {
 
   return (
     <main className={styles.console}>
-      <TempoProvider><ModuleZero synthStream={synthStream} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); void connectMidi(true); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
+      <TempoProvider><ModuleZero synthStream={synthStream} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
           <span className={styles.brandMark}>&#9670;</span>

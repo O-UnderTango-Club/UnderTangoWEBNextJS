@@ -1,13 +1,13 @@
-export const EXTENDED_SCENES = [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 45, 60, 61] as const;
+export const EXTENDED_SCENES = [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 42, 45, 60, 61, 62] as const;
 export type ExtendedScene = typeof EXTENDED_SCENES[number];
 export type TimbreScene = Exclude<ExtendedScene, 15 | 16 | 17 | 18 | 19>;
 export const TIMBRE_NAMES: Record<TimbreScene, string> = {
   20: "Armónicos", 21: "Filtro resonante", 22: "Saturación", 23: "Trémolo", 24: "Modulación en anillo",
-  25: "Chorus", 26: "Flanger", 27: "Phaser", 28: "Eco", 29: "Reverberación", 30: "Ecos en estéreo", 31: "Ondas concéntricas", 45: "Espiral expansiva", 60: "Primera voluntad · Hardstyle", 61: "Seguimos de pie",
+  25: "Chorus", 26: "Flanger", 27: "Phaser", 28: "Eco", 29: "Reverberación", 30: "Ecos en estéreo", 31: "Ondas concéntricas", 42: "El punto pensado", 45: "Espiral expansiva", 60: "Primera voluntad · Hardstyle", 61: "Seguimos de pie", 62: "Letras de pie",
 };
 export const EXTENDED_DEFAULT_SECONDS: Record<ExtendedScene, number> = {
   15: 0, 16: 16, 17: 14, 18: 0, 19: 6,
-  20: 0, 21: 0, 22: 0, 23: 0, 24: 0, 25: 0, 26: 0, 27: 0, 28: 0, 29: 0, 30: 0, 31: 0, 45: 0, 60: 0, 61: 0,
+  20: 0, 21: 0, 22: 0, 23: 0, 24: 0, 25: 0, 26: 0, 27: 0, 28: 0, 29: 0, 30: 0, 31: 0, 42: 42, 45: 0, 60: 0, 61: 0, 62: 0,
 };
 export function isTimbreScene(scene: ExtendedScene | null): scene is TimbreScene {
   return scene !== null && scene >= 20;

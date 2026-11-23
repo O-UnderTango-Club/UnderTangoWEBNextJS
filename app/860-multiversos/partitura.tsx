@@ -19,6 +19,7 @@ import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
+import { TransportMidiButton, useTransportMidi } from "./transport-midi";
 import { EXTENDED_STYLE } from "./extended-style";
 
 type ControlDefinition = {
@@ -1459,6 +1460,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
 }) {
   const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE | ExtendedScene>("ready");
   const [scanState, setScanState] = useState<"idle" | "busy" | "done">("idle");
+  const transportMidi = useTransportMidi(connectMidi);
   const faderLabel = learningFader ? "Cancelar asignación del fader" : faderBinding ? "Reasignar fader al volumen" : "Asignar fader al volumen";
   const activeScene = typeof stage === "number" ? stage : MODULE_ZERO_SCENE_BY_STAGE[stage];
   const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
@@ -1964,6 +1966,15 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
   const soundAction = muted ? "Restaurar sonido" : "Silenciar sonido";
   const preparing = stage === "preparing";
   const ready = stage === "ready";
+  const waitingForAudio = (preparing || (paused && transportBusy)) && !pausedRef.current && audioRef.current?.state === "suspended";
+  const canPlayGeneral = waitingForAudio || (!preparing && !transportBusy && (ready || paused));
+  function playGeneral() {
+    if (!canPlayGeneral) return;
+    if (waitingForAudio) void audioRef.current?.resume().catch(() => {});
+    else if (ready) {
+      if (!audioRef.current) void start();
+    } else void changePaused(false);
+  }
   const breathing = stage === "breath-hold";
   const canStart = ready || breathing || noteScene !== null || extendedScene !== null || (previewMode !== null && !preparing);
   const light = !showObject && stage !== "ready" && !preparing;
@@ -2044,18 +2055,25 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
       .tempo-bar i:first-child[data-current=true] {background:#fff;box-shadow:0 0 0 2px #ffdb82;}
       .scene-mixer-tools progress {width:5rem;}
       .scene-mixer-tools { position:sticky; top:0; background:#15151d; z-index:1; }
-      .sample-bank {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,auto);grid-auto-flow:column;}
+      .sample-bank {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,auto);grid-auto-flow:column;container:sample-bank / inline-size;}
       .sample-bank > div {border:1px solid #44444f;min-width:0;}
       .sample-bank > [data-selected=true] {box-shadow:inset 0 0 0 2px #fbd27d;background:#332d25;}
       .sample-bank button.sample-empty {text-align:left;min-width:0;}
       .sample-empty {padding:.1rem .5rem;color:#92929e;font-variant-numeric:tabular-nums;}
-      .sample-bank .scene-mixer-row {gap:.22rem;padding:.25rem;}
-      .sample-bank .scene-mixer-row span {width:100%;}
-      .sample-bank input {max-width:95%;}
-      .scene-mixer-row { border-top:1px solid #494951; }
+      .sample-bank .scene-mixer-row {gap:2px;padding:3px;align-content:center;}
+      .sample-bank .scene-mixer-row button {flex:none;display:grid;place-items:center;min-width:24px;height:24px;padding:0 .18rem;font:600 .68rem/1 system-ui;}
+      .sample-mute svg {width:15px;height:15px;}
+      .sample-info {flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.66rem;color:#c4c7d3;}
+      .sample-bank .scene-mixer-row input {flex:1 1 3.5rem;min-width:2.5rem;max-width:7rem;height:20px;margin:0 2px;}
+      @container sample-bank (max-width:57rem) {
+        .sample-info {order:1;flex:1 0 100%;line-height:1.1;}
+      }
+      @container sample-bank (max-width:31rem) {
+        .sample-bank .scene-mixer-row {align-content:start;}
+        .sample-bank .scene-mixer-row input {flex-basis:2.5rem;}
+      }
       .scene-mixer button { padding:.25rem .6rem; border:1px solid #737482; background:#252631; color:white; border-radius:4px; cursor:pointer; }
       .scene-mixer button[aria-pressed=true] { background:#664481; }
-      .scene-mixer-row input { width:clamp(4rem,12vw,9rem); }
       .zero-stage:has(.scene-mixer) .zero-subtitle { bottom:auto; top:.5rem; }
       .zero-start, .zero-object { position: absolute; inset: 0; width: 100%; height: 100%; }
       .zero-start { border: 0; padding: 0; background: transparent; cursor: pointer; }
@@ -2236,8 +2254,11 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
       .zero-midi { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .65rem; }
       .zero-midi p { margin: 0; color: #dce6ff; font-size: .76rem; overflow-wrap: anywhere; }
       .zero-controls .zero-midi button { font-size: .75rem; padding: .25rem .55rem; }
-      .zero-transport { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .25rem; }
+      .zero-transport { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.7fr) repeat(3,minmax(0,1fr)); gap: .25rem; }
       .zero-controls .zero-transport button { display: grid; place-items: center; min-width: 0; padding: 0; }
+      .zero-general-play {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px;}
+      .zero-controls .zero-general-play .transport-midi-button {width:auto;padding:0 .3rem;font:600 .64rem/1 system-ui;}
+      .zero-general-play .transport-midi-button[aria-pressed=true] {background:#664481;}
       .zero-transport svg { width: min(70%, 1.2rem); height: auto; fill: currentColor; }
       .zero-master {
         display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
@@ -2366,7 +2387,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer connectMidi={connectMidi} analyser={extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} analyser={extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null ? <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>
         : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>
@@ -2460,11 +2481,13 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
             disabled={sceneIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(-1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h2v14H5zM19 5v14L8 12z" /></svg>
           </button>
-          <button type="button" aria-label={paused ? "Reanudar" : "Reproducir"} title={paused ? "Reanudar" : "Reproducir"}
-            disabled={preparing || transportBusy || (!ready && !paused)}
-            onClick={() => ready ? void start() : void changePaused(false)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z" /></svg>
-          </button>
+          <div className="zero-general-play">
+            <button type="button" aria-label={paused ? "Reanudar" : "Reproducir"} title={paused ? "Reanudar" : "Reproducir"}
+              disabled={!canPlayGeneral} onClick={playGeneral}>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z" /></svg>
+            </button>
+            <TransportMidiButton action="play" midi={transportMidi} />
+          </div>
           <button type="button" aria-label="Pausar" title="Pausar"
             disabled={ready || preparing || paused || transportBusy} onClick={() => void changePaused(true)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
@@ -2477,6 +2500,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
           </button>
         </div>
+        {transportMidi.learning === "play" && <small role="status">{transportMidi.hint}</small>}
         <div className="zero-master">
           <button type="button" aria-label={soundAction} title={soundAction}
             onClick={() => setMasterVolume(muted ? audibleVolumeRef.current : 0)}>
@@ -2503,7 +2527,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
           <input type="checkbox" role="switch" checked={showSubtitles}
             onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
         </label>
-        {(preparing || paused) && <span className="zero-playback-status" role="status">{preparing ? "Preparando audio…" : "En pausa"}</span>}
+        {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
     </aside>
   </div>;
@@ -2947,6 +2971,13 @@ export default function Multiversos860Page() {
         const controlType = kind === 0xe0 ? "bend" : kind === 0xb0 && first < 120 ? "cc" :
           kind === 0x90 || kind === 0x80 ? "note" : null;
         const uniqueName = input.name && midiInputs.filter(p => p.name === input.name).length === 1 ? input.name : null;
+        if ((status === 0xfa || status === 0xfb) && midiLearnRef.current === null) {
+          // A transport can send Start from rest and Continue with the same Play button after a pause.
+          const id = JSON.stringify([input.id,"transport","play"]);
+          const alias = uniqueName ? JSON.stringify(["name",uniqueName,"transport","play"]) : "";
+          window.dispatchEvent(new CustomEvent("860-record-midi",{cancelable:true,detail:{id,alias,on:true,pulse:true}}));
+          return;
+        }
         const fromPort = (binding?: CcBinding) => !!binding && (binding.inputId === input.id ||
           (uniqueName === binding.inputName && !midiInputs.some(port => port.id === binding.inputId)));
         const alias = uniqueName ? JSON.stringify(["name",uniqueName,channel,controlType,first]) : "";
@@ -3324,7 +3355,7 @@ export default function Multiversos860Page() {
   }, [masterVolume]);
 
   useEffect(() => {
-    const reset = (event: Event) => { if ((event as CustomEvent).detail === "mixer") { midiLearnRef.current = null; setMidiLearnFor(null); } };
+    const reset = (event: Event) => { if ((event as CustomEvent).detail !== "synth") { midiLearnRef.current = null; setMidiLearnFor(null); } };
     window.addEventListener("860-midi-learn", reset);
     return () => window.removeEventListener("860-midi-learn", reset);
   }, []);

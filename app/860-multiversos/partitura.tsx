@@ -13,6 +13,7 @@ import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isTimbreScene, type ExtendedScene } from "./extended-scenes";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
+import { SceneMixer } from "./scene-mixer";
 import { EXTENDED_STYLE } from "./extended-style";
 
 type ControlDefinition = {
@@ -1490,6 +1491,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const audioRef = useRef<AudioContext | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const activeSceneRef = useRef<HTMLDivElement | null>(null);
+  const mixMaster = useRef<GainNode | null>(null);
   const outputRef = useRef<GainNode | null>(null);
   const masterVolumeRef = useRef(masterVolume);
   const audibleVolumeRef = useRef(masterVolume);
@@ -1543,6 +1545,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
     waitingCues.current.clear();
     const context = audioRef.current;
     audioRef.current = null;
+    mixMaster.current = null;
     outputRef.current = null;
     if (context && context.state !== "closed") void context.close();
   }, []);
@@ -1611,7 +1614,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
     if (volume > 0) audibleVolumeRef.current = volume;
 
 
-    const output = outputRef.current;
+    const output = mixMaster.current;
     if (!output) return;
     const now = output.context.currentTime;
     const gain = output.gain;
@@ -1678,8 +1681,10 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       const context = new AudioContext();
       audioRef.current = context;
       const masterOutput = context.createGain();
-      masterOutput.gain.value = masterVolumeRef.current / 100;
-      masterOutput.connect(context.destination);
+      const sceneMaster = context.createGain();
+      sceneMaster.gain.value = masterVolumeRef.current / 100;
+      masterOutput.connect(sceneMaster).connect(context.destination);
+      mixMaster.current = sceneMaster;
       outputRef.current = masterOutput;
       if (startPaused) await context.suspend();
       else await context.resume();
@@ -2024,6 +2029,14 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         position: relative; display: grid; place-items: center; min-width: 0; min-height: 0;
         width: 100%; padding: 0; border: 0; overflow: hidden; isolation: isolate;
       }
+      .scene-mixer { position:absolute; bottom:0; inset-inline:0; z-index:4; max-height:50%; overflow:auto; overscroll-behavior:contain; background:#15151ded; color:white; font: .76rem system-ui; }
+      .scene-mixer-tools,.scene-mixer-row { display:flex; align-items:center; gap:.5rem; padding:.24rem .55rem; flex-wrap:wrap; }
+      .scene-mixer-tools { position:sticky; top:0; background:#15151d; z-index:1; }
+      .scene-mixer-row { border-top:1px solid #494951; }
+      .scene-mixer button { padding:.25rem .6rem; border:1px solid #737482; background:#252631; color:white; border-radius:4px; cursor:pointer; }
+      .scene-mixer button[aria-pressed=true] { background:#664481; }
+      .scene-mixer-row input { width:clamp(4rem,12vw,9rem); }
+      .zero-stage:has(.scene-mixer) .zero-subtitle { bottom:auto; top:.5rem; }
       .zero-start, .zero-object { position: absolute; inset: 0; width: 100%; height: 100%; }
       .zero-start { border: 0; padding: 0; background: transparent; cursor: pointer; }
       .zero-object { cursor: grab; touch-action: none; }
@@ -2325,6 +2338,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         ? <ExtendedPerformanceProjection performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
+      <SceneMixer scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null ? <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>
         : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>

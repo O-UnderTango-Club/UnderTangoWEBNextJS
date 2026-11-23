@@ -1,30 +1,55 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { captureFactory } from "./measure-recorder";
+import { warmRecorder, captureFactory } from "./measure-recorder";
 import { useSavedSetting } from "./saved-setting";
 
 type Clip = { id: number; scene: string; buffer: AudioBuffer; muted: boolean; volume: number };
 type Voice = { gain: GainNode; dispose: () => void };
 
-export function SceneMixer({scene, pitch, input, master, paused}: {
-  scene?: string; pitch: number; input: GainNode | null; master: GainNode | null; paused: boolean;
+export function SceneMixer({scene, pitch, input, master, paused, startScene, ready}: {
+  startScene:()=>void; ready:boolean; scene?: string; pitch: number; input: GainNode | null; master: GainNode | null; paused: boolean;
 }) {
   const [clips, setClips] = useState<Clip[]>([]);
   const [bpm,setBpm] = useSavedSetting("mixerBpm",111);
   const [meter,setMeter] = useSavedSetting("mixerMeter",4);
   const [bars,setBars] = useSavedSetting("mixerBars",4);
-  const [room,setRoom] = useState(true);
+  const [room,setRoom] = useState(false);
   const [learn,setLearn] = useState(false);
   const [binding,setBinding] = useSavedSetting("mixerRecordButton","");
-  const [state,setState] = useState<"idle"|"waiting"|"recording"|"preparing">("idle");
+  const [state,setState] = useState<"idle"|"padding"|"recording">("idle");
   const [origin,setOrigin] = useState<number|null>(null);
   const [position,setPosition] = useState(0);
   const [message,setMessage] = useState("");
   const voices = useRef(new Map<number, Voice>());
   const serial = useRef(0);
   const generation = useRef(0);
-  const pending = useRef<null | {start:number; cancel:()=>void}>(null);
+  const pending = useRef<null | {silence:()=>void; cancel:()=>void}>(null);
   const mic = useRef<MediaStream|null>(null);
+  const external = useRef<MediaStream|null>(null);
+  const [shared,setShared] = useState(false);
+  const [requesting,setRequesting] = useState(false);
+  const alive=useRef(true);
+  const queued=useRef(false);
+  useEffect(()=>{alive.current=true;return ()=>{alive.current=false;for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
+  useEffect(()=>{if(input)warmRecorder(input.context as AudioContext);},[input]);
+  async function chooseSource(kind:"room"|"computer", enabled:boolean) {
+    const ref=kind==="room"?mic:external;
+    const update=kind==="room"?setRoom:setShared;
+    if(!enabled){ref.current?.getTracks().forEach(t=>t.stop());ref.current=null;update(false);return;}
+    setRequesting(true);setMessage("");
+    try {
+      const stream=kind==="room" ? await navigator.mediaDevices.getUserMedia({audio:true}) :
+        await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+      if(!alive.current || !stream.getAudioTracks().length){
+        stream.getTracks().forEach(t=>t.stop());
+        if(alive.current)setMessage("Elegí una fuente con la opción Compartir audio activada.");
+        return;
+      }
+      ref.current=stream;update(true);
+      stream.getAudioTracks()[0].onended=()=>{stream.getTracks().forEach(t=>t.stop());if(ref.current===stream){ref.current=null;update(false);}};
+    } catch {setMessage(kind==="room"?"Micrófono desactivado. Revisá el permiso de Sala.":"Se mantiene el estéreo de 860.");}
+    finally {if(alive.current)setRequesting(false);}
+  }
   const tone = useRef<OscillatorNode | null>(null);
   const stopTone = useCallback(() => { tone.current?.stop(); tone.current = null; }, []);
   const beat = 60 / bpm;
@@ -32,10 +57,11 @@ export function SceneMixer({scene, pitch, input, master, paused}: {
   const cancel = useCallback(() => {
     generation.current++;
     pending.current?.cancel(); pending.current=null;
-    mic.current?.getTracks().forEach(track=>track.stop()); mic.current=null;
+
     setState("idle");
   },[]);
-  useEffect(() => () => { cancel(); stopTone(); }, [scene,input,cancel,stopTone]);
+  useEffect(() => () => { cancel(); stopTone(); }, [input,cancel,stopTone]);
+  useEffect(() => () => stopTone(), [scene,stopTone]);
   useEffect(() => {setOrigin(null);setPosition(0);},[input,bpm,meter,bars]);
   useEffect(() => {
     if (origin===null || !input || paused) return;
@@ -43,7 +69,7 @@ export function SceneMixer({scene, pitch, input, master, paused}: {
     const draw=()=> {
       const now=input.context.currentTime;
       setPosition(Math.floor(Math.max(0,now-origin)/beat) % (meter*bars));
-      if(pending.current && now>=pending.current.start) setState("recording");
+
       frame=requestAnimationFrame(draw);
     };
     draw();return ()=>cancelAnimationFrame(frame);
@@ -73,33 +99,32 @@ export function SceneMixer({scene, pitch, input, master, paused}: {
   }, [play, stopTone]);
 
   async function record() {
-    if (!input || !master || !scene || paused) return;
-    if (state !== "idle") { cancel(); return; }
+    if (!scene || !input || !master) {
+      if(ready){queued.current=true;startScene();}
+      return;
+    }
+    if(paused || requesting)return;
+    if(pending.current){pending.current.silence();setState("padding");return;}
     const ctx=input.context as AudioContext;
     const attempt=++generation.current;
-    setMessage("");setState("preparing");
+    setMessage("");
     try {
-      const makeCapture=await captureFactory(ctx);
-      if (attempt!==generation.current) return;
-      let stream: MediaStream|null=null;
-      if (room) {
-        stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
-        if (attempt!==generation.current) {stream.getTracks().forEach(t=>t.stop());return;}
-        mic.current=stream;
-      }
-      const earliest=ctx.currentTime+0.1;
-      const anchor=origin ?? earliest;
-      const start=anchor+Math.max(0,Math.ceil((earliest-anchor)/cycle))*cycle;
+      const makeCapture=captureFactory(ctx);
+      const start=ctx.currentTime;
       const length=Math.round(ctx.sampleRate*cycle);
       const capture=makeCapture(Math.round(start*ctx.sampleRate),length,onLoop);
       const node=capture.node;
       const gain=ctx.createGain();gain.gain.value=0.75;
       node.connect(gain).connect(master);
-      const source=stream ? ctx.createMediaStreamSource(stream) : null;
-      input.connect(node);source?.connect(node);
-      const detach=()=>{input.disconnect(node);source?.disconnect();stream?.getTracks().forEach(t=>t.stop());mic.current=null;};
+      const gate=ctx.createGain();
+      const sources:AudioNode[]=[];
+      sources.push(shared && external.current ? ctx.createMediaStreamSource(external.current) : input);
+      if(room && mic.current)sources.push(ctx.createMediaStreamSource(mic.current));
+      for(const source of sources)source.connect(gate);
+      gate.connect(node);
+      const detach=()=>{for(const source of sources)source.disconnect(gate);gate.disconnect();};
       const dispose=()=>{capture.stop();gain.disconnect();};
-      pending.current={start,cancel:()=>{detach();dispose();}};
+      pending.current={silence:()=>gate.gain.setValueAtTime(0,ctx.currentTime),cancel:()=>{detach();dispose();}};
       const label=scene;
       function onLoop(channels:Float32Array[]){
         if(attempt!==generation.current)return;
@@ -110,23 +135,26 @@ export function SceneMixer({scene, pitch, input, master, paused}: {
         voices.current.set(id,{gain,dispose});
         setClips(all=>[...all,{id,scene:label,buffer,volume:75,muted:false}]);setState("idle");
       };
-      setOrigin(anchor);setState("waiting");
+      setOrigin(start);setState("recording");
     } catch {
       if(attempt!==generation.current)return;
       cancel();setMessage(room ? "Revisá el permiso de micrófono. Para grabar solo el instrumento, desactivá Sala." : "No se pudo iniciar la captura de audio.");
     }
   }
   useEffect(()=>{
-    let pressed=false;
+    if(queued.current && scene && input && master){queued.current=false;void record();}
+  },[scene,input,master]);
+  const pressed=useRef(false);
+  useEffect(()=>{
     const receive=(event:Event)=>{
       const e=event as CustomEvent<{id:string;on:boolean}>;
       if(!scene || (!learn && e.detail.id!==binding)) return;
       e.preventDefault();
-      if(!e.detail.on){pressed=false;return;}
-      if(pressed)return;
-      pressed=true;
+      if(!e.detail.on){pressed.current=false;return;}
+      if(pressed.current)return;
+      pressed.current=true;
       if(learn){setBinding(e.detail.id);setLearn(false);return;}
-      if(state==="idle")void record();
+      if(state!=="padding")void record();
     };
     window.addEventListener("860-record-midi",receive);
     return ()=>window.removeEventListener("860-record-midi",receive);
@@ -154,18 +182,19 @@ export function SceneMixer({scene, pitch, input, master, paused}: {
     }
   }, [master,clips]);
 
-  if (!scene && !clips.length && !message) return null;
+
   return <div className="scene-mixer" role="region" aria-label="Lupera de objetos sonoros">
     <div className="scene-mixer-tools">
+      <button className="scene-record" aria-label={state==="idle"?"Grabar":"Detener entrada"} title={state==="idle"?"Grabar":"Detener entrada y completar con silencio"} disabled={(!scene && !ready)||paused||requesting||state==="padding"} onClick={()=>void record()}>{state==="idle"?"●":"■"}</button>
+      <output>{state==="padding"?"Completando en silencio":state==="recording"?"Grabando":shared?"Audio compartido":"Estéreo de 860"}{state!=="idle" && (" · "+(Math.floor(position/meter)+1)+"/"+bars+" · "+(position%meter+1)+"/"+meter)}</output>
+      <label title="Sumar el micrófono predeterminado"><input type="checkbox" checked={room} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("room",e.target.checked)}/> Sala</label>
+      <details><summary>{bpm} BPM · {bars} × {meter}</summary>
       <label>BPM <input aria-label="BPM de grabación" type="number" min="30" max="240" defaultValue={bpm} disabled={state!=="idle"} onBlur={e=>{const n=Math.min(240,Math.max(30,Math.round(Number(e.target.value)||111)));setBpm(n);e.target.value=String(n);}} /></label>
       <label>Pulsos <select aria-label="Pulsos" disabled={state!=="idle"} value={meter} onChange={e=>setMeter(Number(e.target.value))}>{[2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
       <label>Compases <select aria-label="Compases" disabled={state!=="idle"} value={bars} onChange={e=>setBars(Number(e.target.value))}>{[1,2,3,4,5,6,7,8,12,16].map(n=><option key={n}>{n}</option>)}</select></label>
-      <label><input type="checkbox" checked={room} disabled={state!=="idle"} onChange={e=>setRoom(e.target.checked)}/> Sala</label>
-      <button disabled={!input||paused||state!=="idle"} aria-label="Play del reloj" onClick={()=>setOrigin(input!.context.currentTime)}>▶</button>
-      <output>Compás {Math.floor(position/meter)+1}/{bars} · Pulso {position%meter+1}/{meter}</output>
-      <progress aria-label="Posición en la vuelta" max={bars*meter} value={position+1}/>
-      <button disabled={!scene || paused} onClick={()=>void record()}>{state==="idle"?"Grabar sonido":state==="preparing"?"Preparando · Cancelar":state==="waiting"?"Espera del 1 · Cancelar":"Grabando · Cancelar"}</button>
+      <label><input type="checkbox" checked={shared} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("computer",e.target.checked)}/> Audio de otra pestaña o pantalla</label>
       <button aria-label="Asignar botón MIDI a grabar" aria-pressed={learn} title={binding?"Reasignar botón MIDI":"Asignar botón MIDI"} onClick={()=>setLearn(!learn)}>{learn?"Pulsá el botón MIDI":binding?"MIDI ✓":"MIDI ●"}</button>
+      </details>
       <button disabled={!scene || paused} aria-label="Tocar sonido de escena" onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); play(); }}
         onPointerUp={stopTone} onLostPointerCapture={stopTone} onKeyDown={e => { if (e.key === " " || e.key === "Enter") play(); }}
         onKeyUp={stopTone}>Tocar · P</button>

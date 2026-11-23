@@ -42,19 +42,18 @@ export function prepareMeasureRecorder(ctx: AudioContext) {
   return ready;
 }
 
-export async function captureFactory(ctx: AudioContext) {
-  // Some browser/audio drivers never resolve addModule. Keep the transport usable.
-  let timer = 0;
-  try {
-    await Promise.race([prepareMeasureRecorder(ctx),new Promise<void>((_,reject)=>{
-      timer=window.setTimeout(()=>reject(new Error("audio worklet timeout")),1500);
-    })]);
+const readyContexts = new WeakSet<AudioContext>();
+export function warmRecorder(ctx: AudioContext) {
+  if (ctx.audioWorklet) void prepareMeasureRecorder(ctx).then(()=>readyContexts.add(ctx)).catch(()=>{});
+}
+export function captureFactory(ctx: AudioContext) {
+  if (readyContexts.has(ctx)) {
     return (start: number,length: number,onLoop:(data:Float32Array[])=>void) => {
       const node = new AudioWorkletNode(ctx,"measure-recorder",{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],processorOptions:{start,length}});
       node.port.onmessage=e=>onLoop(e.data);
       return {node,stop:()=>{node.port.postMessage("stop");node.port.close();node.disconnect();}};
     };
-  } catch {
+  } else {
     return (start:number,length:number,onLoop:(data:Float32Array[])=>void) => {
       const node=ctx.createScriptProcessor(1024,2,2);
       const channels=[new Float32Array(length),new Float32Array(length)];
@@ -74,5 +73,5 @@ export async function captureFactory(ctx: AudioContext) {
       };
       return {node,stop:()=>{node.onaudioprocess=null;node.disconnect();}};
     };
-  } finally {window.clearTimeout(timer);}
+  }
 }

@@ -1450,11 +1450,13 @@ const MIDI_PITCH_NAMES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "So
 function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
   masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
-  connectMidi: () => Promise<void>;
+  connectMidi: (rescan?: boolean) => Promise<void>;
   midiConnection: MidiConnection;
   midiInputs: MidiDevice[];
 }) {
   const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE | ExtendedScene>("ready");
+  const [scanState, setScanState] = useState<"idle" | "busy" | "done">("idle");
+  const faderLabel = learningFader ? "Cancelar asignación del fader" : faderBinding ? "Reasignar fader al volumen" : "Asignar fader al volumen";
   const activeScene = typeof stage === "number" ? stage : MODULE_ZERO_SCENE_BY_STAGE[stage];
   const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
   const extendedScene = typeof stage === "number" ? stage : null;
@@ -2215,6 +2217,10 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap;
         gap: .1rem .35rem; font-size: .8rem;
       }
+      .zero-controls button.zero-midi-icon { display:inline-grid; place-items:center; width:28px; height:28px; min-height:28px; padding:3px; border-radius:50%; }
+      .zero-controls .zero-midi-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+      .zero-midi-icon[aria-pressed=true] { background:#65518f; }
+      .zero-master-label output { margin-left:auto; }
       .zero-master-label output { color: #dce6ff; font-variant-numeric: tabular-nums; }
       .zero-settings {
         display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.15rem;
@@ -2400,7 +2406,11 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
           <p role="status">{midiInputs.length ? `MIDI activo · ${midiInputs.map(({ name }) => name).join(", ")}`
             : midiConnection === "checking" ? "Buscando piano MIDI… Podés usar el teclado."
               : "Teclado de la computadora listo"}</p>
-          {midiConnection === "blocked" && <button type="button" onClick={() => void connectMidi()}>Habilitar MIDI</button>}
+          <button className="zero-midi-icon" type="button" title="Actualizar dispositivos MIDI" aria-label="Actualizar dispositivos MIDI" disabled={scanState === "busy"} onClick={async () => {
+            setScanState("busy");
+            try { await connectMidi(true); } finally { setScanState("done"); }
+          }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5v6h-6M4 19v-6h6M5.3 8a7.5 7.5 0 0 1 12.4-2L20 9M4 15l2.3 3A7.5 7.5 0 0 0 19 16"/></svg></button>
+          {scanState !== "idle" && <small role="status">{scanState === "busy" ? "Buscando…" : midiConnection === "blocked" ? "Permiso MIDI bloqueado" : midiConnection === "unavailable" ? "MIDI no disponible" : midiInputs.length + " entradas detectadas"}</small>}
         </div>
         <div className="zero-transport" role="group" aria-label="Reproducción">
           <button type="button" aria-label="Escena anterior" title="Escena anterior"
@@ -2436,6 +2446,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
           <div>
             <div className="zero-master-label">
               <label htmlFor="zero-master-volume">Volumen master</label>
+              <button type="button" className="zero-midi-icon" title={faderLabel} aria-label={faderLabel} aria-pressed={learningFader} onClick={learnFader}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7"/><path d="m12 13 3-5M3 9l1 .5M7 3.5l.7 1.3M17 3.5l-.7 1.3M21 9l-1 .5"/></svg></button>
               <output htmlFor="zero-master-volume">{masterVolume}%</output>
             </div>
             <input id="zero-master-volume" type="range" min={0} max={100} step={1}
@@ -2443,7 +2454,6 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
               onChange={(event) => setMasterVolume(Number(event.currentTarget.value))} />
           </div>
         </div>
-        <button type="button" onClick={learnFader} aria-pressed={learningFader}>{learningFader ? "Mové el fader · Cancelar" : faderBinding ? "Reasignar fader · " + (faderBinding.bendChannel !== undefined ? "Pitch Bend" : "CC " + faderBinding.cc) : "Asignar fader al volumen"}</button>
         {(learningFader || faderSignal) && <small role="status" style={{display:"block"}}>{faderSignal || "Esperando un movimiento MIDI del fader…"}</small>}
         <label className="zero-subtitle-toggle">
           Activar subtítulos

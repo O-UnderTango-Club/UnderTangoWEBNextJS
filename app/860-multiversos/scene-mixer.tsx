@@ -30,7 +30,9 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
   const previous=useRef(new Map<number,Clip>());
   const currentClips=useRef(clips);
   currentClips.current=clips;
+  const selectionVersion=useRef(0);
   function selectSlot(slot:number|null){
+    selectionVersion.current++;
     target.current=slot;setSelected(slot);
     if(slot!==null)setBankSlot(slot);
   }
@@ -61,7 +63,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
   const [shared,setShared] = useState(false);
   const [requesting,setRequesting] = useState(false);
   const alive=useRef(true);
-  const queued=useRef<{kind:Mode;slot:number}[]>([]);
+  const queued=useRef<{kind:Mode;slot:number;version:number}[]>([]);
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
   useEffect(()=>{if(input)warmRecorder(input.context as AudioContext);},[input]);
   // The scene and the lower synth own different AudioContexts. Bridge the synth
@@ -175,14 +177,15 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
       setMessage(modes.length===2?"Elegí un canal y dejá otro libre para la segunda toma.":"Elegí el canal que querés volver a grabar.");
       return;
     }
-    const plan=modes.map((kind,i)=>({kind,slot:slots[i]}));
+    const version=++selectionVersion.current;
+    const plan=modes.map((kind,i)=>({kind,slot:slots[i],version}));
     if(!scene || !input || !master){
       if(ready){queued.current=plan;startScene();}
       return;
     }
-    for(const {kind,slot} of plan)record(kind,slot);
+    for(const {kind,slot,version} of plan)record(kind,slot,version);
   }
-  function record(kind:Mode,slot:number) {
+  function record(kind:Mode,slot:number,version:number) {
     if(!scene || !input || !master || pending.current.has(kind) || reservedSlots.current.has(slot))return;
     if(paused || requesting)return;
     const ctx=input.context as AudioContext;
@@ -236,6 +239,11 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
         const old=currentClips.current.find(c=>c.slot===slot);
         if(old)previous.current.set(slot,old);
         reservedSlots.current.delete(slot);occupied.current.add(slot);
+        if(version===selectionVersion.current){
+          const next=Array.from({length:9},(_,i)=>(slot+i+1)%9)
+            .find(candidate=>!occupied.current.has(candidate) && !reservedSlots.current.has(candidate));
+          selectSlot(next ?? null);
+        }
         setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:old?.volume ?? bankVolumes.current.get(slot) ?? 75,muted:false}]);if(!pending.current.size)setState("idle");
       };
       setState("recording");
@@ -253,7 +261,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
     return ()=>window.removeEventListener("blur",releaseLive);
   },[]);
   useEffect(()=>{
-    if(queued.current.length && scene && input && master){const modes=queued.current;queued.current=[];for(const {kind,slot} of modes)record(kind,slot);}
+    if(queued.current.length && scene && input && master){const modes=queued.current;queued.current=[];for(const {kind,slot,version} of modes)record(kind,slot,version);}
   },[scene,input,master]);
   const pressed=useRef(new Set<string>());
   useEffect(()=>{

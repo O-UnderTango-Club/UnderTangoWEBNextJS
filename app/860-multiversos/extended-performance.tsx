@@ -32,6 +32,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const attack = useRef({ count: 0, frequency: 0, velocity: 0 });
   const player = useRef<{ strike: (id: string, track: CubeTrack, index: number, velocity: number) => void; release: (id: string) => void } | null>(null);
   const timbre = isTimbreScene(scene) ? scene : null;
+  const spiral=scene===45;
   const loopScene = timbre ? 20 : scene === 15 || scene === 18 ? scene : null;
   const loopCue = useMemo(() => clock && loopScene ? { context: clock, beginsAt: clock.currentTime } : null, [clock, loopScene]);
   const three = loopScene === 15 || loopScene === 18;
@@ -95,7 +96,11 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       midiNote: (id, channel, note, velocity) => {
         const identity = `${midiPrefix(id)}${channel}:${note}`;
         if (velocity <= 0) { release(identity); return; }
-        if (loopScene === 15) {
+        if (spiral && !splitRef.current) {
+          strike(identity,selectedRef.current,((note-60)%CUBE_SIZE+CUBE_SIZE)%CUBE_SIZE,velocity);
+          return;
+        }
+        if (spiral || loopScene === 15) {
           const offset = note - CUBE_FIRST_MIDI;
           const track = CUBE_TRACKS[Math.max(0, Math.min(2, Math.floor(offset / CUBE_SIZE)))];
           strike(identity, track, ((offset % CUBE_SIZE) + CUBE_SIZE) % CUBE_SIZE, velocity);
@@ -143,7 +148,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       window.removeEventListener("blur", releaseAll);
       document.removeEventListener("visibilitychange", hide);
     };
-  }, [captureCenter, captureLeft, captureManual, captureRight, keys, loopCue, loopScene, paused, routing, three]);
+  }, [captureCenter, captureLeft, captureManual, captureRight, keys, loopCue, loopScene, paused, routing, three, spiral]);
 
   return {
     attack, keys, three, timbre, selected, a4, setA4, splitMidi, live, strength, manual, loops: [left, center, right],
@@ -158,8 +163,8 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
 type Performance = ReturnType<typeof useExtendedPerformance>;
 const hz = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1, useGrouping: false });
 
-export function ExtendedPerformanceProjection({ performance, clock, paused, scene }: {
-  performance: Performance; clock: AudioContext; paused: boolean; scene: ExtendedScene;
+export function ExtendedPerformanceProjection({ analyser, performance, clock, paused, scene }: {
+  analyser:{current:AnalyserNode|null}; performance: Performance; clock: AudioContext; paused: boolean; scene: ExtendedScene;
 }) {
   const { selected, keys, live, loops, manual, three, select, press, release } = performance;
   const pulseId = useRef(0);
@@ -175,7 +180,7 @@ export function ExtendedPerformanceProjection({ performance, clock, paused, scen
   }, [selected]);
   const liveNotes = [...new Set(live.flat())].sort((a, b) => a - b);
   return <div className="extended-instrument" data-extended-scene={scene}>
-    {(scene === 31 || scene === 45) && <SpiralProjection attack={performance.attack} scene={scene} clock={clock} notes={[...liveNotes, ...(active?.sounding ?? [])]} />}
+    {(scene === 31 || scene === 45) && <SpiralProjection analyser={analyser} attack={performance.attack} scene={scene} clock={clock} notes={[...liveNotes, ...(active?.sounding ?? [])]} />}
     <div className="extended-cubes" ref={strip} role="group" aria-label="Tres cubos de frecuencias">
       {CUBE_TRACKS.map((track) => {
         const frame = loops[track].frame;

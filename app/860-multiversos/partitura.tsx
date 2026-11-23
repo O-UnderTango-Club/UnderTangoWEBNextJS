@@ -13,6 +13,7 @@ import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isTimbreScene, type ExtendedScene } from "./extended-scenes";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
+import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
 import { EXTENDED_STYLE } from "./extended-style";
@@ -76,6 +77,7 @@ type NoteVoice = {
 };
 
 type SoundEngine = {
+  protectedOutput: WaveShaperNode;
   output: GainNode;
   context: AudioContext;
   noteVoices: Map<number, NoteVoice>;
@@ -310,7 +312,8 @@ function createSoundEngine(): SoundEngine {
   rhythmBus.connect(compressor);
   compressor.connect(analyser);
   analyser.connect(output);
-  output.connect(context.destination);
+  const protectedOutput=protectPeaks(output,SPEAKER_CEILING);
+  protectedOutput.connect(context.destination);
 
   sequenceOscillator.start();
   sequenceSub.start();
@@ -320,7 +323,7 @@ function createSoundEngine(): SoundEngine {
 
   return {
     context,
-    output,
+    output, protectedOutput,
     noteVoices: new Map<number, NoteVoice>(),
     sequenceOscillator,
     sequenceSub,
@@ -1492,6 +1495,8 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
   const audioRef = useRef<AudioContext | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const activeSceneRef = useRef<HTMLDivElement | null>(null);
+  const spiralAnalyser=useRef<AnalyserNode|null>(null);
+  const sceneMonitor=useRef<WaveShaperNode|null>(null);
   const mixMaster = useRef<GainNode | null>(null);
   const outputRef = useRef<GainNode | null>(null);
   const masterVolumeRef = useRef(masterVolume);
@@ -1546,6 +1551,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
     waitingCues.current.clear();
     const context = audioRef.current;
     audioRef.current = null;
+    sceneMonitor.current = null;
     mixMaster.current = null;
     outputRef.current = null;
     if (context && context.state !== "closed") void context.close();
@@ -1678,7 +1684,9 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
       const masterOutput = context.createGain();
       const sceneMaster = context.createGain();
       sceneMaster.gain.value = masterVolumeRef.current / 100;
-      masterOutput.connect(sceneMaster).connect(context.destination);
+      masterOutput.connect(sceneMaster);
+      sceneMonitor.current=protectPeaks(sceneMaster,SPEAKER_CEILING);
+      sceneMonitor.current.connect(context.destination);
       mixMaster.current = sceneMaster;
       outputRef.current = masterOutput;
       if (startPaused) await context.suspend();
@@ -2038,6 +2046,12 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
       .tempo-bar i:first-child[data-current=true] {background:#fff;box-shadow:0 0 0 2px #ffdb82;}
       .scene-mixer-tools progress {width:5rem;}
       .scene-mixer-tools { position:sticky; top:0; background:#15151d; z-index:1; }
+      .sample-bank {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,auto);grid-auto-flow:column;}
+      .sample-bank > div {border:1px solid #44444f;min-width:0;}
+      .sample-empty {padding:.1rem .5rem;color:#92929e;font-variant-numeric:tabular-nums;}
+      .sample-bank .scene-mixer-row {gap:.22rem;padding:.25rem;}
+      .sample-bank .scene-mixer-row span {width:100%;}
+      .sample-bank input {max-width:95%;}
       .scene-mixer-row { border-top:1px solid #494951; }
       .scene-mixer button { padding:.25rem .6rem; border:1px solid #737482; background:#252631; color:white; border-radius:4px; cursor:pointer; }
       .scene-mixer button[aria-pressed=true] { background:#664481; }
@@ -2341,10 +2355,10 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
         beginsAt={cue?.beginsAt ?? 0} />}
       {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
       {extendedScene && cue && (extendedPlaying
-        ? <ExtendedPerformanceProjection performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
+        ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      <SceneMixer analyser={extendedScene===45?spiralAnalyser:undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null ? <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>
         : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>
@@ -2657,7 +2671,7 @@ export default function Multiversos860Page() {
       engine.output.gain.value = 0.56 * volumeRef.current / 100;
       engineRef.current = engine;
       const tap=engine.context.createMediaStreamDestination();
-      engine.output.connect(tap);
+      engine.protectedOutput.connect(tap);
       synthTap.current=tap;
       setSynthStream(tap.stream);
       valuesRef.current.forEach((value, index) => applyControl(engine as SoundEngine, index, value, bpmRef.current));

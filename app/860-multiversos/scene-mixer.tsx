@@ -5,6 +5,7 @@ import { useSavedSetting } from "./saved-setting";
 
 import { useTempo } from "./tempo";
 
+type Mode = "matrix" | "live";
 type Clip = { id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; dispose: () => void };
 
@@ -16,7 +17,8 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
   const [meter,setMeter] = useSavedSetting("mixerMeter",4);
   const [bars,setBars] = useSavedSetting("mixerBars",4);
   const [room,setRoom] = useState(false);
-  const [learn,setLearn] = useState(false);
+  const [learn,setLearn] = useState<Mode|null>(null);
+  const [liveBinding,setLiveBinding]=useSavedSetting("mixerLiveButton","");
   const [binding,setBinding] = useSavedSetting("mixerRecordButton","");
   const [state,setState] = useState<"idle"|"padding"|"recording">("idle");
   useEffect(()=>{setLocked(state!=="idle");return ()=>setLocked(false);},[state,setLocked]);
@@ -31,7 +33,9 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
   const [shared,setShared] = useState(false);
   const [requesting,setRequesting] = useState(false);
   const alive=useRef(true);
-  const queued=useRef(false);
+  const queued=useRef<Mode|null>(null);
+  const lastMode=useRef<Mode>("matrix");
+  const [mode,setMode]=useState<Mode>("matrix");
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
   useEffect(()=>{if(input)warmRecorder(input.context as AudioContext);},[input]);
   async function chooseSource(kind:"room"|"computer", enabled:boolean) {
@@ -101,13 +105,15 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", stopTone); };
   }, [play, stopTone]);
 
-  async function record() {
+  function record(kind:Mode) {
+    if(pending.current)return;
+    lastMode.current=kind;setMode(kind);
     if (!scene || !input || !master) {
-      if(ready){queued.current=true;startScene();}
+      if(ready){queued.current=kind;startScene();}
       return;
     }
     if(paused || requesting)return;
-    if(pending.current){pending.current.silence();setState("padding");return;}
+
     const ctx=input.context as AudioContext;
     if(cycle>180){setMessage("Para grabar hasta 3 minutos a este tempo, elegí menos compases.");return;}
     const attempt=++generation.current;
@@ -116,9 +122,12 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
       const makeCapture=captureFactory(ctx);
       const origin=clock(ctx);
       const start=ctx.currentTime;
-      const startBeat=(start-origin)/beat;
+      const pressBeat=(start-origin)/beat;
+      const startBeat=kind==="matrix" ? Math.floor(pressBeat/(meter*bars))*meter*bars : pressBeat;
+      const base=origin+startBeat*beat;
+      const end=kind==="matrix" ? origin+(Math.floor(pressBeat/meter)+1)*meter*beat : start+cycle;
       const length=Math.round(ctx.sampleRate*cycle);
-      const capture=makeCapture(Math.round(start*ctx.sampleRate),length,onLoop);
+      const capture=makeCapture(Math.round(base*ctx.sampleRate),length,Math.round(end*ctx.sampleRate),onLoop);
       const node=capture.node;
       const gain=ctx.createGain();gain.gain.value=0.75;
       node.connect(gain).connect(master);
@@ -130,15 +139,15 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
       gate.connect(node);
       const detach=()=>{for(const source of sources)source.disconnect(gate);gate.disconnect();};
       const dispose=()=>{capture.stop();gain.disconnect();};
-      pending.current={silence:()=>gate.gain.setValueAtTime(0,ctx.currentTime),cancel:()=>{detach();dispose();}};
+      pending.current={silence:()=>{gate.gain.setValueAtTime(0,ctx.currentTime);capture.finish(Math.round(ctx.currentTime*ctx.sampleRate));},cancel:()=>{detach();dispose();}};
       const label=scene;
       function onLoop(channels:Float32Array[]){
         if(attempt!==generation.current)return;
-        detach();pending.current=null;
+        detach();dispose();pending.current=null;
         const buffer=ctx.createBuffer(2,length,ctx.sampleRate);
         channels.forEach((samples,ch)=>buffer.getChannelData(ch).set(samples));
         const id=++serial.current;
-        voices.current.set(id,{bpm,gain,dispose});
+
         setClips(all=>[...all,{id,scene:label,buffer,recordedBpm:bpm,startBeat,volume:75,muted:false}]);setState("idle");
       };
       setState("recording");
@@ -147,20 +156,37 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
       cancel();setMessage(room ? "Revisá el permiso de micrófono. Para grabar solo el instrumento, desactivá Sala." : "No se pudo iniciar la captura de audio.");
     }
   }
+  function releaseLive(){
+    if(queued.current==="live") queued.current=null;
+    if(lastMode.current==="live") pending.current?.silence();
+  }
   useEffect(()=>{
-    if(queued.current && scene && input && master){queued.current=false;void record();}
+    window.addEventListener("blur",releaseLive);
+    return ()=>window.removeEventListener("blur",releaseLive);
+  },[]);
+  useEffect(()=>{
+    if(queued.current && scene && input && master){const kind=queued.current;queued.current=null;record(kind);}
   },[scene,input,master]);
-  const pressed=useRef(false);
+  const pressed=useRef(new Set<string>());
   useEffect(()=>{
     const receive=(event:Event)=>{
       const e=event as CustomEvent<{id:string;on:boolean}>;
-      if(!scene || (!learn && e.detail.id!==binding)) return;
+      const id=e.detail.id;
+      const kind=id===liveBinding?"live":id===binding?"matrix":null;
+      if(!scene || (!learn && !kind))return;
       e.preventDefault();
-      if(!e.detail.on){pressed.current=false;return;}
-      if(pressed.current)return;
-      pressed.current=true;
-      if(learn){setBinding(e.detail.id);setLearn(false);return;}
-      if(state!=="padding")void record();
+      if(!e.detail.on){
+        if(pressed.current.delete(id) && kind==="live") releaseLive();
+        return;
+      }
+      if(pressed.current.has(id))return;
+      pressed.current.add(id);
+      if(learn){
+        if(learn==="live"){setLiveBinding(id);if(id===binding)setBinding("");}
+        else {setBinding(id);if(id===liveBinding)setLiveBinding("");}
+        setLearn(null);return;
+      }
+      if(kind)record(kind);
     };
     window.addEventListener("860-record-midi",receive);
     return ()=>window.removeEventListener("860-record-midi",receive);
@@ -196,8 +222,13 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
 
   return <div className="scene-mixer" role="region" aria-label="Lupera de objetos sonoros">
     <div className="scene-mixer-tools">
-      <button className="scene-record" aria-label={state==="idle"?"Grabar":"Detener entrada"} title={state==="idle"?"Grabar":"Detener entrada y completar con silencio"} disabled={(!scene && !ready)||paused||requesting||state==="padding"} onClick={()=>void record()}>{state==="idle"?"●":"■"}</button>
-      <output>{state==="padding"?"Completando en silencio":state==="recording"?"Grabando":shared?"Audio compartido":"Estéreo de 860"}</output>
+      <button className="scene-record" aria-label="Grabar matriz" title="Desde ahora hasta el fin de este compás" disabled={(!scene && !ready)||paused||requesting||state!=="idle"} onClick={()=>record("matrix")}>● Matriz</button>
+      <button className="scene-record" aria-label="Grabar en vivo" title="Mantené apretado para grabar; soltá para cerrar" disabled={(!scene && !ready)||paused||requesting||(state!=="idle" && mode!=="live")}
+        onPointerDown={e=>{if(e.button!==0)return;e.currentTarget.setPointerCapture(e.pointerId);record("live");}}
+        onPointerUp={releaseLive} onPointerCancel={releaseLive} onLostPointerCapture={releaseLive}
+        onKeyDown={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();if(!e.repeat)record("live");}}}
+        onKeyUp={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();releaseLive();}}}>● En vivo</button>
+      <output>{state==="recording"?(mode==="matrix"?"Grabando hasta fin de compás":"Grabando mientras sostenés"):shared?"Audio compartido":"Estéreo de 860"}</output>
       <div className="tempo-lights" role="img" aria-label={input ? `Compás ${Math.floor(position/meter)+1} de ${bars}, pulso ${position%meter+1} de ${meter}` : `${bars} compases de ${meter} pulsos`}>
         {Array.from({length:bars},(_,bar)=><span className="tempo-bar" key={bar} aria-hidden="true">
           {Array.from({length:meter},(_,pulse)=><i key={pulse} data-current={Boolean(input) && (bar*meter+pulse)===position} />)}
@@ -209,7 +240,8 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
       <label>Pulsos <select aria-label="Pulsos" disabled={state!=="idle"} value={meter} onChange={e=>setMeter(Number(e.target.value))}>{[2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
       <label>Compases <select aria-label="Compases" disabled={state!=="idle"} value={bars} onChange={e=>setBars(Number(e.target.value))}>{[1,2,3,4,5,6,7,8,12,16].map(n=><option key={n}>{n}</option>)}</select></label>
       <label><input type="checkbox" checked={shared} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("computer",e.target.checked)}/> Audio de otra pestaña o pantalla</label>
-      <button aria-label="Asignar botón MIDI a grabar" aria-pressed={learn} title={binding?"Reasignar botón MIDI":"Asignar botón MIDI"} onClick={()=>setLearn(!learn)}>{learn?"Pulsá el botón MIDI":binding?"MIDI ✓":"MIDI ●"}</button>
+      {(["matrix","live"] as const).map(kind=><button key={kind} aria-pressed={learn===kind} onClick={()=>setLearn(learn===kind?null:kind)}>
+        {learn===kind?"Pulsá el botón MIDI":`MIDI · ${kind==="matrix"?"Matriz":"En vivo"}${(kind==="matrix"?binding:liveBinding)?" ✓":""}`}</button>)}
       </details>
       <button disabled={!scene || paused} aria-label="Tocar sonido de escena" onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); play(); }}
         onPointerUp={stopTone} onLostPointerCapture={stopTone} onKeyDown={e => { if (e.key === " " || e.key === "Enter") play(); }}

@@ -2,6 +2,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 export type SiteLanguage = "es" | "en" | "pt";
 const dictionary: Record<string, {en:string;pt:string}> = {
+  "Reproducir": { en: "Play", pt: "Reproduzir" },
+  "Ver el registro": { en: "Watch the video", pt: "Assistir ao vídeo" },
+  "Ver en YouTube": { en: "Watch on YouTube", pt: "Ver no YouTube" },
   "Calendario de actividades": { en: "Activities calendar", pt: "Agenda de atividades" },
   "¿Qué estás buscando?": {
     "en": "What are you looking for?",

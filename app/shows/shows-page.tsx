@@ -6,6 +6,7 @@ import { FixedSiteLanguage, type SiteLanguage } from "../components/home-languag
 import styles from "../produccion-artistica/produccion-artistica.module.css";
 import local from "./shows.module.css";
 import { showLanguages, showsCopy } from "./shows-copy";
+import { bandLanguages } from "../867-producciones-musicales/band-copy";
 
 const site = "https://www.undertangoclub.com";
 const brand = "Ø UnderTango Club";
@@ -175,7 +176,7 @@ export default function ShowsPage({ language }: { language: SiteLanguage }) {
           </section>
 
           <div className={local.bandDiscovery}>
-            <Link className={styles.secondaryCta} href="/banda" hrefLang="es-AR">
+            <Link className={styles.secondaryCta} href={bandLanguages[language].path} hrefLang={bandLanguages[language].tag}>
               {copy.bandLink} <span aria-hidden="true">→</span>
             </Link>
           </div>

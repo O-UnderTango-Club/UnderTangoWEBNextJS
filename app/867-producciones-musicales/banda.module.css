@@ -22,6 +22,37 @@
   margin-inline: auto;
 }
 
+.languageSwitch {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.languageSwitch a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid #f1c77638;
+  border-radius: 8px;
+  color: var(--band-paper);
+  font-size: .875rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.languageSwitch a:hover {
+  border-color: var(--band-gold);
+}
+
+.languageSwitch a[aria-current="page"] {
+  background: var(--band-gold);
+  border-color: var(--band-gold);
+  color: #221208;
+}
+
 .hero {
   display: grid;
   grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
@@ -166,6 +197,7 @@
 
 @media (max-width: 760px) {
   .page { padding: 100px 16px 54px; }
+  .languageSwitch { justify-content: flex-start; margin-bottom: 20px; }
   .feature, .videoCard { padding: 0; overflow: hidden; }
   .feature figure > div, .videoCard figure > div { border-radius: 0; }
   .feature figcaption, .videoCard figcaption, .videoCard > p { padding-inline: 12px; }

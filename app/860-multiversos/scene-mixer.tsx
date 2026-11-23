@@ -9,8 +9,8 @@ type Mode = "matrix" | "live";
 type Clip = { mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; dispose: () => void };
 
-export function SceneMixer({scene, pitch, input, master, paused, startScene, ready}: {
-  startScene:()=>void; ready:boolean; scene?: string; pitch: number; input: GainNode | null; master: GainNode | null; paused: boolean;
+export function SceneMixer({synthStream, scene, pitch, input, master, paused, startScene, ready}: {
+  synthStream:MediaStream|null; startScene:()=>void; ready:boolean; scene?: string; pitch: number; input: GainNode | null; master: GainNode | null; paused: boolean;
 }) {
   const [clips, setClips] = useState<Clip[]>([]);
   const {bpm,setBpm,clock,setLocked}=useTempo();
@@ -40,6 +40,23 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
   const queued=useRef<Mode[]>([]);
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
   useEffect(()=>{if(input)warmRecorder(input.context as AudioContext);},[input]);
+  // The scene and the lower synth own different AudioContexts. Bridge the synth
+  // for recording only; its normal speaker output stays connected exactly once.
+  const stereo=useRef<GainNode|null>(null);
+  useEffect(()=>{
+    if(!master)return;
+    const bus=master.context.createGain();
+    bus.channelCount=2;bus.channelCountMode="explicit";
+    master.connect(bus);stereo.current=bus;
+    return ()=>{master.disconnect(bus);bus.disconnect();stereo.current=null;};
+  },[master]);
+  useEffect(()=>{
+    const bus=stereo.current;
+    if(!bus || !synthStream)return;
+    const synth=(bus.context as AudioContext).createMediaStreamSource(synthStream);
+    synth.connect(bus);
+    return ()=>synth.disconnect();
+  },[master,synthStream]);
   async function chooseSource(kind:"room"|"computer", enabled:boolean) {
     const ref=kind==="room"?mic:external;
     const update=kind==="room"?setRoom:setShared;
@@ -47,7 +64,7 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
     setRequesting(true);setMessage("");
     try {
       const stream=kind==="room" ? await navigator.mediaDevices.getUserMedia({audio:true}) :
-        await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+        await navigator.mediaDevices.getDisplayMedia({video:true,audio:true,systemAudio:"include",selfBrowserSurface:"exclude"} as DisplayMediaStreamOptions);
       if(!alive.current || !stream.getAudioTracks().length){
         stream.getTracks().forEach(t=>t.stop());
         if(alive.current)setMessage("Elegí una fuente con la opción Compartir audio activada.");
@@ -142,10 +159,14 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
       const capture=makeCapture(Math.round(base*ctx.sampleRate),length,Math.round(end*ctx.sampleRate),onLoop);
       const node=capture.node;
       const gain=ctx.createGain();gain.gain.value=0.75;
-      node.connect(gain).connect(master);
+      // The processor outputs silence. Keep it outside the recorded master graph.
+      node.connect(gain).connect(ctx.destination);
       const gate=ctx.createGain();
       const sources:AudioNode[]=[];
-      sources.push(shared && external.current ? ctx.createMediaStreamSource(external.current) : input);
+      const desktop=shared ? external.current : null;
+      const surface=desktop?.getVideoTracks()[0]?.getSettings().displaySurface;
+      if(!desktop || surface==="browser")sources.push(stereo.current ?? master);
+      if(desktop)sources.push(ctx.createMediaStreamSource(desktop));
       if(room && mic.current)sources.push(ctx.createMediaStreamSource(mic.current));
       for(const source of sources)source.connect(gate);
       gate.connect(node);
@@ -257,7 +278,8 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
       <label>BPM <input aria-label="BPM de grabación" type="number" min="1" max="240" key={bpm} defaultValue={bpm} disabled={state!=="idle"} onBlur={e=>{const n=Math.min(240,Math.max(1,Math.round(Number(e.target.value)||111)));setBpm(n);e.target.value=String(n);}} /></label>
       <label>Pulsos <select aria-label="Pulsos" disabled={state!=="idle"} value={meter} onChange={e=>setMeter(Number(e.target.value))}>{[2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
       <label>Compases <select aria-label="Compases" disabled={state!=="idle"} value={bars} onChange={e=>setBars(Number(e.target.value))}>{[1,2,3,4,5,6,7,8,12,16].map(n=><option key={n}>{n}</option>)}</select></label>
-      <label><input type="checkbox" checked={shared} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("computer",e.target.checked)}/> Audio de otra pestaña o pantalla</label>
+      <label><input type="checkbox" checked={shared} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("computer",e.target.checked)}/> Compartir audio de la computadora</label>
+      <small>Para todo lo que suena en la computadora, elegí Pantalla completa y activá Compartir audio del sistema.</small>
       <button aria-pressed={learn} onClick={()=>setLearn(!learn)}>{learn?"Pulsá el botón MIDI":`MIDI · Récord${binding||liveBinding?" ✓":""}`}</button>
       </details>
       <button disabled={!scene || paused} aria-label="Tocar sonido de escena" onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); play(); }}

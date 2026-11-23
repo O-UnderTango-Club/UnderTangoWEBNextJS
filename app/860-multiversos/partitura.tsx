@@ -1449,8 +1449,8 @@ const MODULE_ZERO_SCENE_BY_STAGE = {
 
 const MIDI_PITCH_NAMES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "Sol", "La♭", "La", "Si♭", "Si"];
 
-function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
-  masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
+function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
+  synthStream: MediaStream|null; masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
   connectMidi: (rescan?: boolean) => Promise<void>;
   midiConnection: MidiConnection;
@@ -1576,13 +1576,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
     return () => window.clearTimeout(timer);
   }, [cue, enterNumberedScene, extendedScene, nextAfterSeconds, nextTimedScene, paused, previewMode, reset]);
 
-  useEffect(() => {
-    window.addEventListener("multiversos-instrument-start", reset);
-    return () => {
-      window.removeEventListener("multiversos-instrument-start", reset);
-      stop();
-    };
-  }, [reset, stop]);
+  useEffect(() => () => stop(), [stop]);
 
   useEffect(() => {
     const settings = settingsRef.current;
@@ -2350,7 +2344,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         ? <ExtendedPerformanceProjection performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      <SceneMixer synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null ? <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>
         : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>
@@ -2632,6 +2626,8 @@ export default function Multiversos860Page() {
   const phraseIndexRef = useRef(0);
   const sequenceCursorRef = useRef(0);
   const engineRef = useRef<SoundEngine | null>(null);
+  const [synthStream,setSynthStream]=useState<MediaStream|null>(null);
+  const synthTap=useRef<MediaStreamAudioDestinationNode|null>(null);
   const midiAccessRef = useRef<MidiAccessLike | null>(null);
   const midiRequestRef = useRef<Promise<void> | null>(null);
   const midiMountedRef = useRef(false);
@@ -2654,12 +2650,16 @@ export default function Multiversos860Page() {
   presetsRef.current = presets;
 
   const ensureAudio = useCallback(async () => {
-    if (!engineRef.current || engineRef.current.context.state !== "running") window.dispatchEvent(new Event("multiversos-instrument-start"));
+
     let engine = engineRef.current;
     if (!engine) {
       engine = createSoundEngine();
       engine.output.gain.value = 0.56 * volumeRef.current / 100;
       engineRef.current = engine;
+      const tap=engine.context.createMediaStreamDestination();
+      engine.output.connect(tap);
+      synthTap.current=tap;
+      setSynthStream(tap.stream);
       valuesRef.current.forEach((value, index) => applyControl(engine as SoundEngine, index, value, bpmRef.current));
     }
     if (engine.context.state !== "running") await engine.context.resume();
@@ -3230,6 +3230,7 @@ export default function Multiversos860Page() {
   useEffect(() => {
     return () => {
       const engine = engineRef.current;
+      synthTap.current?.stream.getTracks().forEach(track=>track.stop());
       if (engine) void engine.context.close();
       const access = midiAccessRef.current;
       if (access) access.onstatechange = null;
@@ -3404,7 +3405,7 @@ export default function Multiversos860Page() {
 
   return (
     <main className={styles.console}>
-      <TempoProvider><ModuleZero faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); void connectMidi(true); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
+      <TempoProvider><ModuleZero synthStream={synthStream} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); void connectMidi(true); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
           <span className={styles.brandMark}>&#9670;</span>

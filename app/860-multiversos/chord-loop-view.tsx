@@ -5,10 +5,10 @@ import { buildLoopTraces } from "./chord-loop-traces";
 import type { NoteStrike } from "./performance-notes";
 
 type LoopCue = { context: AudioContext; beginsAt: number };
-type LoopConfig = { storageKey?: string; manual?: boolean; bpm?: number; click?: boolean; mix?: number; synchronized?: boolean; clickOutputRef?: { current: GainNode | null } };
+type LoopConfig = { melodic?: boolean; storageKey?: string; manual?: boolean; bpm?: number; click?: boolean; mix?: number; synchronized?: boolean; clickOutputRef?: { current: GainNode | null } };
 
 export function useChordLoop(cue: LoopCue | null, outputRef: { current: GainNode | null }, config: LoopConfig = {}) {
-  const { manual, bpm, click, mix, synchronized, clickOutputRef } = config;
+  const { melodic, manual, bpm, click, mix, synchronized, clickOutputRef } = config;
   const [settings, setSettings] = useSavedSetting(config.storageKey ?? "loop14", () => ({ ...DEFAULT_CHORD_LOOP, bpm: bpm ?? DEFAULT_CHORD_LOOP.bpm }));
   const [latest, setLatest] = useState<{ cue: LoopCue; frame: ChordLoopFrame } | null>(null);
   const settingsRef = useRef(settings);
@@ -23,17 +23,19 @@ export function useChordLoop(cue: LoopCue | null, outputRef: { current: GainNode
     const output = outputRef.current;
     if (!cue || !output || output.context !== cue.context) return;
     const player = createChordLoop(output, settingsRef.current, (frame) => setLatest({ cue, frame }), {
-      manual, click, mix, startAt: synchronized ? cue.beginsAt + 0.06 : undefined, clickOutput: clickOutputRef?.current ?? undefined,
+      melodic, manual, click, mix, startAt: synchronized ? cue.beginsAt + 0.06 : undefined, clickOutput: clickOutputRef?.current ?? undefined,
     });
     playerRef.current = player;
     return () => {
       player.stop();
       playerRef.current = null;
     };
-  }, [cue, outputRef, manual, click, mix, synchronized, clickOutputRef]);
+  }, [cue, outputRef, melodic, manual, click, mix, synchronized, clickOutputRef]);
 
   return {
     settings,
+    pressNote: useCallback((id: string, frequency: number, velocity: number) => playerRef.current?.pressNote(id, frequency, velocity), []),
+    releaseNote: useCallback((id: string) => playerRef.current?.releaseNote(id), []),
     frame: latest?.cue === cue ? latest.frame : null,
     setBpm: (bpm: number) => setSettings((current) => ({ ...current, bpm })),
     setLength: (length: number) => setSettings((current) => ({ ...current, length })),

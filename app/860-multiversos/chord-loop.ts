@@ -19,7 +19,7 @@ export type ChordLoopFrame = {
 export const DEFAULT_CHORD_LOOP: ChordLoopSettings = { bpm: 11, length: 4 };
 export const MAX_LOOP_BPM = 240;
 export const MAX_LOOP_BEATS = 8;
-export type ChordLoopOptions = { manual?: boolean; click?: boolean; mix?: number; startAt?: number; clickOutput?: GainNode };
+export type ChordLoopOptions = { melodic?: boolean; manual?: boolean; click?: boolean; mix?: number; startAt?: number; clickOutput?: GainNode };
 const SILENCE: Chord = [];
 const sortNotes = (notes: Set<NoteFrequency>): Chord => [...notes].sort((a, b) => a - b);
 
@@ -30,6 +30,15 @@ export function createChordLoop(output: GainNode, initial: ChordLoopSettings, on
   const { manual = false, click = true, mix = 1, clickOutput = bus } = options;
   let settings = initial;
   let cells = Array<Chord | null>(settings.length).fill(null);
+  type PlayedNote = { frequency: number; offset: number; velocity: number; duration: number };
+  let phrases: PlayedNote[][] = cells.map(() => []);
+  const heldNotes = new Map<string, { event: PlayedNote; at: number; period: number }>();
+  function releaseNote(id: string, time = clock.currentTime) {
+    const held = heldNotes.get(id);
+    if (!held) return;
+    held.event.duration = Math.max(0.001, time - held.at) / held.period;
+    heldNotes.delete(id);
+  }
   const draft = new Set<NoteFrequency>();
   const voices = new Map<NoteFrequency, { oscillator: OscillatorNode; level: GainNode; gain: number }>();
   let running = !manual;
@@ -101,13 +110,18 @@ export function createChordLoop(output: GainNode, initial: ChordLoopSettings, on
     closeSlot();
     if (armed || cells.length !== settings.length) {
       cells = Array<Chord | null>(settings.length).fill(null);
+      heldNotes.clear();
+      phrases = cells.map(() => []);
       slot = 0;
       if (!manual) recording = true;
       armed = false;
     } else if (slot < 0) slot = 0;
     else {
       slot = (slot + 1) % cells.length;
-      if (slot === 0 && !manual) recording = false;
+      if (slot === 0 && !manual) {
+        for (const id of heldNotes.keys()) releaseNote(id, nextAt);
+        recording = false;
+      }
     }
     beat++;
     beatAt = nextAt;
@@ -125,7 +139,18 @@ export function createChordLoop(output: GainNode, initial: ChordLoopSettings, on
       const at = clock.currentTime + 0.006;
       const downbeat = slot === 0;
       if (click) tone(downbeat ? 1720 : 1520, downbeat ? 0.12 : 0.08, at, 0.032, 0.002, 0.027);
-      changesAt(!manual && recording ? SILENCE : cells[slot] ?? SILENCE, at);
+      if (options.melodic && !recording) {
+        for (const event of phrases[slot]) {
+          const onset = beatAt + event.offset * period;
+          const end = onset + event.duration * period;
+          const start = Math.max(clock.currentTime, onset);
+          if (end <= start) continue;
+          const duration = end - start;
+          tone(event.frequency, 0.15 * event.velocity * mix, start, duration,
+            Math.min(0.005, duration / 3), Math.min(0.008, duration / 3));
+        }
+        sounding = cells[slot] ?? SILENCE;
+      } else changesAt(!manual && recording ? SILENCE : cells[slot] ?? SILENCE, at);
       publish();
     }
 
@@ -147,6 +172,16 @@ export function createChordLoop(output: GainNode, initial: ChordLoopSettings, on
 
   return {
     strike,
+    releaseNote,
+    pressNote(id: string, frequency: number, velocity: number) {
+      const time = clock.currentTime;
+      if (time >= nextAt) wake(time);
+      if (!options.melodic || !recording) return;
+      releaseNote(id, time);
+      const event = { frequency, velocity, duration: 0, offset: slot < 0 ? 0 : (time - beatAt) / period };
+      phrases[Math.max(0, slot)].push(event);
+      heldNotes.set(id, {event, at: Math.max(time, beatAt), period});
+    },
     configure(next: ChordLoopSettings) {
       settings = next;
       publish();

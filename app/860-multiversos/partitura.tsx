@@ -2031,6 +2031,8 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       }
       .scene-mixer { position:absolute; bottom:0; inset-inline:0; z-index:4; max-height:50%; overflow:auto; overscroll-behavior:contain; background:#15151ded; color:white; font: .76rem system-ui; }
       .scene-mixer-tools,.scene-mixer-row { display:flex; align-items:center; gap:.5rem; padding:.24rem .55rem; flex-wrap:wrap; }
+      .scene-mixer-tools input[type=number] {width:4em;}
+      .scene-mixer-tools progress {width:5rem;}
       .scene-mixer-tools { position:sticky; top:0; background:#15151d; z-index:1; }
       .scene-mixer-row { border-top:1px solid #494951; }
       .scene-mixer button { padding:.25rem .6rem; border:1px solid #737482; background:#252631; color:white; border-radius:4px; cursor:pointer; }
@@ -2918,6 +2920,11 @@ export default function Multiversos860Page() {
         const kind = status & 0xf0;
         const piano = pianoRouting.current;
         const channel = status & 0x0f;
+        if (kind === 0x90 || kind === 0x80 || (kind === 0xb0 && first < 120)) {
+          const id = JSON.stringify([input.id,channel,kind===0xb0?"cc":"note",first]);
+          const event = new CustomEvent("860-record-midi",{cancelable:true,detail:{id,on:kind!==0x80 && second>0}});
+          if(!window.dispatchEvent(event)) return;
+        }
         if (kind === 0x90 && second > 0) {
           if (piano) piano.midiNote(input.id, channel, first, second / 127);
           else {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { frequencyPoint, type FrequencyVector } from "./frequency-tuning";
 import {
-  BREATH_CUE, CROSS_CUE, NOISE_COLORS, NOISE_CUE, NOISE_IDS, RETURN_CUE, SCENE_SYMBOLS, SPHERE_CUE,
+  BREATH_CUE, CROSS_CUE, NOISE_COLORS, NOISE_CUE, noiseJourney, NOISE_IDS, RETURN_CUE, SCENE_SYMBOLS, SPHERE_CUE,
   crossTuningAt, sceneProgress, type ContinuationScene, type NoiseColor, type NoisePair,
 } from "./scene-cues";
 
@@ -166,11 +166,11 @@ function soundGallery(ink: Ink, progress: number) {
   planeFrame(ink, progress, SPHERE_CUE.gather, pull);
 }
 
-function connection(ink: Ink, from: NoiseSphere, to: NoiseSphere, progress: number, alpha: number) {
+function connection(ink: Ink, from: NoiseSphere, to: NoiseSphere, progress: number, alpha: number, inset = 0.62) {
   if (progress <= 0) return;
   const direction = Math.sign(to.x - from.x);
-  const start = from.x + direction * from.radius * 0.62;
-  const end = to.x - direction * to.radius * 0.62;
+  const start = from.x + direction * from.radius * inset;
+  const end = to.x - direction * to.radius * inset;
   const middle = { x: (start + end) / 2, y: Math.min(from.y, to.y) - 110 };
   const path = (t: number) => ({
     x: (1 - t) ** 2 * start + 2 * (1 - t) * t * middle.x + t * t * end,
@@ -200,16 +200,19 @@ function connection(ink: Ink, from: NoiseSphere, to: NoiseSphere, progress: numb
 
 function noiseField(ink: Ink, progress: number, pair: NoisePair) {
   const spread = ease(sceneProgress(progress, NOISE_CUE.spread, NOISE_CUE.spreadOut));
-  const linking = sceneProgress(progress, NOISE_CUE.connect, NOISE_CUE.connected);
-  const from = SPHERE_BY_COLOR[pair.from];
-  const to = SPHERE_BY_COLOR[pair.to];
+  const legs = noiseJourney(pair);
+  const current = legs.find(leg => progress < leg.arrive) ?? legs[legs.length - 1];
+  const linking = sceneProgress(progress, current.depart, current.arrive);
   frame(ink, { x: CENTER_X, y: CENTER_Y }, FRAME_RADIUS, 1 - spread);
-  connection(ink, from, to, linking, 1);
+  for (const leg of legs) {
+    connection(ink, SPHERE_BY_COLOR[leg.from], SPHERE_BY_COLOR[leg.to],
+      sceneProgress(progress, leg.depart, leg.arrive), 1, 0);
+  }
 
   for (const item of NOISE_SPHERES) {
     const { id, x, y, radius } = item;
     const light = id === "white" ? 1 : spread;
-    const emphasis = id === pair.from ? 1 - linking : id === pair.to ? linking : 0;
+    const emphasis = id === current.from ? 1 - linking : id === current.to ? linking : 0;
     const position = { x: lerp(CENTER_X, x, spread), y: lerp(CENTER_Y, y, spread) };
     const scale = id === "white" ? lerp(SPHERE_RADIUS, radius, spread) : lerp(9, radius, spread);
     sphere(ink, { id, ...position, radius: scale + 9 * emphasis * spread }, light, 0.2 + spread * (x / WIDTH - 0.5));
@@ -317,7 +320,7 @@ export function ContinuationProjection({ scene, startsAt, seconds, clock, pair, 
   }, [clock, hold, pair, scene, seconds, startsAt]);
 
   const label = hold ? "Esfera blanca en reposo" : scene === "noise"
-    ? `${DESCRIPTIONS.noise}. Transición de ${NOISE_COLORS[pair.from].label.toLowerCase()} a ${NOISE_COLORS[pair.to].label.toLowerCase()}` : DESCRIPTIONS[scene];
+    ? `${DESCRIPTIONS.noise}. Recorrido: ${[pair.from, ...noiseJourney(pair).map(leg => leg.to)].map(id => NOISE_COLORS[id].label).join(' → ')}` : DESCRIPTIONS[scene];
   return <div className="zero-harmonic-frame">
     {inheritedTrail && <div ref={trailRef} className="zero-frequency-space" aria-hidden="true">{inheritedTrail}</div>}
     <canvas ref={canvasRef} className="zero-harmonic-diagram" role="img" aria-label={label} />

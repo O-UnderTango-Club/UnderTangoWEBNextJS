@@ -26,6 +26,16 @@ export const DEFAULT_PAIR: NoisePair = { from: "white", to: "pink" };
 export const CROSS_CUE = { enter: 0.12, morph: 0.26, formed: 0.90 };
 export const SPHERE_CUE = { gather: 0.08, grouped: 0.36, pullback: 0.51, white: 0.88 };
 export const NOISE_CUE = { spread: 0.08, spreadOut: 0.30, connect: 0.36, connected: 0.87 };
+export function noiseJourney(pair: NoisePair) {
+  const stops = [pair.from, ...NOISE_IDS.filter(id => id !== pair.from && id !== pair.to), pair.to];
+  const interval = (NOISE_CUE.connected - NOISE_CUE.connect) / (stops.length - 1);
+  return stops.slice(1).map((to, i) => ({
+    from: stops[i], to,
+    depart: NOISE_CUE.connect + i * interval,
+    arrive: NOISE_CUE.connect + (i + 0.72) * interval,
+  }));
+}
+
 export const RETURN_CUE = { linked: 0.13, gather: 0.18, combined: 0.50, grouped: 0.80, white: 0.94 };
 export const BREATH_CUE = { pullback: 0.08, revealed: 0.79 };
 

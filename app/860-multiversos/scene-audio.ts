@@ -1,6 +1,6 @@
 import { OCTAVE_NOTES, type FrequencyVector } from "./frequency-tuning";
 import {
-  BREATH_CUE, CROSS_CUE, NEXT_NOTES, NOISE_COLORS, NOISE_CUE, NOISE_IDS, RETURN_CUE, SCENE_SYMBOLS, SPHERE_CUE,
+  BREATH_CUE, CROSS_CUE, NEXT_NOTES, NOISE_COLORS, NOISE_CUE, noiseJourney, NOISE_IDS, RETURN_CUE, SCENE_SYMBOLS, SPHERE_CUE,
   type NoiseColor, type NoisePair, type TimedScene,
 } from "./scene-cues";
 
@@ -152,8 +152,10 @@ export function scheduleContinuationAudio(output: GainNode, timing: SceneTiming[
       noise(0, { white: 1 });
       noise(NOISE_CUE.spread, { white: 1 });
       noise(NOISE_CUE.spreadOut, { [pair.from]: 1 });
-      noise(NOISE_CUE.connect, { [pair.from]: 1 });
-      noise(NOISE_CUE.connected, { [pair.to]: 1 });
+      for (const leg of noiseJourney(pair)) {
+        noise(leg.depart, { [leg.from]: 1 });
+        noise(leg.arrive, { [leg.to]: 1 });
+      }
     } else if (scene === "return") {
       noise(0, { [pair.to]: 1 });
       noise(RETURN_CUE.linked, { [pair.from]: 0.5, [pair.to]: 0.5 });

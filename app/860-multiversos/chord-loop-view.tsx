@@ -1,5 +1,6 @@
+import { useTempo } from "./tempo";
 import { useSavedSetting } from "./saved-setting";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createChordLoop, DEFAULT_CHORD_LOOP, MAX_LOOP_BEATS, MAX_LOOP_BPM, type Chord, type ChordLoopFrame } from "./chord-loop";
 import { buildLoopTraces } from "./chord-loop-traces";
 import type { NoteStrike } from "./performance-notes";
@@ -9,7 +10,11 @@ type LoopConfig = { melodic?: boolean; storageKey?: string; manual?: boolean; bp
 
 export function useChordLoop(cue: LoopCue | null, outputRef: { current: GainNode | null }, config: LoopConfig = {}) {
   const { melodic, manual, bpm, click, mix, synchronized, clickOutputRef } = config;
-  const [settings, setSettings] = useSavedSetting(config.storageKey ?? "loop14", () => ({ ...DEFAULT_CHORD_LOOP, bpm: bpm ?? DEFAULT_CHORD_LOOP.bpm }));
+  const transport=useTempo();
+  const [stored, setSettings] = useSavedSetting(config.storageKey ?? "loop14", () => ({ ...DEFAULT_CHORD_LOOP, bpm: bpm ?? DEFAULT_CHORD_LOOP.bpm }));
+  const settings=useMemo(()=>({...stored,bpm:transport.bpm}),[stored,transport.bpm]);
+  const transportRef=useRef(transport);
+  transportRef.current=transport;
   const [latest, setLatest] = useState<{ cue: LoopCue; frame: ChordLoopFrame } | null>(null);
   const settingsRef = useRef(settings);
   const playerRef = useRef<ReturnType<typeof createChordLoop> | null>(null);
@@ -23,7 +28,7 @@ export function useChordLoop(cue: LoopCue | null, outputRef: { current: GainNode
     const output = outputRef.current;
     if (!cue || !output || output.context !== cue.context) return;
     const player = createChordLoop(output, settingsRef.current, (frame) => setLatest({ cue, frame }), {
-      melodic, manual, click, mix, startAt: synchronized ? cue.beginsAt + 0.06 : undefined, clickOutput: clickOutputRef?.current ?? undefined,
+      melodic, manual, click, mix, nextPulse: () => { const t=transportRef.current, origin=t.clock(cue.context), beat=60/t.bpm; return origin+Math.ceil((cue.context.currentTime-origin)/beat)*beat; }, clickOutput: clickOutputRef?.current ?? undefined,
     });
     playerRef.current = player;
     return () => {
@@ -37,7 +42,8 @@ export function useChordLoop(cue: LoopCue | null, outputRef: { current: GainNode
     pressNote: useCallback((id: string, frequency: number, velocity: number) => playerRef.current?.pressNote(id, frequency, velocity), []),
     releaseNote: useCallback((id: string) => playerRef.current?.releaseNote(id), []),
     frame: latest?.cue === cue ? latest.frame : null,
-    setBpm: (bpm: number) => setSettings((current) => ({ ...current, bpm })),
+    setBpm: transport.setBpm,
+    tempoLocked: transport.locked,
     setLength: (length: number) => setSettings((current) => ({ ...current, length })),
     arm: () => playerRef.current?.arm(),
     toggleRecording: () => playerRef.current?.toggleRecording(),
@@ -63,7 +69,7 @@ export function ChordLoopControls({ loop, active, paused, label = "Modo acorde",
     <legend>{label}</legend>
     <div className="zero-loop-options">
       <label>Tempo (BPM)
-        <input type="number" min={1} max={MAX_LOOP_BPM} step={1} inputMode="numeric"
+        <input type="number" disabled={loop.tempoLocked} min={1} max={MAX_LOOP_BPM} step={1} inputMode="numeric"
           value={tempoText ?? settings.bpm} onChange={(event) => setTempoText(event.currentTarget.value)}
           onBlur={commitTempo} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
       </label>
@@ -74,7 +80,7 @@ export function ChordLoopControls({ loop, active, paused, label = "Modo acorde",
       </label>
     </div>
     <div className="zero-loop-presets" role="group" aria-label="Tempos de prueba">
-      {[11, 111].map((bpm) => <button key={bpm} type="button" aria-pressed={settings.bpm === bpm}
+      {[11, 111].map((bpm) => <button key={bpm} disabled={loop.tempoLocked} type="button" aria-pressed={settings.bpm === bpm}
         onClick={() => { setTempoText(null); setBpm(bpm); }}>{bpm} BPM</button>)}
     </div>
     {active && <>

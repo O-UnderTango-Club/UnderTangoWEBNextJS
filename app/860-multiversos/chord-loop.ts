@@ -19,7 +19,7 @@ export type ChordLoopFrame = {
 export const DEFAULT_CHORD_LOOP: ChordLoopSettings = { bpm: 11, length: 4 };
 export const MAX_LOOP_BPM = 240;
 export const MAX_LOOP_BEATS = 8;
-export type ChordLoopOptions = { melodic?: boolean; manual?: boolean; click?: boolean; mix?: number; startAt?: number; clickOutput?: GainNode };
+export type ChordLoopOptions = { melodic?: boolean; manual?: boolean; click?: boolean; mix?: number; startAt?: number; nextPulse?:()=>number; clickOutput?: GainNode };
 const SILENCE: Chord = [];
 const sortNotes = (notes: Set<NoteFrequency>): Chord => [...notes].sort((a, b) => a - b);
 
@@ -46,7 +46,7 @@ export function createChordLoop(output: GainNode, initial: ChordLoopSettings, on
   let armed = false;
   let beat = -1;
   let slot = -1;
-  let beatAt = options.startAt ?? clock.currentTime;
+  let beatAt = options.nextPulse?.() ?? options.startAt ?? clock.currentTime;
   let nextAt = beatAt;
   let period = 60 / settings.bpm;
   let sounding = SILENCE;
@@ -183,7 +183,14 @@ export function createChordLoop(output: GainNode, initial: ChordLoopSettings, on
       heldNotes.set(id, {event, at: Math.max(time, beatAt), period});
     },
     configure(next: ChordLoopSettings) {
+      if(next.bpm!==settings.bpm && options.nextPulse){
+        nextAt=options.nextPulse();
+        period=60/next.bpm;
+        beatAt=nextAt-period;
+      }
+      const changed=next.bpm!==settings.bpm;
       settings = next;
+      if(changed && running) wake();
       publish();
     },
     arm() {
@@ -195,7 +202,7 @@ export function createChordLoop(output: GainNode, initial: ChordLoopSettings, on
       if (!running) {
         running = true;
         slot = -1;
-        nextAt = clock.currentTime;
+        nextAt = options.nextPulse?.() ?? clock.currentTime;
       }
       if (recording) closeSlot();
       recording = !recording;

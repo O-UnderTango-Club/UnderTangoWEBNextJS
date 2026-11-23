@@ -13,6 +13,7 @@ import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isTimbreScene, type ExtendedScene } from "./extended-scenes";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
+import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
 import { EXTENDED_STYLE } from "./extended-style";
 
@@ -2035,6 +2036,12 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .scene-mixer-tools details[open] {display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;}
       .scene-mixer-tools summary {cursor:pointer;}
       .scene-mixer-tools input[type=number] {width:4em;}
+      .tempo-lights {display:flex;flex-wrap:wrap;align-items:center;row-gap:5px;max-width:100%;}
+      .tempo-bar {display:inline-flex;align-items:center;gap:4px;padding:2px 6px;}
+      .tempo-bar + .tempo-bar {border-inline-start:1px solid #9692a1;}
+      .tempo-bar i {width:8px;height:8px;border-radius:50%;background:#565461;box-shadow:inset 0 0 0 1px #797581;}
+      .tempo-bar i[data-current=true] {background:#ffe28d;box-shadow:0 0 0 1px #ffebaa,0 0 6px #ffc85b;}
+      .tempo-bar i:first-child[data-current=true] {background:#fff;box-shadow:0 0 0 2px #ffdb82;}
       .scene-mixer-tools progress {width:5rem;}
       .scene-mixer-tools { position:sticky; top:0; background:#15151d; z-index:1; }
       .scene-mixer-row { border-top:1px solid #494951; }
@@ -3397,7 +3404,7 @@ export default function Multiversos860Page() {
 
   return (
     <main className={styles.console}>
-      <ModuleZero faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); void connectMidi(true); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} />
+      <TempoProvider><ModuleZero faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); void connectMidi(true); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
           <span className={styles.brandMark}>&#9670;</span>

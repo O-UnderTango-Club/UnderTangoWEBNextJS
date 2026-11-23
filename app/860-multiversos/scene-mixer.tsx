@@ -3,21 +3,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { warmRecorder, captureFactory } from "./measure-recorder";
 import { useSavedSetting } from "./saved-setting";
 
-type Clip = { id: number; scene: string; buffer: AudioBuffer; muted: boolean; volume: number };
-type Voice = { gain: GainNode; dispose: () => void };
+import { useTempo } from "./tempo";
+
+type Clip = { id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
+type Voice = { bpm:number; gain: GainNode; dispose: () => void };
 
 export function SceneMixer({scene, pitch, input, master, paused, startScene, ready}: {
   startScene:()=>void; ready:boolean; scene?: string; pitch: number; input: GainNode | null; master: GainNode | null; paused: boolean;
 }) {
   const [clips, setClips] = useState<Clip[]>([]);
-  const [bpm,setBpm] = useSavedSetting("mixerBpm",111);
+  const {bpm,setBpm,clock,setLocked}=useTempo();
   const [meter,setMeter] = useSavedSetting("mixerMeter",4);
   const [bars,setBars] = useSavedSetting("mixerBars",4);
   const [room,setRoom] = useState(false);
   const [learn,setLearn] = useState(false);
   const [binding,setBinding] = useSavedSetting("mixerRecordButton","");
   const [state,setState] = useState<"idle"|"padding"|"recording">("idle");
-  const [origin,setOrigin] = useState<number|null>(null);
+  useEffect(()=>{setLocked(state!=="idle");return ()=>setLocked(false);},[state,setLocked]);
   const [position,setPosition] = useState(0);
   const [message,setMessage] = useState("");
   const voices = useRef(new Map<number, Voice>());
@@ -62,9 +64,10 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
   },[]);
   useEffect(() => () => { cancel(); stopTone(); }, [input,cancel,stopTone]);
   useEffect(() => () => stopTone(), [scene,stopTone]);
-  useEffect(() => {setOrigin(null);setPosition(0);},[input,bpm,meter,bars]);
+
   useEffect(() => {
-    if (origin===null || !input || paused) return;
+    if (!input || paused) return;
+    const origin=clock(input.context);
     let frame=0;
     const draw=()=> {
       const now=input.context.currentTime;
@@ -73,7 +76,7 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
       frame=requestAnimationFrame(draw);
     };
     draw();return ()=>cancelAnimationFrame(frame);
-  },[origin,input,paused,beat,meter,bars]);
+  },[clock,input,paused,beat,meter,bars]);
 
   const play = useCallback(() => {
     if (!input || !scene || paused || tone.current) return;
@@ -106,11 +109,14 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
     if(paused || requesting)return;
     if(pending.current){pending.current.silence();setState("padding");return;}
     const ctx=input.context as AudioContext;
+    if(cycle>180){setMessage("Para grabar hasta 3 minutos a este tempo, elegí menos compases.");return;}
     const attempt=++generation.current;
     setMessage("");
     try {
       const makeCapture=captureFactory(ctx);
+      const origin=clock(ctx);
       const start=ctx.currentTime;
+      const startBeat=(start-origin)/beat;
       const length=Math.round(ctx.sampleRate*cycle);
       const capture=makeCapture(Math.round(start*ctx.sampleRate),length,onLoop);
       const node=capture.node;
@@ -132,10 +138,10 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
         const buffer=ctx.createBuffer(2,length,ctx.sampleRate);
         channels.forEach((samples,ch)=>buffer.getChannelData(ch).set(samples));
         const id=++serial.current;
-        voices.current.set(id,{gain,dispose});
-        setClips(all=>[...all,{id,scene:label,buffer,volume:75,muted:false}]);setState("idle");
+        voices.current.set(id,{bpm,gain,dispose});
+        setClips(all=>[...all,{id,scene:label,buffer,recordedBpm:bpm,startBeat,volume:75,muted:false}]);setState("idle");
       };
-      setOrigin(start);setState("recording");
+      setState("recording");
     } catch {
       if(attempt!==generation.current)return;
       cancel();setMessage(room ? "Revisá el permiso de micrófono. Para grabar solo el instrumento, desactivá Sala." : "No se pudo iniciar la captura de audio.");
@@ -171,25 +177,35 @@ export function SceneMixer({scene, pitch, input, master, paused, startScene, rea
     }
     for (const clip of clips) {
       let voice = voices.current.get(clip.id);
+      if(voice && voice.bpm!==bpm){voice.dispose();voices.current.delete(clip.id);voice=undefined;}
       if (!voice) {
         const source = ctx.createBufferSource(), gain = ctx.createGain();
         gain.gain.value = 0;
         source.buffer = clip.buffer; source.loop = true;
-        source.connect(gain).connect(master); source.start();
-        voice = {gain,dispose:()=>{source.stop();source.disconnect();gain.disconnect();}}; voices.current.set(clip.id,voice);
+        const beatNow=(ctx.currentTime-clock(ctx))*bpm/60;
+        const seconds=(beatNow-clip.startBeat)*60/clip.recordedBpm;
+        const offset=((seconds%clip.buffer.duration)+clip.buffer.duration)%clip.buffer.duration;
+        source.playbackRate.value=bpm/clip.recordedBpm;
+        source.connect(gain).connect(master); source.start(0,offset);
+        voice = {bpm,gain,dispose:()=>{source.stop();source.disconnect();gain.disconnect();}}; voices.current.set(clip.id,voice);
       }
       voice.gain.gain.setTargetAtTime(clip.muted ? 0 : clip.volume / 100, ctx.currentTime, 0.012);
     }
-  }, [master,clips]);
+  }, [master,clips,bpm,clock]);
 
 
   return <div className="scene-mixer" role="region" aria-label="Lupera de objetos sonoros">
     <div className="scene-mixer-tools">
       <button className="scene-record" aria-label={state==="idle"?"Grabar":"Detener entrada"} title={state==="idle"?"Grabar":"Detener entrada y completar con silencio"} disabled={(!scene && !ready)||paused||requesting||state==="padding"} onClick={()=>void record()}>{state==="idle"?"●":"■"}</button>
-      <output>{state==="padding"?"Completando en silencio":state==="recording"?"Grabando":shared?"Audio compartido":"Estéreo de 860"}{state!=="idle" && (" · "+(Math.floor(position/meter)+1)+"/"+bars+" · "+(position%meter+1)+"/"+meter)}</output>
+      <output>{state==="padding"?"Completando en silencio":state==="recording"?"Grabando":shared?"Audio compartido":"Estéreo de 860"}</output>
+      <div className="tempo-lights" role="img" aria-label={input ? `Compás ${Math.floor(position/meter)+1} de ${bars}, pulso ${position%meter+1} de ${meter}` : `${bars} compases de ${meter} pulsos`}>
+        {Array.from({length:bars},(_,bar)=><span className="tempo-bar" key={bar} aria-hidden="true">
+          {Array.from({length:meter},(_,pulse)=><i key={pulse} data-current={Boolean(input) && (bar*meter+pulse)===position} />)}
+        </span>)}
+      </div>
       <label title="Sumar el micrófono predeterminado"><input type="checkbox" checked={room} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("room",e.target.checked)}/> Sala</label>
       <details><summary>{bpm} BPM · {bars} × {meter}</summary>
-      <label>BPM <input aria-label="BPM de grabación" type="number" min="30" max="240" defaultValue={bpm} disabled={state!=="idle"} onBlur={e=>{const n=Math.min(240,Math.max(30,Math.round(Number(e.target.value)||111)));setBpm(n);e.target.value=String(n);}} /></label>
+      <label>BPM <input aria-label="BPM de grabación" type="number" min="1" max="240" key={bpm} defaultValue={bpm} disabled={state!=="idle"} onBlur={e=>{const n=Math.min(240,Math.max(1,Math.round(Number(e.target.value)||111)));setBpm(n);e.target.value=String(n);}} /></label>
       <label>Pulsos <select aria-label="Pulsos" disabled={state!=="idle"} value={meter} onChange={e=>setMeter(Number(e.target.value))}>{[2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
       <label>Compases <select aria-label="Compases" disabled={state!=="idle"} value={bars} onChange={e=>setBars(Number(e.target.value))}>{[1,2,3,4,5,6,7,8,12,16].map(n=><option key={n}>{n}</option>)}</select></label>
       <label><input type="checkbox" checked={shared} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("computer",e.target.checked)}/> Audio de otra pestaña o pantalla</label>

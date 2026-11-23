@@ -32,7 +32,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const attack = useRef({ count: 0, frequency: 0, velocity: 0 });
   const player = useRef<{ strike: (id: string, track: CubeTrack, index: number, velocity: number) => void; release: (id: string) => void } | null>(null);
   const timbre = isTimbreScene(scene) ? scene : null;
-  const fullMidiRange = scene === 45 || scene === 60;
+  const fullMidiRange = scene === 45 || scene === 60 || scene === 61;
   const loopScene = timbre ? 20 : scene === 15 || scene === 18 ? scene : null;
   const loopCue = useMemo(() => clock && loopScene ? { context: clock, beginsAt: clock.currentTime } : null, [clock, loopScene]);
   const three = loopScene === 15 || loopScene === 18;

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 type Props = {
   clock: AudioContext;
-  output: GainNode | null;
+
   analyser: { current: AnalyserNode | null };
   attack: { current: { count: number; frequency: number; velocity: number } };
   paused: boolean;
@@ -10,8 +10,8 @@ type Props = {
   release: (id: string) => void;
 };
 
-export function PrimeraVoluntad({ clock, output, analyser, attack, paused, press, release }: Props) {
-  const frame = useRef<HTMLButtonElement>(null);
+export function HardstyleTrack({ clock, output, paused }: { clock: AudioContext; output: GainNode | null; paused: boolean }) {
+
   const [attempt, setAttempt] = useState(0);
   const [retry, setRetry] = useState(false);
 
@@ -44,6 +44,11 @@ export function PrimeraVoluntad({ clock, output, analyser, attack, paused, press
       gain.disconnect();
     };
   }, [clock, output, attempt]);
+  return retry && !paused ? <button className="voluntad-retry" onClick={() => setAttempt(value => value + 1)}>Reproducir Hardstyle</button> : null;
+}
+
+export function PrimeraVoluntad({ clock, analyser, attack, paused, press, release }: Props) {
+  const frame = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const el = frame.current;
     if (!el || paused) return;
@@ -85,6 +90,6 @@ export function PrimeraVoluntad({ clock, output, analyser, attack, paused, press
       <img src="/multiversos/primera-voluntad.png" alt="Multiversos 2026. Ø Primera voluntad. Pablo Cieslik y UnderTango Club. 2 de diciembre en La Cabaña de los Muñecos." draggable={false} />
       <img className="voluntad-resonance" src="/multiversos/primera-voluntad.png" alt="" draggable={false} />
     </button>
-    {retry && !paused && <button className="voluntad-retry" onClick={() => setAttempt(value => value + 1)}>Reproducir Hardstyle</button>}
+
   </div>;
 }

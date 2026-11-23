@@ -3,14 +3,19 @@ export const EXTENDED_STYLE = `
   .extended-instrument { width: min(95%, 1120px); padding-top: clamp(26px, 6dvh, 56px); }
   .extended-cubes { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(.4rem, 1.1vw, 1rem); }
   .extended-instrument:is([data-extended-scene="31"],[data-extended-scene="45"]) .extended-cubes { display:none; }
-  .zero-stage:has(.voluntad-stage) { grid-template-rows:minmax(0,1fr) fit-content(50%); background:#080810 !important; }
-  .zero-stage:has(.voluntad-stage) .scene-mixer { position:relative; grid-row:2; width:100%; max-height:100%; }
+  .zero-stage:has(.voluntad-stage,.audience-projection) { grid-template-rows:minmax(0,1fr) fit-content(50%); background:#080810 !important; }
+  .zero-stage:has(.voluntad-stage,.audience-projection) .scene-mixer { position:relative; grid-row:2; width:100%; max-height:100%; }
   .voluntad-stage { position:relative; grid-row:1; width:100%; height:100%; display:grid; place-items:center; container-type:size; }
   .voluntad-poster { --pulse:0; --strike:0; --tone:0deg; display:block; position:relative; width:min(100cqw,78.13cqh); border:0; padding:0; background:#080810; cursor:crosshair; touch-action:none; }
   .voluntad-poster img { width:100%; height:auto; display:block; pointer-events:none; }
   .voluntad-poster .voluntad-resonance { position:absolute; inset:0; clip-path:polygon(0 88%, 0 69%, 8% 43%, 22% 33%, 72% 30%, 88% 4%, 100% 4%, 100% 64%, 90% 83%, 65% 87%);
     opacity:var(--pulse); mix-blend-mode:screen; filter:brightness(1.5) hue-rotate(var(--tone)); transform:translate(calc(var(--strike) * 1.2%),calc(var(--strike) * -0.8%)); }
-  .voluntad-retry { position:absolute; bottom:0; }
+  .voluntad-retry { position:absolute; z-index:3; top:.5rem; right:.5rem; }
+  .audience-projection { position:relative; grid-row:1; width:100%; height:100%; min-height:0; overflow:hidden; background:#080810; }
+  .audience-projection video,.audience-projection canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .audience-projection canvas { pointer-events:none; mix-blend-mode:screen; }
+  .audience-camera-status { position:absolute; inset:0; display:grid; place-content:center; justify-items:center; gap:.8rem; padding:1rem; color:#fff; background:#080810; text-align:center; }
+  .audience-camera-status button { padding:.6rem 1rem; cursor:pointer; }
   @media (prefers-reduced-motion:reduce) { .voluntad-poster .voluntad-resonance { transform:none; } }
   .extended-generative {display:block;width:100%;height:min(48dvh,460px);background:#fff;}
   .extended-track {

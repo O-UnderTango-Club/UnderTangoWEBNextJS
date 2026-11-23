@@ -121,7 +121,7 @@ export function createTimbreRack(output: GainNode) {
         source.connect(convolver).connect(wet);
         break;
       }
-      case 31: case 45: case 60: case 30: {
+      case 31: case 45: case 60: case 61: case 30: {
         const left = use(clock.createDelay(1));
         const right = use(clock.createDelay(1));
         const stereo = use(clock.createChannelMerger(2));

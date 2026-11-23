@@ -2,6 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
+import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
+import { scheduleContinuationAudio } from "./scene-audio";
+import { CONTINUATION_SCENES, DEFAULT_PAIR, NOISE_COLORS, NOISE_IDS, type ContinuationScene, type NoiseColor, type NoisePair } from "./scene-cues";
+import { ContinuationProjection } from "./scene-visuals";
+import { FIRST_MIDI_NOTE, NOTE_SCENES, NOTE_SCENE_IDS, isNoteScene, type NoteScene, type PerformanceInput } from "./performance-notes";
+import { PerformanceProjection, usePerformanceInput } from "./performance-view";
+import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
+import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isTimbreScene, type ExtendedScene } from "./extended-scenes";
+import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
+import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
+import { EXTENDED_STYLE } from "./extended-style";
 
 type ControlDefinition = {
   number: string;
@@ -13,6 +24,7 @@ type ControlDefinition = {
 type MidiInputLike = {
   id: string;
   name?: string;
+  state?: string;
   onmidimessage: ((event: { data: ArrayLike<number> }) => void) | null;
 };
 
@@ -47,6 +59,9 @@ type MidiAccessLike = {
 type MidiNavigator = Navigator & {
   requestMIDIAccess?: (options?: { sysex?: boolean }) => Promise<MidiAccessLike>;
 };
+
+type MidiConnection = "checking" | "ready" | "blocked" | "unavailable";
+type MidiDevice = { id: string; name: string };
 
 type NoteVoice = {
   oscillator: OscillatorNode;
@@ -335,12 +350,12 @@ function smooth(parameter: AudioParam, value: number, context: AudioContext, tim
   parameter.setTargetAtTime(value, now, time);
 }
 
-type FrequencyVector = [x: number, y: number, z: number];
 type FrequencyPoint = [x: number, y: number];
 
 const FREQUENCY_VIEW = { width: 640, height: 360, x: 320, y: 180, yaw: 0.64, tilt: 0.62, scale: 102 };
 const FREQUENCY_STOP_YAW = FREQUENCY_VIEW.yaw + 1.72;
 const FREQUENCY_TRAIL_TRAVEL = 380;
+const FREQUENCY_TRAIL_TURN_SECONDS = 3;
 
 function temporalTrailFrame(progress: number, roll: number) {
   const halfSpan = FREQUENCY_TRAIL_TRAVEL * progress / 2;
@@ -348,22 +363,8 @@ function temporalTrailFrame(progress: number, roll: number) {
   const verticalFit = 170 / (170 + halfSpan * Math.sin(roll));
   return { halfSpan, zoom: Math.min(1, horizontalFit, verticalFit) };
 }
-const ORIGINAL_NOTES: FrequencyVector = [111, 222, 333];
-const CONCERT_A_HZ = 440;
-const OCTAVE_NOTES: FrequencyVector = [CONCERT_A_HZ / 2, CONCERT_A_HZ, CONCERT_A_HZ * 2];
 const FREQUENCY_FORMAT = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 
-function tuningAt(progress: number): FrequencyVector {
-  return ORIGINAL_NOTES.map((hz, index) => hz * (OCTAVE_NOTES[index] / hz) ** progress) as FrequencyVector;
-}
-
-function frequencyPoint(t: number, notes: FrequencyVector) {
-  return {
-    x: Math.sin(t * notes[0] / 111),
-    y: Math.sin(t * notes[1] / 111 + 0.7),
-    z: Math.sin(t * notes[2] / 111 + 1.2),
-  };
-}
 const FREQUENCY_AXES: { hz: number; label: string; color: string; direction: FrequencyVector }[] = [
   { hz: 111, label: "X", color: "#345a9b", direction: [1, 0, 0] },
   { hz: 222, label: "Y", color: "#a25d94", direction: [0, 1, 0] },
@@ -657,8 +658,8 @@ function createTemporalTrailRenderer(canvas: HTMLCanvasElement, sampleCount: num
   };
 }
 
-function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock }: {
-  progress: number; durationMs: number; intervalMs: number; clock: AudioContext;
+function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock, frozenAtEnd = false }: {
+  progress: number; durationMs: number; intervalMs: number; clock: AudioContext; frozenAtEnd?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const progressRef = useRef(progress);
@@ -697,7 +698,7 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock }: {
       const time = clock.currentTime;
       if (!resized && now - last < 32) return;
       if (!resized && current === previousProgress &&
-        (current === 0 || time === previousTime || (current === 1 && reduceMotion.matches))) return;
+        (frozenAtEnd || current === 0 || time === previousTime || (current === 1 && reduceMotion.matches))) return;
       resized = false;
       last = now;
       previousProgress = current;
@@ -717,8 +718,9 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock }: {
 
       if (current === 1 && raisedAt === null) raisedAt = time;
       const seconds = raisedAt === null ? 0 : time - raisedAt;
-      const lift = current < 1 ? 0 : reduceMotion.matches ? 1 : smoothSceneLight(seconds / 3);
-      const spin = lift * 0.26 + (reduceMotion.matches ? 0 : Math.max(0, seconds - 3) * 0.34);
+      const stationary = frozenAtEnd || reduceMotion.matches;
+      const lift = current < 1 ? 0 : stationary ? 1 : smoothSceneLight(seconds / FREQUENCY_TRAIL_TURN_SECONDS);
+      const spin = lift * 0.26 + (stationary ? 0 : Math.max(0, seconds - FREQUENCY_TRAIL_TURN_SECONDS) * 0.34);
       renderer.paint(visibleCount, current, lift, spin);
     };
     frame = window.requestAnimationFrame(draw);
@@ -727,7 +729,7 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock }: {
       observer.disconnect();
       renderer.dispose();
     };
-  }, [clock, durationMs, intervalMs]);
+  }, [clock, durationMs, frozenAtEnd, intervalMs]);
 
   const notes = tuningAt(progress).map((value) => FREQUENCY_FORMAT.format(value) + " Hz").join(" · ");
   const { halfSpan, zoom } = temporalTrailFrame(progress, 0);
@@ -737,15 +739,15 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock }: {
     {unavailable
       ? <><FrequencySpace opacity={1} yaw={FREQUENCY_STOP_YAW} /><p className="zero-trail-fallback" role="status">La estela rotatoria requiere WebGL 2.</p></>
       : <canvas ref={canvasRef} role="img" aria-label="Estela tridimensional de fotogramas opacos que se eleva y gira al completarse" />}
-    {progress < 1 && axisHalfWidth >= 3 && <div className="zero-trail-axis" aria-hidden="true"
+    {!frozenAtEnd && progress < 1 && axisHalfWidth >= 3 && <div className="zero-trail-axis" aria-hidden="true"
       style={{ left: `${50 - axisHalfWidth}%`, width: `${2 * axisHalfWidth}%` }}>
       <span>0 s</span><span>{elapsed} s</span>
     </div>}
-    <div className="zero-time-caption">
+    {!frozenAtEnd && <div className="zero-time-caption">
       <span>Cuarta dimensión: el tiempo</span>
       <small>{progress === 1 ? "La en tres octavas · " : ""}{notes}</small>
       <small>{elapsed} / {durationMs / 1000} s · {intervalMs} ms por muestra</small>
-    </div>
+    </div>}
   </div>;
 }
 
@@ -1403,7 +1405,11 @@ function playModuleGong(context: AudioContext, output: AudioNode, time: number, 
   });
 }
 
-type ModuleZeroScene = "opening" | "beacon" | "line" | "harmonics" | "space" | "time";
+type NumberedScene = NoteScene | ExtendedScene;
+type ModuleZeroScene = "opening" | "beacon" | "line" | "harmonics" | "space" | "time" | ContinuationScene | NumberedScene;
+
+const isContinuationScene = (stage: ModuleZeroScene): stage is ContinuationScene =>
+  CONTINUATION_SCENES.some(({ mode }) => mode === stage);
 
 const MODULE_ZERO_SCENE_BY_STAGE = {
   ready: null,
@@ -1421,11 +1427,32 @@ const MODULE_ZERO_SCENE_BY_STAGE = {
   space: "space",
   temporal: "time",
   time: "time",
+  cross: "cross",
+  sphere: "sphere",
+  noise: "noise",
+  return: "return",
+  breath: "breath",
+  "breath-hold": "breath",
+  ten: "ten",
+  eleven: "eleven",
+  twelve: "twelve",
+  thirteen: "thirteen",
+  fourteen: "fourteen",
 } satisfies Record<string, ModuleZeroScene | null>;
 
-function ModuleZero() {
-  const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE>("ready");
-  const activeScene = MODULE_ZERO_SCENE_BY_STAGE[stage];
+const MIDI_PITCH_NAMES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "Sol", "La♭", "La", "Si♭", "Si"];
+
+function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
+  pianoRouting: { current: PerformanceInput | null };
+  connectMidi: () => Promise<void>;
+  midiConnection: MidiConnection;
+  midiInputs: MidiDevice[];
+}) {
+  const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE | ExtendedScene>("ready");
+  const activeScene = typeof stage === "number" ? stage : MODULE_ZERO_SCENE_BY_STAGE[stage];
+  const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
+  const extendedScene = typeof stage === "number" ? stage : null;
+  const extendedPlaying = isPlayableExtendedScene(extendedScene);
   const [showSubtitles, setShowSubtitles] = useState(false);
   const [masterVolume, setMasterVolume] = useState(100);
   const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
@@ -1434,6 +1461,15 @@ function ModuleZero() {
   const [harmonicSeconds, setHarmonicSeconds] = useState(SCENE_HARMONIC_DEFAULT_SECONDS);
   const [spaceSeconds, setSpaceSeconds] = useState(SCENE_SPACE_DEFAULT_SECONDS);
   const [timeSeconds, setTimeSeconds] = useState(SCENE_TIME_DEFAULT_SECONDS);
+  const [restSeconds, setRestSeconds] = useState(4);
+  const [noteSeconds, setNoteSeconds] = useState<Record<NoteScene, number>>({ ten: 12, eleven: 12, twelve: 12, thirteen: 12, fourteen: 0 });
+  const [extendedSeconds, setExtendedSeconds] = useState(EXTENDED_DEFAULT_SECONDS);
+  const [splitNote, setSplitNote] = useState(FIRST_MIDI_NOTE);
+  const [learningSplit, setLearningSplit] = useState(false);
+  const [continuationSeconds, setContinuationSeconds] = useState<Record<ContinuationScene, number>>(() =>
+    Object.fromEntries(CONTINUATION_SCENES.map(({ mode, seconds }) => [mode, seconds])) as Record<ContinuationScene, number>);
+  const [noisePair, setNoisePair] = useState<NoisePair>(DEFAULT_PAIR);
+  const [playingNoisePair, setPlayingNoisePair] = useState<NoisePair>(DEFAULT_PAIR);
   const [timeSamplingMs, setTimeSamplingMs] = useState(SCENE_TIME_DEFAULT_SAMPLE_MS);
   const [activeSamplingMs, setActiveSamplingMs] = useState(SCENE_TIME_DEFAULT_SAMPLE_MS);
   const [previewMode, setPreviewMode] = useState<ModuleZeroScene | null>(null);
@@ -1454,6 +1490,39 @@ function ModuleZero() {
   const pausedRef = useRef(false);
   const runRef = useRef(0);
   const frameRef = useRef<number | null>(null);
+  const learningSplitRef = useRef(false);
+  const learnSplit = useCallback((note: number) => {
+    if (!learningSplitRef.current || note < 1 || note > 127) return false;
+    learningSplitRef.current = false;
+    setLearningSplit(false);
+    setSplitNote(note);
+    return true;
+  }, []);
+  const chordLoop = useChordLoop(noteScene === "fourteen" ? cue : null, outputRef);
+  const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, pausedRef);
+  const directionSeconds = extendedScene ? extendedSeconds[extendedScene] || (EXTENDED_DEFAULT_SECONDS[extendedScene] || 16) : 0;
+  useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
+  const noteInput = usePerformanceInput({
+    scene: noteScene, ownsInput: stage !== "ready" && !extendedPlaying, splitNote, learnSplit,
+    clock: cue?.context ?? null, outputRef, pausedRef, routing: pianoRouting, onStrike: chordLoop.strike,
+  });
+  const enterNumberedScene = useCallback((mode: NumberedScene, context: AudioContext, asPreview: boolean) => {
+    setCue({ context, beginsAt: context.currentTime });
+    setPreviewMode(asPreview ? mode : null);
+    setStage(mode);
+  }, []);
+  const nextTimedScene = extendedScene ? EXTENDED_SCENES[EXTENDED_SCENES.indexOf(extendedScene) + 1]
+    : noteScene === "fourteen" ? 15 : noteScene ? NOTE_SCENES[noteScene].next
+      : stage === "breath-hold" && previewMode === null && restSeconds > 0 ? "ten" : null;
+  const nextAfterSeconds = extendedScene ? extendedSeconds[extendedScene] : noteScene ? noteSeconds[noteScene] : activeDurationMs / 1000 + restSeconds;
+
+  useEffect(() => {
+    if (noteScene !== "eleven") return;
+    return () => {
+      learningSplitRef.current = false;
+      setLearningSplit(false);
+    };
+  }, [noteScene]);
 
   const stop = useCallback(() => {
     runRef.current++;
@@ -1479,6 +1548,21 @@ function ModuleZero() {
     setPreviewMode(null);
     setStage("ready");
   }, [stop]);
+
+  useEffect(() => {
+    if ((!nextTimedScene && extendedScene !== 45) || nextAfterSeconds === 0 || !cue || paused) return;
+    const deadline = cue.beginsAt + nextAfterSeconds;
+    let timer: number | undefined;
+    const advance = () => {
+      if (pausedRef.current || audioRef.current !== cue.context) return;
+      const remaining = deadline - cue.context.currentTime;
+      if (remaining > 0.005) timer = window.setTimeout(advance, Math.max(8, remaining * 1000));
+      else if (nextTimedScene) enterNumberedScene(nextTimedScene, cue.context, previewMode !== null);
+      else reset();
+    };
+    advance();
+    return () => window.clearTimeout(timer);
+  }, [cue, enterNumberedScene, extendedScene, nextAfterSeconds, nextTimedScene, paused, previewMode, reset]);
 
   useEffect(() => {
     window.addEventListener("multiversos-instrument-start", reset);
@@ -1539,7 +1623,11 @@ function ModuleZero() {
     pausedRef.current = next;
     setTransportBusy(true);
     try {
-      if (next) await context.suspend();
+      if (next) {
+        noteInput.releaseAll();
+        pianoRouting.current?.releaseAll?.();
+        await context.suspend();
+      }
       else await context.resume();
       if (run === runRef.current) setPaused(next);
     } catch {
@@ -1589,6 +1677,11 @@ function ModuleZero() {
       else await context.resume();
       if (run !== runRef.current || audioRef.current !== context) return;
 
+      if (typeof mode === "number" || isNoteScene(mode)) {
+        enterNumberedScene(mode, context, previewOnly);
+        return;
+      }
+
       const atTime = (time: number, action: (time: number) => void) => {
         const schedule = (delay: number) => {
           const timer = window.setTimeout(() => {
@@ -1613,6 +1706,23 @@ function ModuleZero() {
         if (mode === scene) show(time);
         else atTime(time, show);
       };
+      const playContinuation = (first: ContinuationScene, time: number) => {
+        const index = CONTINUATION_SCENES.findIndex(({ mode }) => mode === first);
+        const timing = CONTINUATION_SCENES.slice(index, previewOnly ? index + 1 : undefined).map(({ mode }) => ({
+          scene: mode, seconds: continuationSeconds[mode],
+        }));
+        const pair = previewOnly && first === "noise" ? noisePair : DEFAULT_PAIR;
+        setPlayingNoisePair(pair);
+        const scenes = scheduleContinuationAudio(masterOutput, timing, time, pair);
+        for (const { scene, startsAt, seconds } of scenes) {
+          showAt(scene, startsAt, () => {
+            setCue({ context, beginsAt: startsAt });
+            setActiveDurationMs(seconds * 1000);
+            setStage(scene);
+          });
+          if (scene === "breath") atTime(startsAt + seconds, () => setStage("breath-hold"));
+        }
+      };
       const createChordBus = () => {
         const output = context.createGain();
         output.gain.value = 0.8;
@@ -1634,7 +1744,7 @@ function ModuleZero() {
         setActiveDurationMs(seconds * 1000);
         setStage(stage);
       };
-      const playTime = (time: number, voices: OscillatorNode[]) => {
+      const playTime = (bus: GainNode, time: number, voices: OscillatorNode[]) => {
         voices.forEach((voice, index) => {
           voice.frequency.setValueAtTime(ORIGINAL_NOTES[index], time);
           voice.frequency.exponentialRampToValueAtTime(OCTAVE_NOTES[index], time + timeSeconds);
@@ -1644,10 +1754,18 @@ function ModuleZero() {
           enterDiagram("temporal", time, timeSeconds);
         });
         atTime(time + timeSeconds, () => setStage("time"));
+        if (!previewOnly) {
+          const continuationAt = time + timeSeconds + FREQUENCY_TRAIL_TURN_SECONDS;
+          const end = continuationAt + 0.10;
+          bus.gain.setValueAtTime(bus.gain.value, continuationAt);
+          bus.gain.linearRampToValueAtTime(0, end);
+          voices.forEach((voice) => voice.stop(end));
+          playContinuation("cross", continuationAt);
+        }
       };
-      const playSpatial = (time: number, voices: OscillatorNode[]) => {
+      const playSpatial = (bus: GainNode, time: number, voices: OscillatorNode[]) => {
         showAt("space", time, () => enterDiagram("spatial", time, spaceSeconds));
-        if (!previewOnly) playTime(time + spaceSeconds, voices);
+        if (!previewOnly) playTime(bus, time + spaceSeconds, voices);
         else atTime(time + spaceSeconds, () => setStage("space"));
       };
       const playHarmonics = (bus: GainNode, time: number, root: OscillatorNode) => {
@@ -1656,9 +1774,15 @@ function ModuleZero() {
         const second = addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
         const third = addTone(bus, 333, time + harmonicSeconds * HARMONIC_CUE.trace333, harmonicSeconds * (HARMONIC_CUE.result - HARMONIC_CUE.trace333));
         showAt("harmonics", time, () => enterDiagram("harmonics", time, harmonicSeconds));
-        if (!previewOnly) playSpatial(time + harmonicSeconds, [root, second, third]);
+        if (!previewOnly) playSpatial(bus, time + harmonicSeconds, [root, second, third]);
         else atTime(time + harmonicSeconds, () => setStage("equation"));
       };
+
+      if (isContinuationScene(mode)) {
+        setActiveSamplingMs(timeSamplingMs);
+        playContinuation(mode, context.currentTime);
+        return;
+      }
 
       if (mode === "harmonics" || mode === "space" || mode === "time") {
         const time = context.currentTime + 0.07;
@@ -1666,8 +1790,8 @@ function ModuleZero() {
         if (mode === "harmonics") playHarmonics(bus, time, addTone(bus, 111, time, 0.28));
         else {
           const voices = ORIGINAL_NOTES.map((hz) => addTone(bus, hz, time, 0.28));
-          if (mode === "space") playSpatial(time, voices);
-          else playTime(time, voices);
+          if (mode === "space") playSpatial(bus, time, voices);
+          else playTime(bus, time, voices);
         }
         return;
       }
@@ -1840,12 +1964,16 @@ function ModuleZero() {
   const soundAction = muted ? "Restaurar sonido" : "Silenciar sonido";
   const preparing = stage === "preparing";
   const ready = stage === "ready";
-  const canStart = stage === "ready" || (previewMode !== null && !preparing);
+  const breathing = stage === "breath-hold";
+  const canStart = ready || breathing || noteScene !== null || extendedScene !== null || (previewMode !== null && !preparing);
   const light = !showObject && stage !== "ready" && !preparing;
   const question = stage === "question";
   const dots = stage === "two" || stage === "multiplying";
   const expression = stage === "vertical" || stage === "harmonics" || stage === "equation" || stage === "spatial" ||
     stage === "space" || stage === "temporal" || stage === "time";
+  const continuation = activeScene && isContinuationScene(activeScene) ? activeScene : null;
+  const splitLabel = MIDI_PITCH_NAMES[splitNote % 12] + (Math.floor(splitNote / 12) - 1);
+  const restLabel = restSeconds === 0 ? "Hasta avanzar" : `${restSeconds} s`;
   const sceneControls = [
     { mode: "opening", title: "Escena Ø → {}", id: "zero-duration", label: "Duración de la transición de luz y sonido", duration: durationSeconds, min: 1, max: 30, setDuration: setDurationSeconds },
     { mode: "beacon", title: "Escena {} → 0", id: "one-duration", label: "Duración de la escena de conjunto vacío a cero", duration: oneSeconds, min: 6, max: 60, setDuration: setOneSeconds },
@@ -1853,12 +1981,36 @@ function ModuleZero() {
     { mode: "harmonics", title: "Escena 1 → 2", id: "harmonic-duration", label: "Duración de la escena de uno a dos", duration: harmonicSeconds, min: 6, max: 60, setDuration: setHarmonicSeconds },
     { mode: "space", title: "Escena 2 → 3", id: "space-duration", label: "Duración de la escena de dos a tres", duration: spaceSeconds, min: 3, max: 30, setDuration: setSpaceSeconds },
     { mode: "time", title: "Escena 3 → 4", id: "time-duration", label: "Duración de la escena de tres a cuatro", duration: timeSeconds, min: 4, max: 60, setDuration: setTimeSeconds },
+    ...CONTINUATION_SCENES.map(({ mode, title }) => ({
+      mode, title, id: `${mode}-duration`, label: `Duración de ${title.toLowerCase()}`,
+      duration: continuationSeconds[mode], min: 4, max: 60,
+      setDuration: (seconds: number) => setContinuationSeconds((current) => ({ ...current, [mode]: seconds })),
+    })),
+    ...NOTE_SCENE_IDS.map((mode) => {
+      const number = NOTE_SCENES[mode].number;
+      const control = { mode, title: `Escena ${number}`, id: `scene-${mode}` };
+      return { ...control, label: `Duración de la escena ${number}`, duration: noteSeconds[mode], min: mode === "fourteen" ? 0 : 1, max: 120,
+        setDuration: (seconds: number) => setNoteSeconds((current) => ({ ...current, [mode]: seconds })) };
+    }),
+    ...EXTENDED_SCENES.map((mode) => ({ mode, title: `Escena ${mode}`, id: `scene-${mode}`, label: `Duración de la escena ${mode}`,
+      duration: extendedSeconds[mode], min: 0, max: 120,
+      setDuration: (seconds: number) => setExtendedSeconds((current) => ({ ...current, [mode]: seconds })),
+    })),
   ] as const;
   const sceneIndex = sceneControls.findIndex(({ mode }) => mode === activeScene);
-  const sceneTitle = sceneControls[sceneIndex]?.title;
+  const sceneTitle = breathing ? "Plano 9" : sceneControls[sceneIndex]?.title;
+  const sceneNumber = extendedScene ?? (noteScene ? NOTE_SCENES[noteScene].number : null);
+  const extendedDark = extendedScene === 16 || extendedScene === 17 || isTimbreScene(extendedScene);
+  const playMode = (mode: ModuleZeroScene, asPreview: boolean, startPaused = false) => {
+    if ((typeof mode === "number" || isNoteScene(mode)) && (breathing || noteScene || extendedScene) && cue) {
+      enterNumberedScene(mode, cue.context, asPreview);
+      return;
+    }
+    void start(mode, asPreview, startPaused);
+  };
   const moveScene = (offset: number) => {
     const scene = sceneControls[Math.max(0, sceneIndex) + offset];
-    if (scene) void start(scene.mode, previewMode !== null, paused);
+    if (scene) playMode(scene.mode, previewMode !== null, paused);
   };
   const pointPosition = (index: number) => {
     let n = index, fraction = 0, scale = 0.5;
@@ -1891,6 +2043,11 @@ function ModuleZero() {
         background: #191d25; color: #f2f3f7; font: 600 .75rem/1.25 system-ui, sans-serif;
         text-align: center;
       }
+      .zero-scene-number {
+        position: absolute; inset-block-start: clamp(.8rem, 2.5vw, 2rem); inset-inline-start: clamp(.95rem, 3vw, 2.6rem);
+        z-index: 2; color: #191b22; font: 400 clamp(1.5rem, 3.25vw, 2.8rem)/1 Georgia, serif;
+        font-variant-numeric: tabular-nums; pointer-events: none;
+      }
       .zero-stage:has(.zero-subtitle span) .zero-harmonic-frame:has(.zero-time-caption) {
         translate: 0 clamp(-4rem, calc((100dvh - 880px) / 5), 0px);
       }
@@ -1902,6 +2059,133 @@ function ModuleZero() {
       .zero-point { width: clamp(8px, 1.05vw, 16px); aspect-ratio: 1; border-radius: 50%; background: #000; }
       .zero-harmonic-frame { position: relative; width: min(94%, 800px, 116dvh); aspect-ratio: 16 / 9; pointer-events: none; }
       .zero-harmonic-diagram, .zero-frequency-space, .zero-frequency-space canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .zero-note-scene[data-note-scene=ten] .zero-resting-sphere {
+        transform: translateX(17%) scale(.90);
+        animation: zeroSphereEntrance .5s ease-out both;
+      }
+      .zero-note-scene:is([data-note-scene=twelve], [data-note-scene=thirteen], [data-note-scene=fourteen]) .zero-resting-sphere {
+        transform: translateX(-20%) scale(.78);
+      }
+      .zero-stage:has([data-note-scene=fourteen]) { grid-template-rows: minmax(0, 1fr) auto; }
+      .zero-loop-timeline {
+        --loop-beat-width: clamp(7rem, 15vw, 12.5rem); --loop-playhead: 25%; --loop-ruler-height: 1.4rem;
+        display: grid; grid-template-rows: auto minmax(0, 1fr); grid-row: 2;
+        width: min(92%, 800px); height: clamp(113px, 23dvh, 205px); margin-bottom: clamp(.65rem, 2.4dvh, 1.6rem);
+        z-index: 1; overflow: hidden; border: 1px solid #433a60; border-radius: 5px; background: #1b1530;
+        color: #eee9fb; font: .74rem/1.15 system-ui, sans-serif; font-variant-numeric: tabular-nums;
+      }
+      .zero-loop-readout {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem;
+        padding: .42rem .65rem; background: #231b38; border-bottom: 1px solid #47395d;
+      }
+      .zero-loop-readout > div { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: .4rem; min-width: 0; }
+      .zero-loop-readout > div > span:first-child { color: #c1b6d2; }
+      .zero-loop-readout-value { white-space: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+      .zero-loop-plot {
+        position: relative; overflow: hidden; min-width: 0;
+        background: repeating-linear-gradient(0deg, #c1a9f110 0 1px, transparent 1px 10px), linear-gradient(#1b1530, #211533);
+      }
+      .zero-loop-track {
+        position: absolute; inset-block: 0; left: var(--loop-playhead); display: flex; width: max-content;
+        transform: translateX(calc(-1 * var(--loop-beat-width) * var(--loop-position, 2)));
+      }
+      .zero-loop-playhead {
+        position: absolute; z-index: 3; inset-block: 0; left: var(--loop-playhead); width: 1px;
+        background: #e2d7fc; translate: -50% 0; pointer-events: none; box-shadow: 0 0 8px #c8a4ff80;
+      }
+      .zero-loop-playhead::before {
+        content: ""; position: absolute; top: 0; left: 50%; translate: -50% 0; width: 9px; height: 6px;
+        background: #e2d7fc; clip-path: polygon(0 0, 100% 0, 50% 100%);
+      }
+      .zero-loop-beat {
+        position: relative; flex: 0 0 var(--loop-beat-width); width: var(--loop-beat-width);
+        box-shadow: inset 1px 0 #b69de641;
+      }
+      .zero-loop-beat[aria-current=true] { background: #b69de612; box-shadow: inset 1px 0 #d7c7fb; }
+      .zero-loop-card {
+        display: flex; align-items: center; gap: .45rem; height: var(--loop-ruler-height); padding-inline: .55rem;
+        border-bottom: 1px solid #b69de633; color: #d5c9e8;
+      }
+      .zero-loop-count { flex: none; color: #f2eafd; font-weight: 600; }
+      .zero-loop-traces, .zero-loop-pitches, .zero-loop-lights {
+        position: absolute; inset: var(--loop-ruler-height) 0 .32rem; pointer-events: none;
+      }
+      .zero-loop-traces { width: 100%; height: calc(100% - var(--loop-ruler-height) - .32rem); z-index: 1; overflow: visible; filter: drop-shadow(0 0 2px #dfbbff50); }
+      .zero-loop-traces path { fill: none; stroke-width: 1.3px; stroke-linecap: round; }
+      .zero-loop-pitches { z-index: 2; }
+      .zero-loop-pitches span {
+        position: absolute; left: .55rem; translate: 0 calc(-100% - 2px); font-size: .68rem; text-shadow: 0 0 4px #12101b;
+      }
+      .zero-loop-light {
+        position: absolute; left: 50%; width: 6px; height: 6px; translate: -50% -50%; border-radius: 50%;
+        background: currentColor; box-shadow: 0 0 6px currentColor, 0 0 13px currentColor;
+      }
+      @media (max-width: 760px) and (max-height: 660px) {
+        .zero-note-scene[data-note-scene=fourteen] { width: min(94%, 57dvh); }
+        .zero-loop-timeline { height: clamp(88px, 20dvh, 118px); }
+      }
+      @media (max-width: 490px) {
+        .zero-loop-readout { gap: .45rem; padding-inline: .45rem; }
+        .zero-loop-readout > div { gap: .3rem; }
+        .zero-loop-readout-value { height: 2.3em; overflow: auto; white-space: normal; }
+      }
+      @keyframes zeroSphereEntrance { from { transform: translateX(0) scale(1); } }
+      .zero-note-bank {
+        position: absolute; top: 50%; transform: translateY(-50%); display: grid;
+        align-items: center; gap: clamp(.2rem, .75vw, .75rem); pointer-events: auto;
+      }
+      [data-note-scene=ten] .zero-note-bank { left: 6%; right: 55%; justify-items: center; }
+      [data-note-scene=eleven] .zero-note-bank { left: 3%; right: 3%; grid-template-columns: 1fr 1fr; }
+      [data-note-scene=eleven] .zero-note-key { justify-self: start; }
+      [data-note-scene=eleven] .zero-note-key:last-child { justify-self: end; }
+      .zero-cube-area { position: absolute; top: 50%; left: 51%; right: 2%; height: 0; }
+      .zero-cube { position: absolute; top: 0; left: 50%; width: 100%; translate: -50% -50%; transform-style: preserve-3d; }
+      .zero-cube-face {
+        display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center;
+        gap: clamp(.2rem, .75vw, .75rem); pointer-events: auto; backface-visibility: hidden;
+      }
+      .zero-cube-right, .zero-cube-top { display: none; }
+      .zero-cube[data-folding] .zero-cube-face {
+        align-items: stretch; gap: clamp(2px, .45vw, 6px); padding: clamp(2px, .55vw, 7px);
+        box-shadow: inset 0 0 0 1px #777f9e;
+      }
+      .zero-cube[data-folding] .zero-cube-front {
+        position: absolute; inset: 0; transform: translateZ(calc(var(--cube-depth) * .5));
+        background: rgb(227 232 249 / var(--cube-color));
+      }
+      .zero-cube[data-show-sides=true] .zero-cube-right {
+        display: grid; position: absolute; top: 50%; left: 100%; width: var(--cube-depth); height: 100%;
+        translate: -50% -50%; transform: rotateY(90deg); background: #e6e3f5;
+      }
+      .zero-cube[data-show-sides=true] .zero-cube-top {
+        display: grid; position: absolute; top: 0; left: 50%; width: 100%; height: var(--cube-depth); translate: -50% -50%;
+        transform: rotateX(90deg); backface-visibility: hidden; background: #f1f3fa; box-shadow: inset 0 0 0 1px #777f9e;
+      }
+      .zero-note-key {
+        display: grid; justify-items: center; align-content: center; min-width: 0; min-height: 44px;
+        gap: .3rem; padding: clamp(.2rem, 1vw, .65rem); border: 1px solid transparent; border-radius: 5px;
+        color: #161821; background: transparent; cursor: pointer; font: inherit; touch-action: none; user-select: none;
+      }
+      .zero-cube-face .zero-note-key { border-color: #b8becd; background: #fafafe; }
+      .zero-cube-right .zero-note-key { border-color: #b8afd0; background: #f6f2fc; }
+      .zero-cube-top .zero-note-key { border-color: #b7c1d5; background: #f7f9ff; }
+      .zero-cube[data-folding] .zero-note-key { min-height: 0; padding: 1px; gap: .1rem; }
+      .zero-cube[data-folding] .zero-note-hz { font-size: clamp(.56rem, 1.26vw, 1rem); }
+      .zero-cube[data-folding] .zero-note-key kbd { font-size: clamp(.5rem, .72vw, .66rem); }
+      @media (max-width: 480px) { .zero-cube[data-folding] .zero-note-hz small { display: none; } }
+      .zero-note-key:not(:disabled):hover { border-color: #797c99; }
+      .zero-note-key[data-sounding=true] { color: #47339e; background: #eae5ff; border-color: #8171bf; }
+      .zero-note-key:disabled { cursor: default; }
+      .zero-note-glyph { position: relative; height: clamp(27px, 11vw, 116px); width: 2px; margin: .3rem 1.1rem .6rem; background: currentColor; }
+      .zero-note-glyph::before, .zero-note-glyph::after {
+        content: ""; position: absolute; left: 50%; translate: -50% 0; width: clamp(12px, 1.5vw, 20px); height: 2px; background: currentColor;
+      }
+      .zero-note-glyph::before { top: 0; }
+      .zero-note-glyph::after { bottom: 0; }
+      .zero-note-hz { white-space: nowrap; font-size: clamp(.68rem, 1.5vw, 1.2rem); font-variant-numeric: tabular-nums; }
+      .zero-note-hz small { font-size: .74em; }
+      .zero-note-key kbd { color: #545b70; font-size: clamp(.58rem, .90vw, .78rem); }
+      @media (prefers-reduced-motion: reduce) { .zero-note-scene[data-note-scene=ten] .zero-resting-sphere { animation: none; } }
       .zero-trail-axis {
         position: absolute; bottom: 4%; display: flex; justify-content: space-between;
         border-top: 1px solid #abb7cd; color: #46516b; padding-top: .3rem;
@@ -1922,6 +2206,9 @@ function ModuleZero() {
         min-height: 0; overflow: hidden; padding: 0; border-left: 1px solid #30333d;
       }
       .zero-control-bar { padding: .85rem var(--zero-controls-padding) .4rem; border-bottom: 1px solid #30333d; }
+      .zero-midi { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .65rem; }
+      .zero-midi p { margin: 0; color: #dce6ff; font-size: .76rem; overflow-wrap: anywhere; }
+      .zero-controls .zero-midi button { font-size: .75rem; padding: .25rem .55rem; }
       .zero-transport { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .25rem; }
       .zero-controls .zero-transport button { display: grid; place-items: center; min-width: 0; padding: 0; }
       .zero-transport svg { width: min(70%, 1.2rem); height: auto; fill: currentColor; }
@@ -1970,14 +2257,38 @@ function ModuleZero() {
       .zero-controls .zero-master input { margin: .35rem 0 0; }
       .zero-sampling { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; font-size: .75rem; }
       .zero-sampling output { color: #e5e9f9; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .zero-noise-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; margin: 0 0 .75rem; padding: 0; border: 0; min-width: 0; }
+      .zero-noise-pair legend { margin-bottom: .42rem; font-size: .75rem; }
+      .zero-noise-pair label { display: grid; gap: .3rem; min-width: 0; font-size: .75rem; }
+      .zero-noise-pair select {
+        min-width: 0; min-height: 40px; border: 1px solid #424958; border-radius: 6px;
+        padding: .32rem; background: #202533; color: #f2f3f7; font: inherit;
+      }
       .zero-controls button {
         border: 1px solid #424958; border-radius: 6px; min-height: 44px; padding: .55rem .6rem;
         background: #202533; color: #f2f3f7; font: inherit; cursor: pointer;
       }
       .zero-controls .zero-play { background: #dce6ff; color: #131b2b; border-color: transparent; width: 100%; }
+      .zero-controls .zero-continue { width: 100%; margin-top: .45rem; }
       .zero-controls .zero-transport button:enabled:hover { background: #3b4660; }
       .zero-controls button:disabled { opacity: .55; cursor: default; }
       .zero-playback-status { display: block; color: #dce6ff; font-size: .75rem; margin: 0 0 .4rem; }
+      .zero-scene-input { margin: .65rem 0; font: 400 .75rem/1.5 system-ui, sans-serif; }
+      .zero-scene-input p { margin: .4rem 0; }
+      .zero-scene-input button { width: 100%; }
+      .zero-loop-controls { min-width: 0; margin: .7rem 0; padding: 0; border: 0; font-size: .78rem; }
+      .zero-loop-controls legend { padding: 0; margin-bottom: .55rem; color: #e5e9f9; }
+      .zero-loop-options, .zero-loop-presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
+      .zero-loop-options label { display: grid; align-content: space-between; gap: .3rem; color: #e5e9f9; }
+      .zero-loop-options :is(input, select) {
+        width: 100%; min-width: 0; min-height: 38px; padding: .3rem .4rem; border: 1px solid #626c83;
+        border-radius: 5px; background: #202533; color: #f2f3f7; font: inherit; color-scheme: dark;
+      }
+      .zero-loop-presets { margin-top: .4rem; }
+      .zero-controls .zero-loop-presets button { min-height: 36px; padding: .25rem; }
+      .zero-loop-presets button[aria-pressed=true] { border-color: #a7b0ed; background: #3b4660; }
+      .zero-loop-status { margin: .65rem 0 .4rem; color: #dce6ff; font-variant-numeric: tabular-nums; }
+      .zero-loop-record { width: 100%; }
       .zero-layout :focus-visible { outline: 2px solid #a8c3ff; outline-offset: -3px; }
       @media (min-width: 761px) and (max-width: 950px) {
         .zero-controls { --zero-controls-padding: .75rem; }
@@ -1990,8 +2301,10 @@ function ModuleZero() {
         .zero-controls { --zero-controls-padding: .75rem; border-left: 0; border-top: 1px solid #30333d; }
         .zero-scene { padding-top: 1rem; }
       }
+      ${EXTENDED_STYLE}
     `}</style>
-    <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" style={{background:light ? "#fff" : "#000"}}>
+    <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" data-extended-dark={extendedDark ? "true" : undefined}
+      style={{background:extendedDark ? "#130f20" : light ? "#fff" : "#000"}}>
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} beacon={stage === "beacon"} cue={cue} paused={paused} />}
       {question && <p className="zero-question" style={{ animationPlayState: paused ? "paused" : "running" }}>¿Cuál es la entidad mínima capaz de ser imaginada?</p>}
@@ -2002,13 +2315,29 @@ function ModuleZero() {
       </svg>}
       {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={cue} durationMs={activeDurationMs}
         sampleIntervalMs={activeSamplingMs} />}
+      {continuation && cue && <ContinuationProjection scene={continuation} clock={cue.context} startsAt={cue.beginsAt}
+        seconds={activeDurationMs / 1000} pair={playingNoisePair} hold={breathing}
+        inheritedTrail={(continuation === "cross" || continuation === "sphere") &&
+          <TemporalFrequencyTrail progress={1} durationMs={timeSeconds * 1000} intervalMs={activeSamplingMs} clock={cue.context} frozenAtEnd />} />}
+      {noteScene && <PerformanceProjection scene={noteScene} paused={paused} clock={cue?.context ?? null}
+        input={chordLoop.frame ? { ...noteInput, sounding: [...noteInput.sounding, ...chordLoop.frame.sounding] } : noteInput}
+        beginsAt={cue?.beginsAt ?? 0} />}
+      {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
+      {extendedScene && cue && (extendedPlaying
+        ? <ExtendedPerformanceProjection performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
+        : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <div className="zero-subtitle" role="status">
-        {showSubtitles && sceneTitle && <span>{sceneTitle}</span>}
-      </div>
+      {sceneNumber !== null ? <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>
+        : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>
     <aside className="zero-controls" aria-label="Controles de las escenas">
       <div className="zero-control-bar">
+        <div id="zero-midi" className="zero-midi">
+          <p role="status">{midiInputs.length ? `MIDI activo · ${midiInputs.map(({ name }) => name).join(", ")}`
+            : midiConnection === "checking" ? "Buscando piano MIDI… Podés usar el teclado."
+              : "Teclado de la computadora listo"}</p>
+          {midiConnection === "blocked" && <button type="button" onClick={() => void connectMidi()}>Habilitar MIDI</button>}
+        </div>
         <div className="zero-transport" role="group" aria-label="Reproducción">
           <button type="button" aria-label="Escena anterior" title="Escena anterior"
             disabled={sceneIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(-1)}>
@@ -2027,7 +2356,7 @@ function ModuleZero() {
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
           </button>
           <button type="button" aria-label="Escena siguiente" title="Escena siguiente"
-            disabled={sceneIndex === sceneControls.length - 1 || preparing || transportBusy} onClick={() => moveScene(1)}>
+            disabled={sceneIndex === sceneControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
           </button>
         </div>
@@ -2058,8 +2387,9 @@ function ModuleZero() {
         {(preparing || paused) && <span className="zero-playback-status" role="status">{preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
       <div className="zero-settings" ref={settingsRef}>
-        {sceneControls.map(({ mode, title, id, label, duration, min, max, setDuration }) => {
-          const seconds = `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
+        {sceneControls.map((control) => {
+          const { mode, title, id, duration } = control;
+          const seconds = duration === 0 ? (mode === 45 ? "Hasta detener" : "Hasta avanzar") : `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
           const isActive = mode === activeScene;
           return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}
             ref={isActive ? activeSceneRef : undefined} aria-current={isActive ? "step" : undefined}>
@@ -2067,9 +2397,9 @@ function ModuleZero() {
               <h2 id={`${id}-title`}>{title}</h2>
               <output htmlFor={id}>{seconds}</output>
             </div>
-            <input id={id} aria-label={label} type="range" min={min} max={max} step={1} value={duration}
+            <input id={id} aria-label={control.label} type="range" min={control.min} max={control.max} step={1} value={control.duration}
               aria-valuetext={seconds} disabled={!canStart}
-              onChange={(event) => setDuration(Number(event.currentTarget.value))} />
+              onChange={(event) => control.setDuration(Number(event.currentTarget.value))} />
             {mode === "time" && <>
               <div className="zero-sampling">
                 <label htmlFor="time-sampling">Intervalo de muestreo</label>
@@ -2079,9 +2409,52 @@ function ModuleZero() {
                 aria-valuetext={`${timeSamplingMs} milisegundos`} disabled={!canStart || previewMode === "time"}
                 onChange={(event) => setTimeSamplingMs(Number(event.currentTarget.value))} />
             </>}
+            {mode === "noise" && <fieldset className="zero-noise-pair">
+              <legend>Enlace para la prueba individual</legend>
+              {(["from", "to"] as const).map((side) => <label key={side}>
+                {side === "from" ? "Ruido de origen" : "Ruido de llegada"}
+                <select value={noisePair[side]} disabled={!canStart || previewMode === mode} onChange={(event) => {
+                  const next = event.currentTarget.value as NoiseColor;
+                  setNoisePair((current) => {
+                    const other = side === "from" ? "to" : "from";
+                    return { ...current, [side]: next, [other]: next === current[other] ? current[side] : current[other] };
+                  });
+                }}>
+                  {NOISE_IDS.map((id) => <option key={id} value={id}>{NOISE_COLORS[id].label}</option>)}
+                </select>
+              </label>)}
+            </fieldset>}
+            {mode === "breath" && <>
+              <div className="zero-sampling">
+                <label htmlFor="rest-duration">Respiro en el plano 9</label>
+                <output htmlFor="rest-duration">{restLabel}</output>
+              </div>
+              <input id="rest-duration" type="range" min={0} max={60} step={1} value={restSeconds}
+                aria-valuetext={restLabel} disabled={!canStart} onChange={(event) => setRestSeconds(Number(event.currentTarget.value))} />
+            </>}
+            {mode === "fourteen" && <ChordLoopControls loop={chordLoop} active={isActive} paused={paused} />}
+            {typeof mode === "number" && isActive && <ExtendedPerformanceControls performance={extended} scene={mode} paused={paused} />}
+            {isActive && noteScene && noteScene !== "fourteen" && <div className="zero-scene-input">
+              <p>{noteScene === "ten" ? "Usá cualquier tecla MIDI o 1–9 en la computadora. Después del tiempo elegido entra la escena 11."
+                : noteScene === "eleven" ? "En la computadora, 1–4 para la nota grave y 5–9 para la aguda."
+                  : noteScene === "thirteen" ? "La cara derecha se toca con Mayús y 1–9 o de Do5 a La♭5 por MIDI. Para la superior, tocá las celdas o usá de Do6 a La♭6."
+                    : "En la computadora, 1–9. En el piano MIDI, de Do4 a La♭4."}</p>
+              {noteScene === "eleven" && midiInputs.length > 0 && <>
+                <p role="status">{learningSplit ? "Tocá la primera tecla de la zona aguda." : `Corte MIDI en ${splitLabel}. Desde ahí suenan 999 Hz.`}</p>
+                <button type="button" disabled={paused} onClick={() => {
+                  learningSplitRef.current = !learningSplit;
+                  setLearningSplit(!learningSplit);
+                }}>{learningSplit ? "Cancelar cambio" : "Cambiar tecla de corte"}</button>
+              </>}
+            </div>}
             {previewMode === mode && !preparing
               ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
-              : <button type="button" className="zero-play" disabled={!canStart} onClick={() => void start(mode, true)}>Probar escena</button>}
+              : <button type="button" className="zero-play" disabled={!canStart} onClick={() => playMode(mode, true)}>Probar escena</button>}
+            {mode === "time" && <button type="button" className="zero-continue" disabled={!canStart}
+              onClick={() => void start("time")}>Reproducir desde 3 → 4</button>}
+            {mode === "return" && <button type="button" className="zero-continue" disabled={!canStart}
+              onClick={() => void start("return")}>Reproducir desde 7 → 8</button>}
+            {mode === "breath" && breathing && <button type="button" className="zero-continue" onClick={() => moveScene(1)}>Ir a escena 10</button>}
           </div>;
         })}
       </div>
@@ -2200,8 +2573,9 @@ export default function Multiversos860Page() {
   const [isSequencing, setIsSequencing] = useState(false);
   const [audioActive, setAudioActive] = useState(false);
   const [audioMessage, setAudioMessage] = useState("AUDIO EN ESPERA");
-  const [midiInputs, setMidiInputs] = useState<Array<{ id: string; name: string }>>([]);
-  const [midiMessage, setMidiMessage] = useState("MIDI SIN CONECTAR");
+  const [midiInputs, setMidiInputs] = useState<MidiDevice[]>([]);
+  const [midiConnection, setMidiConnection] = useState<MidiConnection>("checking");
+  const [midiMessage, setMidiMessage] = useState("BUSCANDO MIDI");
   const [midiLearnFor, setMidiLearnFor] = useState<number | null>(null);
   const [ccMap, setCcMap] = useState<Record<number, CcBinding>>({});
   const [activeNote, setActiveNote] = useState<number | null>(null);
@@ -2225,6 +2599,10 @@ export default function Multiversos860Page() {
   const sequenceCursorRef = useRef(0);
   const engineRef = useRef<SoundEngine | null>(null);
   const midiAccessRef = useRef<MidiAccessLike | null>(null);
+  const midiRequestRef = useRef<Promise<void> | null>(null);
+  const midiMountedRef = useRef(false);
+  const connectedMidiIds = useRef(new Set<string>());
+  const pianoRouting = useRef<PerformanceInput | null>(null);
   const midiLearnRef = useRef<number | null>(null);
   const ccMapRef = useRef(ccMap);
   const activeNoteRef = useRef<number | null>(null);
@@ -2438,54 +2816,99 @@ export default function Multiversos860Page() {
     }).catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
   }, [ensureAudio, stopRecording]);
 
+  const refreshMidiInputs = useCallback(() => {
+    const access = midiAccessRef.current;
+    if (!access || !midiMountedRef.current) return;
+    const inputs = Array.from(access.inputs.values()).filter((input) => input.state !== "disconnected").map((input) => ({
+      id: input.id,
+      name: input.name || "Entrada MIDI",
+    }));
+    const ids = new Set(inputs.map(({ id }) => id));
+    for (const id of connectedMidiIds.current) {
+      if (!ids.has(id)) pianoRouting.current?.releaseMidi(id);
+    }
+    connectedMidiIds.current = ids;
+    setMidiInputs(inputs);
+    setMidiConnection("ready");
+    setMidiMessage(inputs.length > 0 ? "MIDI LISTO · " + inputs.length + " ENTRADA(S)" : "CONECTÁ EL CASIO O LOS FADERS USB");
+  }, []);
+
   const connectMidi = useCallback(async () => {
+    const active = midiAccessRef.current;
+    if (active) {
+      active.onstatechange = refreshMidiInputs;
+      refreshMidiInputs();
+      return;
+    }
+    if (midiRequestRef.current) return midiRequestRef.current;
     if (!window.isSecureContext) {
-      setMidiMessage("MIDI NECESITA UNA CONEXIÓN HTTPS");
+      setMidiConnection("unavailable");
+      setMidiMessage("MIDI NECESITA UN CONTEXTO SEGURO");
       return;
     }
     const requestAccess = (navigator as MidiNavigator).requestMIDIAccess;
     if (!requestAccess) {
+      setMidiConnection("unavailable");
       setMidiMessage("MIDI NO ESTÁ DISPONIBLE EN ESTE NAVEGADOR");
       return;
     }
-    try {
-      const access = await requestAccess.call(navigator, { sysex: false });
-      midiAccessRef.current = access;
-      const refreshInputs = () => {
-        const inputs = Array.from(access.inputs.values()).map((input) => ({
-          id: input.id,
-          name: input.name || "Entrada MIDI",
-        }));
-        setMidiInputs(inputs);
-        setMidiMessage(inputs.length > 0 ? "MIDI LISTO · " + inputs.length + " ENTRADA(S)" : "CONECTÁ EL CASIO O LOS FADERS USB");
-      };
-      access.onstatechange = refreshInputs;
-      refreshInputs();
-    } catch {
-      setMidiMessage("PERMISO MIDI NO CONCEDIDO");
-    }
-  }, []);
+    setMidiConnection("checking");
+    const request = Promise.resolve().then(() => requestAccess.call(navigator, { sysex: false })).then((access) => {
+      if (midiMountedRef.current) {
+        midiAccessRef.current = access;
+        access.onstatechange = refreshMidiInputs;
+        refreshMidiInputs();
+      }
+    }).catch(() => {
+      if (midiMountedRef.current) {
+        setMidiConnection("blocked");
+        setMidiMessage("PERMISO MIDI NO CONCEDIDO");
+      }
+    }).finally(() => {
+      midiRequestRef.current = null;
+    });
+    midiRequestRef.current = request;
+    return request;
+  }, [refreshMidiInputs]);
+
+  useEffect(() => {
+    midiMountedRef.current = true;
+    void connectMidi();
+    return () => {
+      midiMountedRef.current = false;
+      if (midiAccessRef.current) {
+        midiAccessRef.current.onstatechange = null;
+      }
+    };
+  }, [connectMidi]);
 
   useEffect(() => {
     const access = midiAccessRef.current;
     if (!access || midiInputs.length === 0) return;
-    const inputs = Array.from(access.inputs.values());
+    const inputs = Array.from(access.inputs.values()).filter((input) => input.state !== "disconnected");
     const handlers = inputs.map((input) => {
       const onMessage = (event: { data: ArrayLike<number> }) => {
         const status = event.data[0] || 0;
         const first = event.data[1] || 0;
         const second = event.data[2] || 0;
         const kind = status & 0xf0;
+        const piano = pianoRouting.current;
+        const channel = status & 0x0f;
         if (kind === 0x90 && second > 0) {
-          captureNote(first);
-          startNote(first, second / 127);
+          if (piano) piano.midiNote(input.id, channel, first, second / 127);
+          else {
+            captureNote(first);
+            startNote(first, second / 127);
+          }
           return;
         }
         if (kind === 0x80 || (kind === 0x90 && second === 0)) {
-          releaseNote(first);
+          if (piano) piano.midiNote(input.id, channel, first, 0);
+          else releaseNote(first);
           return;
         }
         if (kind === 0xb0) {
+          if (first === 120 || first === 123) piano?.releaseMidi(input.id, channel);
           const waitingFor = midiLearnRef.current;
           if (waitingFor !== null) {
             setCcMap((current) => {
@@ -2528,10 +2951,16 @@ export default function Multiversos860Page() {
     const held = new Set<string>();
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target && ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(target.tagName)) return;
       const key = event.key.toLowerCase();
       const note = keyMap[key];
       if (note === undefined || held.has(key) || event.repeat) return;
+      const piano = pianoRouting.current;
+      if (piano) {
+        if (target?.closest("input, select, textarea, [contenteditable=true]") || event.altKey || event.ctrlKey || event.metaKey) return;
+        piano.computerNote(event.code || key, note, true);
+        return;
+      }
+      if (target && ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(target.tagName)) return;
       held.add(key);
       captureNote(note);
       startNote(note);
@@ -2540,8 +2969,10 @@ export default function Multiversos860Page() {
       const key = event.key.toLowerCase();
       const note = keyMap[key];
       if (note === undefined) return;
-      held.delete(key);
-      releaseNote(note);
+      const wasHeld = held.delete(key);
+      const piano = pianoRouting.current;
+      piano?.computerNote(event.code || key, note, false);
+      if (!piano || wasHeld) releaseNote(note);
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
@@ -2908,7 +3339,7 @@ export default function Multiversos860Page() {
 
   return (
     <main className={styles.console}>
-      <ModuleZero />
+      <ModuleZero pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} />
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
           <span className={styles.brandMark}>&#9670;</span>
@@ -3138,9 +3569,7 @@ export default function Multiversos860Page() {
                 <p className={styles.eyebrow}>ENTRADA EXTERNA</p>
                 <h3>Casio + faders <em>/ MIDI.</em></h3>
               </div>
-              <button type="button" className={styles.connectButton} onClick={() => void connectMidi()}>
-                CONECTAR MIDI
-              </button>
+              {midiConnection === "blocked" && <a href="#zero-midi" className={styles.connectButton}>PERMISO MIDI</a>}
             </div>
             <p className={styles.midiMessage} aria-live="polite">{midiMessage}</p>
             {midiInputs.length > 0 && (

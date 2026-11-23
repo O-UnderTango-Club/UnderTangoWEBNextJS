@@ -1,14 +1,15 @@
+import { useSavedSetting } from "./saved-setting";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createChordLoop, DEFAULT_CHORD_LOOP, MAX_LOOP_BEATS, MAX_LOOP_BPM, type Chord, type ChordLoopFrame } from "./chord-loop";
 import { buildLoopTraces } from "./chord-loop-traces";
 import type { NoteStrike } from "./performance-notes";
 
 type LoopCue = { context: AudioContext; beginsAt: number };
-type LoopConfig = { manual?: boolean; bpm?: number; click?: boolean; mix?: number; synchronized?: boolean; clickOutputRef?: { current: GainNode | null } };
+type LoopConfig = { storageKey?: string; manual?: boolean; bpm?: number; click?: boolean; mix?: number; synchronized?: boolean; clickOutputRef?: { current: GainNode | null } };
 
 export function useChordLoop(cue: LoopCue | null, outputRef: { current: GainNode | null }, config: LoopConfig = {}) {
   const { manual, bpm, click, mix, synchronized, clickOutputRef } = config;
-  const [settings, setSettings] = useState(() => ({ ...DEFAULT_CHORD_LOOP, bpm: bpm ?? DEFAULT_CHORD_LOOP.bpm }));
+  const [settings, setSettings] = useSavedSetting(config.storageKey ?? "loop14", () => ({ ...DEFAULT_CHORD_LOOP, bpm: bpm ?? DEFAULT_CHORD_LOOP.bpm }));
   const [latest, setLatest] = useState<{ cue: LoopCue; frame: ChordLoopFrame } | null>(null);
   const settingsRef = useRef(settings);
   const playerRef = useRef<ReturnType<typeof createChordLoop> | null>(null);

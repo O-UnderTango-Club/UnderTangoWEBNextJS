@@ -1,3 +1,4 @@
+import { useSavedSetting } from "./saved-setting";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SpiralProjection } from "./spiral";
 import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
@@ -17,10 +18,10 @@ export function isPlayableExtendedScene(scene: ExtendedScene | null) {
 
 export function useExtendedPerformance(scene: ExtendedScene | null, clock: AudioContext | null, output: OutputRef,
   routing: { current: PerformanceInput | null }, paused: { current: boolean }) {
-  const [selected, setSelected] = useState<CubeTrack>(0);
-  const [midiLayouts, setMidiLayouts] = useState({ numeric: false, tempered: true });
-  const [a4, setA4] = useState(DEFAULT_A4);
-  const [amounts, setAmounts] = useState<Partial<Record<TimbreScene, number>>>({});
+  const [selected, setSelected] = useSavedSetting<CubeTrack>("selected", 0);
+  const [midiLayouts, setMidiLayouts] = useSavedSetting("midiLayouts", { numeric: false, tempered: true });
+  const [a4, setA4] = useSavedSetting("a4", DEFAULT_A4);
+  const [amounts, setAmounts] = useSavedSetting<Partial<Record<TimbreScene, number>>>("amounts", {});
   const [live, setLive] = useState<TrackNotes>(EMPTY_TRACKS);
   const selectedRef = useRef(selected);
   const layout = scene === 15 ? "numeric" : "tempered";
@@ -56,10 +57,10 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
     if (timbre) rack.current?.select(timbre, strength);
   }, [loopCue, strength, timbre]);
 
-  const left = useChordLoop(three ? loopCue : null, instrument, { synchronized: true, mix: 0.43 });
-  const center = useChordLoop(three ? loopCue : null, instrument, { synchronized: true, click: false, mix: 0.43 });
-  const right = useChordLoop(three ? loopCue : null, instrument, { synchronized: true, click: false, mix: 0.43 });
-  const manual = useChordLoop(loopScene === 20 ? loopCue : null, instrument, { manual: true, bpm: 111, clickOutputRef: output });
+  const left = useChordLoop(three ? loopCue : null, instrument, { storageKey: "loop-left", synchronized: true, mix: 0.43 });
+  const center = useChordLoop(three ? loopCue : null, instrument, { storageKey: "loop-center", synchronized: true, click: false, mix: 0.43 });
+  const right = useChordLoop(three ? loopCue : null, instrument, { storageKey: "loop-right", synchronized: true, click: false, mix: 0.43 });
+  const manual = useChordLoop(loopScene === 20 ? loopCue : null, instrument, { storageKey: "loop-manual", manual: true, bpm: 111, clickOutputRef: output });
   const captureLeft = left.strike, captureCenter = center.strike, captureRight = right.strike, captureManual = manual.strike;
 
   useEffect(() => {

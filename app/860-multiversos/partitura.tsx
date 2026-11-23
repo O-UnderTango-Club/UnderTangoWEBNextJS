@@ -1,5 +1,6 @@
 "use client";
 
+import { useSavedSetting } from "./saved-setting";
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
@@ -1453,24 +1454,24 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
   const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
   const extendedScene = typeof stage === "number" ? stage : null;
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
-  const [showSubtitles, setShowSubtitles] = useState(false);
-  const [masterVolume, setMasterVolume] = useState(100);
-  const [durationSeconds, setDurationSeconds] = useState(SCENE_ZERO_DEFAULT_SECONDS);
-  const [oneSeconds, setOneSeconds] = useState(SCENE_ONE_DEFAULT_SECONDS);
-  const [lineSeconds, setLineSeconds] = useState(SCENE_LINE_DEFAULT_SECONDS);
-  const [harmonicSeconds, setHarmonicSeconds] = useState(SCENE_HARMONIC_DEFAULT_SECONDS);
-  const [spaceSeconds, setSpaceSeconds] = useState(SCENE_SPACE_DEFAULT_SECONDS);
-  const [timeSeconds, setTimeSeconds] = useState(SCENE_TIME_DEFAULT_SECONDS);
-  const [restSeconds, setRestSeconds] = useState(4);
-  const [noteSeconds, setNoteSeconds] = useState<Record<NoteScene, number>>({ ten: 12, eleven: 12, twelve: 12, thirteen: 12, fourteen: 0 });
-  const [extendedSeconds, setExtendedSeconds] = useState(EXTENDED_DEFAULT_SECONDS);
-  const [splitNote, setSplitNote] = useState(FIRST_MIDI_NOTE);
+  const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
+  const [masterVolume, setMasterVolume] = useSavedSetting("masterVolume", 100);
+  const [durationSeconds, setDurationSeconds] = useSavedSetting("durationSeconds", SCENE_ZERO_DEFAULT_SECONDS);
+  const [oneSeconds, setOneSeconds] = useSavedSetting("oneSeconds", SCENE_ONE_DEFAULT_SECONDS);
+  const [lineSeconds, setLineSeconds] = useSavedSetting("lineSeconds", SCENE_LINE_DEFAULT_SECONDS);
+  const [harmonicSeconds, setHarmonicSeconds] = useSavedSetting("harmonicSeconds", SCENE_HARMONIC_DEFAULT_SECONDS);
+  const [spaceSeconds, setSpaceSeconds] = useSavedSetting("spaceSeconds", SCENE_SPACE_DEFAULT_SECONDS);
+  const [timeSeconds, setTimeSeconds] = useSavedSetting("timeSeconds", SCENE_TIME_DEFAULT_SECONDS);
+  const [restSeconds, setRestSeconds] = useSavedSetting("restSeconds", 4);
+  const [noteSeconds, setNoteSeconds] = useSavedSetting<Record<NoteScene, number>>("noteSeconds", { ten: 12, eleven: 12, twelve: 12, thirteen: 12, fourteen: 0 });
+  const [extendedSeconds, setExtendedSeconds] = useSavedSetting("extendedSeconds", EXTENDED_DEFAULT_SECONDS);
+  const [splitNote, setSplitNote] = useSavedSetting("splitNote", FIRST_MIDI_NOTE);
   const [learningSplit, setLearningSplit] = useState(false);
-  const [continuationSeconds, setContinuationSeconds] = useState<Record<ContinuationScene, number>>(() =>
+  const [continuationSeconds, setContinuationSeconds] = useSavedSetting<Record<ContinuationScene, number>>("continuationSeconds", () =>
     Object.fromEntries(CONTINUATION_SCENES.map(({ mode, seconds }) => [mode, seconds])) as Record<ContinuationScene, number>);
-  const [noisePair, setNoisePair] = useState<NoisePair>(DEFAULT_PAIR);
+  const [noisePair, setNoisePair] = useSavedSetting<NoisePair>("noisePair", DEFAULT_PAIR);
   const [playingNoisePair, setPlayingNoisePair] = useState<NoisePair>(DEFAULT_PAIR);
-  const [timeSamplingMs, setTimeSamplingMs] = useState(SCENE_TIME_DEFAULT_SAMPLE_MS);
+  const [timeSamplingMs, setTimeSamplingMs] = useSavedSetting("timeSamplingMs", SCENE_TIME_DEFAULT_SAMPLE_MS);
   const [activeSamplingMs, setActiveSamplingMs] = useState(SCENE_TIME_DEFAULT_SAMPLE_MS);
   const [previewMode, setPreviewMode] = useState<ModuleZeroScene | null>(null);
   const [paused, setPaused] = useState(false);
@@ -1483,8 +1484,8 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const activeSceneRef = useRef<HTMLDivElement | null>(null);
   const outputRef = useRef<GainNode | null>(null);
-  const masterVolumeRef = useRef(100);
-  const audibleVolumeRef = useRef(100);
+  const masterVolumeRef = useRef(masterVolume);
+  const audibleVolumeRef = useRef(masterVolume);
   const timersRef = useRef(new Set<number>());
   const waitingCues = useRef(new Set<() => void>());
   const pausedRef = useRef(false);
@@ -2561,11 +2562,11 @@ function applyControl(engine: SoundEngine, index: number, value: number, bpm: nu
 }
 
 export default function Multiversos860Page() {
-  const [values, setValues] = useState<number[]>(INITIAL_VALUES);
-  const [bpm, setBpm] = useState(106);
-  const [steps, setSteps] = useState<boolean[]>(INITIAL_STEPS);
-  const [recordedNotes, setRecordedNotes] = useState<RecordedPattern>(Array(9).fill(null));
-  const [hasRecording, setHasRecording] = useState(false);
+  const [values, setValues] = useSavedSetting<number[]>("values", INITIAL_VALUES);
+  const [bpm, setBpm] = useSavedSetting("bpm", 106);
+  const [steps, setSteps] = useSavedSetting<boolean[]>("steps", INITIAL_STEPS);
+  const [recordedNotes, setRecordedNotes] = useSavedSetting<RecordedPattern>("recordedNotes", Array(9).fill(null));
+  const [hasRecording, setHasRecording] = useSavedSetting("hasRecording", false);
   const [isRecording, setIsRecording] = useState(false);
   const [sequenceRun, setSequenceRun] = useState(0);
   const [activeStep, setActiveStep] = useState(-1);
@@ -2577,7 +2578,7 @@ export default function Multiversos860Page() {
   const [midiConnection, setMidiConnection] = useState<MidiConnection>("checking");
   const [midiMessage, setMidiMessage] = useState("BUSCANDO MIDI");
   const [midiLearnFor, setMidiLearnFor] = useState<number | null>(null);
-  const [ccMap, setCcMap] = useState<Record<number, CcBinding>>({});
+  const [ccMap, setCcMap] = useSavedSetting<Record<number, CcBinding>>("ccMap", {});
   const [activeNote, setActiveNote] = useState<number | null>(null);
   const [heldNotes, setHeldNotes] = useState<number[]>([]);
   const [presets, setPresets] = useState<ScenePreset[]>([]);
@@ -2588,8 +2589,8 @@ export default function Multiversos860Page() {
   const valuesRef = useRef(values);
   const bpmRef = useRef(bpm);
   const stepsRef = useRef(steps);
-  const recordedNotesRef = useRef<RecordedPattern>(Array(9).fill(null));
-  const hasRecordingRef = useRef(false);
+  const recordedNotesRef = useRef<RecordedPattern>(recordedNotes);
+  const hasRecordingRef = useRef(hasRecording);
   const isRecordingRef = useRef(false);
   const recordingStartedAtRef = useRef<number | null>(null);
   const recordingStepDurationRef = useRef((60_000 / 106) / 2);

@@ -32,7 +32,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const attack = useRef({ count: 0, frequency: 0, velocity: 0 });
   const player = useRef<{ strike: (id: string, track: CubeTrack, index: number, velocity: number) => void; release: (id: string) => void } | null>(null);
   const timbre = isTimbreScene(scene) ? scene : null;
-  const spiral=scene===45;
+  const fullMidiRange = scene === 45 || scene === 60;
   const loopScene = timbre ? 20 : scene === 15 || scene === 18 ? scene : null;
   const loopCue = useMemo(() => clock && loopScene ? { context: clock, beginsAt: clock.currentTime } : null, [clock, loopScene]);
   const three = loopScene === 15 || loopScene === 18;
@@ -96,11 +96,11 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       midiNote: (id, channel, note, velocity) => {
         const identity = `${midiPrefix(id)}${channel}:${note}`;
         if (velocity <= 0) { release(identity); return; }
-        if (spiral && !splitRef.current) {
+        if (fullMidiRange && !splitRef.current) {
           strike(identity,selectedRef.current,((note-60)%CUBE_SIZE+CUBE_SIZE)%CUBE_SIZE,velocity);
           return;
         }
-        if (spiral || loopScene === 15) {
+        if (fullMidiRange || loopScene === 15) {
           const offset = note - CUBE_FIRST_MIDI;
           const track = CUBE_TRACKS[Math.max(0, Math.min(2, Math.floor(offset / CUBE_SIZE)))];
           strike(identity, track, ((offset % CUBE_SIZE) + CUBE_SIZE) % CUBE_SIZE, velocity);
@@ -148,7 +148,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       window.removeEventListener("blur", releaseAll);
       document.removeEventListener("visibilitychange", hide);
     };
-  }, [captureCenter, captureLeft, captureManual, captureRight, keys, loopCue, loopScene, paused, routing, three, spiral]);
+  }, [captureCenter, captureLeft, captureManual, captureRight, keys, loopCue, loopScene, paused, routing, three, fullMidiRange]);
 
   return {
     attack, keys, three, timbre, selected, a4, setA4, splitMidi, live, strength, manual, loops: [left, center, right],

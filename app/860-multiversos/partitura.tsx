@@ -12,6 +12,7 @@ import { PerformanceProjection, usePerformanceInput } from "./performance-view";
 import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isTimbreScene, type ExtendedScene } from "./extended-scenes";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
+import { PrimeraVoluntad } from "./primera-voluntad";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
@@ -1568,7 +1569,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
   }, [stop]);
 
   useEffect(() => {
-    if ((!nextTimedScene && extendedScene !== 45) || nextAfterSeconds === 0 || !cue || paused) return;
+    if ((!nextTimedScene && extendedScene !== 60) || nextAfterSeconds === 0 || !cue || paused) return;
     const deadline = cue.beginsAt + nextAfterSeconds;
     let timer: number | undefined;
     const advance = () => {
@@ -2356,11 +2357,14 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
         input={chordLoop.frame ? { ...noteInput, sounding: [...noteInput.sounding, ...chordLoop.frame.sounding] } : noteInput}
         beginsAt={cue?.beginsAt ?? 0} />}
       {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
-      {extendedScene && cue && (extendedPlaying
+      {extendedScene && cue && (extendedScene === 60
+        ? <PrimeraVoluntad key={cue.beginsAt} clock={cue.context} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} paused={paused}
+            press={(id, index) => extended.press(id, extended.selected, index)} release={extended.release} />
+        : extendedPlaying
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer analyser={extendedScene===45?spiralAnalyser:undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      <SceneMixer analyser={extendedScene === 45 || extendedScene === 60 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null ? <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>
         : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>
@@ -2368,7 +2372,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
       <div className="zero-settings" ref={settingsRef}>
         {sceneControls.map((control) => {
           const { mode, title, id, duration } = control;
-          const seconds = duration === 0 ? (mode === 45 ? "Hasta detener" : "Hasta avanzar") : `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
+          const seconds = duration === 0 ? (mode === 60 ? "Hasta detener" : "Hasta avanzar") : `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
           const isActive = mode === activeScene;
           return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}
             ref={isActive ? activeSceneRef : undefined} aria-current={isActive ? "step" : undefined}>

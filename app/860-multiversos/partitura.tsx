@@ -1514,7 +1514,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
   }, []);
   const nextTimedScene = extendedScene ? EXTENDED_SCENES[EXTENDED_SCENES.indexOf(extendedScene) + 1]
     : noteScene === "fourteen" ? 15 : noteScene ? NOTE_SCENES[noteScene].next
-      : stage === "breath-hold" && previewMode === null && restSeconds > 0 ? "ten" : null;
+      : stage === "breath-hold" && restSeconds > 0 ? "ten" : null;
   const nextAfterSeconds = extendedScene ? extendedSeconds[extendedScene] : noteScene ? noteSeconds[noteScene] : activeDurationMs / 1000 + restSeconds;
 
   useEffect(() => {
@@ -1662,9 +1662,8 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
     const gongLead = lineSeconds / 5;
     const rampSeconds = lineSeconds - gongLead;
     const fadeOutAt = lineStartsAt / 1000 + gongLead / 3;
-    const sustainMurmur = previewOnly && (mode === "opening" || mode === "beacon");
-    const showBeacon = mode === "beacon" || (mode === "opening" && !previewOnly);
-    const waveSeconds = sustainMurmur ? 16 : lineStartsAt / 1000 + gongLead + 0.5;
+    const showBeacon = mode === "beacon" || mode === "opening";
+    const waveSeconds = lineStartsAt / 1000 + gongLead + 0.5;
     setPreviewMode(previewOnly ? mode : null);
     setStage("preparing");
     try {
@@ -1709,7 +1708,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
       };
       const playContinuation = (first: ContinuationScene, time: number) => {
         const index = CONTINUATION_SCENES.findIndex(({ mode }) => mode === first);
-        const timing = CONTINUATION_SCENES.slice(index, previewOnly ? index + 1 : undefined).map(({ mode }) => ({
+        const timing = CONTINUATION_SCENES.slice(index).map(({ mode }) => ({
           scene: mode, seconds: continuationSeconds[mode],
         }));
         const pair = previewOnly && first === "noise" ? noisePair : DEFAULT_PAIR;
@@ -1755,7 +1754,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
           enterDiagram("temporal", time, timeSeconds);
         });
         atTime(time + timeSeconds, () => setStage("time"));
-        if (!previewOnly) {
+        {
           const continuationAt = time + timeSeconds + FREQUENCY_TRAIL_TURN_SECONDS;
           const end = continuationAt + 0.10;
           bus.gain.setValueAtTime(bus.gain.value, continuationAt);
@@ -1766,8 +1765,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
       };
       const playSpatial = (bus: GainNode, time: number, voices: OscillatorNode[]) => {
         showAt("space", time, () => enterDiagram("spatial", time, spaceSeconds));
-        if (!previewOnly) playTime(bus, time + spaceSeconds, voices);
-        else atTime(time + spaceSeconds, () => setStage("space"));
+        playTime(bus, time + spaceSeconds, voices);
       };
       const playHarmonics = (bus: GainNode, time: number, root: OscillatorNode) => {
         playModuleGong(context, masterOutput, time, 330, 0.58);
@@ -1775,8 +1773,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
         const second = addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
         const third = addTone(bus, 333, time + harmonicSeconds * HARMONIC_CUE.trace333, harmonicSeconds * (HARMONIC_CUE.result - HARMONIC_CUE.trace333));
         showAt("harmonics", time, () => enterDiagram("harmonics", time, harmonicSeconds));
-        if (!previewOnly) playSpatial(bus, time + harmonicSeconds, [root, second, third]);
-        else atTime(time + harmonicSeconds, () => setStage("equation"));
+        playSpatial(bus, time + harmonicSeconds, [root, second, third]);
       };
 
       if (isContinuationScene(mode)) {
@@ -1829,16 +1826,9 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
       }
       const rms = Math.sqrt(sumSquares / (forward.length * forward.numberOfChannels));
       const boost = rms > 0 ? Math.min(5, 0.06 / rms, peak > 0 ? 0.6 / peak : 5) : 1;
-      const loopBlend = sustainMurmur ? Math.round(forward.sampleRate * 0.16) : 0;
-      const loopEnd = forward.length - loopBlend;
       for (let channel = 0; channel < forward.numberOfChannels; channel++) {
         const samples = forward.getChannelData(channel);
         for (let i = 0; i < samples.length; i++) samples[i] *= boost;
-        // Fold the tail into the head so the preview can sustain without a click at the loop point.
-        for (let i = 0; i < loopBlend; i++) {
-          const mix = 0.5 - 0.5 * Math.cos(Math.PI * i / (loopBlend - 1));
-          samples[i] = samples[loopEnd + i] * (1 - mix) + samples[i] * mix;
-        }
       }
       const wave = (beginsAt: number) => {
         const source = context.createBufferSource(), gain = context.createGain();
@@ -1848,13 +1838,8 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
         gain.gain.value = 0;
         const attack = mode === "opening" ? durationSeconds : 0.06;
         gain.gain.setValueCurveAtTime(SCENE_ZERO_MURMUR_ATTACK, beginsAt, attack);
-        if (sustainMurmur) {
-          source.loop = true;
-          source.loopEnd = loopEnd / forward.sampleRate;
-        } else {
-          gain.gain.setValueAtTime(1, beginsAt + fadeOutAt);
-          gain.gain.linearRampToValueAtTime(0, beginsAt + waveSeconds);
-        }
+        gain.gain.setValueAtTime(1, beginsAt + fadeOutAt);
+        gain.gain.linearRampToValueAtTime(0, beginsAt + waveSeconds);
         color.frequency.setValueAtTime(mode === "line" ? 700 : 18000, beginsAt);
         color.Q.setValueAtTime(mode === "line" ? 1.4 : 0.7, beginsAt);
         if (showBeacon) {
@@ -1864,7 +1849,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
         source.connect(color); color.connect(gain); gain.connect(masterOutput);
         source.onended = () => { source.disconnect(); color.disconnect(); gain.disconnect(); };
         source.start(beginsAt);
-        if (!sustainMurmur) source.stop(beginsAt + waveSeconds);
+        source.stop(beginsAt + waveSeconds);
       };
 
       const beginsAt = context.currentTime + 0.06;
@@ -1890,7 +1875,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
         atOffset(pointMs, () => setStage("one"));
         atOffset(pointMs + 11500, disconnectGong);
       }
-      if (sustainMurmur) return;
+
       const chordBus = createChordBus();
       const scheduleAcceleration = (beginning: number) => {
         const duration = rampSeconds;
@@ -1927,7 +1912,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
         pitchGain.gain.linearRampToValueAtTime(0.12, beginning + duration);
         pitch.connect(pitchGain); pitchGain.connect(chordBus);
         pitch.start(pitchStart);
-        if (!previewOnly) playHarmonics(chordBus, beginning + duration + 4, pitch);
+        playHarmonics(chordBus, beginning + duration + 4, pitch);
         const draw = () => {
           if (run !== runRef.current || audioRef.current !== context) return;
           const elapsed = context.currentTime - beginning;
@@ -2203,10 +2188,10 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
       .zero-time-caption small:last-child { color: #46516b; }
       .zero-controls {
         --zero-controls-padding: clamp(.75rem, 2.2vw, 2.5rem);
-        display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr);
+        display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
         min-height: 0; overflow: hidden; padding: 0; border-left: 1px solid #30333d;
       }
-      .zero-control-bar { padding: .85rem var(--zero-controls-padding) .4rem; border-bottom: 1px solid #30333d; }
+      .zero-control-bar { padding: .85rem var(--zero-controls-padding) .4rem; border-top: 1px solid #30333d; }
       .zero-midi { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .65rem; }
       .zero-midi p { margin: 0; color: #dce6ff; font-size: .76rem; overflow-wrap: anywhere; }
       .zero-controls .zero-midi button { font-size: .75rem; padding: .25rem .55rem; }
@@ -2332,61 +2317,6 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
         : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>
     <aside className="zero-controls" aria-label="Controles de las escenas">
-      <div className="zero-control-bar">
-        <div id="zero-midi" className="zero-midi">
-          <p role="status">{midiInputs.length ? `MIDI activo · ${midiInputs.map(({ name }) => name).join(", ")}`
-            : midiConnection === "checking" ? "Buscando piano MIDI… Podés usar el teclado."
-              : "Teclado de la computadora listo"}</p>
-          {midiConnection === "blocked" && <button type="button" onClick={() => void connectMidi()}>Habilitar MIDI</button>}
-        </div>
-        <div className="zero-transport" role="group" aria-label="Reproducción">
-          <button type="button" aria-label="Escena anterior" title="Escena anterior"
-            disabled={sceneIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(-1)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h2v14H5zM19 5v14L8 12z" /></svg>
-          </button>
-          <button type="button" aria-label={paused ? "Reanudar" : "Reproducir"} title={paused ? "Reanudar" : "Reproducir"}
-            disabled={preparing || transportBusy || (!ready && !paused)}
-            onClick={() => ready ? void start() : void changePaused(false)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z" /></svg>
-          </button>
-          <button type="button" aria-label="Pausar" title="Pausar"
-            disabled={ready || preparing || paused || transportBusy} onClick={() => void changePaused(true)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
-          </button>
-          <button type="button" aria-label="Detener" title="Detener" disabled={ready} onClick={reset}>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
-          </button>
-          <button type="button" aria-label="Escena siguiente" title="Escena siguiente"
-            disabled={sceneIndex === sceneControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(1)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
-          </button>
-        </div>
-        <div className="zero-master">
-          <button type="button" aria-label={soundAction} title={soundAction}
-            onClick={() => changeMasterVolume(muted ? audibleVolumeRef.current : 0)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M3 9h4l5-4v14l-5-4H3z" />
-              <path fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"
-                d={muted ? "m16 9 5 6m0-6-5 6" : "M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12"} />
-            </svg>
-          </button>
-          <div>
-            <div className="zero-master-label">
-              <label htmlFor="zero-master-volume">Volumen master</label>
-              <output htmlFor="zero-master-volume">{masterVolume}%</output>
-            </div>
-            <input id="zero-master-volume" type="range" min={0} max={100} step={1}
-              value={masterVolume} aria-valuetext={`${masterVolume}%`}
-              onChange={(event) => changeMasterVolume(Number(event.currentTarget.value))} />
-          </div>
-        </div>
-        <label className="zero-subtitle-toggle">
-          Activar subtítulos
-          <input type="checkbox" role="switch" checked={showSubtitles}
-            onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
-        </label>
-        {(preparing || paused) && <span className="zero-playback-status" role="status">{preparing ? "Preparando audio…" : "En pausa"}</span>}
-      </div>
       <div className="zero-settings" ref={settingsRef}>
         {sceneControls.map((control) => {
           const { mode, title, id, duration } = control;
@@ -2448,7 +2378,7 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
                 }}>{learningSplit ? "Cancelar cambio" : "Cambiar tecla de corte"}</button>
               </>}
             </div>}
-            {previewMode === mode && !preparing
+            {previewMode !== null && isActive && !preparing
               ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
               : <button type="button" className="zero-play" disabled={!canStart} onClick={() => playMode(mode, true)}>Probar escena</button>}
             {mode === "time" && <button type="button" className="zero-continue" disabled={!canStart}
@@ -2458,6 +2388,61 @@ function ModuleZero({ pianoRouting, connectMidi, midiConnection, midiInputs }: {
             {mode === "breath" && breathing && <button type="button" className="zero-continue" onClick={() => moveScene(1)}>Ir a escena 10</button>}
           </div>;
         })}
+      </div>
+      <div className="zero-control-bar" role="group" aria-label="Panel de control">
+        <div id="zero-midi" className="zero-midi">
+          <p role="status">{midiInputs.length ? `MIDI activo · ${midiInputs.map(({ name }) => name).join(", ")}`
+            : midiConnection === "checking" ? "Buscando piano MIDI… Podés usar el teclado."
+              : "Teclado de la computadora listo"}</p>
+          {midiConnection === "blocked" && <button type="button" onClick={() => void connectMidi()}>Habilitar MIDI</button>}
+        </div>
+        <div className="zero-transport" role="group" aria-label="Reproducción">
+          <button type="button" aria-label="Escena anterior" title="Escena anterior"
+            disabled={sceneIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(-1)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h2v14H5zM19 5v14L8 12z" /></svg>
+          </button>
+          <button type="button" aria-label={paused ? "Reanudar" : "Reproducir"} title={paused ? "Reanudar" : "Reproducir"}
+            disabled={preparing || transportBusy || (!ready && !paused)}
+            onClick={() => ready ? void start() : void changePaused(false)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z" /></svg>
+          </button>
+          <button type="button" aria-label="Pausar" title="Pausar"
+            disabled={ready || preparing || paused || transportBusy} onClick={() => void changePaused(true)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
+          </button>
+          <button type="button" aria-label="Detener" title="Detener" disabled={ready} onClick={reset}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
+          </button>
+          <button type="button" aria-label="Escena siguiente" title="Escena siguiente"
+            disabled={sceneIndex === sceneControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(1)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
+          </button>
+        </div>
+        <div className="zero-master">
+          <button type="button" aria-label={soundAction} title={soundAction}
+            onClick={() => changeMasterVolume(muted ? audibleVolumeRef.current : 0)}>
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M3 9h4l5-4v14l-5-4H3z" />
+              <path fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"
+                d={muted ? "m16 9 5 6m0-6-5 6" : "M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12"} />
+            </svg>
+          </button>
+          <div>
+            <div className="zero-master-label">
+              <label htmlFor="zero-master-volume">Volumen master</label>
+              <output htmlFor="zero-master-volume">{masterVolume}%</output>
+            </div>
+            <input id="zero-master-volume" type="range" min={0} max={100} step={1}
+              value={masterVolume} aria-valuetext={`${masterVolume}%`}
+              onChange={(event) => changeMasterVolume(Number(event.currentTarget.value))} />
+          </div>
+        </div>
+        <label className="zero-subtitle-toggle">
+          Activar subtítulos
+          <input type="checkbox" role="switch" checked={showSubtitles}
+            onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
+        </label>
+        {(preparing || paused) && <span className="zero-playback-status" role="status">{preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
     </aside>
   </div>;

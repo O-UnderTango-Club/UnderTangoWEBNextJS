@@ -170,7 +170,7 @@ export function ExtendedPerformanceProjection({ performance, clock, paused, scen
       {CUBE_TRACKS.map((track) => {
         const frame = loops[track].frame;
         const sounding = [...live[track], ...(three ? frame?.sounding ?? [] : active?.sounding ?? [])];
-        return <section className="extended-track" key={track} aria-label={`Cubo ${CUBE_TRACK_NAMES[track].toLowerCase()}`} data-selected={selected === track}>
+        return <div role="group" className="extended-track" key={track} aria-label={`Cubo ${CUBE_TRACK_NAMES[track].toLowerCase()}`} data-selected={selected === track}>
           <button type="button" className="extended-track-select" aria-pressed={selected === track} onClick={() => select(track)}>{CUBE_TRACK_NAMES[track]}</button>
           <div className="extended-cube-space">
             <div className="zero-cube extended-cube" data-folding="true" data-show-sides="true">
@@ -196,7 +196,7 @@ export function ExtendedPerformanceProjection({ performance, clock, paused, scen
             </div>
           </div>
           {three && frame && <ChordLoopTimeline clock={clock} frame={frame} paused={paused} live={live[track]} compact />}
-        </section>;
+        </div>;
       })}
     </div>
     {performance.timbre && <>

@@ -43,9 +43,11 @@ export const metadata: Metadata = {
     siteName: "Ø UnderTango Club",
     locale: "es_AR",
     type: "website",
+    images: [{ url: "/marca/esmeralda-social.jpg", width: 600, height: 600, alt: "Ø UnderTango Club — emblema esmeralda" }],
   },
   icons: {
-    icon: "/assets/images/favicon.ico",
+    icon: "/marca/esmeralda.ico",
+    apple: "/marca/logo-esmeralda.png",
   },
 };
 

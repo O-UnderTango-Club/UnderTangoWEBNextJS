@@ -82,7 +82,8 @@ export default function BandaPage() {
                 <GalleryVideo id="iQOyq6xWdcc" title="Fragmento Bailongo en Foz do Iguaçú" portrait />
               </div>
               <div className={styles.videoCard}>
-                <GalleryVideo id="7yVf96vjurQ" title="Banda de Ø UnderTango Club en vivo" portrait />
+                <GalleryVideo id="7yVf96vjurQ" title="Tango Rave · Banda en vivo" portrait />
+                <p>Registro de la banda en otro formato de Ø UnderTango Club.</p>
               </div>
             </div>
           </section>

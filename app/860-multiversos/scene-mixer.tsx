@@ -62,7 +62,8 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
     const bus=monitor.context.createGain();
     bus.channelCount=2;bus.channelCountMode="explicit";
     monitor.connect(bus);stereo.current=bus;
-    return ()=>{monitor.disconnect(bus);bus.disconnect();stereo.current=null;};
+    // Meter and recorder own their outgoing edges and release them independently.
+    return ()=>{monitor.disconnect(bus);stereo.current=null;};
   },[monitor]);
   useEffect(()=>{
     const bus=stereo.current;
@@ -201,13 +202,18 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
       for(const source of sources)source.connect(gate);
       const protectedTake=protectPeaks(gate,RECORDING_CEILING);
       protectedTake.connect(node);
-      const detach=()=>{for(const source of sources)source.disconnect(gate);gate.disconnect();protectedTake.disconnect();};
-      const dispose=()=>{capture.stop();gain.disconnect();};
-      pending.current.set(kind,{silence:()=>{gate.gain.setValueAtTime(0,ctx.currentTime);capture.finish(Math.round(ctx.currentTime*ctx.sampleRate));},cancel:()=>{occupied.current.delete(slot);detach();dispose();}});
+      let released=false;
+      const dispose=()=>{
+        if(released)return;
+        released=true;
+        for(const source of sources)source.disconnect(gate);
+        gate.disconnect();protectedTake.disconnect();capture.stop();gain.disconnect();
+      };
+      pending.current.set(kind,{silence:()=>{gate.gain.setValueAtTime(0,ctx.currentTime);capture.finish(Math.round(ctx.currentTime*ctx.sampleRate));},cancel:()=>{occupied.current.delete(slot);dispose();}});
       const label=scene;
       function onLoop(channels:Float32Array[]){
-        if(attempt!==generation.current)return;
-        detach();dispose();pending.current.delete(kind);
+        if(released || attempt!==generation.current)return;
+        dispose();pending.current.delete(kind);
         const buffer=ctx.createBuffer(2,length,ctx.sampleRate);
         channels.forEach((samples,ch)=>buffer.getChannelData(ch).set(samples));
         const id=++serial.current;

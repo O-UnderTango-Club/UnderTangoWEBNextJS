@@ -22,7 +22,11 @@ class MeasureRecorder extends AudioWorkletProcessor {
         for (let ch = 0; ch < 2; ch++) this.channels[ch][offset] = (input[ch] || input[0])?.[i] || 0;
     }
     if (currentFrame + frames >= this.end) {
-      this.port.postMessage(this.channels, this.channels.map(ch=>ch.buffer));
+      // A connected input can wake the processor again after process returns false.
+      this.stopped = true;
+      const channels = this.channels;
+      this.channels = null;
+      this.port.postMessage(channels, channels.map(ch=>ch.buffer));
       return false;
     }
     return true;
@@ -50,8 +54,11 @@ export function captureFactory(ctx: AudioContext) {
   if (readyContexts.has(ctx)) {
     return (start: number,length: number,end:number,onLoop:(data:Float32Array[])=>void) => {
       const node = new AudioWorkletNode(ctx,"measure-recorder",{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],processorOptions:{start,length,end}});
-      node.port.onmessage=e=>onLoop(e.data);
-      return {node,finish:(frame:number)=>node.port.postMessage(frame),stop:()=>{node.port.postMessage("stop");node.port.close();node.disconnect();}};
+      node.port.onmessage=e=>{
+        node.port.onmessage=null;
+        onLoop(e.data);
+      };
+      return {node,finish:(frame:number)=>node.port.postMessage(frame),stop:()=>{node.port.onmessage=null;node.port.postMessage("stop");node.port.close();node.disconnect();}};
     };
   } else {
     return (start:number,length:number,end:number,onLoop:(data:Float32Array[])=>void) => {

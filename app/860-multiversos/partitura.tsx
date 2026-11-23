@@ -2944,6 +2944,16 @@ export default function Multiversos860Page() {
         const kind = status & 0xf0;
         const piano = pianoRouting.current;
         const channel = status & 0x0f;
+        const controlType = kind === 0xe0 ? "bend" : kind === 0xb0 && first < 120 ? "cc" :
+          kind === 0x90 || kind === 0x80 ? "note" : null;
+        if (controlType && midiLearnRef.current === null) {
+          const id = JSON.stringify([input.id,channel,controlType,controlType==="bend"?0:first]);
+          const reserved = Object.values(ccMapRef.current).some(b=>b.inputId===input.id &&
+            (controlType==="bend"?b.bendChannel===channel:controlType==="cc" && b.cc===first));
+          const value = controlType==="bend"?(first+128*second)/16383:kind===0x80?0:second/127;
+          if(!window.dispatchEvent(new CustomEvent("860-bank-midi",{cancelable:true,
+            detail:{id,value,type:controlType,reserved,label:(input.name||"MIDI")+" · "+(controlType==="bend"?"Pitch Bend":(controlType==="cc"?"CC ":"Nota ")+first)+" · canal "+(channel+1)}})))return;
+        }
         if (kind === 0x90 || kind === 0x80 || (kind === 0xb0 && first < 120)) {
           const id = JSON.stringify([input.id,channel,kind===0xb0?"cc":"note",first]);
           const event = new CustomEvent("860-record-midi",{cancelable:true,detail:{id,on:kind!==0x80 && second>0}});

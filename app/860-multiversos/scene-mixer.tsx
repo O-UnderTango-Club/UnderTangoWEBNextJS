@@ -6,6 +6,11 @@ import { useSavedSetting } from "./saved-setting";
 
 import { useTempo } from "./tempo";
 
+const BANK_ACTIONS = {volume:"Volumen",stop:"Stop",play:"Play inmediato",next:"Play en el 1",toggle:"Play / stop"} as const;
+type BankAction = keyof typeof BANK_ACTIONS;
+type Assignment = {slot:number;action:BankAction;label:string};
+type BankMessage = {id:string;value:number;type:"cc"|"note"|"bend";reserved:boolean;label:string};
+
 type Mode = "matrix" | "live";
 type Clip = { slot:number; stopped:boolean; launchBeat?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; dispose: () => void };
@@ -18,6 +23,11 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
   const [meter,setMeter] = useSavedSetting("mixerMeter",4);
   const [bars,setBars] = useSavedSetting("mixerBars",4);
   const [room,setRoom] = useState(false);
+  const [bankMap,setBankMap]=useSavedSetting<Record<string,Assignment>>("sampleBankMidi",{});
+  const [bankSlot,setBankSlot]=useState(0);
+  const [bankLearn,setBankLearn]=useState<BankAction|null>(null);
+  const downControls=useRef(new Set<string>());
+  const bankVolumes=useRef(new Map<number,number>());
   const [learn,setLearn]=useState(false);
   const [matrix,setMatrix]=useSavedSetting("mixerMatrixEnabled",true);
   const [live,setLive]=useSavedSetting("mixerLiveEnabled",false);
@@ -203,7 +213,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
         const id=++serial.current;
         launchContext.current.set(buffer,ctx);
         const stopped=stopAtStart!==stopGeneration.current;
-        setClips(all=>[...all,{id,slot,stopped,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:75,muted:false}]);if(!pending.current.size)setState("idle");
+        setClips(all=>[...all,{id,slot,stopped,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:bankVolumes.current.get(slot) ?? 75,muted:false}]);if(!pending.current.size)setState("idle");
       };
       setState("recording");
     } catch {
@@ -298,6 +308,53 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
     halt(id);
     setClips(all=>all.map(c=>c.id===id?{...c,stopped:false,muted:false,startBeat:start,launchBeat:start}:c));
   }
+  function stopClip(id:number){
+    halt(id);
+    setClips(all=>all.map(c=>c.id===id?{...c,stopped:true}:c));
+  }
+  useEffect(()=>{
+    function receive(event:Event){
+      const e=event as CustomEvent<BankMessage>;
+      const {id,value,type,reserved,label}=e.detail;
+      let assignment=bankMap[id];
+      if(learn)return;
+      if(bankLearn){
+        if(bankLearn==="volume"?type==="note":type==="bend" || value===0)return;
+        if(reserved || id===(binding||liveBinding)){
+          e.preventDefault();setMessage("Ese control ya maneja otro parámetro de 860. Elegí otro.");return;
+        }
+        e.preventDefault();
+        assignment={slot:bankSlot,action:bankLearn,label};
+        const selected=assignment;
+        setBankMap(current=>{
+          const next={...current};
+          for(const key of Object.keys(next))if(next[key].slot===selected.slot && next[key].action===selected.action)delete next[key];
+          next[id]=selected;
+          return next;
+        });
+        setBankLearn(null);setMessage("");
+        if(assignment.action!=="volume"){downControls.current.add(id);return;}
+      }
+      if(!assignment || reserved || id===(binding||liveBinding))return;
+      e.preventDefault();
+      const {slot,action}=assignment;
+      const clip=clips.find(c=>c.slot===slot);
+      if(action==="volume"){
+        const volume=Math.round(value*100);
+        bankVolumes.current.set(slot,volume);
+        if(clip)setClips(all=>all.map(c=>c.id===clip.id?{...c,volume}:c));
+        return;
+      }
+      if(!value){downControls.current.delete(id);return;}
+      if(downControls.current.has(id))return;
+      downControls.current.add(id);
+      if(!clip)return;
+      if(action==="stop" || (action==="toggle" && !clip.stopped))stopClip(clip.id);
+      else launch(clip.id,action==="next");
+    }
+    window.addEventListener("860-bank-midi",receive);
+    return ()=>window.removeEventListener("860-bank-midi",receive);
+  });
   return <div className="scene-mixer" role="region" aria-label="Lupera de objetos sonoros">
     <div className="scene-mixer-tools">
       <button className="scene-record" aria-label="Grabar" title="Grabar con los modos seleccionados" disabled={(!scene && !ready && !queued.current.length)||paused||requesting||(!matrix && !live)}
@@ -321,7 +378,19 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
       <label>Compases <select aria-label="Compases" disabled={state!=="idle"} value={bars} onChange={e=>setBars(Number(e.target.value))}>{[1,2,3,4,5,6,7,8,12,16].map(n=><option key={n}>{n}</option>)}</select></label>
       <label><input type="checkbox" checked={shared} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("computer",e.target.checked)}/> Compartir audio de la computadora</label>
       <small>Para todo lo que suena en la computadora, elegí Pantalla completa y activá Compartir audio del sistema.</small>
-      <button aria-pressed={learn} onClick={()=>setLearn(!learn)}>{learn?"Pulsá el botón MIDI":`MIDI · Récord${binding||liveBinding?" ✓":""}`}</button>
+      <button aria-pressed={learn} onClick={()=>{setBankLearn(null);setLearn(!learn);}}>{learn?"Pulsá el botón MIDI":`MIDI · Récord${binding||liveBinding?" ✓":""}`}</button>
+      </details>
+      <details onToggle={e=>{if(!e.currentTarget.open)setBankLearn(null);}}><summary>MIDI · Samples</summary>
+        <label>Sample <select aria-label="Sample para asignar MIDI" value={bankSlot} onChange={e=>{setBankSlot(Number(e.target.value));setBankLearn(null);}}>
+          {Array.from({length:9},(_,i)=><option key={i} value={i}>{i+1}</option>)}</select></label>
+        {(Object.keys(BANK_ACTIONS) as BankAction[]).map(action=>{
+          const entry=Object.entries(bankMap).find(([,v])=>v.slot===bankSlot && v.action===action);
+          return <span key={action}><button aria-pressed={bankLearn===action} title={entry?.[1].label}
+            aria-label={`Asignar ${BANK_ACTIONS[action]} al sample ${bankSlot+1}`}
+            onClick={()=>{setLearn(false);setMessage("");setBankLearn(bankLearn===action?null:action);}}>
+            {bankLearn===action?(action==="volume"?"Mové el fader":"Pulsá el botón"):BANK_ACTIONS[action]+(entry?" ✓":"")}</button>
+            {entry && <button aria-label={`Quitar asignación de ${BANK_ACTIONS[action]}`} onClick={()=>{setBankLearn(null);setBankMap(current=>{const next={...current};delete next[entry[0]];return next;});}}>×</button>}</span>;
+        })}
       </details>
       <button disabled={!scene || paused} aria-label="Tocar sonido de escena" onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); play(); }}
         onPointerUp={stopTone} onLostPointerCapture={stopTone} onKeyDown={e => { if (e.key === " " || e.key === "Enter") play(); }}
@@ -335,7 +404,7 @@ export function SceneMixer({analyser,monitor,synthStream, scene, pitch, input, m
       const waitingForPlay=master && launchContext.current.get(clip.buffer)===master.context && clip.launchBeat!==undefined && master.context.currentTime<clock(master.context)+clip.launchBeat*beat;
       return <div className="scene-mixer-row" role="group" aria-label={`Sample ${slot+1}`} key={slot}>
       <span>{slot+1} · {clip.mode==="matrix"?"Matriz":"En vivo"} · {clip.scene} · {clip.buffer.duration.toFixed(1)} s · {clip.stopped?"Detenido":waitingForPlay?"Espera del 1":"En marcha"}</span>
-      <button title="Detener sample" aria-label="Detener sample" onClick={()=>{halt(clip.id);setClips(all=>all.map(c=>c.id===clip.id?{...c,stopped:true}:c));}}>■</button>
+      <button title="Detener sample" aria-label="Detener sample" onClick={()=>stopClip(clip.id)}>■</button>
       <button title="Reproducir ahora" aria-label="Reproducir ahora" disabled={!master||paused} onClick={()=>launch(clip.id,false)}>▶</button>
       <button title="Reproducir en el próximo tiempo 1" aria-label="Reproducir en el próximo tiempo 1" disabled={!master||paused} onClick={()=>launch(clip.id,true)}>▶ 1</button>
       <button aria-pressed={clip.muted} onClick={() => setClips(all => all.map(c => c.id === clip.id ? {...c,muted:!c.muted} : c))}>{clip.muted ? "Activar" : "Mutear"}</button>

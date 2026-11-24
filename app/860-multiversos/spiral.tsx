@@ -21,7 +21,7 @@ export function SpiralProjection({scene,clock,notes,attack,analyser}:{analyser:{
       const keys=pitches.current, signature=keys.join(",");
       if(seen!==attack.current.count || (signature!==previous && keys.length)){energy=Math.max(.4,attack.current.velocity);if(scene===31)rings.push(time);} seen=attack.current.count;previous=signature;
       energy*=Math.exp(-dt*1.8);
-      const meter=scene===45 && analyser.current;
+      const meter=analyser.current;
       if(meter && dt>0){
         meter.getFloatTimeDomainData(waveform);
         meter.getByteFrequencyData(spectrum);
@@ -33,6 +33,7 @@ export function SpiralProjection({scene,clock,notes,attack,analyser}:{analyser:{
         }
         const rms=Math.sqrt(power/waveform.length);
         const target=Math.min(1,Math.sqrt(Math.max(0,rms-.0008)*4));
+        if (scene === 31 && target > loudness + .08 && time - (rings[rings.length-1] ?? -1) > .18) rings.push(time);
         loudness+=(target-loudness)*(1-Math.exp(-dt*(target>loudness?28:6)));
         brightness=total ? Math.min(1,Math.log2(1+weighted/total)/6):0;
       }
@@ -55,7 +56,7 @@ export function SpiralProjection({scene,clock,notes,attack,analyser}:{analyser:{
       }else{
         while(rings.length && time-rings[0]>5)rings.shift();
         for(const age of [time%5,...rings.map(t=>time-t)]){
-          ctx.strokeStyle="rgba(224,161,255,"+Math.max(0,1-age/5)+")";ctx.lineWidth=1+energy*3;ctx.beginPath();ctx.arc(w/2,h/2,2+age*bound/5,0,2*Math.PI);ctx.stroke();
+          ctx.strokeStyle="rgba(224,161,255,"+Math.max(0,1-age/5)+")";ctx.lineWidth=1+energy*3+loudness*4;ctx.beginPath();ctx.arc(w/2,h/2,2+age*bound/5,0,2*Math.PI);ctx.stroke();
         }
       }
       frame=requestAnimationFrame(paint);

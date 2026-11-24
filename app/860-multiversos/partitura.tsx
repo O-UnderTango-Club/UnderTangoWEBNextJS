@@ -1812,6 +1812,13 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .sample-bank .scene-mixer-row button {flex:none;display:grid;place-items:center;min-width:24px;height:24px;padding:0 .18rem;font:600 .68rem/1 system-ui;}
       .sample-mute svg {width:15px;height:15px;}
       .sample-info {flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.66rem;color:#c4c7d3;}
+      .sample-wave {order:2;flex:0 0 100%;position:relative;min-width:0;height:21px;overflow:hidden;border:1px solid #4d4a5b;border-radius:3px;background:#100f17;}
+      .sample-wave canvas {display:block;width:100%;height:100%;}
+      .sample-wave[data-muted] canvas {opacity:.45;}
+      .sample-wave-cursor {position:absolute;inset:0;pointer-events:none;border-inline-start:2px solid #fbd27d;}
+      .sample-wave[data-stopped] .sample-wave-cursor,.sample-wave-cursor:not([data-playback]) {visibility:hidden;}
+      .sample-wave-cursor[data-playback=waiting] {border-inline-start-style:dashed;}
+      .sample-wave-cursor[data-playback=paused],.sample-wave[data-muted] .sample-wave-cursor {border-inline-start-color:#a3a0ad;}
       .sample-bank .scene-mixer-row input {flex:1 1 3.5rem;min-width:2.5rem;max-width:7rem;height:20px;margin:0 2px;}
       @container sample-bank (max-width:57rem) {
         .sample-info {order:1;flex:1 0 100%;line-height:1.1;}

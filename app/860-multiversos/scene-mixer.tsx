@@ -15,6 +15,7 @@ import type { LiveSetScene } from "./extended-scenes";
 import type { PerformanceInput } from "./performance-notes";
 import { useRoomInstrument } from "./room-instrument";
 import { getVoiceMicrophone, useVoiceLoop, VOICE_CUES, type VoiceScene } from "./voice-loop";
+import { SampleWaveform } from "./sample-waveform";
 
 type BankAction = keyof typeof BANK_ACTIONS;
 type BankMessage = {id:string;alias?:string;value:number;type:"cc"|"note"|"bend";reserved:boolean;label:string};
@@ -24,7 +25,14 @@ const BANK_SIZE = 9;
 type RecordingBatch = { version:number; lastCompleted:number };
 type Recording = { kind:Mode; slot:number; batch:RecordingBatch; order:number };
 type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; layer?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
-type Voice = { bpm:number; gain: GainNode; source: AudioBufferSourceNode; dispose: () => void };
+type Voice = {
+  bpm:number; gain:GainNode; source:AudioBufferSourceNode; dispose:()=>void;
+  phaseTime:number; phaseOffset:number; duration:number;
+};
+
+function voicePosition(voice:Voice, time:number) {
+  return voice.phaseOffset + Math.max(0,time - voice.phaseTime) * voice.source.playbackRate.value;
+}
 
 export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pauseScene,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
   voiceScene: VoiceScene | null; cue: {context: AudioContext; beginsAt: number} | null; seconds: number;
@@ -79,6 +87,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
     return disarmClear;
   },[cue,transportMidi.learning,disarmClear]);
   const voices = useRef(new Map<number, Voice>());
+  const waveCursors = useRef(new Map<number, HTMLSpanElement>());
   const launchContext=useRef(new WeakMap<AudioBuffer,BaseAudioContext>());
   const serial = useRef(0);
   const occupied=useRef(new Set<number>());
@@ -176,11 +185,29 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
   useEffect(() => () => stopTone(), [scene,stopTone]);
 
   useEffect(() => {
-    if (!input || paused) return;
-    const origin=clock(input.context);
+    if (!input) return;
+    const context=input.context;
+    function drawCursors(now:number) {
+      const playing=context.state==="running" && !paused;
+      for (const [id,cursor] of waveCursors.current) {
+        const voice=voices.current.get(id);
+        if (!voice || voice.source.context!==context) {
+          delete cursor.dataset.playback;
+          continue;
+        }
+        const position=voicePosition(voice,now);
+        const progress=(voice.source.loop ? position % voice.duration : Math.min(position,voice.duration)) / voice.duration;
+        cursor.style.transform=`translateX(${progress * 100}%)`;
+        const playback=now<voice.phaseTime ? "waiting" : playing ? "playing" : "paused";
+        if (cursor.dataset.playback!==playback) cursor.dataset.playback=playback;
+      }
+    }
+    if (paused) { drawCursors(context.currentTime); return; }
+    const origin=clock(context);
     let frame=0;
     const draw=()=> {
-      const now=input.context.currentTime;
+      const now=context.currentTime;
+      drawCursors(now);
       const left = Math.ceil((matrixStart.current-now)/beat);
       setCountIn(countingTake.current && left>=1 && left<=meter ? meter+1-left : null);
       setWaiting(pending.current.has("matrix") && now<matrixStart.current);
@@ -389,6 +416,8 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
       let voice = voices.current.get(clip.id);
       if(voice && voice.bpm!==bpm){
         if(clip.once){
+          voice.phaseOffset=voicePosition(voice,now);
+          voice.phaseTime=Math.max(voice.phaseTime,now);
           voice.source.playbackRate.value=bpm/clip.recordedBpm;
           voice.bpm=bpm;
         } else {
@@ -407,12 +436,14 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
         const offset=Math.abs(seconds)<1e-7 ? 0 : ((seconds%clip.buffer.duration)+clip.buffer.duration)%clip.buffer.duration;
         source.playbackRate.value=bpm/clip.recordedBpm;
         source.connect(gain).connect(master);
-        voice = {bpm,gain,source,dispose:()=>{source.onended=null;source.stop();source.disconnect();gain.disconnect();}};
+        const firstFrame=clip.once ? 0 : offset;
+        voice = {bpm,gain,source,phaseTime:when,phaseOffset:firstFrame,duration:clip.buffer.duration,
+          dispose:()=>{source.onended=null;source.stop();source.disconnect();gain.disconnect();}};
         voices.current.set(clip.id,voice);
         if (clip.once) source.onended = () => {
           if (voices.current.get(clip.id)?.source === source) stopClip(clip.id);
         };
-        source.start(when, clip.once ? 0 : offset);
+        source.start(when, firstFrame);
         firstPasses.current.get(clip.id)?.handoff();firstPasses.current.delete(clip.id);
       }
       const codaLevel = codaScene === null ? 1 : (111 - codaScene) / 22;
@@ -713,6 +744,8 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
         setClips(all=>all.map(c=>c.id===clip.id?{...old,stopped:true}:c));
       }}>⟲</button>}
       <button disabled={reservedSlots.current.has(slot)} title="Eliminar sample" aria-label={"Eliminar sonido " + clip.id} onClick={() => {halt(clip.id);previous.current.delete(slot);occupied.current.delete(slot);setMessage("");setClips(all => all.filter(c => c.id !== clip.id));}}>×</button>
+      <SampleWaveform key={clip.id} id={clip.id} slot={slot} buffer={clip.buffer} cursors={waveCursors.current}
+        stopped={clip.stopped || !master} muted={clip.muted || clip.volume===0} />
     </div>;})}</div>
   </div></>;
 }

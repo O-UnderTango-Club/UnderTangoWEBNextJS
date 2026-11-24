@@ -1,0 +1,24 @@
+.page {
+  width: min(100% - 2rem, 58rem);
+  margin: 4rem auto;
+  padding: clamp(1.2rem, 4vw, 3rem);
+  background: #14141b;
+  color: #f1edf2;
+  font-family: var(--font-undertango-sans, system-ui), sans-serif;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.page h1 { margin: 1.2rem 0 .2rem; font-size: clamp(2.3rem, 7vw, 4rem); }
+.page h2 { margin: 0 0 .8rem; font-size: 1.5rem; }
+.page a, .page time { color: #d3c5ec; }
+.page table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.page th, .page td { text-align: left; vertical-align: top; padding: .4rem .25rem; border-bottom: 1px solid #49434f; }
+.page th { width: 40%; }
+.page details { padding: .65rem 0; border-top: 1px solid #59515f; }
+.page summary, .page button { cursor: pointer; }
+.page button, .page input { font: inherit; }
+.page button { background: #e6ddf0; color: #211b28; padding: .4rem .8rem; border-radius: .25rem; margin: .25rem .4rem .25rem 0; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin: 1rem 0; }
+.actions label, .actions input { display: block; max-width: 100%; }
+.review { padding: 1rem; border: 1px solid #b5a6c7; }
+.page pre { overflow-x: auto; font: .8rem/1.5 monospace; }

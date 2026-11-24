@@ -1,4 +1,5 @@
 import { useSavedSetting } from "./saved-setting";
+import { TOP_KEYS } from "./control-map";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SpiralProjection } from "./spiral";
 import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
@@ -12,7 +13,6 @@ import { useTempo } from "./tempo";
 type OutputRef = { current: GainNode | null };
 type TrackNotes = [NoteFrequency[], NoteFrequency[], NoteFrequency[]];
 const EMPTY_TRACKS: TrackNotes = [[], [], []];
-const TOP_KEYS = ["KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period"];
 
 export function isPlayableExtendedScene(scene: ExtendedScene | null) {
   return scene === 15 || scene === 18 || isTimbreScene(scene);

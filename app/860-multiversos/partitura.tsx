@@ -10,6 +10,7 @@ import { CONTINUATION_SCENES, DEFAULT_PAIR, NOISE_COLORS, NOISE_IDS, type Contin
 import { ContinuationProjection } from "./scene-visuals";
 import { FIRST_MIDI_NOTE, NOTE_SCENES, NOTE_SCENE_IDS, isNoteScene, type NoteScene, type PerformanceInput } from "./performance-notes";
 import { PerformanceProjection, usePerformanceInput } from "./performance-view";
+import { usePausedSceneOutput } from "./paused-scene-output";
 import { useEarlyInstrument } from "./early-instrument";
 import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isLiveSetScene, isTimbreScene, type ExtendedScene } from "./extended-scenes";
@@ -25,6 +26,7 @@ import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
+import { usesSceneKeyboard } from "./scene-instrument";
 import { DjConsole } from "./dj-console";
 import { herculesCommand, isInpulse200 } from "./dj-midi";
 import { VOICE_CUES } from "./voice-loop";
@@ -35,35 +37,9 @@ import { warmRecorder } from "./measure-recorder";
 import { TransportMidiButton, useTransportMidi } from "./transport-midi";
 import { EXTENDED_STYLE } from "./extended-style";
 
-type ControlDefinition = {
-  number: string;
-  name: string;
-  role: string;
-  unit: string;
-};
-
 import { monitorMidiInputs, type MidiInputLike, type MidiDevice } from "./midi-inputs";
 
 const MASTER_FADER = -1;
-
-type RecordedPattern = Array<number | null>;
-type SceneSnapshot = {
-  values?: number[];
-  bpm?: number;
-  steps?: boolean[];
-  recordedNotes?: RecordedPattern;
-  hasRecording?: boolean;
-};
-type ScenePreset = SceneSnapshot & {
-  id: string;
-  title: string;
-  savedAt: number;
-  values: number[];
-  bpm: number;
-  steps: boolean[];
-  recordedNotes: RecordedPattern;
-  hasRecording: boolean;
-};
 
 type MidiAccessLike = {
   inputs: {
@@ -80,123 +56,6 @@ type MidiNavigator = Navigator & {
 type MidiConnection = "checking" | "ready" | "blocked" | "unavailable";
 
 
-type NoteVoice = {
-  oscillator: OscillatorNode;
-  sub: OscillatorNode;
-  oscillatorEnvelope: GainNode;
-  subEnvelope: GainNode;
-};
-
-type SoundEngine = {
-  protectedOutput: WaveShaperNode;
-  output: GainNode;
-  context: AudioContext;
-  noteVoices: Map<number, NoteVoice>;
-  sequenceOscillator: OscillatorNode;
-  sequenceSub: OscillatorNode;
-  noise: AudioBufferSourceNode;
-  noiseGain: GainNode;
-  oscillatorGain: GainNode;
-  subGain: GainNode;
-  sequenceOscillatorGain: GainNode;
-  sequenceSubGain: GainNode;
-  filter: BiquadFilterNode;
-  envelope: GainNode;
-  sequenceEnvelope: GainNode;
-  bassRoomEnvelope: GainNode;
-  rhythmBus: GainNode;
-  rhythmNoise: AudioBuffer;
-  tremolo: GainNode;
-  pulseLfo: OscillatorNode;
-  pulseDepth: GainNode;
-  driftLfo: OscillatorNode;
-  driftDepth: GainNode;
-  delay: DelayNode;
-  delayFeedback: GainNode;
-  delayMix: GainNode;
-  roomMix: GainNode;
-  analyser: AnalyserNode;
-  activeNotes: Map<number, number>;
-  sequenceActiveNotes: Map<number, number>;
-};
-
-const CONTROLS: ControlDefinition[] = [
-  { number: "01", name: "NUBE", role: "ruido", unit: "RUIDO BLANCO" },
-  { number: "02", name: "VCO", role: "oscilador", unit: "ONDA PRINCIPAL" },
-  { number: "03", name: "SUB", role: "gravedad", unit: "SUBGRAVE" },
-  { number: "04", name: "CORTE", role: "filtro", unit: "FRECUENCIA" },
-  { number: "05", name: "Q", role: "resonancia", unit: "RESONANCIA" },
-  { number: "06", name: "PULSO", role: "modulación", unit: "TREMOLACIÓN" },
-  { number: "07", name: "DERIVA", role: "desafinación", unit: "MOVIMIENTO" },
-  { number: "08", name: "ECO", role: "retardo", unit: "DELAY" },
-  { number: "09", name: "ESPACIO", role: "reverberación", unit: "ROOM" },
-];
-
-const INITIAL_VALUES = [0.26, 0.68, 0.44, 0.58, 0.16, 0.18, 0.14, 0.24, 0.42];
-// Frase provisional para la presentación: se puede modificar desde el secuenciador.
-const INITIAL_STEPS = [true, true, true, false, true, true, true, false, true];
-const PHRASES = [
-  [0, 7, 12, 15, 7, 10, 14, 19, 15],
-  [5, 12, 15, 19, 12, 8, 14, 17, 12],
-  [3, 10, 15, 19, 10, 14, 17, 22, 14],
-  [0, 12, 7, 15, 10, 14, 19, 17, 7],
-];
-const PIANO_KEYS = [
-  { note: 60, label: "C", black: false },
-  { note: 61, label: "C#", black: true },
-  { note: 62, label: "D", black: false },
-  { note: 63, label: "D#", black: true },
-  { note: 64, label: "E", black: false },
-  { note: 65, label: "F", black: false },
-  { note: 66, label: "F#", black: true },
-  { note: 67, label: "G", black: false },
-  { note: 68, label: "G#", black: true },
-  { note: 69, label: "A", black: false },
-  { note: 70, label: "A#", black: true },
-  { note: 71, label: "B", black: false },
-  { note: 72, label: "C", black: false },
-];
-
-function clamp(value: number, min = 0, max = 1) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function noteName(note: number) {
-  const names = ["DO", "DO#", "RE", "RE#", "MI", "FA", "FA#", "SOL", "SOL#", "LA", "LA#", "SI"];
-  return names[note % 12] + (Math.floor(note / 12) - 1);
-}
-
-function frequencyForNote(note: number) {
-  return 440 * Math.pow(2, (note - 69) / 12);
-}
-
-function readoutFor(index: number, value: number) {
-  if (index === 3) {
-    const hz = 120 + value * value * 11_000;
-    return hz > 1000 ? (hz / 1000).toFixed(1) + " kHz" : Math.round(hz) + " Hz";
-  }
-  if (index === 4) return "Q " + (0.4 + value * 11).toFixed(1);
-  if (index === 5) return (0.5 + value * 7.5).toFixed(1) + " Hz";
-  if (index === 6) return Math.round(value * 24) + " ct";
-  return Math.round(value * 100) + "%";
-}
-
-function isScenePreset(value: unknown): value is ScenePreset {
-  if (!value || typeof value !== "object") return false;
-  const preset = value as Partial<ScenePreset>;
-  return typeof preset.id === "string"
-    && typeof preset.title === "string"
-    && preset.title.trim().length > 0
-    && typeof preset.savedAt === "number"
-    && Array.isArray(preset.values) && preset.values.length === 9
-    && preset.values.every((entry) => typeof entry === "number" && Number.isFinite(entry))
-    && typeof preset.bpm === "number"
-    && Array.isArray(preset.steps) && preset.steps.length === 9
-    && preset.steps.every((entry) => typeof entry === "boolean")
-    && Array.isArray(preset.recordedNotes) && preset.recordedNotes.length === 9
-    && typeof preset.hasRecording === "boolean";
-}
-
 function makeRoomImpulse(context: AudioContext) {
   const seconds = 2.1;
   const length = Math.floor(context.sampleRate * seconds);
@@ -209,166 +68,6 @@ function makeRoomImpulse(context: AudioContext) {
     }
   }
   return impulse;
-}
-
-function createSoundEngine(): SoundEngine {
-  const context = new AudioContext();
-  const sequenceOscillator = context.createOscillator();
-  sequenceOscillator.type = "sawtooth";
-  sequenceOscillator.frequency.value = frequencyForNote(48);
-
-  const sequenceSub = context.createOscillator();
-  sequenceSub.type = "sine";
-  sequenceSub.frequency.value = frequencyForNote(36);
-
-  const noiseBuffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate);
-  const noiseData = noiseBuffer.getChannelData(0);
-  for (let sample = 0; sample < noiseData.length; sample += 1) {
-    noiseData[sample] = Math.random() * 2 - 1;
-  }
-  const noise = context.createBufferSource();
-  noise.buffer = noiseBuffer;
-  noise.loop = true;
-
-  const oscillatorGain = context.createGain();
-  const subGain = context.createGain();
-  const sequenceOscillatorGain = context.createGain();
-  const sequenceSubGain = context.createGain();
-  const noiseGain = context.createGain();
-  const filter = context.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.frequency.value = 4200;
-  filter.Q.value = 1.5;
-
-  const envelope = context.createGain();
-  envelope.gain.value = 0.0001;
-  const sequenceEnvelope = context.createGain();
-  sequenceEnvelope.gain.value = 0.0001;
-  const bassRoomEnvelope = context.createGain();
-  bassRoomEnvelope.gain.value = 0.0001;
-  const bassRoomFilter = context.createBiquadFilter();
-  bassRoomFilter.type = "lowpass";
-  bassRoomFilter.frequency.value = 380;
-  const rhythmBus = context.createGain();
-  rhythmBus.gain.value = 0.62;
-  const tremolo = context.createGain();
-  tremolo.gain.value = 1;
-
-  const pulseLfo = context.createOscillator();
-  pulseLfo.type = "sine";
-  pulseLfo.frequency.value = 1.8;
-  const pulseDepth = context.createGain();
-  pulseDepth.gain.value = 0;
-  pulseLfo.connect(pulseDepth);
-  pulseDepth.connect(tremolo.gain);
-
-  const driftLfo = context.createOscillator();
-  driftLfo.type = "sine";
-  driftLfo.frequency.value = 0.2;
-  const driftDepth = context.createGain();
-  driftDepth.gain.value = 0;
-  driftLfo.connect(driftDepth);
-
-  const dry = context.createGain();
-  dry.gain.value = 0.88;
-
-  const delay = context.createDelay(1.5);
-  delay.delayTime.value = 0.28;
-  const delayFeedback = context.createGain();
-  delayFeedback.gain.value = 0.2;
-  const delayMix = context.createGain();
-  delayMix.gain.value = 0;
-  delay.connect(delayFeedback);
-  delayFeedback.connect(delay);
-
-  const room = context.createConvolver();
-  room.buffer = makeRoomImpulse(context);
-  const roomMix = context.createGain();
-  roomMix.gain.value = 0;
-
-  const compressor = context.createDynamicsCompressor();
-  compressor.threshold.value = -15;
-  compressor.knee.value = 18;
-  compressor.ratio.value = 7;
-  compressor.attack.value = 0.008;
-  compressor.release.value = 0.22;
-  const analyser = context.createAnalyser();
-  analyser.fftSize = 2048;
-  analyser.smoothingTimeConstant = 0.78;
-  const output = context.createGain();
-  output.gain.value = 0.56;
-
-  sequenceOscillator.connect(sequenceOscillatorGain);
-  sequenceSub.connect(sequenceSubGain);
-  noise.connect(noiseGain);
-  oscillatorGain.connect(filter);
-  subGain.connect(filter);
-  noiseGain.connect(envelope);
-  envelope.connect(filter);
-  sequenceOscillatorGain.connect(sequenceEnvelope);
-  sequenceSubGain.connect(sequenceEnvelope);
-  sequenceSubGain.connect(bassRoomEnvelope);
-  bassRoomEnvelope.connect(bassRoomFilter);
-  bassRoomFilter.connect(room);
-  sequenceEnvelope.connect(filter);
-  filter.connect(tremolo);
-  tremolo.connect(dry);
-  dry.connect(compressor);
-  tremolo.connect(delay);
-  delay.connect(delayMix);
-  delayMix.connect(compressor);
-  tremolo.connect(room);
-  room.connect(roomMix);
-  roomMix.connect(compressor);
-  rhythmBus.connect(compressor);
-  compressor.connect(analyser);
-  analyser.connect(output);
-  const protectedOutput=protectPeaks(output,SPEAKER_CEILING);
-  protectedOutput.connect(context.destination);
-
-  sequenceOscillator.start();
-  sequenceSub.start();
-  noise.start();
-  pulseLfo.start();
-  driftLfo.start();
-
-  return {
-    context,
-    output, protectedOutput,
-    noteVoices: new Map<number, NoteVoice>(),
-    sequenceOscillator,
-    sequenceSub,
-    noise,
-    noiseGain,
-    oscillatorGain,
-    subGain,
-    sequenceOscillatorGain,
-    sequenceSubGain,
-    filter,
-    envelope,
-    sequenceEnvelope,
-    bassRoomEnvelope,
-    rhythmBus,
-    rhythmNoise: noiseBuffer,
-    tremolo,
-    pulseLfo,
-    pulseDepth,
-    driftLfo,
-    driftDepth,
-    delay,
-    delayFeedback,
-    delayMix,
-    roomMix,
-    analyser,
-    activeNotes: new Map<number, number>(),
-    sequenceActiveNotes: new Map<number, number>(),
-  };
-}
-
-function smooth(parameter: AudioParam, value: number, context: AudioContext, time = 0.035) {
-  const now = context.currentTime;
-  parameter.cancelScheduledValues(now);
-  parameter.setTargetAtTime(value, now, time);
 }
 
 type FrequencyPoint = [x: number, y: number];
@@ -1474,11 +1173,9 @@ async function resumeAudioOutput(context: AudioContext) {
   }
 }
 
-function ModuleZero({ synthStream, enterSolo, deckAudio, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
-  deckAudio: () => Promise<AudioNode>;
-  synthStream: MediaStream|null; masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
+function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
+  masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
-  enterSolo: () => void;
   connectMidi: (rescan?: boolean) => Promise<void>;
   midiConnection: MidiConnection;
   midiInputs: MidiDevice[];
@@ -1490,7 +1187,6 @@ function ModuleZero({ synthStream, enterSolo, deckAudio, masterVolume, setMaster
   const activeScene = typeof stage === "number" ? stage : MODULE_ZERO_SCENE_BY_STAGE[stage];
   const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
   const extendedScene = typeof stage === "number" ? stage : null;
-  useEffect(()=>{if(extendedScene===88 || extendedScene===89)enterSolo();},[extendedScene,enterSolo]);
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
 
@@ -1550,20 +1246,23 @@ function ModuleZero({ synthStream, enterSolo, deckAudio, masterVolume, setMaster
     setSplitNote(note);
     return true;
   }, []);
+  const scoreClock = cue?.context ?? null;
+  const audition = usePausedSceneOutput(paused ? scoreClock : null, masterVolume);
+  const manualOutput = activeScene && cue ? (paused ? audition : outputRef.current) : null;
   const chordLoop = useChordLoop(noteScene === "fourteen" ? cue : null, outputRef);
-  const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, pausedRef);
+  const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, manualOutput);
   const liveAttack = extended.attack, strikeChord = chordLoop.strike;
   const noteStrike = useCallback((frequency:number, time:number, velocity=.85) => {
     liveAttack.current={count:liveAttack.current.count+1,frequency,velocity};
-    if (noteScene==="fourteen") strikeChord(frequency,time);
+    if (noteScene==="fourteen" && !pausedRef.current) strikeChord(frequency,time);
   },[liveAttack,noteScene,strikeChord]);
   const directionSeconds = extendedScene ? extendedSeconds[extendedScene] || (EXTENDED_DEFAULT_SECONDS[extendedScene] || 16) : 0;
   useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
   const earlyScene = typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
-  useEarlyInstrument(earlyScene, outputRef.current, cue?.beginsAt ?? 0, activeDurationMs / 1000, playingNoisePair, pausedRef, pianoRouting);
+  useEarlyInstrument(earlyScene, manualOutput, cue?.beginsAt ?? 0, activeDurationMs / 1000, playingNoisePair, scoreClock, pianoRouting);
   const noteInput = usePerformanceInput({
     scene: noteScene, ownsInput: noteScene !== null || stage === "preparing", splitNote, learnSplit,
-    clock: cue?.context ?? null, outputRef, pausedRef, routing: pianoRouting, onStrike: noteStrike,
+    output: manualOutput, routing: pianoRouting, onStrike: noteStrike,
   });
   const enterNumberedScene = useCallback((mode: NumberedScene, context: AudioContext, asPreview: boolean, beginsAt = context.currentTime) => {
     setCue({ context, beginsAt });
@@ -2446,7 +2145,7 @@ function ModuleZero({ synthStream, enterSolo, deckAudio, masterVolume, setMaster
         beginsAt={cue?.beginsAt ?? 0} />}
       {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
       {(extendedScene === 60 || extendedScene === 61 || extendedScene === 62) && cue && <HardstyleTrack clock={cue.context} output={outputRef.current} paused={paused} />}
-      {coda && cue && <CodaProjection scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={outputRef.current} paused={paused} routing={pianoRouting} />}
+      {coda && cue && <CodaProjection scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} paused={paused} routing={pianoRouting} />}
       {extendedScene && !liveSet && !coda && cue && (extendedScene === 42 || extendedScene === 62
         ? <TypeProjection scene={extendedScene} beginsAt={cue.beginsAt} clock={cue.context} paused={paused} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} />
         : extendedScene === 61
@@ -2458,9 +2157,9 @@ function ModuleZero({ synthStream, enterSolo, deckAudio, masterVolume, setMaster
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} codaScene={coda} liveSet={liveSet}
+      <SceneMixer canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
-        countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
+        countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
         notes={noteScene ? noteInput.sounding : undefined} loop={loopFrame} tuning={extended.a4}
         resting={breathing} interactiveObject={showObject} />}
@@ -2630,7 +2329,7 @@ function ModuleZero({ synthStream, enterSolo, deckAudio, masterVolume, setMaster
           <input type="checkbox" role="switch" checked={showSubtitles}
             onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
         </label>
-        <DjConsole output={deckAudio} inputs={midiInputs}/>
+        <DjConsole output={manualOutput} inputs={midiInputs}/>
         <a className={styles.organonLink} href="/860-multiversos/organon" target="_blank" rel="noopener">Órganon · Mapa de controles ↗</a>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
@@ -2638,148 +2337,13 @@ function ModuleZero({ synthStream, enterSolo, deckAudio, masterVolume, setMaster
   </div>;
 }
 
-function playRhythm(engine: SoundEngine, step: number, cycle: number, section: number) {
-  const { context, rhythmBus, rhythmNoise } = engine;
-  const now = context.currentTime;
-  const kickSteps = section % 2 === 0 ? [0, 4, 7] : [0, 3, 6];
-  if (kickSteps.includes(step)) {
-    const kick = context.createOscillator();
-    const gain = context.createGain();
-    kick.type = "sine";
-    kick.frequency.setValueAtTime(135, now);
-    kick.frequency.exponentialRampToValueAtTime(46, now + 0.13);
-    gain.gain.setValueAtTime(step === 0 ? 0.48 : 0.30, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
-    kick.connect(gain);
-    gain.connect(rhythmBus);
-    kick.onended = () => { kick.disconnect(); gain.disconnect(); };
-    kick.start(now);
-    kick.stop(now + 0.24);
-  }
-  const snare = step === 2 || step === 6 || (cycle % 5 === 4 && step === 8);
-  const hat = step % 2 === 1 || (cycle % 2 === 1 && step === 8);
-  if (snare || hat) {
-    const noise = context.createBufferSource();
-    const filter = context.createBiquadFilter();
-    const gain = context.createGain();
-    const length = snare ? 0.13 : 0.045;
-    noise.buffer = rhythmNoise;
-    filter.type = snare ? "bandpass" : "highpass";
-    filter.frequency.value = snare ? 1800 : 7000;
-    gain.gain.setValueAtTime(snare ? 0.15 : 0.065, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + length);
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(rhythmBus);
-    noise.onended = () => { noise.disconnect(); filter.disconnect(); gain.disconnect(); };
-    noise.start(now);
-    noise.stop(now + length + 0.01);
-  }
-}
-
-function updateLiveVoiceLevels(engine: SoundEngine) {
-  const voices = Array.from(engine.activeNotes.entries());
-  const count = Math.max(1, voices.length);
-  let loudestVelocity = 0;
-  for (const [note, velocity] of voices) {
-    const voice = engine.noteVoices.get(note);
-    if (!voice) continue;
-    const level = (0.38 * velocity) / Math.sqrt(count);
-    smooth(voice.oscillatorEnvelope.gain, level, engine.context, 0.012);
-    smooth(voice.subEnvelope.gain, level, engine.context, 0.012);
-    loudestVelocity = Math.max(loudestVelocity, velocity);
-  }
-  smooth(engine.envelope.gain, loudestVelocity > 0 ? 0.38 * loudestVelocity : 0.0001, engine.context, loudestVelocity > 0 ? 0.012 : 0.08);
-}
-
-function retireNoteVoice(engine: SoundEngine, voice: NoteVoice) {
-  const stopAt = engine.context.currentTime + 0.22;
-  smooth(voice.oscillatorEnvelope.gain, 0.0001, engine.context, 0.035);
-  smooth(voice.subEnvelope.gain, 0.0001, engine.context, 0.035);
-  voice.oscillator.stop(stopAt);
-  voice.sub.stop(stopAt);
-  window.setTimeout(() => {
-    engine.driftDepth.disconnect(voice.oscillator.detune);
-    voice.oscillator.disconnect();
-    voice.sub.disconnect();
-    voice.oscillatorEnvelope.disconnect();
-    voice.subEnvelope.disconnect();
-  }, 260);
-}
-
-function applyControl(engine: SoundEngine, index: number, value: number, bpm: number) {
-  const context = engine.context;
-  if (index === 0) smooth(engine.noiseGain.gain, value * 0.34, context);
-  if (index === 1) {
-    smooth(engine.oscillatorGain.gain, value * 0.72, context);
-    smooth(engine.sequenceOscillatorGain.gain, value * 0.72, context);
-  }
-  if (index === 2) {
-    smooth(engine.subGain.gain, value * 0.48, context);
-    smooth(engine.sequenceSubGain.gain, value * 0.48, context);
-  }
-  if (index === 3) smooth(engine.filter.frequency, 120 + value * value * 11_000, context);
-  if (index === 4) smooth(engine.filter.Q, 0.4 + value * 11, context);
-  if (index === 5) {
-    smooth(engine.pulseLfo.frequency, 0.5 + value * 7.5, context);
-    smooth(engine.pulseDepth.gain, value * 0.46, context);
-  }
-  if (index === 6) {
-    smooth(engine.driftLfo.frequency, 0.08 + value * 0.72, context);
-    smooth(engine.driftDepth.gain, value * 24, context);
-  }
-  if (index === 7) {
-    smooth(engine.delay.delayTime, (60 / bpm) * 0.75, context);
-    smooth(engine.delayMix.gain, value * 0.5, context);
-    smooth(engine.delayFeedback.gain, 0.12 + value * 0.34, context);
-  }
-  if (index === 8) smooth(engine.roomMix.gain, value * 0.54, context);
-}
-
 export default function Multiversos860Page() {
-  const [values, setValues] = useSavedSetting<number[]>("values", INITIAL_VALUES);
-  const [bpm, setBpm] = useSavedSetting("bpm", 106);
-  const [steps, setSteps] = useSavedSetting<boolean[]>("steps", INITIAL_STEPS);
-  const [recordedNotes, setRecordedNotes] = useSavedSetting<RecordedPattern>("recordedNotes", Array(9).fill(null));
-  const [hasRecording, setHasRecording] = useSavedSetting("hasRecording", false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [sequenceRun, setSequenceRun] = useState(0);
-  const [activeStep, setActiveStep] = useState(-1);
-  const [phraseIndex, setPhraseIndex] = useState(0);
-  const [isSequencing, setIsSequencing] = useState(false);
-  const [audioActive, setAudioActive] = useState(false);
-  const [audioMessage, setAudioMessage] = useState("AUDIO EN ESPERA");
   const [midiInputs, setMidiInputs] = useState<MidiDevice[]>([]);
   const [midiConnection, setMidiConnection] = useState<MidiConnection>("checking");
-  const [midiMessage, setMidiMessage] = useState("BUSCANDO MIDI");
   const [midiLearnFor, setMidiLearnFor] = useState<number | null>(null);
   const [masterVolume, setMasterVolume] = useSavedSetting("masterVolume", 100);
-  const volumeRef = useRef(masterVolume);
-  volumeRef.current = masterVolume;
   const [faderSignal, setFaderSignal] = useState("");
   const [ccMap, setCcMap] = useSavedSetting<Record<number, CcBinding>>("ccMap", {});
-  const [activeNote, setActiveNote] = useState<number | null>(null);
-  const [heldNotes, setHeldNotes] = useState<number[]>([]);
-  const [presets, setPresets] = useState<ScenePreset[]>([]);
-  const [presetNameDraft, setPresetNameDraft] = useState("");
-  const [presetFormOpen, setPresetFormOpen] = useState(false);
-  const [savedMessage, setSavedMessage] = useState("");
-
-  const valuesRef = useRef(values);
-  const bpmRef = useRef(bpm);
-  const stepsRef = useRef(steps);
-  const recordedNotesRef = useRef<RecordedPattern>(recordedNotes);
-  const hasRecordingRef = useRef(hasRecording);
-  const isRecordingRef = useRef(false);
-  const recordingStartedAtRef = useRef<number | null>(null);
-  const recordingStepDurationRef = useRef((60_000 / 106) / 2);
-  const recordingTimeoutRef = useRef<number | null>(null);
-  const activeStepRef = useRef(activeStep);
-  const phraseIndexRef = useRef(0);
-  const sequenceCursorRef = useRef(0);
-  const engineRef = useRef<SoundEngine | null>(null);
-  const [synthStream,setSynthStream]=useState<MediaStream|null>(null);
-  const synthTap=useRef<MediaStreamAudioDestinationNode|null>(null);
   const midiAccessRef = useRef<MidiAccessLike | null>(null);
   const midiRequestRef = useRef<Promise<void> | null>(null);
   const midiMountedRef = useRef(false);
@@ -2787,226 +2351,8 @@ export default function Multiversos860Page() {
   const pianoRouting = useRef<PerformanceInput | null>(null);
   const midiLearnRef = useRef<number | null>(null);
   const ccMapRef = useRef(ccMap);
-  const activeNoteRef = useRef<number | null>(null);
-  const pressedNotesRef = useRef(new Set<number>());
-  const presetsRef = useRef(presets);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  valuesRef.current = values;
-  bpmRef.current = bpm;
-  stepsRef.current = steps;
-  activeStepRef.current = activeStep;
   ccMapRef.current = ccMap;
   midiLearnRef.current = midiLearnFor;
-  activeNoteRef.current = activeNote;
-  presetsRef.current = presets;
-
-  const ensureAudio = useCallback(async () => {
-
-    let engine = engineRef.current;
-    if (!engine) {
-      engine = createSoundEngine();
-      engine.output.gain.value = 0.56 * volumeRef.current / 100;
-      engineRef.current = engine;
-      const tap=engine.context.createMediaStreamDestination();
-      engine.protectedOutput.connect(tap);
-      synthTap.current=tap;
-      setSynthStream(tap.stream);
-      valuesRef.current.forEach((value, index) => applyControl(engine as SoundEngine, index, value, bpmRef.current));
-    }
-    if (engine.context.state !== "running") await engine.context.resume();
-    setAudioActive(true);
-    setAudioMessage("AUDIO LISTO · VCA ABIERTO AL TECLADO");
-    return engine.analyser;
-  }, []);
-
-  const updateControl = useCallback((index: number, nextValue: number) => {
-    const next = clamp(nextValue);
-    const updated = valuesRef.current.slice();
-    updated[index] = next;
-    valuesRef.current = updated;
-    setValues(updated);
-    const engine = engineRef.current;
-    if (engine) applyControl(engine, index, next, bpmRef.current);
-  }, []);
-
-  const startNote = useCallback((note: number, velocity = 0.86) => {
-    pressedNotesRef.current.add(note);
-    const activate = () => {
-      const engine = engineRef.current;
-      if (!engine || !pressedNotesRef.current.has(note)) return;
-      const safeVelocity = clamp(velocity);
-      let voice = engine.noteVoices.get(note);
-      if (!voice) {
-        const oscillator = engine.context.createOscillator();
-        oscillator.type = "sawtooth";
-        oscillator.frequency.value = frequencyForNote(note);
-        const sub = engine.context.createOscillator();
-        sub.type = "sine";
-        sub.frequency.value = frequencyForNote(note - 12);
-        const oscillatorEnvelope = engine.context.createGain();
-        const subEnvelope = engine.context.createGain();
-        oscillatorEnvelope.gain.value = 0.0001;
-        subEnvelope.gain.value = 0.0001;
-        oscillator.connect(oscillatorEnvelope);
-        oscillatorEnvelope.connect(engine.oscillatorGain);
-        sub.connect(subEnvelope);
-        subEnvelope.connect(engine.subGain);
-        engine.driftDepth.connect(oscillator.detune);
-        oscillator.start();
-        sub.start();
-        voice = { oscillator, sub, oscillatorEnvelope, subEnvelope };
-        engine.noteVoices.set(note, voice);
-      }
-      engine.activeNotes.set(note, safeVelocity);
-      updateLiveVoiceLevels(engine);
-      setActiveNote(note);
-      setHeldNotes(Array.from(engine.activeNotes.keys()));
-    };
-    const engine = engineRef.current;
-    if (engine?.context.state === "running") {
-      activate();
-      return;
-    }
-    void ensureAudio().then(activate).catch(() => {
-      pressedNotesRef.current.delete(note);
-      setAudioMessage("NO SE PUDO INICIAR EL AUDIO");
-    });
-  }, [ensureAudio]);
-
-  const releaseNote = useCallback((note: number) => {
-    pressedNotesRef.current.delete(note);
-    const engine = engineRef.current;
-    if (!engine) {
-      setHeldNotes([]);
-      setActiveNote(null);
-      return;
-    }
-    const voice = engine.noteVoices.get(note);
-    engine.activeNotes.delete(note);
-    engine.noteVoices.delete(note);
-    if (voice) retireNoteVoice(engine, voice);
-    updateLiveVoiceLevels(engine);
-    const remaining = Array.from(engine.activeNotes.keys());
-    setHeldNotes(remaining);
-    setActiveNote(remaining.length > 0 ? remaining[remaining.length - 1] : null);
-  }, []);
-
-  const startSequenceNote = useCallback((note: number, velocity = 0.86) => {
-    void ensureAudio().then(() => {
-      const engine = engineRef.current;
-      if (!engine) return;
-      engine.sequenceActiveNotes.set(note, clamp(velocity));
-      smooth(engine.sequenceOscillator.frequency, frequencyForNote(note), engine.context, 0.016);
-      smooth(engine.sequenceSub.frequency, frequencyForNote(note - 12), engine.context, 0.018);
-      smooth(engine.sequenceEnvelope.gain, 0.38 * clamp(velocity), engine.context, 0.012);
-      smooth(engine.bassRoomEnvelope.gain, 0.55 * clamp(velocity), engine.context, 0.015);
-    }).catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
-  }, [ensureAudio]);
-
-  const releaseSequenceNote = useCallback((note: number) => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    engine.sequenceActiveNotes.delete(note);
-    const remaining = Array.from(engine.sequenceActiveNotes.entries());
-    if (remaining.length > 0) {
-      const [lastNote, velocity] = remaining[remaining.length - 1];
-      smooth(engine.sequenceOscillator.frequency, frequencyForNote(lastNote), engine.context, 0.025);
-      smooth(engine.sequenceSub.frequency, frequencyForNote(lastNote - 12), engine.context, 0.025);
-      smooth(engine.sequenceEnvelope.gain, 0.38 * velocity, engine.context, 0.02);
-      smooth(engine.bassRoomEnvelope.gain, 0.55 * velocity, engine.context, 0.02);
-    } else {
-      smooth(engine.sequenceEnvelope.gain, 0.0001, engine.context, 0.1);
-      smooth(engine.bassRoomEnvelope.gain, 0.0001, engine.context, 0.18);
-    }
-  }, []);
-
-  const captureNote = useCallback((note: number) => {
-    const startedAt = recordingStartedAtRef.current;
-    const stepDuration = recordingStepDurationRef.current;
-    if (!isRecordingRef.current || startedAt === null || stepDuration <= 0) return;
-    const elapsed = performance.now() - startedAt;
-    if (elapsed >= stepDuration * 9) return;
-    const index = Math.round(elapsed / stepDuration) % 9;
-    const nextPattern = recordedNotesRef.current.slice();
-    nextPattern[index] = note;
-    recordedNotesRef.current = nextPattern;
-    setRecordedNotes(nextPattern);
-    if (!stepsRef.current[index]) {
-      const nextSteps = stepsRef.current.slice();
-      nextSteps[index] = true;
-      stepsRef.current = nextSteps;
-      setSteps(nextSteps);
-    }
-  }, []);
-
-  const stopRecording = useCallback(() => {
-    if (!isRecordingRef.current) return;
-    isRecordingRef.current = false;
-    if (recordingTimeoutRef.current !== null) {
-      window.clearTimeout(recordingTimeoutRef.current);
-      recordingTimeoutRef.current = null;
-    }
-    recordingStartedAtRef.current = null;
-    hasRecordingRef.current = true;
-    setHasRecording(true);
-    setIsRecording(false);
-  }, []);
-
-  const startRecording = useCallback(() => {
-    if (isRecordingRef.current) {
-      stopRecording();
-      return;
-    }
-    void ensureAudio().then(() => {
-      const emptyPattern: RecordedPattern = Array(9).fill(null);
-      recordedNotesRef.current = emptyPattern;
-      setRecordedNotes(emptyPattern);
-      hasRecordingRef.current = false;
-      setHasRecording(false);
-      recordingStepDurationRef.current = (60_000 / bpmRef.current) / 2;
-      recordingStartedAtRef.current = performance.now();
-      sequenceCursorRef.current = 0;
-      isRecordingRef.current = true;
-      setIsRecording(true);
-      setIsSequencing(true);
-      setSequenceRun((current) => current + 1);
-      recordingTimeoutRef.current = window.setTimeout(stopRecording, recordingStepDurationRef.current * 9);
-    }).catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
-  }, [ensureAudio, stopRecording]);
-
-  const toggleAudio = useCallback(() => {
-    const engine = engineRef.current;
-    if (engine && engine.context.state === "running") {
-      pressedNotesRef.current.clear();
-      engine.activeNotes.clear();
-      const voices = Array.from(engine.noteVoices.values());
-      engine.noteVoices.clear();
-      voices.forEach((voice) => retireNoteVoice(engine, voice));
-      engine.sequenceActiveNotes.clear();
-      smooth(engine.sequenceEnvelope.gain, 0.0001, engine.context, 0.04);
-      smooth(engine.bassRoomEnvelope.gain, 0.0001, engine.context, 0.04);
-      smooth(engine.envelope.gain, 0.0001, engine.context, 0.04);
-      if (isRecordingRef.current) stopRecording();
-      setIsSequencing(false);
-      setHeldNotes([]);
-      setActiveStep(-1);
-      void engine.context.suspend().then(() => {
-        setAudioActive(false);
-        setActiveNote(null);
-        setAudioMessage("AUDIO EN PAUSA");
-      });
-      return;
-    }
-    void ensureAudio().then(() => {
-      setSequenceRun((current) => current + 1);
-      setIsSequencing(true);
-    }).catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
-  }, [ensureAudio, stopRecording]);
-
-  const enterSolo = useCallback(()=>{
-    if(engineRef.current?.context.state==="running")toggleAudio();
-  },[toggleAudio]);
   const onMidiData = useRef<(port: MidiInputLike, data: ArrayLike<number>) => void>(() => {});
   const djHeld = useRef(new Set<string>());
   const [portMonitor] = useState(() => monitorMidiInputs(setMidiInputs,
@@ -3017,7 +2363,6 @@ export default function Multiversos860Page() {
     const access = midiAccessRef.current;
     if (!access || !midiMountedRef.current) return;
     portMonitor.refresh(access.inputs.values(), retry);
-    setMidiMessage(Array.from(access.inputs.values()).some(p => p.state !== "disconnected") ? "ENTRADAS MIDI DETECTADAS" : "CONECTÁ EL CASIO O LOS FADERS USB");
     setMidiConnection("ready");
   }, [portMonitor]);
 
@@ -3031,13 +2376,11 @@ export default function Multiversos860Page() {
     if (midiRequestRef.current) return midiRequestRef.current;
     if (!window.isSecureContext) {
       setMidiConnection("unavailable");
-      setMidiMessage("MIDI NECESITA UN CONTEXTO SEGURO");
       return;
     }
     const requestAccess = (navigator as MidiNavigator).requestMIDIAccess;
     if (!requestAccess) {
       setMidiConnection("unavailable");
-      setMidiMessage("MIDI NO ESTÁ DISPONIBLE EN ESTE NAVEGADOR");
       return;
     }
     setMidiConnection("checking");
@@ -3051,7 +2394,6 @@ export default function Multiversos860Page() {
     }).catch(() => {
       if (midiMountedRef.current) {
         setMidiConnection("blocked");
-        setMidiMessage("PERMISO MIDI NO CONCEDIDO");
       }
     }).finally(() => {
       midiRequestRef.current = null;
@@ -3097,8 +2439,9 @@ export default function Multiversos860Page() {
         const alias = uniqueName ? JSON.stringify(["name",uniqueName,channel,controlType,controlType==="bend"?0:first]) : "";
         if (controlType && midiLearnRef.current === null) {
           const id = JSON.stringify([input.id,channel,controlType,controlType==="bend"?0:first]);
-          const reserved = Object.values(ccMapRef.current).some(b=>fromPort(b) &&
-            (controlType==="bend"?b.bendChannel===channel:controlType==="cc" && b.cc===first));
+          const masterFader = ccMapRef.current[MASTER_FADER];
+          const reserved = !!masterFader && fromPort(masterFader) &&
+            (controlType==="bend" ? masterFader.bendChannel===channel : controlType==="cc" && masterFader.cc===first);
           const value = controlType==="bend"?(first+128*second)/16383:kind===0x80?0:second/127;
           if(!window.dispatchEvent(new CustomEvent("860-bank-midi",{cancelable:true,
             detail:{id,alias,value,type:controlType,reserved,label:(input.name||"MIDI")+" · "+(controlType==="bend"?"Pitch Bend":(controlType==="cc"?"CC ":"Nota ")+first)+" · canal "+(channel+1)}})))return;
@@ -3114,16 +2457,11 @@ export default function Multiversos860Page() {
         }
         if (kind === 0x90 && second > 0) {
           if (midiLearnRef.current === MASTER_FADER) setFaderSignal((input.name || "MIDI") + " · Nota " + first + " recibida. Para volumen, mové un fader o Pitch Bend.");
-          if (piano) piano.midiNote(input.id, channel, first, second / 127);
-          else {
-            captureNote(first);
-            startNote(first, second / 127);
-          }
+          piano?.midiNote(input.id, channel, first, second / 127);
           return;
         }
         if (kind === 0x80 || (kind === 0x90 && second === 0)) {
-          if (piano) piano.midiNote(input.id, channel, first, 0);
-          else releaseNote(first);
+          piano?.midiNote(input.id, channel, first, 0);
           return;
         }
         const master = ccMapRef.current[MASTER_FADER];
@@ -3160,315 +2498,31 @@ export default function Multiversos860Page() {
             });
             midiLearnRef.current = null;
             setMidiLearnFor(null);
-            setMidiMessage("FADER " + (waitingFor === MASTER_FADER ? "MASTER" : CONTROLS[waitingFor].number) + " · " + (input.name || "ENTRADA MIDI") + " · CC " + first);
             return;
           }
-          const mappedIndex = Object.keys(ccMapRef.current).find((key) => {
-            const binding = ccMapRef.current[Number(key)];
-            return fromPort(binding) && binding?.cc === first;
-          });
-          if (mappedIndex === String(MASTER_FADER)) setMasterVolume(Math.round(second * 100 / 127));
-          else if (mappedIndex !== undefined) updateControl(Number(mappedIndex), second / 127);
-          else if (first === 64) piano?.sustainMidi?.(input.id, channel, second >= 64);
+          if (first === 64 && !(fromPort(master) && master?.cc === first)) piano?.sustainMidi?.(input.id, channel, second >= 64);
         }
       };
 
 
   useEffect(() => {
-    const keyMap = computerPianoKeys;
-    const held = new Set<string>();
-    const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const key = event.key.toLowerCase();
-      const note = keyMap[key];
-      if (note === undefined || held.has(key) || event.repeat) return;
-      const piano = pianoRouting.current;
-      if (piano) {
-        if (target?.closest("input, select, textarea, [contenteditable=true]") || event.altKey || event.ctrlKey || event.metaKey) return;
-        piano.computerNote(event.code || key, note, true);
-        return;
-      }
-      if (target && ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(target.tagName)) return;
-      held.add(key);
-      captureNote(note);
-      startNote(note);
+    const down = (event: KeyboardEvent) => {
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey ||
+          (event.target instanceof Element && event.target.closest("input, select, textarea, [contenteditable=true]"))) return;
+      const note = computerPianoKeys[event.key.toLowerCase()];
+      if (note !== undefined) pianoRouting.current?.computerNote(event.code || event.key, note, true);
     };
-    const onKeyUp = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase();
-      const note = keyMap[key];
-      if (note === undefined) return;
-      const wasHeld = held.delete(key);
-      const piano = pianoRouting.current;
-      piano?.computerNote(event.code || key, note, false);
-      if (!piano || wasHeld) releaseNote(note);
+    const up = (event: KeyboardEvent) => {
+      const note = computerPianoKeys[event.key.toLowerCase()];
+      if (note !== undefined) pianoRouting.current?.computerNote(event.code || event.key, note, false);
     };
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-    };
-  }, [captureNote, releaseNote, startNote]);
-
-  useEffect(() => {
-    if (!isSequencing) {
-      setActiveStep(-1);
-      return;
-    }
-    const duration = (60_000 / bpmRef.current) / 2;
-    const tick = () => {
-      const cursor = sequenceCursorRef.current;
-      const step = cursor % 9;
-      const cycle = Math.floor(cursor / 9);
-      const section = Math.floor(cycle / 10) % PHRASES.length;
-      if (!hasRecordingRef.current && !isRecordingRef.current && section !== phraseIndexRef.current) {
-        phraseIndexRef.current = section;
-        setPhraseIndex(section);
-      }
-      setActiveStep(step);
-      const engine = engineRef.current;
-      if (engine && engine.context.state === "running") playRhythm(engine, step, cycle, section);
-      if (stepsRef.current[step]) {
-        const note = hasRecordingRef.current ? recordedNotesRef.current[step] : 48 + PHRASES[phraseIndexRef.current][step];
-        if (note !== null) {
-          startSequenceNote(note, 0.9);
-          window.setTimeout(() => releaseSequenceNote(note), Math.max(100, duration * 0.72));
-        }
-      }
-      sequenceCursorRef.current = cursor + 1;
-    };
-    tick();
-    const timer = window.setInterval(tick, duration);
-    return () => {
-      window.clearInterval(timer);
-      const engine = engineRef.current;
-      if (engine) {
-        engine.sequenceActiveNotes.clear();
-        smooth(engine.sequenceEnvelope.gain, 0.0001, engine.context, 0.04);
-        smooth(engine.bassRoomEnvelope.gain, 0.0001, engine.context, 0.04);
-      }
-    };
-  }, [bpm, isSequencing, sequenceRun, releaseSequenceNote, startSequenceNote]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
-    let animation = 0;
-    let width = 0;
-    let height = 0;
-    let pixelRatio = 1;
-    const samples = new Uint8Array(1024);
-    const stars = Array.from({ length: 116 }, (_, index) => ({
-      x: ((index * 0.61803398875) % 1),
-      y: ((index * 0.41421356237) % 1),
-      size: 0.5 + ((index * 7) % 10) / 10,
-      phase: index * 0.71,
-    }));
-    const resize = () => {
-      const bounds = canvas.getBoundingClientRect();
-      pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-      width = bounds.width;
-      height = bounds.height;
-      canvas.width = Math.max(1, Math.floor(width * pixelRatio));
-      canvas.height = Math.max(1, Math.floor(height * pixelRatio));
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    };
-    const draw = () => {
-      const time = performance.now() / 1000;
-      const engine = engineRef.current;
-      let rms = 0;
-      if (engine) {
-        engine.analyser.getByteTimeDomainData(samples);
-        let total = 0;
-        for (let index = 0; index < samples.length; index += 1) {
-          const sample = (samples[index] - 128) / 128;
-          total += sample * sample;
-        }
-        rms = Math.sqrt(total / samples.length);
-      }
-      const currentValues = valuesRef.current;
-      const motion = Math.min(1, 0.08 + rms * 7 + currentValues.reduce((sum, item) => sum + item, 0) * 0.028 + (activeNoteRef.current !== null ? 0.15 : 0));
-      context.clearRect(0, 0, width, height);
-      const backdrop = context.createLinearGradient(0, 0, width, height);
-      backdrop.addColorStop(0, "#090b13");
-      backdrop.addColorStop(0.48, "#10101d");
-      backdrop.addColorStop(1, "#160d17");
-      context.fillStyle = backdrop;
-      context.fillRect(0, 0, width, height);
-
-      for (const star of stars) {
-        const twinkle = 0.2 + (Math.sin(time * 0.8 + star.phase) + 1) * 0.22;
-        context.globalAlpha = twinkle;
-        context.fillStyle = star.phase % 2 > 1 ? "#d1f6ea" : "#e4c8ea";
-        context.beginPath();
-        context.arc(star.x * width, star.y * height, star.size, 0, Math.PI * 2);
-        context.fill();
-      }
-      context.globalAlpha = 1;
-
-      const centerX = width * 0.68;
-      const centerY = height * 0.54;
-      const base = Math.min(width, height) * 0.2;
-      const pulse = 1 + motion * 0.13 + Math.sin(time * 1.7) * 0.018;
-      for (let ring = 0; ring < 7; ring += 1) {
-        const radiusX = base * (1.12 + ring * 0.29) * pulse;
-        const radiusY = base * (0.48 + ring * 0.17) * pulse;
-        context.beginPath();
-        context.ellipse(centerX, centerY, radiusX, radiusY, -0.31 + ring * 0.025 + Math.sin(time * 0.09) * 0.03, 0, Math.PI * 2);
-        context.strokeStyle = ring % 2 === 0 ? "rgba(129, 226, 218, " + (0.18 - ring * 0.012) + ")" : "rgba(220, 109, 185, " + (0.16 - ring * 0.01) + ")";
-        context.lineWidth = ring === 0 ? 1.6 : 0.8;
-        context.stroke();
-      }
-
-      const centerGlow = context.createRadialGradient(centerX, centerY, 2, centerX, centerY, base * (1.65 + motion));
-      centerGlow.addColorStop(0, "rgba(245, 192, 125, " + (0.3 + motion * 0.23) + ")");
-      centerGlow.addColorStop(0.36, "rgba(181, 91, 190, 0.12)");
-      centerGlow.addColorStop(1, "rgba(39, 44, 87, 0)");
-      context.fillStyle = centerGlow;
-      context.fillRect(centerX - base * 2.2, centerY - base * 2.2, base * 4.4, base * 4.4);
-
-      for (let index = 0; index < 9; index += 1) {
-        const value = currentValues[index] || 0;
-        const angle = -Math.PI / 2 + (Math.PI * 2 * index) / 9 + time * (index % 2 ? 0.018 : -0.012);
-        const orbit = base * (1.35 + index * 0.16 + value * 0.54);
-        const x = centerX + Math.cos(angle) * orbit * 1.35;
-        const y = centerY + Math.sin(angle) * orbit * 0.58;
-        const radius = 3 + value * 8 + motion * 2;
-        context.beginPath();
-        context.moveTo(centerX, centerY);
-        context.lineTo(x, y);
-        context.strokeStyle = "rgba(211, 213, 227, " + (0.06 + value * 0.22) + ")";
-        context.lineWidth = 0.7 + value * 0.9;
-        context.stroke();
-
-        const hue = 168 + index * 19;
-        const nodeGlow = context.createRadialGradient(x, y, 1, x, y, radius * 5);
-        nodeGlow.addColorStop(0, "hsla(" + hue + ", 88%, 72%, " + (0.86 + value * 0.12) + ")");
-        nodeGlow.addColorStop(0.22, "hsla(" + hue + ", 80%, 58%, " + (0.32 + value * 0.28) + ")");
-        nodeGlow.addColorStop(1, "hsla(" + hue + ", 75%, 45%, 0)");
-        context.fillStyle = nodeGlow;
-        context.beginPath();
-        context.arc(x, y, radius * 5, 0, Math.PI * 2);
-        context.fill();
-        context.fillStyle = "#f2e9ef";
-        context.beginPath();
-        context.arc(x, y, radius * 0.43, 0, Math.PI * 2);
-        context.fill();
-        context.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
-        context.fillStyle = "rgba(235, 231, 241, 0.78)";
-        context.fillText("0" + (index + 1), x + 10, y - 8);
-      }
-
-      const coreRadius = base * (0.24 + motion * 0.16);
-      const core = context.createRadialGradient(centerX - coreRadius * 0.3, centerY - coreRadius * 0.4, 1, centerX, centerY, coreRadius * 1.6);
-      core.addColorStop(0, "#fff0cf");
-      core.addColorStop(0.24, "#f5b887");
-      core.addColorStop(0.61, "rgba(212, 98, 163, 0.82)");
-      core.addColorStop(1, "rgba(69, 39, 97, 0.02)");
-      context.fillStyle = core;
-      context.beginPath();
-      context.arc(centerX, centerY, coreRadius * 1.6, 0, Math.PI * 2);
-      context.fill();
-
-      const selectedStep = activeStepRef.current;
-      if (selectedStep >= 0) {
-        const scanAngle = -Math.PI / 2 + selectedStep * (Math.PI * 2 / 9);
-        context.beginPath();
-        context.arc(centerX, centerY, base * (1.12 + selectedStep * 0.29), scanAngle - 0.13, scanAngle + 0.13);
-        context.strokeStyle = "rgba(255, 226, 168, 0.92)";
-        context.lineWidth = 3;
-        context.shadowBlur = 14;
-        context.shadowColor = "#ffd08a";
-        context.stroke();
-        context.shadowBlur = 0;
-      }
-
-      animation = window.requestAnimationFrame(draw);
-    };
-    resize();
-    window.addEventListener("resize", resize);
-    draw();
-    return () => {
-      window.cancelAnimationFrame(animation);
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
     };
   }, []);
-
-  useEffect(() => {
-    return () => {
-      const engine = engineRef.current;
-      synthTap.current?.stream.getTracks().forEach(track=>track.stop());
-      if (engine) void engine.context.close();
-      const access = midiAccessRef.current;
-      if (access) access.onstatechange = null;
-      if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
-    };
-  }, []);
-
-  const handleBpmChange = (nextBpm: number) => {
-    bpmRef.current = nextBpm;
-    setBpm(nextBpm);
-    const engine = engineRef.current;
-    if (engine) applyControl(engine, 7, valuesRef.current[7], nextBpm);
-  };
-
-  useEffect(() => {
-    try {
-      const savedPresets = localStorage.getItem("860-multiversos-presets");
-      if (savedPresets) {
-        const parsed: unknown = JSON.parse(savedPresets);
-        if (Array.isArray(parsed)) {
-          const validPresets = parsed.filter(isScenePreset);
-          if (validPresets.length > 0) {
-            presetsRef.current = validPresets;
-            setPresets(validPresets);
-            return;
-          }
-        }
-      }
-      const savedScene = localStorage.getItem("860-multiversos-escena");
-      const legacy = savedScene ? JSON.parse(savedScene) as SceneSnapshot : {};
-      const initialPreset: ScenePreset = {
-        id: "preset-timbre-captura-860",
-        title: "Timbre de la captura",
-        savedAt: Date.now(),
-        values: Array.isArray(legacy.values) && legacy.values.length === 9
-          ? legacy.values.map((value) => clamp(value))
-          : INITIAL_VALUES.slice(),
-        bpm: typeof legacy.bpm === "number" ? Math.min(150, Math.max(70, legacy.bpm)) : 106,
-        steps: Array.isArray(legacy.steps) && legacy.steps.length === 9
-          ? legacy.steps.map((step) => step === true)
-          : INITIAL_STEPS.slice(),
-        recordedNotes: Array.isArray(legacy.recordedNotes) && legacy.recordedNotes.length === 9
-          ? legacy.recordedNotes.map((note) => typeof note === "number" && Number.isInteger(note) && note >= 0 && note <= 127 ? note : null)
-          : Array(9).fill(null),
-        hasRecording: legacy.hasRecording === true,
-      };
-      const initialPresets = [initialPreset];
-      localStorage.setItem("860-multiversos-presets", JSON.stringify(initialPresets));
-      presetsRef.current = initialPresets;
-      setPresets(initialPresets);
-    } catch {
-      const fallback: ScenePreset = {
-        id: "preset-timbre-captura-860",
-        title: "Timbre de la captura",
-        savedAt: Date.now(),
-        values: INITIAL_VALUES.slice(),
-        bpm: 106,
-        steps: INITIAL_STEPS.slice(),
-        recordedNotes: Array(9).fill(null),
-        hasRecording: false,
-      };
-      presetsRef.current = [fallback];
-      setPresets([fallback]);
-    }
-  }, []);
-
-  useEffect(() => {
-    const engine = engineRef.current;
-    if (engine) engine.output.gain.setTargetAtTime(0.56 * masterVolume / 100, engine.context.currentTime, 0.01);
-  }, [masterVolume]);
 
   useEffect(() => {
     const reset = (event: Event) => { if ((event as CustomEvent).detail !== "synth") { midiLearnRef.current = null; setMidiLearnFor(null); } };
@@ -3480,380 +2534,20 @@ export default function Multiversos860Page() {
     void connectMidi(true);
     midiLearnRef.current = index;
     setMidiLearnFor(index);
-    setMidiMessage("MOVÉ EL FADER PARA ASIGNAR " + (index === MASTER_FADER ? "VOLUMEN MASTER" : CONTROLS[index].number));
   };
-
-  const toggleStep = (index: number) => {
-    setSteps((current) => {
-      const next = current.slice();
-      next[index] = !next[index];
-      stepsRef.current = next;
-      return next;
-    });
-  };
-
-  const applyScene = (scene: SceneSnapshot) => {
-    if (Array.isArray(scene.values) && scene.values.length === 9) {
-      scene.values.forEach((value, index) => updateControl(index, clamp(value)));
-    }
-    if (typeof scene.bpm === "number" && Number.isFinite(scene.bpm)) {
-      handleBpmChange(Math.min(150, Math.max(70, scene.bpm)));
-    }
-    if (Array.isArray(scene.steps) && scene.steps.length === 9 && scene.steps.every((step) => typeof step === "boolean")) {
-      const nextSteps = scene.steps.slice();
-      setSteps(nextSteps);
-      stepsRef.current = nextSteps;
-    }
-    const restoredPattern: RecordedPattern = Array.isArray(scene.recordedNotes) && scene.recordedNotes.length === 9
-      ? scene.recordedNotes.map((note) => typeof note === "number" && Number.isInteger(note) && note >= 0 && note <= 127 ? note : null)
-      : Array(9).fill(null);
-    const restoredHasRecording = scene.hasRecording === true
-      && Array.isArray(scene.recordedNotes)
-      && scene.recordedNotes.length === 9;
-    recordedNotesRef.current = restoredPattern;
-    setRecordedNotes(restoredPattern);
-    hasRecordingRef.current = restoredHasRecording;
-    setHasRecording(restoredHasRecording);
-  };
-
-  const openPresetForm = () => {
-    setPresetNameDraft("");
-    setPresetFormOpen(true);
-  };
-
-  const saveNamedPreset = () => {
-    const title = presetNameDraft.trim();
-    if (!title) {
-      setSavedMessage("ESCRIBÍ UN NOMBRE PARA EL PRESET");
-      return;
-    }
-    const preset: ScenePreset = {
-      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
-      title,
-      savedAt: Date.now(),
-      values: valuesRef.current.slice(),
-      bpm: bpmRef.current,
-      steps: stepsRef.current.slice(),
-      recordedNotes: recordedNotesRef.current.slice(),
-      hasRecording: hasRecordingRef.current,
-    };
-    const next = [preset, ...presetsRef.current];
-    try {
-      localStorage.setItem("860-multiversos-presets", JSON.stringify(next));
-      localStorage.setItem("860-multiversos-escena", JSON.stringify(preset));
-      presetsRef.current = next;
-      setPresets(next);
-      setPresetFormOpen(false);
-      setPresetNameDraft("");
-      setSavedMessage("PRESET GUARDADO · " + title.toUpperCase());
-      window.setTimeout(() => setSavedMessage(""), 2400);
-    } catch {
-      setSavedMessage("NO SE PUDO GUARDAR EL PRESET");
-    }
-  };
-
-  const restoreScene = () => {
-    try {
-      const saved = localStorage.getItem("860-multiversos-escena");
-      if (!saved) {
-        setSavedMessage("TODAVÍA NO HAY ESCENA GUARDADA");
-        window.setTimeout(() => setSavedMessage(""), 1800);
-        return;
-      }
-      const scene = JSON.parse(saved) as SceneSnapshot;
-      applyScene(scene);
-      setSavedMessage("ESCENA RECUPERADA");
-      window.setTimeout(() => setSavedMessage(""), 1800);
-    } catch {
-      setSavedMessage("NO SE PUDO RECUPERAR");
-    }
-  };
-
-  const loadPreset = (preset: ScenePreset) => {
-    applyScene(preset);
-    setSavedMessage("PRESET CARGADO · " + preset.title.toUpperCase());
-    window.setTimeout(() => setSavedMessage(""), 2400);
-  };
-
-
-  const recordedCount = recordedNotes.filter((note) => note !== null).length;
 
   return (
     <main className={styles.console}>
-      <TempoProvider><ModuleZero deckAudio={ensureAudio} enterSolo={enterSolo} synthStream={synthStream} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
-      <header className={styles.topbar}>
-        <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
-          <span className={styles.brandMark}>&#9670;</span>
-          <span className={styles.brandText}>UNDER TANGO CLUB<small>LABORATORIO SONORO</small></span>
-        </a>
-        <div className={styles.topbarRight}>
-          <span className={styles.liveDot} />
-          <span className={styles.topbarCode}>PROYECTO 860 <b>·</b> EXPERIMENTO 01</span>
-        </div>
-      </header>
-
-      <div className={styles.world} aria-label="Espacio visual generativo">
-        <canvas ref={canvasRef} className={styles.canvas} aria-label="Constelación visual que reacciona al sonido" role="img" />
-        <div className={styles.worldShade} />
-        <div className={styles.worldTopline}>
-          <span>RUIDO <i>+</i> VCO / VCA <i>+</i> FILTRO</span>
-          <span className={styles.worldState}><b /> SÍNTESIS EN TIEMPO REAL</span>
-        </div>
-        <div className={styles.worldTitle}>
-          <p className={styles.eyebrow}>UNA MÁQUINA PARA ABRIR UNIVERSOS</p>
-          <h1><span>860</span><br />MULTIVERSOS</h1>
-          <p className={styles.worldDescription}>Mové una frecuencia.<br />Mirá qué mundo aparece.</p>
-          <div className={styles.worldActions}>
-            <button type="button" className={styles.audioButton} onClick={toggleAudio}>
-              <span className={audioActive ? styles.pauseIcon : styles.playIcon} />
-              {audioActive ? "PAUSAR AUDIO" : "INICIAR AUDIO"}
-            </button>
-            <span className={styles.audioStatus}>{audioMessage}</span>
-          </div>
-        </div>
-        <div className={styles.worldReadout}>
-          <div><span>FRASE</span><strong>09</strong></div>
-          <div><span>NOTA</span><strong>{activeNote === null ? "-" : noteName(activeNote)}</strong></div>
-          <div><span>TEMPO</span><strong>{bpm}<small> BPM</small></strong></div>
-        </div>
-        <div className={styles.worldBottomline}>
-          <span>01-09 / NUEVE DIMENSIONES SONORAS</span>
-          <span>VISUAL / RESPUESTA DEL SISTEMA</span>
-        </div>
-      </div>
-
+      <h1 className={styles.scoreTitle}>860 Multiversos</h1>
+      <TempoProvider><ModuleZero faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
       <div className={styles.horizon}>
         <span>LA FRONTERA ENTRE ESCUCHAR Y VER</span>
         <i />
         <span>ARRASTRÁ · TOCÁ · CONECTÁ</span>
       </div>
 
-      <section className={styles.deck} aria-labelledby="deck-heading">
-        <div className={styles.deckHeader}>
-          <div>
-            <p className={styles.eyebrow}>CONTROL DE SÍNTESIS <span>·</span> 09 CANALES</p>
-            <h2 id="deck-heading">El tablero <em>multiversal.</em></h2>
-            <p className={styles.deckIntro}>Cada fader abre una dimensión. Arrancamos con la arquitectura que ya probamos y seguimos afinando el mapa.</p>
-          </div>
-          <div className={styles.sceneActions}>
-            <span className={styles.savedMessage} aria-live="polite">{savedMessage}</span>
-            <button type="button" className={styles.textButton} onClick={restoreScene}>RECUPERAR</button>
-            <button type="button" className={styles.textButton} onClick={openPresetForm}>GUARDAR ESCENA</button>
-          </div>
-        </div>
-
-        <div className={styles.controlBay}>
-        <div className={styles.channelScroller} aria-label="Nueve faders sonoros">
-          <div className={styles.channels}>
-            {CONTROLS.map((control, index) => (
-              <article className={styles.channel} key={control.number}>
-                <div className={styles.channelTop}>
-                  <span className={styles.channelNumber}>{control.number}</span>
-                  <span className={styles.channelUnit}>{control.unit}</span>
-                </div>
-                <div className={styles.channelName}>{control.name}</div>
-                <label className={styles.fader} aria-label={control.name + " - " + control.role}>
-                  <span className={styles.faderTrack} />
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.001"
-                    value={values[index]}
-                    onChange={(event) => updateControl(index, Number(event.target.value))}
-                    aria-label={"Dimensión " + control.number + ": " + control.name}
-                  />
-                  <span className={styles.faderTicks} aria-hidden="true" />
-                </label>
-                <div className={styles.channelReadout}>{readoutFor(index, values[index])}</div>
-                <div className={styles.channelFooter}>
-                  <span>{ccMap[index] === undefined ? "CC -" : "CC " + String(ccMap[index]).padStart(2, "0")}</span>
-                  <button
-                    type="button"
-                    className={midiLearnFor === index ? styles.learnActive : styles.learnButton}
-                    onClick={() => beginMidiLearn(index)}
-                    aria-label={"Aprender fader MIDI para " + control.name}
-                  >
-                    {midiLearnFor === index ? "MOVÉ" : "APRENDER"}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-        <aside className={styles.presetPanel} aria-labelledby="preset-heading">
-          <div className={styles.presetHeader}>
-            <div>
-              <p className={styles.eyebrow}>MEMORIA DE TIMBRES</p>
-              <h3 id="preset-heading">Presets <span>{String(presets.length).padStart(2, "0")}</span></h3>
-            </div>
-          </div>
-          {presetFormOpen && (
-            <form
-              className={styles.presetForm}
-              onSubmit={(event) => {
-                event.preventDefault();
-                saveNamedPreset();
-              }}
-            >
-              <label htmlFor="preset-title">TÍTULO DE LA ESCENA</label>
-              <input
-                id="preset-title"
-                type="text"
-                maxLength={40}
-                value={presetNameDraft}
-                onChange={(event) => setPresetNameDraft(event.target.value)}
-                placeholder="Ej. Nube de madrugada"
-                autoFocus
-              />
-              <div className={styles.presetFormActions}>
-                <button type="button" className={styles.textButton} onClick={() => setPresetFormOpen(false)}>CANCELAR</button>
-                <button type="submit" className={styles.presetSaveButton}>GUARDAR</button>
-              </div>
-            </form>
-          )}
-          <div className={styles.presetList} aria-live="polite">
-            {presets.map((preset) => (
-              <article className={styles.presetItem} key={preset.id}>
-                <div className={styles.presetItemInfo}>
-                  <strong>{preset.title}</strong>
-                  <small>{preset.bpm} BPM <i>·</i> 9 FADERS</small>
-                </div>
-                <button type="button" className={styles.presetLoadButton} onClick={() => loadPreset(preset)}>CARGAR</button>
-              </article>
-            ))}
-          </div>
-          <p className={styles.presetHint}>Guarda y recupera el timbre, tempo y secuencia de cada escena.</p>
-        </aside>
-        </div>
-
-        <div className={styles.playSurface}>
-          <div className={styles.sequencePanel}>
-            <div className={styles.sequenceHeader}>
-              <div>
-                <p className={styles.eyebrow}>RELOJ / FRASE CÍCLICA</p>
-                <h3>Secuencia <em>de nueve.</em></h3>
-              </div>
-              <div className={styles.sequenceActions}>
-                <button
-                  type="button"
-                  className={isRecording ? styles.stopButton : styles.sequenceButton}
-                  onClick={startRecording}
-                  aria-pressed={isRecording}
-                >
-                  {isRecording ? "PARAR REC" : "GRABAR"}
-                </button>
-                <button
-                  type="button"
-                  className={isSequencing ? styles.stopButton : styles.sequenceButton}
-                  onClick={() => {
-                    if (isSequencing) {
-                      if (isRecordingRef.current) stopRecording();
-                      setIsSequencing(false);
-                    } else {
-                      void ensureAudio().then(() => {
-                        setSequenceRun((current) => current + 1);
-                        setIsSequencing(true);
-                      });
-                    }
-                  }}
-                >
-                  {isSequencing ? "DETENER" : "INICIAR"}
-                </button>
-              </div>
-            </div>
-            <div className={styles.steps} aria-label="Secuenciador de nueve pasos">
-              {steps.map((enabled, index) => {
-                const note = hasRecording || isRecording ? recordedNotes[index] : enabled ? 48 + PHRASES[phraseIndex][index] : null;
-                return (
-                  <button
-                    type="button"
-                    key={index}
-                    className={[styles.step, enabled ? styles.stepEnabled : "", activeStep === index ? styles.stepCurrent : ""].filter(Boolean).join(" ")}
-                    onClick={() => toggleStep(index)}
-                    aria-label={"Paso " + (index + 1) + (enabled ? ", activo" : ", apagado") + (note === null ? "" : ", nota " + noteName(note))}
-                    aria-pressed={enabled}
-                  >
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    <small className={styles.stepNote}>{note === null ? "—" : noteName(note)}</small>
-                    <i />
-                  </button>
-                );
-              })}
-            </div>
-            <p className={styles.recordStatus} aria-live="polite">
-              {isRecording
-                ? "REC · " + recordedCount + (recordedCount === 1 ? " NOTA" : " NOTAS") + " · TOCÁ EN LOS 9 PASOS"
-                : hasRecording
-                  ? "BUCLE GRABADO · " + recordedCount + (recordedCount === 1 ? " NOTA" : " NOTAS") + " · " + (isSequencing ? "EN LOOP" : "INICIÁ PARA REPRODUCIR")
-                  : "GRABAR CAPTURA UNA VUELTA DE 9 PASOS Y LA REPITE"}
-            </p>
-            <div className={styles.tempoRow}>
-              <span>70</span>
-              <input
-                type="range"
-                min="70"
-                max="150"
-                value={bpm}
-                onChange={(event) => handleBpmChange(Number(event.target.value))}
-                aria-label="Tempo en pulsos por minuto"
-                disabled={isRecording}
-              />
-              <span>150</span>
-              <strong>{bpm}<small> BPM</small></strong>
-            </div>
-          </div>
-
-          <div className={styles.keyboardPanel}>
-            <div className={styles.keyboardHeader}>
-              <div>
-                <p className={styles.eyebrow}>ENTRADA EXTERNA</p>
-                <h3>Casio + faders <em>/ MIDI.</em></h3>
-              </div>
-              {midiConnection === "blocked" && <a href="#zero-midi" className={styles.connectButton}>PERMISO MIDI</a>}
-            </div>
-            <p className={styles.midiMessage} aria-live="polite">{midiMessage}</p>
-            {midiInputs.length > 0 && (
-              <div className={styles.midiDevices} aria-label="Entradas MIDI conectadas">
-                <span className={styles.midiDevicesLabel}>ENTRADAS ACTIVAS</span>
-                {midiInputs.map((input) => (
-                  <span className={styles.midiDevice} key={input.id}>{input.name}</span>
-                ))}
-              </div>
-            )}
-            <div className={styles.keybed} aria-label="Teclado virtual de una octava">
-              {PIANO_KEYS.map((key) => (
-                <button
-                  type="button"
-                  key={key.note}
-                  className={[
-                    styles.pianoKey,
-                    key.black ? styles.blackKey : styles.whiteKey,
-                    heldNotes.includes(key.note) ? styles.keyPressed : "",
-                  ].filter(Boolean).join(" ")}
-                  onPointerDown={(event) => {
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                    if(pianoRouting.current){pianoRouting.current.computerNote("pointer:"+event.pointerId,key.note,true);return;}
-                    captureNote(key.note);
-                    startNote(key.note, 0.9);
-                  }}
-                  onLostPointerCapture={event=>{
-                    pianoRouting.current?.computerNote("pointer:"+event.pointerId,key.note,false);
-                    if(!pianoRouting.current || pressedNotesRef.current.has(key.note))releaseNote(key.note);
-                  }}
-                  aria-label={"Tocar " + noteName(key.note)}
-                >
-                  <span>{key.label}</span>
-                </button>
-              ))}
-            </div>
-            <p className={styles.keyboardHint}>Casio y faders USB MIDI, o probá con A W S E D F T G Y H U J K.</p>
-          </div>
-        </div>
-      </section>
-
       <footer className={styles.footer}>
-        <span>&#9670; UNDER TANGO CLUB <i>/</i> 860 MULTIVERSOS</span>
+        <span><a href="/" aria-label="UnderTango Club, inicio">◆ UNDER TANGO CLUB</a> <i>/</i> 860 MULTIVERSOS</span>
         <span>{midiInputs.length > 0 ? "MIDI ACTIVO · " + midiInputs.length + " DISPOSITIVO(S)" : "PROTOTIPO SONORO · AUDIO Y VISUALES GENERATIVOS"}</span>
       </footer>
     </main>

@@ -65,14 +65,13 @@ function makeTake(ctx: AudioContext, samples: Float32Array, scene: VoiceScene) {
   return buffer;
 }
 
-function playTake(ctx: AudioContext, output: GainNode, scene: VoiceScene, take: AudioBuffer) {
+function playTake(ctx: AudioContext, output: GainNode, scene: VoiceScene, take: AudioBuffer, start = ctx.currentTime + .015) {
   const bus = ctx.createGain();
   bus.connect(output);
   const rack = createTimbreRack(bus);
   rack.select(scene === 31 ? 31 : 29, scene === 31 ? 68 : 96);
   const voices: AudioBufferSourceNode[] = [];
   const branches: AudioNode[] = [];
-  const start = ctx.currentTime + .015;
 
   function layer(buffer: AudioBuffer, rate: number, offset: number, pan: number, volume: number, swell: number) {
     const source = ctx.createBufferSource();
@@ -140,7 +139,8 @@ export function useVoiceLoop(scene: VoiceScene | null, cue: Cue | null, seconds:
     stream: MediaStream | null, output: GainNode | null, bpm: number) {
   const [phase, setPhase] = useState<Phase>("off");
   const [attempt, setAttempt] = useState(0);
-  const controls = useRef<{ record: () => void; stop: () => void } | null>(null);
+  const controls = useRef<{ record: () => void; stop: () => void; replay: (when: number) => void } | null>(null);
+  const savedTake = useRef<AudioBuffer | null>(null);
   const player = useRef<ReturnType<typeof playTake> | null>(null);
   const timing = useRef({ end: 0, bpm });
   useEffect(() => {
@@ -186,6 +186,14 @@ export function useVoiceLoop(scene: VoiceScene | null, cue: Cue | null, seconds:
       player.current?.close();
       player.current = null;
     };
+    const replay = (when: number) => {
+      const take = savedTake.current;
+      if (!take || ctx.state !== "running" || when >= timing.current.end) return;
+      player.current?.close();
+      player.current = playTake(ctx, output, scene, take, when);
+      player.current.fadeAt(timing.current.end);
+      setPhase("playing");
+    };
     const record = () => {
       if (cancelled || !listening || ctx.state !== "running") return;
       listening = false;
@@ -202,9 +210,8 @@ export function useVoiceLoop(scene: VoiceScene | null, cue: Cue | null, seconds:
           releaseInput();
           const take = makeTake(ctx, channels[0], scene);
           if (!take) { setPhase("empty"); return; }
-          player.current = playTake(ctx, output, scene, take);
-          player.current.fadeAt(timing.current.end);
-          setPhase("playing");
+          savedTake.current = take;
+          replay(ctx.currentTime + .015);
         });
         preRoll.connect(recorder.node).connect(silence);
         setPhase("recording");
@@ -218,10 +225,10 @@ export function useVoiceLoop(scene: VoiceScene | null, cue: Cue | null, seconds:
       for (const value of samples) power += value * value;
       if (power > samples.length * .006 ** 2) record();
     }, 24);
-    controls.current = { record, stop: () => { stop(); setPhase("stopped"); } };
-    return () => { controls.current = null; stop(); };
+    controls.current = { record, replay, stop: () => { stop(); setPhase("stopped"); } };
+    return () => { controls.current = null; savedTake.current = null; stop(); };
   }, [attempt, cue, output, scene, stream]);
 
-  return { phase, record: () => controls.current?.record(), stop: () => controls.current?.stop(),
+  return { phase, hasTake: !!savedTake.current, replay: (when: number) => controls.current?.replay(when), record: () => controls.current?.record(), stop: () => controls.current?.stop(),
     retake: () => setAttempt(value => value + 1) };
 }

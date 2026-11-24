@@ -1,5 +1,4 @@
-// The synth and the scene use independent contexts but can feed the same speakers.
-// Two protected outputs together leave almost 2 dB of digital headroom.
+// Keep the same listening level for the score and the paused scene instrument.
 export const SPEAKER_CEILING = 0.4;
 export const RECORDING_CEILING = 0.8;
 

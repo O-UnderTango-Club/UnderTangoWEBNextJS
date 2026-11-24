@@ -9,7 +9,7 @@ export const PIANO_KEYS: Record<string, number> = {
 };
 export const TOP_KEYS = ["KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period"];
 export const FIXED_CONTROLS = {
-  "Piano cromático · MIDI 60 a 72": Object.keys(PIANO_KEYS).join(" ").toUpperCase(),
+  "Teclas del instrumento de la escena · MIDI 60 a 72": Object.keys(PIANO_KEYS).join(" ").toUpperCase(),
   "Banco de notas · cara frontal": "1 a 9",
   "Cubo · cara derecha": "Mayús + 1 a 9",
   "Cubo extendido · cara superior": TOP_KEYS.map(key => key.replace("Key", "").replace("Comma", ",").replace("Period", ".")).join(" "),
@@ -30,13 +30,14 @@ type Settings = {
   generalPlayButton: string;
   mixerRecordButton: string;
   mixerLiveButton: string;
+  mixerPlayAllButton: string;
   mixerStopButton: string;
-  mixerTransportAliases: Partial<Record<"play" | "record" | "stop", string>>;
+  mixerTransportAliases: Partial<Record<"play" | "record" | "playAll" | "stop", string>>;
   midiLayouts: {numeric: boolean; tempered: boolean};
   splitNote: number;
 };
 const defaults: Settings = {
-  sampleBankMidi: {}, ccMap: {}, generalPlayButton: "", mixerRecordButton: "", mixerLiveButton: "", mixerStopButton: "",
+  sampleBankMidi: {}, ccMap: {}, generalPlayButton: "", mixerRecordButton: "", mixerLiveButton: "", mixerPlayAllButton: "", mixerStopButton: "",
   mixerTransportAliases: {}, midiLayouts: {numeric: false, tempered: true}, splitNote: 60,
 };
 type SettingName = keyof Settings;
@@ -71,7 +72,7 @@ function validSetting(name: SettingName, value: unknown): boolean {
         short(b.inputId) && (b.inputName === undefined || short(b.inputName)) && integer(b.cc, -1, 127) &&
         (b.bendChannel === undefined || integer(b.bendChannel, 0, 15)));
     case "mixerTransportAliases":
-      return object(value) && Object.entries(value).every(([k, id]) => ["play", "record", "stop"].includes(k) && validSignal(id, true));
+      return object(value) && Object.entries(value).every(([k, id]) => ["play", "record", "playAll", "stop"].includes(k) && validSignal(id, true));
     case "midiLayouts":
       return object(value) && typeof value.numeric === "boolean" && typeof value.tempered === "boolean";
     case "splitNote": return integer(value, 0, 127);
@@ -103,7 +104,7 @@ function normalized(raw: unknown): Settings {
     }
   }
   settings.mixerTransportAliases = { ...settings.mixerTransportAliases };
-  const buttons = { play: settings.generalPlayButton, record: settings.mixerRecordButton || settings.mixerLiveButton, stop: settings.mixerStopButton };
+  const buttons = { play: settings.generalPlayButton, record: settings.mixerRecordButton || settings.mixerLiveButton, playAll: settings.mixerPlayAllButton, stop: settings.mixerStopButton };
   for (const name of Object.keys(buttons) as (keyof typeof buttons)[]) {
     const parts = signal(buttons[name]);
     const device = devices.get(String(parts[0]));
@@ -135,12 +136,13 @@ export function describeControls(s: Settings): Rows {
     rows["S" + (item.slot + 1) + " · " + BANK_ACTIONS[item.action]] = item.label;
   }
   for (const [slot, b] of Object.entries(s.ccMap)) {
-    rows[slot === "-1" ? "Máster" : "Síntesis · " + synth[Number(slot)]] =
+    rows[slot === "-1" ? "Máster" : "Síntesis histórica · " + synth[Number(slot)]] =
       (b.inputName || b.inputId) + " · " + (b.cc < 0 ? "Pitch Bend · canal " + (Number(b.bendChannel) + 1) : "CC " + b.cc);
   }
   const buttons = [
     ["Play general", s.generalPlayButton, s.mixerTransportAliases.play],
     ["Grabar", s.mixerRecordButton || s.mixerLiveButton, s.mixerTransportAliases.record],
+    ["Reproducir todos los loops", s.mixerPlayAllButton, s.mixerTransportAliases.playAll],
     ["Detener todos", s.mixerStopButton, s.mixerTransportAliases.stop],
   ];
   for (const [label, id, alias] of buttons) if (label && id) rows[label] = labelSignal(alias || id);
@@ -159,10 +161,11 @@ function sharedFaders(settings: Settings): string[] {
     if (key.length === 5 && key[0] === "name") key.shift();
     if (key[2] !== "cc" && key[2] !== "bend") continue;
     for (const [slot, b] of Object.entries(settings.ccMap)) {
+      if (slot !== "-1") continue;
       const sameDevice = key[0] === b.inputId || (b.inputName && a.label.startsWith(b.inputName + " · "));
       const sameSignal = key[2] === "cc" ? b.cc === key[3] : b.cc < 0 && b.bendChannel === key[1];
       if (sameDevice && sameSignal) found.push("S" + (a.slot + 1) + " · " + BANK_ACTIONS[a.action] + " comparte " + a.label +
-        " con " + (slot === "-1" ? "el máster" : synth[Number(slot)]) + ". El banco cede ese control.");
+        " con el máster. El banco cede ese control.");
     }
   }
   return found;

@@ -30,7 +30,7 @@ function axisPitch(scene: EarlyScene, note: number, progress: number) {
   return ORIGINAL_NOTES[axis] * octave;
 }
 
-export function earlyInstrument(scene: EarlyScene, output: GainNode, beginsAt: number, seconds: number, pair: NoisePair, paused: { current: boolean }) {
+export function earlyInstrument(scene: EarlyScene, output: GainNode, beginsAt: number, seconds: number, pair: NoisePair, score: AudioContext) {
   const ctx = output.context;
   const bus = ctx.createGain();
   bus.connect(output);
@@ -39,7 +39,7 @@ export function earlyInstrument(scene: EarlyScene, output: GainNode, beginsAt: n
   const balance = () => bus.gain.setTargetAtTime(1 / Math.sqrt(Math.max(1, held.size)), ctx.currentTime, 0.012);
 
   function play(id: string, note: number, velocity: number) {
-    if (paused.current || ctx.state !== "running") return;
+    if (ctx.state !== "running") return;
     if (held.has(id)) release(id);
     if (held.size >= 12) release(held.keys().next().value!);
     const now = ctx.currentTime;
@@ -68,11 +68,11 @@ export function earlyInstrument(scene: EarlyScene, output: GainNode, beginsAt: n
       const osc = ctx.createOscillator();
       const from = scene === "cross" ? CROSS_CUE.morph : 0;
       const to = scene === "cross" ? CROSS_CUE.formed : 1;
-      const progress = sceneProgress((now - beginsAt) / Math.max(0.001, seconds), from, to);
+      const progress = sceneProgress((score.currentTime - beginsAt) / Math.max(0.001, seconds), from, to);
       const hz = axisPitch(scene, note, progress);
       osc.type = scene === "beacon" || scene === "sphere" ? "triangle" : "sine";
       osc.frequency.setValueAtTime(hz, now);
-      if ((scene === "time" || scene === "cross") && progress < 1) {
+      if ((scene === "time" || scene === "cross") && progress < 1 && score === ctx) {
         osc.frequency.setValueAtTime(hz, Math.max(now, beginsAt + seconds * from));
         osc.frequency.exponentialRampToValueAtTime(axisPitch(scene, note, 1), beginsAt + seconds * to);
       }
@@ -148,10 +148,10 @@ export function earlyInstrument(scene: EarlyScene, output: GainNode, beginsAt: n
 }
 
 export function useEarlyInstrument(scene: EarlyScene | null, output: GainNode | null, beginsAt: number, seconds: number,
-  pair: NoisePair, paused: {current: boolean}, routing: {current: PerformanceInput | null}) {
+  pair: NoisePair, score: AudioContext | null, routing: {current: PerformanceInput | null}) {
   useEffect(() => {
-    if (!scene || !output) return;
-    const player = earlyInstrument(scene, output, beginsAt, seconds, pair, paused);
+    if (!scene || !output || !score) return;
+    const player = earlyInstrument(scene, output, beginsAt, seconds, pair, score);
     routing.current = player.input;
     const clear = () => player.input.releaseAll?.();
     const hide = () => { if (document.hidden) clear(); };
@@ -163,5 +163,5 @@ export function useEarlyInstrument(scene: EarlyScene | null, output: GainNode | 
       if (routing.current === player.input) routing.current = null;
       player.dispose();
     };
-  }, [scene, output, beginsAt, seconds, pair, paused, routing]);
+  }, [scene, output, beginsAt, seconds, pair, score, routing]);
 }

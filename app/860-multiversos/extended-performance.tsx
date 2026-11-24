@@ -19,7 +19,7 @@ export function isPlayableExtendedScene(scene: ExtendedScene | null) {
 }
 
 export function useExtendedPerformance(scene: ExtendedScene | null, clock: AudioContext | null, output: OutputRef,
-  routing: { current: PerformanceInput | null }, paused: { current: boolean }) {
+  routing: { current: PerformanceInput | null }, manualOutput: GainNode | null) {
   const [selected, setSelected] = useSavedSetting<CubeTrack>("selected", 0);
   const [midiLayouts, setMidiLayouts] = useSavedSetting("midiLayouts", { numeric: false, tempered: true });
   const [a4, setA4] = useSavedSetting("a4", DEFAULT_A4);
@@ -31,6 +31,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const splitRef = useRef(splitMidi);
   const instrument = useRef<OutputRef["current"]>(null);
   const rack = useRef<ReturnType<typeof createTimbreRack> | null>(null);
+  const auditionRack = useRef<ReturnType<typeof createTimbreRack> | null>(null);
   const attack = useRef({ count: 0, frequency: 0, velocity: 0 });
   const {bpm,clock:beatOrigin}=useTempo();
   const transport=useRef({bpm,beatOrigin});
@@ -44,16 +45,16 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const strength = timbre ? amounts[timbre] ?? 72 : 72;
 
   useEffect(() => {
-    const bus=output.current;
-    if(!usesSceneKeyboard(scene) || !clock || !bus)return;
+    const bus=manualOutput;
+    if(!usesSceneKeyboard(scene) || !bus)return;
     const synth=createSceneInstrument(scene,bus,a4,()=>({
-      bpm:transport.current.bpm,origin:transport.current.beatOrigin(clock),
+      bpm:transport.current.bpm,origin:transport.current.beatOrigin(bus.context),
     }),(frequency,velocity)=>{attack.current={count:attack.current.count+1,frequency,velocity};});
     const prefix=(device:string)=>`midi:${JSON.stringify(device)}:`;
     const pedals=new Set<string>(), sustained=new Set<string>();
     const play=(key:string,note:number,velocity:number)=>{
       if(velocity<=0)synth.release(key);
-      else if(!paused.current)synth.press(key,note,Math.min(1,velocity));
+      else if(bus.context.state==="running")synth.press(key,note,Math.min(1,velocity));
     };
     const destination: PerformanceInput={
       midiNote:(device,channel,note,velocity)=>{
@@ -89,7 +90,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       window.removeEventListener("blur",releaseAll);document.removeEventListener("visibilitychange",hidden);
       synth.close();
     };
-  },[scene,clock,output,routing,paused,a4]);
+  },[scene,manualOutput,routing,a4]);
 
   useEffect(() => { splitRef.current = splitMidi; }, [splitMidi]);
 
@@ -110,6 +111,17 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
     if (timbre) rack.current?.select(timbre, strength);
   }, [loopCue, strength, timbre]);
 
+  const auditionOutput = manualOutput && manualOutput.context !== clock ? manualOutput : null;
+  useEffect(() => {
+    if (!auditionOutput || loopScene !== 20) return;
+    const effect = createTimbreRack(auditionOutput);
+    auditionRack.current = effect;
+    return () => { effect.close(); auditionRack.current = null; };
+  }, [auditionOutput, loopScene]);
+  useEffect(() => {
+    if (timbre) auditionRack.current?.select(timbre, strength);
+  }, [auditionOutput, strength, timbre]);
+
   const left = useChordLoop(three ? loopCue : null, instrument, { storageKey: "loop-left", synchronized: true, melodic: loopScene === 15, mix: 0.43 });
   const center = useChordLoop(three ? loopCue : null, instrument, { storageKey: "loop-center", synchronized: true, melodic: loopScene === 15, click: false, mix: 0.43 });
   const right = useChordLoop(three ? loopCue : null, instrument, { storageKey: "loop-right", synchronized: true, melodic: loopScene === 15, click: false, mix: 0.43 });
@@ -119,23 +131,24 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const captureLeft = left.strike, captureCenter = center.strike, captureRight = right.strike, captureManual = manual.strike;
 
   useEffect(() => {
-    const bus = instrument.current;
-    if (!loopCue || !bus) return;
+    if (!manualOutput || !loopCue) return;
+    const bus = auditionOutput ? auditionRack.current?.input ?? auditionOutput : instrument.current;
+    if (!bus) return;
     const players = CUBE_TRACKS.map((track) => createPerformanceNotes(bus, (notes) => {
       setLive((current) => current.map((existing, index) => index === track ? notes : existing) as TrackNotes);
-    }, three ? [captureLeft, captureCenter, captureRight][track] : captureManual, 0.15));
+    }, auditionOutput ? undefined : three ? [captureLeft, captureCenter, captureRight][track] : captureManual, 0.15));
     const held = new Map<string, CubeTrack>();
     const release = (id: string) => {
       const track = held.get(id);
       if (track === undefined) return;
       held.delete(id);
-      melody.current[track].releaseNote(id);
+      if (!auditionOutput) melody.current[track].releaseNote(id);
       players[track].release(id);
     };
     const releaseAll = () => { for (const id of held.keys()) release(id); };
     const strike = (id: string, track: CubeTrack, index: number, velocity: number, midiPitch?:number) => {
       if (velocity <= 0) { release(id); return; }
-      if (paused.current || index < 0 || index >= CUBE_SIZE) return;
+      if (bus.context.state !== "running" || index < 0 || index >= CUBE_SIZE) return;
       if (held.has(id) && held.get(id) !== track) release(id);
       held.set(id, track);
       if(midiPitch!==undefined){
@@ -144,7 +157,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       }
       const frequency = midiPitch===undefined ? keys[track][Math.floor(index / 9)][index % 9].frequency : a4*2**((midiPitch-69)/12);
       attack.current = {count: attack.current.count + 1, frequency, velocity};
-      if (loopScene === 15) melody.current[track].pressNote(id, frequency, velocity);
+      if (!auditionOutput && loopScene === 15) melody.current[track].pressNote(id, frequency, velocity);
       players[track].press(id, frequency, velocity);
     };
     const midiPrefix = (id: string) => `midi:${JSON.stringify(id)}:`;
@@ -201,7 +214,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       window.removeEventListener("blur", releaseAll);
       document.removeEventListener("visibilitychange", hide);
     };
-  }, [captureCenter, captureLeft, captureManual, captureRight, keys, loopCue, loopScene, paused, routing, three, a4]);
+  }, [captureCenter, captureLeft, captureManual, captureRight, keys, loopCue, loopScene, manualOutput, auditionOutput, routing, three, a4]);
 
   return {
     attack, keys, three, timbre, selected, a4, setA4, splitMidi, live, strength, manual, loops: [left, center, right],
@@ -246,8 +259,8 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
                 {MATRIX_ORDER.map((index) => {
                   const key = keys[track][faceIndex][index];
                   const address = faceIndex * 9 + index;
-                  return <button key={key.midi} type="button" className="zero-note-key" disabled={paused} data-hz={key.frequency}
-                    data-sounding={!paused && sounding.includes(key.frequency)} aria-label={`${key.label}${scene === 15 ? " hercios" : `, ${hz.format(key.frequency)} hercios`}`}
+                  return <button key={key.midi} type="button" className="zero-note-key" data-hz={key.frequency}
+                    data-sounding={sounding.includes(key.frequency)} aria-label={`${key.label}${scene === 15 ? " hercios" : `, ${hz.format(key.frequency)} hercios`}`}
                     onPointerDown={(event) => {
                       if (event.button !== 0) return;
                       event.currentTarget.setPointerCapture(event.pointerId);

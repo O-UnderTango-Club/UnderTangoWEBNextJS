@@ -45,7 +45,7 @@ export function CodaProjection(props:Props) {
     return ()=>clearInterval(timer);
   },[state?.open]);
   const selection=colorSound??{color:"azul",sound:"aire"};
-  useCodaInstrument(scene,selection.sound,props.clock,props.output,paused,props.routing);
+  useCodaInstrument(scene,selection.sound,props.output,paused,props.routing);
   const title=SHOW_SCORE.find(cue=>cue.number===scene)?.title;
   const invite=scene<=100 && (scene<=92 || isRound(scene) || scene===95 || scene===99);
   const vote=state?.scene===scene && isRound(scene);

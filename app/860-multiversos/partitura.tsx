@@ -25,6 +25,7 @@ import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
 import { VOICE_CUES } from "./voice-loop";
+import { REPERTOIRE, RepertoireCue } from "./repertoire-cue";
 import { ProjectionSignalContext, useProjectionSignals, useSceneSignals } from "./projection-signals";
 import { StimulusBar } from "./stimulus-bar";
 import { warmRecorder } from "./measure-recorder";
@@ -2351,6 +2352,9 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
       .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls input[type=range] { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
+      .repertoire-cue { margin-top:.45rem; }
+      .repertoire-cue label { display:flex; align-items:baseline; gap:.45rem; cursor:pointer; }
+      .repertoire-cue input { flex:none; accent-color:#adc4ff; }
       .zero-controls .zero-master input { margin: .35rem 0 0; }
       .zero-scene-seconds {white-space:nowrap;font-size:.84rem;}
       .zero-scene-seconds input {width:4.5rem;padding:.35rem .25rem;color:inherit;background:#191d28;border:1px solid #4c5468;border-radius:4px;text-align:right;font:inherit;}
@@ -2458,6 +2462,7 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
         {numberedControls.map(({mode, id}, index) => {
           const isActive = mode === numberedMode;
           const score = SHOW_SCORE[index], seconds = durations[index];
+          const excerpt = REPERTOIRE[score.number];
           const {min,max} = limits[index];
           return <div key={mode} className="zero-scene" role="region" data-scene={score.number} aria-labelledby={`${id}-title`}
             ref={isActive ? activeSceneRef : undefined} aria-current={isActive ? "step" : undefined}>
@@ -2473,6 +2478,9 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
                 }} onKeyDown={event => {if(event.key === "Enter")event.currentTarget.blur();}} /> s</label>
             </div>
             <small>{scoreTime(cueStarts[index])} · {score.title}</small>
+            {score.number === 70 && <p>Escenas 70–79 · trance psicomusical. El fragmento entra en el ensamble de la 79.</p>}
+            {excerpt && <RepertoireCue scene={score.number} clip={excerpt} seconds={seconds}
+              cue={isActive ? cue : null} output={isActive ? outputRef.current : null} />}
             {(mode === 31 || mode === 89) && <p><strong>Loop de voz.</strong> {VOICE_CUES[mode]}</p>}
             <input id={id} type="range" min={min} max={max} step={1} value={seconds}
               aria-label={`Ajustar duración de la escena ${score.number}`} aria-valuetext={`${seconds} segundos`}

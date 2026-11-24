@@ -20,7 +20,11 @@ const rested={...mon,fields:{...mon.fields,[F.tasks.activateAt]:finishTodayChang
 assert.equal(classify(rested,snapshot([rested]),monday).nextAvailableAt,'2026-09-21T03:00:00.000Z');
 const waiting=row('1',1,{[F.tasks.status]:'En espera',[F.tasks.gate]:'En espera',[F.tasks.dependencies]:['2']});
 assert.equal(classify(waiting,snapshot([waiting,row('2')]),monday).stage,'waiting');
-for(const invalid of [0,128,1.5,'1']) assert.equal(classify(row('1',invalid),data,monday).stage,'catalog');
+for(const invalid of [0,128,1.5,'1']) {
+  const malformed = row('1',invalid);
+  assert.match(classify(malformed,data,monday).issues.join(' '),/días de la semana/);
+  assert.deepEqual(board(snapshot([malformed]),monday).fronts[1].tasks,[]);
+}
 assert.equal(nextAvailableDay(1,NaN).toString(),'NaN');
 const group=row('1',1,{[F.tasks.kind]:'group'}),member=row('2',127,{[F.tasks.group]:'1',[F.tasks.groupOrder]:1,[F.tasks.front]:null,[F.tasks.rank]:null});
 const grouped=board(snapshot([group,member]),tuesday);

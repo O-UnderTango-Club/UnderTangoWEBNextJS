@@ -3,7 +3,7 @@ import type { Board } from "./panel-model";
 type Task = Board["tasks"][number];
 type Assignment = { id: string; department: string | null };
 export type CentralMode = "overview" | "urgent" | "dates" | "priority";
-type Entry = { task: Task; members: Task[]; due: string };
+type Entry = { task: Task; members: Task[]; otherDays: Task[]; due: string };
 
 export function isOpenAction(task: Task) {
   return task.stage !== "done" && task.stage !== "cancelled";
@@ -24,6 +24,8 @@ export function centralActionView(tasks: Task[], assignments: Assignment[], fron
   const departmentById = new Map(assignments.map(row => [row.id, row.department]));
   const departmentOf = (row: Task) => departmentById.get(row.id) || "unassigned";
   const byDate = mode === "urgent" || mode === "dates";
+  const dayBit = 1 << ((new Date(today + "T12:00:00Z").getUTCDay() + 6) % 7);
+  const appearsToday = (row: Task) => !!((row.weekdays & row.parentWeekdays) & dayBit);
   const highlighted = new Set(fronts.flatMap(front => front.tasks));
   const counts: Record<string, number> = {};
   const visible: Entry[] = [];
@@ -48,9 +50,14 @@ export function centralActionView(tasks: Task[], assignments: Assignment[], fron
       }
     });
     if (!matches.length) continue;
-    const due = byDate ? matches.map(row => row.due).sort()[0] : task.due;
-    const list = mode === "overview" && !highlighted.has(task.id) ? rest : visible;
-    list.push({ task, members, due });
+    const todaysMatches = matches.filter(appearsToday);
+    if (mode !== "overview" && !todaysMatches.length) continue;
+    const due = byDate ? todaysMatches.map(row => row.due).sort()[0] : task.due;
+    if (mode === "overview" && (!highlighted.has(task.id) || !todaysMatches.length)) {
+      rest.push({task, members, otherDays: [], due});
+    } else {
+      visible.push({task, members: members.filter(appearsToday), otherDays: members.filter(member => !appearsToday(member)), due});
+    }
   }
   if (byDate) {
     visible.sort((a, b) => a.due.localeCompare(b.due) || a.task.name.localeCompare(b.task.name, "es"));

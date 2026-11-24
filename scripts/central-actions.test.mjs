@@ -59,3 +59,20 @@ assert.deepEqual(ids(view("urgent", "88").visible), ["group", "single"]);
 assert.deepEqual(ids(view("priority", "87").visible), []);
 assert.deepEqual(ids(view("priority", "88").visible), ["group"]);
 console.log("OK: grupos, orden de pasos, tres puestos por frente, espera, departamentos, fechas y prioridad");
+
+const fridayGroup = ranked("weekly-group", 1, { [f.kind]: "group" });
+const fridayStep = step("friday", "weekly-group", 1, { [f.weekdays]: 16, [f.priority]: "Alta" });
+const exceptMonday = step("except-monday", "weekly-group", 2, { [f.weekdays]: 126 });
+const week = { rankingMode: "action", tasks: [fridayGroup, fridayStep, exceptMonday, ranked("fallback",2)], projects: [], cases: [], events: [] };
+function weeklyView(day, mode = "overview") {
+  const data = board(week, Date.parse(day + "T15:00:00Z"));
+  return centralActionView(data.tasks, [], data.fronts, null, mode, day);
+}
+const thursday = weeklyView("2026-11-26");
+assert.deepEqual(thursday.visible[0].members.map(t => t.id), ["except-monday"]);
+assert.deepEqual(thursday.visible[0].otherDays.map(t => t.id), ["friday"]);
+assert.equal(weeklyView("2026-11-26","priority").visible.length,0);
+assert.deepEqual(weeklyView("2026-11-27").visible[0].members.map(t => t.id), ["friday","except-monday"]);
+const monday = weeklyView("2026-11-30");
+assert.deepEqual(ids(monday.visible), ["fallback"]);
+assert.deepEqual(monday.rest[0].members.map(t => t.id), ["friday","except-monday"]);

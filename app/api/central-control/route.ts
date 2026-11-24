@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { centralSnapshotTasks, isOpenAction } from "../../../src/lib/central-actions";
+import { readControlDepartments } from "../../../src/lib/control-departments";
+import { validWeekdays } from "../../../src/lib/panel-model";
 import { sameOrigin } from "../../../src/lib/panel-access";
 import { authorize, mutate, PanelError, responseBoard, snapshot } from "../../../src/lib/panel-server";
 import { operationsConfig, operationsSelected } from "../../../src/lib/panel-operations";
@@ -20,7 +22,7 @@ function failure(error: unknown) {
   );
 }
 
-async function controlRpc(name: "ut_control_departments_v1" | "ut_central_latest_v1" | "ut_central_undo_v1", args: Record<string, string>) {
+async function controlRpc(name: "ut_central_latest_v1" | "ut_central_undo_v1", args: Record<string, string>) {
   const { url, key } = operationsConfig();
   const response = await fetch(`${url}/rest/v1/rpc/${name}`, {
     method: "POST",
@@ -43,14 +45,11 @@ export async function GET(request: Request) {
     if (!operationsSelected()) throw new PanelError("La central necesita la conexión operativa de Supabase.", 503);
     const [data, assignments, latestChange] = await Promise.all([
       snapshot(true),
-      controlRpc("ut_control_departments_v1", {}),
+      readControlDepartments(),
       controlRpc("ut_central_latest_v1", { p_actor: actor }),
     ]);
     const board = responseBoard(data);
     if (board.source !== "supabase" || !board.snapshotRevision) throw new PanelError("La central necesita una lectura completa de Supabase.", 503);
-    if (!Array.isArray(assignments) || assignments.some(x => !x || typeof x.id !== "string" || (x.department !== null && (typeof x.department !== "string" || !/^8\d$/.test(x.department))))) {
-      throw new PanelError("La lectura de departamentos está incompleta.", 503);
-    }
     const tasks = centralSnapshotTasks(board.tasks);
     const revisions = Object.fromEntries(tasks.filter(isOpenAction).map(task => [task.id, board.revisions[task.id]]));
     return NextResponse.json({
@@ -84,14 +83,17 @@ export async function POST(request: Request) {
       return NextResponse.json(receipt, { headers });
     }
 
-    if ((input.operation !== "finish" && input.operation !== "doneToday") ||
+    if (!["finish", "doneToday", "weekdays"].includes(input.operation) ||
         typeof input.taskId !== "string" || !input.taskId || input.taskId.length > 150 ||
         typeof input.revision !== "string" || !revision.test(input.revision) ||
         typeof input.snapshotRevision !== "string" || !snapshotRevision.test(input.snapshotRevision)) {
       throw new PanelError("Actualizá la Central antes de guardar.", 409);
     }
 
-    const changes = input.operation === "finish"
+    if (input.operation === "weekdays" && !validWeekdays(input.weekdays)) {
+      throw new PanelError("Elegí al menos un día de la semana.");
+    }
+    const changes = input.operation === "weekdays" ? { weekdays: input.weekdays } : input.operation === "finish"
       ? { stage: "done", evidence: "Finalización confirmada desde la Central de control." }
       : { doneToday: true };
     const receipt = await mutate({

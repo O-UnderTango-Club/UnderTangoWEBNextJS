@@ -30,6 +30,17 @@ export default function WebUndertango() {
           <p>Miércoles 2 de diciembre de 2026 · La Cabaña de los Muñecos · Puerto Iguazú.</p>
           <p><strong>Mensaje:</strong> Una performance donde la música y la imagen se transforman en vivo. Cada cambio en el sonido puede cambiar también lo que ves.</p>
         </section>
+        <section aria-labelledby="pulso">
+          <p className={styles.kicker}>84 / 847 · Un gesto creativo por día</p><h2 id="pulso">Dejá que la obra se presente sola</h2>
+          <p>Para el 2/12, buscá a quienes disfrutan descubrir música electrónica en vivo, arte audiovisual y experimentación en Iguazú y Foz. Hacé que primero sientan algo de la obra. El título, la fecha, la Cabaña y el enlace aparecen al final o en el pie, siempre legibles.</p>
+          <div className={styles.grid}>
+            <article><h3>01 · Del ruido a la nota</h3><p>Microclip real del 860: oscuro, textura, una nota. Texto de trabajo: «Primero fue ruido. Después, algo quiso sonar».</p></article>
+            <article><h3>02 · Una nota mueve una imagen</h3><p>Mostrá la mano y la proyección en la misma toma: una variación audible, un cambio visible. Que el video sea la explicación.</p></article>
+            <article><h3>03 · El momento en que aparece el pulso</h3><p>Compartí el instante de transición y cortá antes de mostrar el desarrollo. Reservá la invitación concreta para el final.</p></article>
+            <article><h3>04 · Después del registro de Posadas</h3><p>Armá un minuto con el intérprete y la imagen en el mismo plano. Para programadores importa entender qué pasa en escena y qué necesita la sala, no repetir la invitación del 2/12.</p></article>
+          </div>
+          <p><strong>Regla de preparación:</strong> una pieza por día puede ser un recorte, una frase o un ensayo. Usá material real, revisá que se entienda aun sin sonido y guardá los borradores hasta que toque publicar.</p>
+        </section>
         <section aria-labelledby="recorrido">
           <p className={styles.kicker}>Auditoría inicial · 24/11/2026</p><h2 id="recorrido">De ver un show a pedir presupuesto</h2>
           <p>En producción, <Link href="/produccion-artistica">Producción artística</Link> redirige a <Link href="/shows">Shows</Link>. Ahí conviven un video principal, un catálogo y dos accesos a WhatsApp: «Diseñar mi espectáculo» arriba y «Conversemos sobre tu idea» en producción a medida. Los dos abren el mismo mensaje inicial. También hay un camino por <Link href="/reservas">Reservas</Link> desde el menú.</p>

@@ -19,6 +19,9 @@ type BankAction = keyof typeof BANK_ACTIONS;
 type BankMessage = {id:string;alias?:string;value:number;type:"cc"|"note"|"bend";reserved:boolean;label:string};
 
 type Mode = "matrix" | "live";
+const BANK_SIZE = 9;
+type RecordingBatch = { version:number; lastCompleted:number };
+type Recording = { kind:Mode; slot:number; batch:RecordingBatch; order:number };
 type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; layer?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; source: AudioBufferSourceNode; dispose: () => void };
 
@@ -46,8 +49,11 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
   const selectionVersion=useRef(0);
   function selectSlot(slot:number|null){
     selectionVersion.current++;
+    showDestination(slot);
+  }
+  function showDestination(slot:number|null){
     target.current=slot;setSelected(slot);
-    if(slot!==null)setBankSlot(slot);
+    setBankSlot(slot??0);
   }
   const [bankSlot,setBankSlot]=useState(0);
   const [bankLearn,setBankLearn]=useState<BankAction|null>(null);
@@ -100,7 +106,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
   const [requestKind,setRequestKind] = useState<"room"|"computer"|null>(null);
   const requesting = requestKind !== null;
   const alive=useRef(true);
-  const queued=useRef<{kind:Mode;slot:number;version:number}[]>([]);
+  const queued=useRef<Recording[]>([]);
   function chooseDestination(slot:number, explicit=false) {
     if (reservedSlots.current.has(slot) || queued.current.some(take=>take.slot===slot)) return;
     if (!explicit && occupied.current.has(slot)) return;
@@ -207,26 +213,23 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
     if(matrix && !pending.current.has("matrix"))modes.push("matrix");
     if(live && !pending.current.has("live"))modes.push("live");
     if(!modes.length)return;
-    const first=target.current;
-    if(first!==null && reservedSlots.current.has(first)){
-      setMessage(`S${first+1} está grabando.`);return;
-    }
-    const slots=Array.from({length:9},(_,i)=>((first??0)+i)%9)
-      .filter(slot=>!reservedSlots.current.has(slot) && (slot===first || !occupied.current.has(slot)));
-    if(slots.length<modes.length){
-      setMessage(modes.length===2?"Elegí un canal y dejá otro libre para la segunda toma.":"Elegí el canal que querés volver a grabar.");
+    const first=target.current??0;
+    const slots=modes.map((_,i)=>(first+i)%BANK_SIZE);
+    const busy=slots.find(slot=>reservedSlots.current.has(slot));
+    if(busy!==undefined){
+      setMessage(`S${busy+1} está grabando.`);
       return;
     }
-    const version=++selectionVersion.current;
-    const plan=modes.map((kind,i)=>({kind,slot:slots[i],version}));
+    const batch={version:++selectionVersion.current,lastCompleted:-1};
+    const plan=modes.map((kind,order)=>({kind,slot:slots[order],batch,order}));
     if(!scene || !input || !master){
       queued.current=plan;
       if(ready)startScene();
       return;
     }
-    for(const {kind,slot,version} of plan)record(kind,slot,version);
+    for(const take of plan)record(take);
   }
-  function record(kind:Mode,slot:number,version:number,plan?:LayerPlan) {
+  function record({kind,slot,batch,order}:Recording,plan?:LayerPlan) {
     if(!scene || !input || !master || pending.current.has(kind) || reservedSlots.current.has(slot))return;
     if(paused || requesting)return;
     const ctx=input.context as AudioContext;
@@ -294,10 +297,10 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
         if(plan)setLayerState(stopped?"Detenido":"En loop");
         if(old){ previous.current.set(slot,old); halt(old.id); }
         reservedSlots.current.delete(slot);occupied.current.add(slot);
-        if(version===selectionVersion.current){
-          const next=Array.from({length:9},(_,i)=>(slot+i+1)%9)
-            .find(candidate=>!occupied.current.has(candidate) && !reservedSlots.current.has(candidate));
-          selectSlot(next ?? null);
+        if(batch.version===selectionVersion.current && order>batch.lastCompleted){
+          // A later destination in the batch wins even if its take finishes first.
+          batch.lastCompleted=order;
+          showDestination((slot+1)%BANK_SIZE);
         }
         setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,layer:plan?.scene,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:old?.volume ?? bankVolumes.current.get(slot) ?? volume,muted:old?.muted ?? false}]);if(!pending.current.size)setState("idle");
       };
@@ -317,7 +320,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
   },[]);
   useEffect(()=>{
     if(ready)queued.current=[];
-    else if(queued.current.length && scene && input && master){const modes=queued.current;queued.current=[];for(const {kind,slot,version} of modes)record(kind,slot,version);}
+    else if(queued.current.length && scene && input && master){const takes=queued.current;queued.current=[];for(const take of takes)record(take);}
   },[ready,scene,input,master]);
   const pressed=useRef(new Set<string>());
   useEffect(() => {
@@ -568,7 +571,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
     }
     const plan={scene:liveSet,slot,startBeat,base,beat,meter,bars};
     layer.current=plan;chooseDestination(slot);setLayerState("Próximo compás");
-    record("matrix",slot,selectionVersion.current,plan);
+    record({kind:"matrix",slot,batch:{version:selectionVersion.current,lastCompleted:-1},order:0},plan);
   });
   useEffect(() => {
     if (!voiceScene) return;
@@ -634,7 +637,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
       <TransportMidiButton midi={transportMidi} action="clear" />
       {clearArmed && <small id="confirmar-vaciado-a9" role="status">Pulsá el mismo botón otra vez para vaciar S1 a S9.</small>}
       {transportMidi.learning && transportMidi.learning !== "play" && transportMidi.learning !== "stopScene" && <small role="status">{transportMidi.hint}</small>}
-      <button title="Usar el próximo espacio libre" aria-label="Destino automático" onClick={()=>selectSlot(null)}>{selected===null?"Auto":`Destino S${selected+1}`}</button>
+      <button title="Volver a S1" aria-label="Destino automático" onClick={()=>selectSlot(null)}>{selected===null?"Auto":`Destino S${selected+1}`}</button>
       <label title="Grabar los compases configurados desde el próximo tiempo 1"><input type="checkbox" checked={matrix} disabled={state!=="idle"} onChange={e=>setMatrix(e.target.checked)}/> Matriz</label>
       <label title="Grabar desde que apretás hasta que soltás"><input type="checkbox" checked={live} disabled={state!=="idle"} onChange={e=>setLive(e.target.checked)}/> En vivo</label>
       <output>{state==="recording" ? [pending.current.has("live")?"En vivo grabando":"",pending.current.has("matrix")?(waiting?"Matriz espera el 1":"Matriz grabando"):""].filter(Boolean).join(" · ") : shared?"Audio compartido":"Estéreo de 860"}</output>
@@ -653,7 +656,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
       </details>
       <details onToggle={e=>{if(!e.currentTarget.open)setBankLearn(null);}}><summary>MIDI · Samples</summary>
         <label>Sample <select aria-label="Sample para asignar MIDI" value={bankSlot} onChange={e=>{setBankSlot(Number(e.target.value));setBankLearn(null);}}>
-          {Array.from({length:9},(_,i)=><option key={i} value={i}>{i+1}</option>)}</select></label>
+          {Array.from({length:BANK_SIZE},(_,i)=><option key={i} value={i}>{i+1}</option>)}</select></label>
         {(Object.keys(BANK_ACTIONS) as BankAction[]).map(action=>{
           const entry=Object.entries(bankMap).find(([,v])=>v.slot===bankSlot && v.action===action);
           return <span key={action}><button aria-pressed={bankLearn===action} title={entry?.[1].label}
@@ -669,7 +672,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
       {message && <small role="status">{message}</small>}
     </div>
     <div className="sample-bank" data-layers={isLayer(liveSet)||undefined} aria-label="Banco de nueve samples">
-    {Array.from({length:9},(_,slot)=>{
+    {Array.from({length:BANK_SIZE},(_,slot)=>{
       const clip=clips.find(c=>c.slot===slot);
       const isTake=isLayer(liveSet) && currentTake?.slot===slot;
       const recordedName=clip?.layer ? LAYERS[clip.layer-32].name : clip?.scene;

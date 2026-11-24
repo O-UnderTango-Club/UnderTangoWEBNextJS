@@ -71,3 +71,5 @@
 .panel .deadlineTask::after{content:"";position:absolute;inset:0;cursor:pointer}
 .panel .deadlineItem:focus-within{outline:2px solid currentColor;outline-offset:-2px}
 .panel .deadlineDetail{position:relative;z-index:1;width:fit-content}
+.panel .finishStep{min-inline-size:8.25rem}
+.panel .finishStep[data-confirming=true]{color:#332600;background:#f2c34e;border-color:#866300}

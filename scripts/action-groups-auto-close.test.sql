@@ -10,6 +10,8 @@ declare
   second_step_id text;
   added_step_id text;
   next_rank integer;
+  discarded_step_id text;
+  replacement_id text;
   before_order text[];
   after_order text[];
 begin
@@ -25,10 +27,14 @@ begin
     values ('TEST second step', group_id, 2) returning id into second_step_id;
 
   update operativo.follow_ups set estado = 'Hecho', estado_de_accion = 'Terminada' where id = first_step_id;
+  set constraints all immediate;
+  set constraints all deferred;
   if (select estado from operativo.follow_ups where id = group_id) <> 'Pendiente' then
     raise exception 'A group with an open step was closed';
   end if;
   update operativo.follow_ups set estado = 'Hecho', estado_de_accion = 'Terminada' where id = second_step_id;
+  set constraints all immediate;
+  set constraints all deferred;
   if (select estado from operativo.follow_ups where id = group_id) <> 'Hecho' then
     raise exception 'A group with all steps completed was not closed';
   end if;
@@ -46,27 +52,78 @@ begin
     values ('TEST discarded ' || gen_random_uuid(), 'group', 'Primario', next_rank) returning id into cancelled_group_id;
   insert into operativo.follow_ups(seguimiento, grupo_de_accion, orden_en_grupo)
     values ('TEST discarded step', cancelled_group_id, 1) returning id into added_step_id;
-  update operativo.follow_ups set estado = 'Cancelado', estado_de_accion = null where id = added_step_id;
-  if (select estado from operativo.follow_ups where id = cancelled_group_id) <> 'Pendiente' then
-    raise exception 'A discarded step was treated as completed';
-  end if;
+  discarded_step_id:=added_step_id;
   insert into operativo.follow_ups(seguimiento, grupo_de_accion, orden_en_grupo)
-    values ('TEST completed alongside discarded', cancelled_group_id, 2) returning id into added_step_id;
-  update operativo.follow_ups set estado = 'Hecho', estado_de_accion = 'Terminada' where id = added_step_id;
-  if (select estado from operativo.follow_ups where id = cancelled_group_id) <> 'Pendiente' then
-    raise exception 'Mixed discarded and completed steps closed a group';
+    values ('TEST remaining step', cancelled_group_id, 2) returning id into added_step_id;
+  update operativo.follow_ups set estado='Cancelado', estado_de_accion=null where id=discarded_step_id;
+  set constraints all immediate;
+  set constraints all deferred;
+  if (select estado from operativo.follow_ups where id=cancelled_group_id) <> 'Pendiente' then
+    raise exception 'A group with a remaining step was retired';
+  end if;
+  update operativo.follow_ups set estado='Hecho', estado_de_accion='Terminada' where id=added_step_id;
+  set constraints all immediate;
+  set constraints all deferred;
+  if (select estado from operativo.follow_ups where id=cancelled_group_id) <> 'Cancelado'
+     or (select estado from operativo.follow_ups where id=discarded_step_id) <> 'Cancelado'
+     or (select estado from operativo.follow_ups where id=added_step_id) <> 'Hecho' then
+    raise exception 'Mixed group failed to retire with original step outcomes';
+  end if;
+
+  -- Replace the last open step in the same transaction that finishes it.
+  select coalesce(max(posicion_de_accion),0)+1 into next_rank from operativo.follow_ups
+    where frente_de_accion='Primario' and estado not in ('Hecho','Cancelado');
+  insert into operativo.follow_ups(seguimiento,tipo_de_accion,frente_de_accion,posicion_de_accion)
+    values ('TEST replacement '||gen_random_uuid(),'group','Primario',next_rank) returning id into cancelled_group_id;
+  insert into operativo.follow_ups(seguimiento,grupo_de_accion,orden_en_grupo)
+    values ('TEST replaced step',cancelled_group_id,1) returning id into added_step_id;
+  update operativo.follow_ups set estado='Hecho',estado_de_accion='Terminada' where id=added_step_id;
+  insert into operativo.follow_ups(seguimiento,grupo_de_accion,orden_en_grupo,activar_en)
+    values ('TEST new scheduled step',cancelled_group_id,2,now()+interval '2 days') returning id into replacement_id;
+  set constraints all immediate;
+  set constraints all deferred;
+  if (select estado from operativo.follow_ups where id=cancelled_group_id) <> 'Pendiente' then
+    raise exception 'Group was closed before seeing its replacement step';
+  end if;
+  -- Detach both members, keeping the open step as an independent action.
+  update operativo.follow_ups set grupo_de_accion=null,orden_en_grupo=null where id=added_step_id;
+  update operativo.follow_ups set grupo_de_accion=null,orden_en_grupo=null,frente_de_accion='Primario',
+    posicion_de_accion=next_rank+1 where id=replacement_id;
+  set constraints all immediate;
+  set constraints all deferred;
+  if (select estado from operativo.follow_ups where id=cancelled_group_id) <> 'Cancelado'
+     or (select estado from operativo.follow_ups where id=replacement_id) <> 'Pendiente' then
+    raise exception 'Empty group must retire and leave its detached step open';
+  end if;
+
+  -- Discarding the only remaining step must also release the group's position.
+  select coalesce(max(posicion_de_accion),0)+1 into next_rank from operativo.follow_ups
+    where frente_de_accion='Primario' and estado not in ('Hecho','Cancelado');
+  insert into operativo.follow_ups(seguimiento,tipo_de_accion,frente_de_accion,posicion_de_accion)
+    values ('TEST last discard '||gen_random_uuid(),'group','Primario',next_rank) returning id into cancelled_group_id;
+  insert into operativo.follow_ups(seguimiento,grupo_de_accion,orden_en_grupo)
+    values ('TEST last discarded step',cancelled_group_id,1) returning id into discarded_step_id;
+  update operativo.follow_ups set estado='Cancelado',estado_de_accion=null where id=discarded_step_id;
+  set constraints all immediate;
+  set constraints all deferred;
+  if (select estado from operativo.follow_ups where id=cancelled_group_id) <> 'Cancelado' then
+    raise exception 'Discarding the last step did not retire the group';
   end if;
 
   -- A deliberately reopened group stays open so another step can be added.
   select coalesce(max(posicion_de_accion), 0) + 1 into next_rank
     from operativo.follow_ups where frente_de_accion = 'Primario' and estado not in ('Hecho', 'Cancelado');
   update operativo.follow_ups set estado = 'Pendiente', estado_de_accion = 'Acción inmediata', posicion_de_accion = next_rank where id = group_id;
+  set constraints all immediate;
+  set constraints all deferred;
   if (select estado from operativo.follow_ups where id = group_id) <> 'Pendiente' then
     raise exception 'Manual reopening did not persist';
   end if;
   insert into operativo.follow_ups(seguimiento, grupo_de_accion, orden_en_grupo)
     values ('TEST added step', group_id, 3) returning id into added_step_id;
   update operativo.follow_ups set estado = 'Hecho', estado_de_accion = 'Terminada' where id = added_step_id;
+  set constraints all immediate;
+  set constraints all deferred;
   if (select estado from operativo.follow_ups where id = group_id) <> 'Hecho' then
     raise exception 'A reopened group did not close after its new step was completed';
   end if;

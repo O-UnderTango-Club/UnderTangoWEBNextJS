@@ -20,7 +20,27 @@ check('descanso grupal no cambia estados ni borra una fecha posterior',()=>{cons
 check('el estado elegido para el grupo no se pierde al editar sus detalles',()=>{for(const [status,gate,expected] of [['En curso','En acción','doing'],['Pendiente','Acción recurrente','recurring']]){const after=structuredClone(grouped),parent=after.tasks.find(t=>t.id==='test-group');parent.fields[F.tasks.status]=status;parent.fields[F.tasks.gate]=gate;const edited=g.applyGroupPlan(after,g.planGroup(after,'test-group',change),'unused');const saved=edited.tasks.find(t=>t.id==='test-group');assert.equal(saved.fields[F.tasks.status],status);assert.equal(saved.fields[F.tasks.gate],gate);assert.equal(m.board(edited).tasks.find(t=>t.id==='test-group').stage,expected);}});
 check('una espera del grupo bloquea su aparición aunque tenga un paso disponible',()=>{const after=structuredClone(grouped),parent=after.tasks.find(t=>t.id==='test-group');parent.fields[F.tasks.status]='En espera';parent.fields[F.tasks.gate]='En espera';parent.fields[F.tasks.dependencies]=['Primario-1'];const b=m.board(after);assert.equal(b.tasks.find(t=>t.id==='test-group').stage,'waiting');assert.ok(b.fronts.every(front=>!front.tasks.includes('test-group')));});
 check('al retirar el último paso abierto se finaliza el grupo sin alterar el orden ajeno',()=>{const after=structuredClone(grouped);for(const id of ids.slice(1)){const step=after.tasks.find(t=>t.id===id);step.fields[F.tasks.status]='Hecho';step.fields[F.tasks.gate]='Terminada';}const updated=g.applyGroupPlan(after,g.planGroup(after,'test-group',{...change,members:ids.slice(1)}),'unused');assert.equal(updated.tasks.find(t=>t.id==='test-group').fields[F.tasks.status],'Hecho');const removed=updated.tasks.find(t=>t.id===ids[0]);assert.equal(removed.fields[F.tasks.group],undefined);assert.equal(removed.fields[F.tasks.status],'Pendiente');const others=s=>s.tasks.filter(t=>t.id!=='test-group'&&t.id!==ids[0]&&!m.closed(t)&&!g.isMember(t)&&t.fields[F.tasks.front]==='Secundario').sort((a,b)=>a.fields[F.tasks.rank]-b.fields[F.tasks.rank]).map(t=>t.id);assert.deepEqual(others(updated),others(after));});
-check('editar un grupo con pasos descartados no lo finaliza automáticamente',()=>{const after=structuredClone(grouped);for(const [index,id] of ids.entries()){const step=after.tasks.find(t=>t.id===id);step.fields[F.tasks.status]=index?'Hecho':'Cancelado';}const updated=g.applyGroupPlan(after,g.planGroup(after,'test-group',change),'unused');assert.equal(updated.tasks.find(t=>t.id==='test-group').fields[F.tasks.status],'Pendiente');});
+check('cerrar un grupo mixto conserva los estados de todos sus pasos',()=>{
+  const after=structuredClone(grouped);
+  for(const [index,id] of ids.entries()){
+    const step=after.tasks.find(t=>t.id===id);
+    step.fields[F.tasks.status]=index?'Hecho':'Cancelado';
+    step.fields[F.tasks.gate]=index?'Terminada':null;
+  }
+  const updated=g.applyGroupPlan(after,g.planGroup(after,'test-group',change),'unused');
+  assert.equal(updated.tasks.find(t=>t.id==='test-group').fields[F.tasks.status],'Cancelado');
+  assert.deepEqual(ids.map(id=>updated.tasks.find(t=>t.id===id).fields[F.tasks.status]),['Cancelado',...ids.slice(1).map(()=>'Hecho')]);
+});
+check('retirar todos los pasos disuelve el grupo y conserva las acciones en orden',()=>{
+  assert.throws(()=>g.planGroup(data,undefined,{...change,members:[]}),/al menos una/);
+  const updated=g.applyGroupPlan(grouped,g.planGroup(grouped,'test-group',{...change,members:[]}),'unused');
+  const group=updated.tasks.find(t=>t.id==='test-group');
+  assert.equal(group.fields[F.tasks.status],'Cancelado');
+  assert.ok(!m.board(updated).fronts.some(front=>front.tasks.includes(group.id)));
+  const steps=ids.map(id=>updated.tasks.find(row=>row.id===id));
+  assert.ok(steps.every(step=>!g.isMember(step)&&!m.closed(step)));
+  assert.deepEqual(steps.map(step=>step.fields[F.tasks.rank]),steps.map((_,i)=>change.rank+i));
+});
 check('rechaza duplicados, grupos anidados y pertenencia múltiple',()=>{assert.throws(()=>g.planGroup(data,undefined,{...change,members:[ids[0],ids[0]]}));assert.throws(()=>g.planGroup(grouped,undefined,{...change,name:'Otro'}));assert.throws(()=>g.planGroup(grouped,undefined,{...change,name:'Otro',members:['test-group']}));});
 check('retirar un paso devuelve posición propia sin duplicarla',()=>{const next=g.applyGroupPlan(grouped,g.planGroup(grouped,'test-group',{...change,members:ids.slice(1)}),'unused');const t=next.tasks.find(t=>t.id===ids[0]);assert.ok(!t.fields[F.tasks.group]);assert.equal(t.fields[F.tasks.front],'Secundario');const ranked=next.tasks.filter(t=>!m.closed(t)&&t.fields[F.tasks.front]);assert.equal(new Set(ranked.map(t=>t.fields[F.tasks.front]+':'+t.fields[F.tasks.rank])).size,ranked.length);});
 if(process.env.GROUP_TEST_SOURCE){fs.writeFileSync('../grouped-preview.json',JSON.stringify(grouped));fs.writeFileSync('../group-plan.json',JSON.stringify(g.planGroup(data,undefined,change)));}

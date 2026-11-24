@@ -24,7 +24,7 @@ export function useTransportMidi(connectMidi: (rescan?: boolean) => Promise<void
 
   function match(id: string, alias?: string) {
     return (Object.keys(buttons) as TransportAction[]).find(action =>
-      buttons[action] === id || (alias && aliases[action] === alias));
+      alias && aliases[action] ? aliases[action] === alias : buttons[action] === id);
   }
 
   function toggle(action: TransportAction) {

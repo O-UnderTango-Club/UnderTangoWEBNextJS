@@ -3,7 +3,7 @@ import { useState } from "react";
 import { DEADLINE_KINDS, deadlineDate, deadlineWindow, safeDeadlineUrl, type DeadlineItem, type DeadlineSnapshot } from "../../src/lib/panel-deadlines";
 import css from "./panel.module.css";
 
-type Props = { data?: DeadlineSnapshot; error?: string; refreshing: boolean; onRefresh: () => void; onOpenTask: (id: string) => void };
+type Props = { data?: DeadlineSnapshot; error?: string; refreshing: boolean; onRefresh: () => void; onOpenTask: (item: DeadlineItem) => void };
 export default function Deadlines({data,error,refreshing,onRefresh,onOpenTask}: Props) {
   const [days,setDays] = useState("90");
   const [limit,setLimit] = useState(10);
@@ -12,12 +12,12 @@ export default function Deadlines({data,error,refreshing,onRefresh,onOpenTask}: 
   const upcoming = window.upcoming.filter(item => showConditional || item.kind !== "conditional");
   function itemRow(item: DeadlineItem) {
     const url = safeDeadlineUrl(item.url);
-    const taskId = item.taskId;
+
     return <li key={item.id} className={css.deadlineItem} data-kind={item.kind}>
       <div className={css.deadlineDate}><time dateTime={item.date}>{deadlineDate(item.date)}</time>
         {item.date === data?.today && <span className={css.badge}>Hoy</span>}
       </div>
-      <h3>{taskId ? <button className={css.deadlineTask} disabled={refreshing} onClick={()=>onOpenTask(taskId)}>{item.title}</button> : item.title}</h3>
+      <h3><button className={css.deadlineTask} disabled={refreshing} onClick={()=>onOpenTask(item)}>{item.title}</button></h3>
       {item.time && <p className={css.deadlineTime}>{item.time}</p>}
       <div className={css.deadlineMeta}>
         <span className={css.deadlineKind} data-kind={item.kind}>{DEADLINE_KINDS[item.kind]}</span>

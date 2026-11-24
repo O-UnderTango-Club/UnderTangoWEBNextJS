@@ -12,7 +12,7 @@ export type OperationsSnapshot = Snapshot & {
   migrationStatus: "staged" | "validated" | "active";
 };
 export type OperationsReceipt = { ok: true; id: string; ids: string[]; requestId: string; revision: string; savedAt: string };
-export type OperationsPatch = { table: "follow_ups" | "projects" | "trigger_events"; id: string | null; fields: Record<string, unknown>; create: boolean };
+export type OperationsPatch = { table: "agenda_items" | "follow_ups" | "projects" | "trigger_events"; id: string | null; fields: Record<string, unknown>; create: boolean };
 export function operationsSelected(env: NodeJS.ProcessEnv = process.env) {
   if (isOperationsPreview(env)) return true;
   if (!env.PANEL_DATA_SOURCE || env.PANEL_DATA_SOURCE === "airtable") return false;

@@ -62,3 +62,5 @@ export function deadlineWindow(data: DeadlineSnapshot, days: number | null) {
 export function deadlineDate(day: string) {
   return new Intl.DateTimeFormat("es-AR", { timeZone:"America/Argentina/Cordoba",weekday:"short",day:"numeric",month:"short",year:"numeric" }).format(new Date(day+"T12:00:00Z"));
 }
+
+export const agendaStatuses = ["Pendiente","Confirmado","Por confirmar","Condicionado","Realizado","Cancelado","Archivado"] as const;

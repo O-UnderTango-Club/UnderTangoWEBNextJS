@@ -24,8 +24,7 @@ export const SampleWaveform = memo(function SampleWaveform({id, slot, buffer, mu
     const context = canvas.current?.getContext("2d");
     if (!context) return;
     context.clearRect(0, 0, COLUMNS, HEIGHT);
-    function paint(peaks: Float32Array) {
-      if (!context) return;
+    const paint = (peaks: Float32Array) => {
       const loudest = Math.max(SILENCE_FLOOR, ...peaks);
       context.fillStyle = "#c8bdec";
       peaks.forEach((peak, column) => {
@@ -34,25 +33,32 @@ export const SampleWaveform = memo(function SampleWaveform({id, slot, buffer, mu
         const height = Math.max(2, Math.round((HEIGHT - 4) * Math.sqrt(peak / loudest)));
         context.fillRect(column, (HEIGHT - height) / 2, 1, height);
       });
-    }
+    };
     const known = cachedPeaks.get(buffer);
     if (known) { paint(known); return; }
     const peaks = new Float32Array(COLUMNS);
-    const channels = Array.from({length:buffer.numberOfChannels}, (_, index) => buffer.getChannelData(index));
-    let column = 0, start = 0, task = 0;
+    const columnsPerTask = Math.max(1, Math.floor(FRAMES_PER_TASK * COLUMNS / buffer.length));
+    const samples = new Float32Array(Math.min(buffer.length, Math.ceil(columnsPerTask * buffer.length / COLUMNS)));
+    const frameAt = (column:number) => Math.floor(column * buffer.length / COLUMNS);
+    let first = 0, task = 0;
     function measure() {
-      const limit = start + FRAMES_PER_TASK;
-      while (column < COLUMNS && start < limit) {
-        const end = Math.floor((column + 1) * buffer.length / COLUMNS);
-        let peak = 0;
-        for (const samples of channels) {
-          for (let frame = start; frame < end; frame++) peak = Math.max(peak, Math.abs(samples[frame]));
+      const last = Math.min(COLUMNS, first + columnsPerTask);
+      const offset = frameAt(first);
+      const segment = samples.subarray(0, frameAt(last) - offset);
+      for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+        buffer.copyFromChannel(segment, channel, offset);
+        let start = 0;
+        for (let column = first; column < last; column++) {
+          const end = frameAt(column + 1) - offset;
+          let peak = peaks[column];
+          for (let frame = start; frame < end; frame++) peak = Math.max(peak, Math.abs(segment[frame]));
+          peaks[column] = peak;
+          start = end;
         }
-        peaks[column++] = peak;
-        start = end;
       }
+      first = last;
       // Long recordings yield between chunks so the scene can still accept MIDI.
-      if (column < COLUMNS) task = window.setTimeout(measure, 0);
+      if (first < COLUMNS) task = window.setTimeout(measure, 0);
       else {
         cachedPeaks.set(buffer, peaks);
         paint(peaks);

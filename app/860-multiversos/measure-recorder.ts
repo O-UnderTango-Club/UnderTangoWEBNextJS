@@ -48,7 +48,15 @@ export function prepareMeasureRecorder(ctx: AudioContext) {
 
 const readyContexts = new WeakSet<AudioContext>();
 export function warmRecorder(ctx: AudioContext) {
-  if (ctx.audioWorklet) void prepareMeasureRecorder(ctx).then(()=>readyContexts.add(ctx)).catch(()=>{});
+  if (!ctx.audioWorklet || readyContexts.has(ctx)) return;
+  return new Promise<void>(resolve => {
+    // Keep the existing capture fallback available if the browser stalls loading the module.
+    const timer = window.setTimeout(resolve, 1000);
+    prepareMeasureRecorder(ctx).then(() => { readyContexts.add(ctx); }, () => {}).finally(() => {
+      window.clearTimeout(timer);
+      resolve();
+    });
+  });
 }
 export function captureFactory(ctx: AudioContext) {
   if (readyContexts.has(ctx)) {

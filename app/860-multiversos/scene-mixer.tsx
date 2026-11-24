@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { protectPeaks, RECORDING_CEILING } from "./peak-protection";
-import { warmRecorder, captureFactory } from "./measure-recorder";
+import { captureFactory } from "./measure-recorder";
 import { useSavedSetting } from "./saved-setting";
 
 import { useTempo } from "./tempo";
@@ -65,7 +65,6 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monit
   const alive=useRef(true);
   const queued=useRef<{kind:Mode;slot:number;version:number}[]>([]);
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
-  useEffect(()=>{if(input)warmRecorder(input.context as AudioContext);},[input]);
   // The scene and the lower synth own different AudioContexts. Bridge the synth
   // for recording only; its normal speaker output stays connected exactly once.
   const stereo=useRef<GainNode|null>(null);
@@ -180,7 +179,8 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monit
     const version=++selectionVersion.current;
     const plan=modes.map((kind,i)=>({kind,slot:slots[i],version}));
     if(!scene || !input || !master){
-      if(ready){queued.current=plan;startScene();}
+      queued.current=plan;
+      if(ready)startScene();
       return;
     }
     for(const {kind,slot,version} of plan)record(kind,slot,version);
@@ -261,8 +261,9 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monit
     return ()=>window.removeEventListener("blur",releaseLive);
   },[]);
   useEffect(()=>{
-    if(queued.current.length && scene && input && master){const modes=queued.current;queued.current=[];for(const {kind,slot,version} of modes)record(kind,slot,version);}
-  },[scene,input,master]);
+    if(ready)queued.current=[];
+    else if(queued.current.length && scene && input && master){const modes=queued.current;queued.current=[];for(const {kind,slot,version} of modes)record(kind,slot,version);}
+  },[ready,scene,input,master]);
   const pressed=useRef(new Set<string>());
   useEffect(() => {
     const clear = () => { pressed.current.clear(); downControls.current.clear(); releaseLive(); };
@@ -359,6 +360,7 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monit
   }
   function stopAll(){
     stopGeneration.current++;
+    queued.current=[];
     for(const id of voices.current.keys())halt(id);
     setClips(all=>all.map(c=>({...c,stopped:true,launchBeat:undefined})));
   }
@@ -430,7 +432,7 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monit
   });
   return <div className="scene-mixer" role="region" aria-label="Lupera de objetos sonoros">
     <div className="scene-mixer-tools">
-      <button className="scene-record" aria-label="Grabar" title="Grabar con los modos seleccionados" disabled={(!scene && !ready && !queued.current.length)||paused||requesting||(!matrix && !live)}
+      <button className="scene-record" aria-label="Grabar" title="Grabar con los modos seleccionados" disabled={paused||requesting||(!matrix && !live)}
         onPointerDown={e=>{if(e.button!==0)return;e.currentTarget.setPointerCapture(e.pointerId);pressRecord();}}
         onPointerUp={releaseLive} onPointerCancel={releaseLive} onLostPointerCapture={releaseLive}
         onKeyDown={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();if(!e.repeat)pressRecord();}}}

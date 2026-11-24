@@ -19,6 +19,7 @@ import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
+import { warmRecorder } from "./measure-recorder";
 import { TransportMidiButton, useTransportMidi } from "./transport-midi";
 import { EXTENDED_STYLE } from "./extended-style";
 
@@ -1452,9 +1453,9 @@ const MODULE_ZERO_SCENE_BY_STAGE = {
 const MIDI_PITCH_NAMES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "Sol", "La♭", "La", "Si♭", "Si"];
 
 async function resumeAudioOutput(context: AudioContext) {
+  await Promise.all([context.resume(), warmRecorder(context)]);
   const previousTime = context.currentTime;
-  await context.resume();
-  // On a cold output, Chrome can resolve resume before note-on and note-off get distinct timestamps.
+  // Wait for the output to render on the recorder's audio thread before exposing the first beat.
   while (context.state === "running" && context.currentTime === previousTime) {
     await new Promise<void>(resolve => window.setTimeout(resolve, 12));
   }

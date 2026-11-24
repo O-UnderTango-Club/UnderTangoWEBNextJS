@@ -39,6 +39,7 @@ export default function WebUndertango() {
             <article><h3>03 · El momento en que aparece el pulso</h3><p>Compartí el instante de transición y cortá antes de mostrar el desarrollo. Reservá la invitación concreta para el final.</p></article>
             <article><h3>04 · Después del registro de Posadas</h3><p>Armá un minuto con el intérprete y la imagen en el mismo plano. Para programadores importa entender qué pasa en escena y qué necesita la sala, no repetir la invitación del 2/12.</p></article>
           </div>
+          <details><summary>Experimento: un Ø en tu mesa</summary><p>Prototipo para evaluar. Un QR en una pieza impresa lleva a la ficha pública desde el celular. Al tocar «Ver en mi mesa», si el equipo lo permite, la animación aparece sobre una superficie: el ruido de partículas encuentra forma con el primer pulso. Sin cámara, se puede conservar la experiencia como animación 3D en la página. Fecha y lugar siguen visibles en todos los casos. No depende de proyectores ni de un plasma.</p><p>Antes de imprimir: verificar el enlace estable, probar apertura y permisos en iPhone y Android, y comprobar la alternativa si la cámara no está habilitada. Solo es una idea de campaña; aún no hay QR ni experiencia de realidad aumentada publicada.</p></details>
           <p><strong>Regla de preparación:</strong> una pieza por día puede ser un recorte, una frase o un ensayo. Usá material real, revisá que se entienda aun sin sonido y guardá los borradores hasta que toque publicar.</p>
         </section>
         <section aria-labelledby="recorrido">

@@ -28,7 +28,7 @@ import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
 import { usesSceneKeyboard } from "./scene-instrument";
 import { DjConsole } from "./dj-console";
-import { herculesCommand, isInpulse200 } from "./dj-midi";
+import { DJ_CONTROL, herculesCommand, isInpulse200, type DjCommand } from "./dj-midi";
 import { VOICE_CUES } from "./voice-loop";
 import { REPERTOIRE, RepertoireCue } from "./repertoire-cue";
 import { ProjectionSignalContext, useProjectionSignals, useSceneSignals } from "./projection-signals";
@@ -75,7 +75,7 @@ type FrequencyPoint = [x: number, y: number];
 
 const FREQUENCY_VIEW = { width: 640, height: 360, x: 320, y: 180, yaw: 0.64, tilt: 0.62, scale: 102 };
 const FREQUENCY_STOP_YAW = FREQUENCY_VIEW.yaw + 1.72;
-const FREQUENCY_TRAIL_TRAVEL = 380;
+const FREQUENCY_TRAIL_TRAVEL = 580;
 const FREQUENCY_TRAIL_TURN_SECONDS = SHOW_TRANSITIONS.trailTurn;
 function scoreTime(seconds: number) {
   const rounded = Math.round(seconds);
@@ -243,6 +243,7 @@ uniform vec4 u_camera;
 uniform vec4 u_rotation;
 uniform vec2 u_projection;
 uniform float u_pivot;
+uniform float u_travel;
 out vec3 v_normal;
 out float v_hue;
 
@@ -268,11 +269,11 @@ void main() {
   vec3 point = camera(sin(phase) + 0.065 * normal);
   // Bake the capture perspective before translating the frame along the time axis.
   point.xy *= 4.5 / (4.5 - point.z);
-  point.x += a_sample.w - u_pivot;
+  point.x += a_sample.w * u_travel - u_pivot;
   point = rotate(point);
   gl_Position = vec4(point.xy * u_projection, -0.13 * point.z, 1.0);
   v_normal = rotate(camera(normal));
-  v_hue = clamp(a_path.x / 6.2831853 * 0.86 + a_sample.w * 0.1, 0.0, 1.0);
+  v_hue = clamp(a_path.x / 6.2831853 * 0.86 + a_sample.w * 0.373, 0.0, 1.0);
 }`;
 
 const TEMPORAL_TRAIL_FRAGMENT_SHADER = `#version 300 es
@@ -354,6 +355,7 @@ function createTemporalTrailRenderer(canvas: HTMLCanvasElement, sampleCount: num
   gl.enable(gl.DEPTH_TEST);
   gl.clearColor(0, 0, 0, 0);
   gl.useProgram(program);
+  gl.uniform1f(gl.getUniformLocation(program, "u_travel"), FREQUENCY_TRAIL_TRAVEL / FREQUENCY_VIEW.scale);
   gl.uniform4f(gl.getUniformLocation(program, "u_camera"),
     Math.cos(FREQUENCY_STOP_YAW), Math.sin(FREQUENCY_STOP_YAW), Math.cos(FREQUENCY_VIEW.tilt), Math.sin(FREQUENCY_VIEW.tilt));
   const rotation = gl.getUniformLocation(program, "u_rotation");
@@ -402,8 +404,7 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock, froze
     const instances = new Float32Array((sampleCount + 1) * 4);
     const write = (index: number, phase: number) => {
       const [x, y, z] = tuningAt(phase);
-      const shift = FREQUENCY_TRAIL_TRAVEL * phase / FREQUENCY_VIEW.scale;
-      instances.set([x / 111, y / 111, z / 111, shift], index * 4);
+      instances.set([x / 111, y / 111, z / 111, phase], index * 4);
     };
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0, nextStamp = 0, raisedAt: number | null = null;
@@ -1217,6 +1218,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const [previewMode, setPreviewMode] = useState<ModuleZeroScene | null>(null);
   const [paused, setPaused] = useState(false);
   const [transportBusy, setTransportBusy] = useState(false);
+  const [sceneSteps, setSceneSteps] = useState<(-1 | 1)[]>([]);
   const [cue, setCue] = useState<SceneZeroCue | null>(null);
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
   const [scheduledRest, setScheduledRest] = useState<number>(SHOW_OPENING.rest);
@@ -1306,9 +1308,19 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
     pausedRef.current = false;
     setPaused(false);
     setTransportBusy(false);
+    setSceneSteps([]);
     setPreviewMode(null);
     setStage("ready");
   }, [stop]);
+
+  useEffect(() => {
+    const receive = (event: Event) => {
+      const command = (event as CustomEvent<DjCommand>).detail;
+      if (command.action === "scene") setSceneSteps(steps => [...steps, command.step]);
+    };
+    window.addEventListener(DJ_CONTROL, receive);
+    return () => window.removeEventListener(DJ_CONTROL, receive);
+  }, []);
 
   useEffect(() => {
     if ((!nextTimedScene && extendedScene !== 111) || nextAfterSeconds === 0 || !cue || paused) return;
@@ -1767,10 +1779,18 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
     }
     void start(mode, asPreview, startPaused);
   };
-  const moveScene = (offset: number) => {
-    const scene = numberedControls[Math.max(0, sceneIndex) + offset];
+  const moveScene = (index: number) => {
+    const scene = numberedControls[index];
     if (scene) playMode(scene.mode, previewMode !== null, paused);
   };
+  useEffect(() => {
+    if (!sceneSteps.length || preparing || transportBusy) return;
+    setSceneSteps(steps => steps.slice(sceneSteps.length));
+    // Several MIDI detents can arrive before React has rendered the new scene.
+    const index = sceneSteps.reduce((at, step) =>
+      Math.max(at < 0 ? -1 : 0, Math.min(numberedControls.length - 1, at + step)), sceneIndex);
+    if (index !== sceneIndex && (stage !== "breath" || index < sceneIndex)) moveScene(index);
+  });
   const pointPosition = (index: number) => {
     let n = index, fraction = 0, scale = 0.5;
     while (n > 0) { fraction += (n % 2) * scale; n = Math.floor(n / 2); scale *= 0.5; }
@@ -2301,7 +2321,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         </div>
         <div className="zero-transport" role="group" aria-label="Reproducción">
           <button type="button" aria-label="Escena anterior" title="Escena anterior"
-            disabled={sceneIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(-1)}>
+            disabled={sceneIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(sceneIndex - 1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h2v14H5zM19 5v14L8 12z" /></svg>
           </button>
           <div className="zero-general-play">
@@ -2325,7 +2345,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
             <TransportMidiButton action="stopScene" midi={transportMidi} />
           </div>
           <button type="button" aria-label="Escena siguiente" title="Escena siguiente"
-            disabled={sceneIndex === numberedControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(1)}>
+            disabled={sceneIndex === numberedControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(Math.max(0, sceneIndex) + 1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
           </button>
         </div>

@@ -2157,7 +2157,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} codaScene={coda} liveSet={liveSet}
+      <SceneMixer canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} stopScene={reset} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
         countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
@@ -2294,15 +2294,18 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
             disabled={ready || preparing || paused || transportBusy} onClick={() => void changePaused(true)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
           </button>
-          <button type="button" aria-label="Detener" title="Detener" disabled={ready} onClick={reset}>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
-          </button>
+          <div className="zero-general-play">
+            <button type="button" aria-label="Detener" title="Stop general de escena" disabled={ready} onClick={reset}>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
+            </button>
+            <TransportMidiButton action="stopScene" midi={transportMidi} />
+          </div>
           <button type="button" aria-label="Escena siguiente" title="Escena siguiente"
             disabled={sceneIndex === numberedControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
           </button>
         </div>
-        {transportMidi.learning === "play" && <small role="status">{transportMidi.hint}</small>}
+        {(transportMidi.learning === "play" || transportMidi.learning === "stopScene") && <small role="status">{transportMidi.hint}</small>}
         <div className="zero-master">
           <button type="button" aria-label={soundAction} title={soundAction}
             onClick={() => setMasterVolume(muted ? audibleVolumeRef.current : 0)}>
@@ -2424,11 +2427,12 @@ export default function Multiversos860Page() {
         const controlType = kind === 0xe0 ? "bend" : kind === 0xb0 && first < 120 ? "cc" :
           kind === 0x90 || kind === 0x80 ? "note" : null;
         const uniqueName = input.name && midiInputs.filter(p => p.name === input.name).length === 1 ? input.name : null;
-        if ((status === 0xfa || status === 0xfb) && midiLearnRef.current === null) {
+        if ((status === 0xfa || status === 0xfb || status === 0xfc) && midiLearnRef.current === null) {
           // A transport can send Start from rest and Continue with the same Play button after a pause.
-          const id = JSON.stringify([input.id,"transport","play"]);
-          const alias = uniqueName ? JSON.stringify(["name",uniqueName,"transport","play"]) : "";
-          window.dispatchEvent(new CustomEvent("860-record-midi",{cancelable:true,detail:{id,alias,on:true,pulse:true}}));
+          const pulse = status === 0xfc ? "stopScene" : "play";
+          const id = JSON.stringify([input.id,"transport",pulse]);
+          const alias = uniqueName ? JSON.stringify(["name",uniqueName,"transport",pulse]) : "";
+          window.dispatchEvent(new CustomEvent("860-record-midi",{cancelable:true,detail:{id,alias,on:true,pulse}}));
           return;
         }
         const fromPort = (binding?: CcBinding) => {

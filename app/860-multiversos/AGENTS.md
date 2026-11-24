@@ -20,4 +20,6 @@ Las escenas 32 a 39 graban en S1 a S8 respectivamente. Verificá el reemplazo co
 
 El teclado, MIDI y el botón de sonido tocan el instrumento de la escena indicada. Al pausar se puede tocar ese mismo instrumento mientras el reloj y las grabaciones esperan. Sin escena activa, el teclado queda en silencio.
 
+**Stop general** tiene su propio botón MIDI junto al stop de la partitura. **Vaciar lupera** requiere dos pulsaciones del mismo botón dentro de tres segundos. Una pulsación muestra la confirmación. La segunda detiene el banco, cancela sus tomas en curso y libera S1 a S9, incluido el historial de deshacer de esas tomas. Verificá el stop y el vaciado con audio de prueba en un perfil descartable.
+
 El archivo se actualiza cuando cambian las asignaciones. Su historial conserva hasta 64 revisiones recientes por perfil. Los cambios de teclas incorporadas se registran al abrir la nueva versión de la partitura. Al modificar esos controles, actualizá la referencia en `control-map.ts` en el mismo cambio y verificá exportación, reapertura y recuperación.

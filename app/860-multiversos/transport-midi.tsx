@@ -1,19 +1,20 @@
 import { useEffect, useState } from "react";
 import { useSavedSetting } from "./saved-setting";
 
-const names = { play: "Play general", record: "Grabar", playAll: "Reproducir todos los loops", stop: "Detener todos" } as const;
-type TransportAction = keyof typeof names;
+import { TRANSPORT_NAMES as names, type TransportAction } from "./control-map";
 
 export function useTransportMidi(connectMidi: (rescan?: boolean) => Promise<void>) {
   const [play, setPlay] = useSavedSetting("generalPlayButton", "");
+  const [stopScene, setStopScene] = useSavedSetting("generalStopButton", "");
   const [record, setRecord] = useSavedSetting("mixerRecordButton", "");
   const [legacyRecord, setLegacyRecord] = useSavedSetting("mixerLiveButton", "");
   const [playAll, setPlayAll] = useSavedSetting("mixerPlayAllButton", "");
   const [stop, setStop] = useSavedSetting("mixerStopButton", "");
-  const [aliases, setAliases] = useSavedSetting("mixerTransportAliases", { play: "", record: "", playAll: "", stop: "" });
+  const [clear, setClear] = useSavedSetting("mixerClearButton", "");
+  const [aliases, setAliases] = useSavedSetting<Partial<Record<TransportAction, string>>>("mixerTransportAliases", {});
   const [learning, setLearning] = useState<TransportAction | null>(null);
   const [conflict, setConflict] = useState("");
-  const buttons = { play, record: record || legacyRecord, playAll, stop };
+  const buttons = { play, stopScene, record: record || legacyRecord, playAll, stop, clear };
 
   useEffect(() => {
     const otherControl = (event: Event) => {
@@ -47,6 +48,8 @@ export function useTransportMidi(connectMidi: (rescan?: boolean) => Promise<void
       setLegacyRecord("");
     } else if (learning === "stop") setStop(id);
     else if (learning === "playAll") setPlayAll(id);
+    else if (learning === "stopScene") setStopScene(id);
+    else if (learning === "clear") setClear(id);
     else setPlay(id);
     setAliases(current => ({ ...current, [learning]: alias || "" }));
     setLearning(null);

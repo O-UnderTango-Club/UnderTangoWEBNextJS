@@ -21,7 +21,8 @@ type Mode = "matrix" | "live";
 type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; source: AudioBufferSourceNode; dispose: () => void };
 
-export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monitor,synthStream, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready}: {
+export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomAnalyser,monitor,synthStream, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready}: {
+  roomAnalyser: {current:AnalyserNode|null};
   codaScene: number | null;
   liveSet: LiveSetScene | null; countingTake: {current:boolean}; routing:{current:PerformanceInput|null};
   transportMidi: TransportMidi; playGeneral: () => void;
@@ -69,6 +70,10 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monit
   const finaleMic = useRef(false);
   const micRequest = useRef(0);
   const roomMeter = useRoomInstrument(liveSet === 89 && !paused, room ? mic.current : null, input);
+  useEffect(()=>{
+    roomAnalyser.current=liveSet===89 && room ? roomMeter.current : null;
+    return ()=>{roomAnalyser.current=null;};
+  },[liveSet,room,paused,input,roomMeter,roomAnalyser]);
   const [countIn,setCountIn] = useState<number|null>(null);
   const external = useRef<MediaStream|null>(null);
   const [shared,setShared] = useState(false);

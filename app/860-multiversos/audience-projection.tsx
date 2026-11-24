@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { drawAsciiCamera } from "./ascii-camera";
+import { StimulusBar } from "./stimulus-bar";
 
 type Props = {
   analyser: { current: AnalyserNode | null };
@@ -67,7 +68,7 @@ export function AudienceProjection({ analyser, attack, paused, treatment = "cont
     const video = camera.current;
     if (!video || !live) return;
     if (paused) video.pause();
-    else void video.play().catch(() => { setStatus("No se pudo reanudar la cámara."); setRetry(true); });
+    else void video.play().catch(() => { setLive(false); setStatus("No se pudo reanudar la cámara."); setRetry(true); });
   }, [live, paused]);
 
   useEffect(() => {
@@ -138,6 +139,7 @@ export function AudienceProjection({ analyser, attack, paused, treatment = "cont
   return <div className="audience-projection" aria-label="Proyección del público">
     <video ref={camera} muted playsInline aria-label="Cámara del público" style={treatment === "ascii" ? {opacity:0} : undefined}/>
     <canvas ref={overlay} aria-hidden="true" />
+    <StimulusBar scene={treatment==="ascii" ? 68 : 61} paused={paused} camera={live ? "live" : retry ? "off" : "waiting"} />
     {status && <div className="audience-camera-status" role="status">{status}
       {retry && <button type="button" onClick={() => setAttempt(value => value + 1)}>Reintentar cámara</button>}
     </div>}

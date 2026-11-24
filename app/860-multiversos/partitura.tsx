@@ -24,6 +24,8 @@ import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
+import { ProjectionSignalContext, useProjectionSignals, useSceneSignals } from "./projection-signals";
+import { StimulusBar } from "./stimulus-bar";
 import { warmRecorder } from "./measure-recorder";
 import { TransportMidiButton, useTransportMidi } from "./transport-midi";
 import { EXTENDED_STYLE } from "./extended-style";
@@ -1220,6 +1222,7 @@ function EmptySetScene({ durationMs, beacon, cue, paused }: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const orientation = useRef<SceneZeroDrag>({ yaw: 0, pitch: 0 });
+  const signals = useProjectionSignals();
   const movementSeconds = useRef(0);
   const phases = useRef<SceneZeroRotation | null>(null);
   const drag = useRef<SceneZeroPointer | null>(null);
@@ -1320,6 +1323,7 @@ function EmptySetScene({ durationMs, beacon, cue, paused }: {
       const pitch = (event.clientY - previous.y) * SCENE_ZERO_DRAG_SCALE;
       const elapsed = Math.max(0.008, (event.timeStamp - previous.movedAt) / 1000);
       const speed = Math.hypot(yaw, pitch) / elapsed;
+      if (speed > 0) signals.current.gesture = 1;
       const scale = Math.min(1, SCENE_ZERO_MAX_DRAG_SPEED / Math.max(speed, 0.001)) / elapsed;
       const response = 1 - Math.exp(-elapsed / 0.04);
       velocity.current.yaw += response * (yaw * scale - velocity.current.yaw);
@@ -1350,6 +1354,7 @@ function EmptySetScene({ durationMs, beacon, cue, paused }: {
       if (paused || !step) return;
       event.preventDefault();
       rotate(step[0] * .14, step[1] * .14);
+      signals.current.gesture = 1;
       redrawRef.current();
     }} />;
 }
@@ -1520,6 +1525,7 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const activeSceneRef = useRef<HTMLDivElement | null>(null);
   const spiralAnalyser=useRef<AnalyserNode|null>(null);
+  const roomAnalyser=useRef<AnalyserNode|null>(null);
   const countingTake = useRef(false);
   const sceneMonitor=useRef<WaveShaperNode|null>(null);
   const mixMaster = useRef<GainNode | null>(null);
@@ -1541,13 +1547,18 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
   }, []);
   const chordLoop = useChordLoop(noteScene === "fourteen" ? cue : null, outputRef);
   const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, pausedRef);
+  const liveAttack = extended.attack, strikeChord = chordLoop.strike;
+  const noteStrike = useCallback((frequency:number, time:number, velocity=.85) => {
+    liveAttack.current={count:liveAttack.current.count+1,frequency,velocity};
+    if (noteScene==="fourteen") strikeChord(frequency,time);
+  },[liveAttack,noteScene,strikeChord]);
   const directionSeconds = extendedScene ? extendedSeconds[extendedScene] || (EXTENDED_DEFAULT_SECONDS[extendedScene] || 16) : 0;
   useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
   const earlyScene = typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
   useEarlyInstrument(earlyScene, outputRef.current, cue?.beginsAt ?? 0, activeDurationMs / 1000, playingNoisePair, pausedRef, pianoRouting);
   const noteInput = usePerformanceInput({
     scene: noteScene, ownsInput: noteScene !== null || stage === "preparing", splitNote, learnSplit,
-    clock: cue?.context ?? null, outputRef, pausedRef, routing: pianoRouting, onStrike: chordLoop.strike,
+    clock: cue?.context ?? null, outputRef, pausedRef, routing: pianoRouting, onStrike: noteStrike,
   });
   const enterNumberedScene = useCallback((mode: NumberedScene, context: AudioContext, asPreview: boolean, beginsAt = context.currentTime) => {
     setCue({ context, beginsAt });
@@ -2032,6 +2043,9 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
   const numberedMode = activeScene === "beacon" || activeScene === "line" ? "opening" : activeScene;
   const sceneIndex = numberedControls.findIndex(control => control.mode === numberedMode);
   const sceneNumber = sceneIndex >= 0 ? sceneIndex + 1 : null;
+  const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack);
+  const loopFrame = sceneNumber===14 ? chordLoop.frame : extended.three
+    ? (extended.loops.find(loop=>loop.frame?.running)?.frame ?? extended.loops[0].frame) : extended.manual.frame;
   const sceneTitle = breathing ? "Plano 9" : sceneControls.find(control => control.mode === activeScene)?.title;
   const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
   const coda = extendedScene !== null && extendedScene >= 90 ? extendedScene as CodaScene : null;
@@ -2104,6 +2118,7 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
       .scene-mixer button { padding:.25rem .6rem; border:1px solid #737482; background:#252631; color:white; border-radius:4px; cursor:pointer; }
       .scene-mixer button[aria-pressed=true] { background:#664481; }
       .zero-stage:has(.scene-mixer) .zero-subtitle { bottom:auto; top:.5rem; }
+      @media(max-width:760px){.zero-stage:has(>.stimulus-bar)>.zero-subtitle {top:2.6rem;}}
       .zero-start, .zero-object { position: absolute; inset: 0; width: 100%; height: 100%; }
       .zero-start { border: 0; padding: 0; background: transparent; cursor: pointer; }
       .zero-object { cursor: grab; touch-action: none; }
@@ -2386,7 +2401,7 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
       }
       ${EXTENDED_STYLE}
     `}</style>
-    <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" data-extended-dark={extendedDark ? "true" : undefined}
+    <ProjectionSignalContext.Provider value={signals}><div className="zero-stage" role="group" aria-label="Proyección del módulo cero" data-extended-dark={extendedDark ? "true" : undefined}
       style={{background:extendedDark ? "#130f20" : light ? "#fff" : "#000"}}>
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} beacon={stage === "beacon"} cue={cue} paused={paused} />}
@@ -2419,10 +2434,13 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} codaScene={coda} liveSet={liveSet} countingTake={countingTake} analyser={liveSet || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} codaScene={coda} liveSet={liveSet} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      {sceneNumber !== null && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
+        notes={noteScene ? noteInput.sounding : undefined} loop={loopFrame} tuning={extended.a4}
+        resting={breathing} interactiveObject={showObject} />}
       {sceneNumber !== null && <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>}
       {sceneNumber !== null && sceneNumber < 10 && <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
-    </div>
+    </div></ProjectionSignalContext.Provider>
     <aside className="zero-controls" aria-label="Controles de las escenas">
       <div className="zero-settings" ref={settingsRef}>
         <div className="zero-scene">

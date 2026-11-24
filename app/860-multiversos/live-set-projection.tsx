@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import { AudienceProjection } from "./audience-projection";
 import { useTempo } from "./tempo";
+import { ResonantVisuals } from "./resonant-visuals";
+import { useProjectionSignals } from "./projection-signals";
+import { StimulusBar } from "./stimulus-bar";
 
 type MeterRef = {current: AnalyserNode | null};
 type LiveSetProps = {
@@ -121,6 +124,7 @@ const style = `
 .live-set>.audience-projection button {pointer-events:auto;}
 .live-set-heading {position:absolute;left:clamp(1.5rem,7%,7rem);top:clamp(2.6rem,12%,6.5rem);max-width:85%;color:inherit;font-size:clamp(1.7rem,5.6cqw,5.4rem);line-height:1.02;letter-spacing:-.035em;}
 .live-set[data-scene="68"] .live-set-heading {top:auto;bottom:4%;font-size:clamp(1rem,2.4cqw,2rem);background:#070b10d9;padding:.18em .35em;}
+.live-set[data-resonant] .live-set-heading {top:auto;bottom:clamp(.7rem,3%,2rem);left:clamp(.7rem,3%,2rem);max-width:52%;font-size:clamp(.86rem,1.55cqw,1.45rem);text-shadow:0 1px 5px #000,0 1px 12px #000;pointer-events:none;}
 .live-set-center {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:clamp(.2rem,1.25cqh,1rem);text-align:center;pointer-events:none;}
 .live-set-center strong {font-family:system-ui,sans-serif;font-size:clamp(3rem,min(30cqh,24cqw),12rem);line-height:.94;letter-spacing:-.06em;font-weight:650;font-variant-numeric:tabular-nums;color:#eefff9;}
 .live-set-center small,.live-set-count {font:500 clamp(.72rem,1.8cqw,1rem)/1.3 system-ui,sans-serif;}
@@ -140,14 +144,18 @@ const style = `
 export function LiveSetProjection(props: LiveSetProps) {
   const {scene,title,analyser,paused,meter,bars,bpm,position,countIn} = props;
   const {setBpm,locked} = useTempo();
+  const signals=useProjectionSignals();
+  const resonant=scene===44 || scene===54 || scene===78;
   const suggestedBpm = scene>=70 && scene<=79 ? 144 : scene>=80 && scene<=87 ? 112 : null;
   const layers = scene >= 32 && scene <= 39;
   const family = scene >= 88 ? "cierre" : scene >= 80 ? "tango" : scene >= 70 ? "psy" : layers ? "capas" : "estilos";
   const pulse = position%meter+1, bar = Math.floor(position/meter)+1;
-  return <div className="live-set" data-scene={scene} data-family={family} role="group" aria-label={title}>
+  return <div className="live-set" data-scene={scene} data-family={family} data-resonant={resonant || undefined} role="group" aria-label={title}>
     <style>{style}</style>
     {scene===68 ? <AudienceProjection analyser={analyser} paused={paused} treatment="ascii" />
+      : resonant ? <ResonantVisuals scene={scene} signals={signals} paused={paused} />
       : <SoundDrawing scene={scene} analyser={analyser} paused={paused} bpm={bpm} />}
+    {scene!==68 && <StimulusBar scene={scene} paused={paused} room={scene===89 && props.room} />}
     <div className="live-set-heading">{scene===88 ? "El último café" : title}</div>
     {layers && <div className="live-set-center">
       <strong aria-label={countIn!==null ? "Cuenta de entrada "+countIn : "Pulso "+pulse}>{countIn ?? pulse}</strong>

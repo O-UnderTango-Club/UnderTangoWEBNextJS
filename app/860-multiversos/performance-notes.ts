@@ -44,7 +44,7 @@ export type PerformanceInput = {
   releaseAll?: () => void;
 };
 
-export type NoteStrike = (frequency: NoteFrequency, time: number) => void;
+export type NoteStrike = (frequency: NoteFrequency, time: number, velocity?: number) => void;
 
 export function createPerformanceNotes(output: GainNode, onChange: (frequencies: NoteFrequency[]) => void, onStrike?: NoteStrike, totalLevel = 0.55) {
   const context = output.context;
@@ -112,7 +112,7 @@ export function createPerformanceNotes(output: GainNode, onChange: (frequencies:
       const time = context.currentTime;
       held.set(id, { frequency, velocity: Math.max(0.10, Math.min(1, velocity)) });
       update(frequency);
-      onStrike?.(frequency, time);
+      onStrike?.(frequency, time, velocity);
     },
     release,
     releaseFrom,

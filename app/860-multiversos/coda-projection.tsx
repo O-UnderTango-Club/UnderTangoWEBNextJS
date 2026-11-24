@@ -1,6 +1,7 @@
 import {useEffect,useState,type CSSProperties} from "react";
 import {INKS, isRound, PALETTES, remainingSeconds, TIMBRES} from "./coda-ballot";
 import {useHostedBallot} from "./coda-host";
+import {StimulusBar} from "./stimulus-bar";
 import {useCodaInstrument} from "./coda-audio";
 import {SHOW_SCORE} from "./show-score";
 import type {PerformanceInput} from "./performance-notes";
@@ -55,6 +56,10 @@ export function CodaProjection(props:Props) {
   return <div className="coda-stage" data-scene={scene} data-color={selection.color} data-sound={selection.sound}
     style={{"--coda-color":INKS[selection.color],"--coda-light":.06+.68*((111-scene)/21)} as CSSProperties}>
     <style>{style}</style>
+    <StimulusBar scene={scene} paused={paused} ballot={state && (!isRound(scene) || vote) ? {
+      open:vote && state.open, total:state.total,
+      choice:colorSound ? PALETTES[colorSound.color]+" · "+TIMBRES[colorSound.sound] : null,
+    } : null} />
     <div className="coda-field" aria-hidden="true">{Array.from({length:5},(_,i)=><i key={i} className="coda-wave" style={{animationDelay:(-i*2.6)+"s",animationPlayState:paused?"paused":"running"}}/>)}</div>
     {invite?<div className="coda-invite">
       <div className="coda-ballot-copy">

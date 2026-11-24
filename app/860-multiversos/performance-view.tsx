@@ -17,7 +17,7 @@ export function usePerformanceInput({ scene, ownsInput, clock, outputRef, paused
   useEffect(() => {
     if (!ownsInput) return;
     const output = outputRef.current;
-    const player = scene && clock && output ? createPerformanceNotes(output, setSounding, scene === "fourteen" ? onStrike : undefined) : null;
+    const player = scene && clock && output ? createPerformanceNotes(output, setSounding, onStrike) : null;
     notesRef.current = player;
     const send = (key: string, index: number, velocity: number, splitIndex?: number, face: NoteFace = "front") => {
       if (!scene || !player) return;

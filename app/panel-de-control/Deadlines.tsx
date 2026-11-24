@@ -12,20 +12,21 @@ export default function Deadlines({data,error,refreshing,onRefresh,onOpenTask}: 
   const upcoming = window.upcoming.filter(item => showConditional || item.kind !== "conditional");
   function itemRow(item: DeadlineItem) {
     const url = safeDeadlineUrl(item.url);
+    const taskId = item.taskId;
     return <li key={item.id} className={css.deadlineItem} data-kind={item.kind}>
       <div className={css.deadlineDate}><time dateTime={item.date}>{deadlineDate(item.date)}</time>
         {item.date === data?.today && <span className={css.badge}>Hoy</span>}
       </div>
-      <h3>{item.title}</h3>
+      <h3>{taskId ? <button className={css.deadlineTask} disabled={refreshing} onClick={()=>onOpenTask(taskId)}>{item.title}</button> : item.title}</h3>
       {item.time && <p className={css.deadlineTime}>{item.time}</p>}
       <div className={css.deadlineMeta}>
         <span className={css.deadlineKind} data-kind={item.kind}>{DEADLINE_KINDS[item.kind]}</span>
         <span>{item.status}</span>
         <span className={item.priority === "Alta" || item.priority === "Crítica" ? css.deadlinePriority : undefined}>{item.priority ? "Prioridad " + item.priority : "Sin prioridad asignada"}</span>
       </div>
-      {(item.detail || item.taskId || url) && <details className={css.deadlineDetail}><summary>Ver detalle</summary>
+      {(item.detail || url) && <details className={css.deadlineDetail}><summary>Ver detalle</summary>
         {item.detail && <p>{item.detail}</p>}
-        <div className={css.actions}>{item.taskId && <button className={css.linkButton} onClick={()=>onOpenTask(item.taskId!)}>Abrir acción</button>}
+        <div className={css.actions}>
           {url && <a href={url} target="_blank" rel="noreferrer">Ver fuente ↗</a>}</div>
       </details>}
     </li>;

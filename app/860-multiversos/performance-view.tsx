@@ -38,11 +38,16 @@ export function usePerformanceInput({ scene, ownsInput, clock, outputRef, paused
           if (note >= MIDI_START_BY_FACE.top) face = "top";
           else if (note >= MIDI_START_BY_FACE.right) face = "right";
         }
-        const index = note - MIDI_START_BY_FACE[face];
+        const offset = note - MIDI_START_BY_FACE[face];
+        // Preserve each face's original nine keys and repeat its scale in unused registers.
+        const index = scene === "eleven" ? offset : ((offset % 9) + 9) % 9;
         send(`${midiPrefix(id)}${channel}:${note}`, index, velocity, splitNote - FIRST_MIDI_NOTE, face);
       },
       releaseMidi: (id, channel) => player?.releaseFrom(midiPrefix(id) + (channel === undefined ? "" : `${channel}:`)),
-      computerNote: (key, note, pressed) => send(`keyboard:${key}`, note - FIRST_MIDI_NOTE, pressed ? 0.85 : 0),
+      computerNote: (key, note, pressed) => {
+        const offset = note - FIRST_MIDI_NOTE;
+        send(`keyboard:${key}`, scene === "eleven" ? offset : ((offset % 9) + 9) % 9, pressed ? 0.85 : 0);
+      },
     };
     routing.current = destination;
 

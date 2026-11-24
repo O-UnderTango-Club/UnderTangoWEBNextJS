@@ -9,8 +9,10 @@ import { CONTINUATION_SCENES, DEFAULT_PAIR, NOISE_COLORS, NOISE_IDS, type Contin
 import { ContinuationProjection } from "./scene-visuals";
 import { FIRST_MIDI_NOTE, NOTE_SCENES, NOTE_SCENE_IDS, isNoteScene, type NoteScene, type PerformanceInput } from "./performance-notes";
 import { PerformanceProjection, usePerformanceInput } from "./performance-view";
+import { useEarlyInstrument } from "./early-instrument";
 import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
-import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isTimbreScene, type ExtendedScene } from "./extended-scenes";
+import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isLiveSetScene, isTimbreScene, type ExtendedScene } from "./extended-scenes";
+import { SCENE_INSTRUMENT_NAMES } from "./scene-instrument";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
 import { TypeProjection } from "./type-projection";
 import { AudienceProjection } from "./audience-projection";
@@ -1461,9 +1463,10 @@ async function resumeAudioOutput(context: AudioContext) {
   }
 }
 
-function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
+function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
   synthStream: MediaStream|null; masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
+  enterSolo: () => void;
   connectMidi: (rescan?: boolean) => Promise<void>;
   midiConnection: MidiConnection;
   midiInputs: MidiDevice[];
@@ -1475,6 +1478,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
   const activeScene = typeof stage === "number" ? stage : MODULE_ZERO_SCENE_BY_STAGE[stage];
   const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
   const extendedScene = typeof stage === "number" ? stage : null;
+  useEffect(()=>{if(extendedScene===88 || extendedScene===89)enterSolo();},[extendedScene,enterSolo]);
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
 
@@ -1485,7 +1489,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
   const [spaceSeconds, setSpaceSeconds] = useSavedSetting("spaceSeconds", SCENE_SPACE_DEFAULT_SECONDS);
   const [timeSeconds, setTimeSeconds] = useSavedSetting("timeSeconds", SCENE_TIME_DEFAULT_SECONDS);
   const [restSeconds, setRestSeconds] = useSavedSetting("restSeconds", 4);
-  const [noteSeconds, setNoteSeconds] = useSavedSetting<Record<NoteScene, number>>("noteSeconds", { ten: 12, eleven: 12, twelve: 12, thirteen: 12, fourteen: 0 });
+  const [noteSeconds, setNoteSeconds] = useSavedSetting<Record<NoteScene, number>>("noteSeconds", { ten: 12, eleven: 12, twelve: 12, thirteen: 12, fourteen: 28 });
   const [extendedSeconds, setExtendedSeconds] = useSavedSetting("extendedSeconds", EXTENDED_DEFAULT_SECONDS);
   const [splitNote, setSplitNote] = useSavedSetting("splitNote", FIRST_MIDI_NOTE);
   const [learningSplit, setLearningSplit] = useState(false);
@@ -1506,6 +1510,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const activeSceneRef = useRef<HTMLDivElement | null>(null);
   const spiralAnalyser=useRef<AnalyserNode|null>(null);
+  const countingTake = useRef(false);
   const sceneMonitor=useRef<WaveShaperNode|null>(null);
   const mixMaster = useRef<GainNode | null>(null);
   const outputRef = useRef<GainNode | null>(null);
@@ -1528,8 +1533,10 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
   const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, pausedRef);
   const directionSeconds = extendedScene ? extendedSeconds[extendedScene] || (EXTENDED_DEFAULT_SECONDS[extendedScene] || 16) : 0;
   useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
+  const earlyScene = typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
+  useEarlyInstrument(earlyScene, outputRef.current, cue?.beginsAt ?? 0, activeDurationMs / 1000, playingNoisePair, pausedRef, pianoRouting);
   const noteInput = usePerformanceInput({
-    scene: noteScene, ownsInput: stage !== "ready" && !extendedPlaying, splitNote, learnSplit,
+    scene: noteScene, ownsInput: noteScene !== null || stage === "preparing", splitNote, learnSplit,
     clock: cue?.context ?? null, outputRef, pausedRef, routing: pianoRouting, onStrike: chordLoop.strike,
   });
   const enterNumberedScene = useCallback((mode: NumberedScene, context: AudioContext, asPreview: boolean) => {
@@ -1578,13 +1585,14 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
   }, [stop]);
 
   useEffect(() => {
-    if ((!nextTimedScene && extendedScene !== 62) || nextAfterSeconds === 0 || !cue || paused) return;
+    if ((!nextTimedScene && extendedScene !== 89) || nextAfterSeconds === 0 || !cue || paused) return;
     const deadline = cue.beginsAt + nextAfterSeconds;
     let timer: number | undefined;
     const advance = () => {
       if (pausedRef.current || audioRef.current !== cue.context) return;
       const remaining = deadline - cue.context.currentTime;
       if (remaining > 0.005) timer = window.setTimeout(advance, Math.max(8, remaining * 1000));
+      else if (countingTake.current) timer = window.setTimeout(advance, 100);
       else if (nextTimedScene) enterNumberedScene(nextTimedScene, cue.context, previewMode !== null);
       else reset();
     };
@@ -2015,14 +2023,17 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
         setDuration: (seconds: number) => setNoteSeconds((current) => ({ ...current, [mode]: seconds })) };
     }),
     ...EXTENDED_SCENES.map((mode) => ({ mode, title: `Escena ${mode}`, id: `scene-${mode}`, label: `Duración de la escena ${mode}`,
-      duration: extendedSeconds[mode], min: 0, max: 120,
+      duration: extendedSeconds[mode], min: 0, max: mode === 88 ? 600 : 120,
       setDuration: (seconds: number) => setExtendedSeconds((current) => ({ ...current, [mode]: seconds })),
     })),
   ] as const;
   const sceneIndex = sceneControls.findIndex(({ mode }) => mode === activeScene);
   const sceneTitle = breathing ? "Plano 9" : sceneControls[sceneIndex]?.title;
   const sceneNumber = extendedScene ?? (noteScene ? NOTE_SCENES[noteScene].number : null);
-  const extendedDark = extendedScene === 16 || extendedScene === 17 || isTimbreScene(extendedScene);
+  const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
+  const extendedDark = extendedScene === 16 || extendedScene === 17 || isTimbreScene(extendedScene) || liveSet !== null;
+  const minutes = (sceneControls.reduce((sum, control) => sum + control.duration, restSeconds) / 60).toFixed(1);
+  const manualScenes = sceneControls.filter(control => !control.duration).length + Number(restSeconds === 0);
   const playMode = (mode: ModuleZeroScene, asPreview: boolean, startPaused = false) => {
     if ((typeof mode === "number" || isNoteScene(mode)) && (breathing || noteScene || extendedScene) && cue) {
       enterNumberedScene(mode, cue.context, asPreview);
@@ -2387,7 +2398,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
         beginsAt={cue?.beginsAt ?? 0} />}
       {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
       {(extendedScene === 60 || extendedScene === 61 || extendedScene === 62) && cue && <HardstyleTrack clock={cue.context} output={outputRef.current} paused={paused} />}
-      {extendedScene && cue && (extendedScene === 42 || extendedScene === 62
+      {extendedScene && !liveSet && cue && (extendedScene === 42 || extendedScene === 62
         ? <TypeProjection scene={extendedScene} beginsAt={cue.beginsAt} clock={cue.context} paused={paused} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} />
         : extendedScene === 61
         ? <AudienceProjection analyser={spiralAnalyser} attack={extended.attack} paused={paused} />
@@ -2398,15 +2409,19 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} analyser={extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} pitch={111 * (1 + Math.max(0,sceneIndex) % 9)} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} liveSet={liveSet} countingTake={countingTake} analyser={liveSet || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null ? <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>
         : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>
     <aside className="zero-controls" aria-label="Controles de las escenas">
       <div className="zero-settings" ref={settingsRef}>
+        <details className="zero-scene"><summary>Duración prevista · {minutes} min{manualScenes ? ` + ${manualScenes} pasos manuales` : " aprox."}</summary>
+          <p>El plan de ensayo reparte el tiempo desde la escena 14 hasta el ambiente final. En la 88 podés elegir «Hasta avanzar» para dar la entrada de sala al terminar de cantar.</p>
+          <button disabled={!ready} onClick={()=>{setExtendedSeconds({...EXTENDED_DEFAULT_SECONDS});setNoteSeconds(old=>({...old,fourteen:28}));}}>Aplicar tiempos de ensayo (14–89)</button>
+        </details>
         {sceneControls.map((control) => {
           const { mode, title, id, duration } = control;
-          const seconds = duration === 0 ? (mode === 62 ? "Hasta detener" : "Hasta avanzar") : `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
+          const seconds = duration === 0 ? (mode === 89 ? "Hasta detener" : "Hasta avanzar") : `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
           const isActive = mode === activeScene;
           return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}
             ref={isActive ? activeSceneRef : undefined} aria-current={isActive ? "step" : undefined}>
@@ -2414,6 +2429,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
               <h2 id={`${id}-title`}>{title}</h2>
               <output htmlFor={id}>{seconds}</output>
             </div>
+            {typeof mode === "number" && isLiveSetScene(mode) && <small>{SCENE_INSTRUMENT_NAMES[mode]}</small>}
             <input id={id} aria-label={control.label} type="range" min={control.min} max={control.max} step={1} value={control.duration}
               aria-valuetext={seconds} disabled={!canStart}
               onChange={(event) => control.setDuration(Number(event.currentTarget.value))} />
@@ -2455,7 +2471,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
               <p>{noteScene === "ten" ? "Usá cualquier tecla MIDI o 1–9 en la computadora. Después del tiempo elegido entra la escena 11."
                 : noteScene === "eleven" ? "En la computadora, 1–4 para la nota grave y 5–9 para la aguda."
                   : noteScene === "thirteen" ? "La cara derecha se toca con Mayús y 1–9 o de Do5 a La♭5 por MIDI. Para la superior, tocá las celdas o usá de Do6 a La♭6."
-                    : "En la computadora, 1–9. En el piano MIDI, de Do4 a La♭4."}</p>
+                    : "En la computadora, 1–9. En el piano, Do4 inicia la serie de 111 a 999 Hz y las nueve alturas se repiten por todo el teclado."}</p>
               {noteScene === "eleven" && midiInputs.length > 0 && <>
                 <p role="status">{learningSplit ? "Tocá la primera tecla de la zona aguda." : `Corte MIDI en ${splitLabel}. Desde ahí suenan 999 Hz.`}</p>
                 <button type="button" disabled={paused} onClick={() => {
@@ -2909,6 +2925,9 @@ export default function Multiversos860Page() {
     }).catch(() => setAudioMessage("NO SE PUDO INICIAR EL AUDIO"));
   }, [ensureAudio, stopRecording]);
 
+  const enterSolo = useCallback(()=>{
+    if(engineRef.current?.context.state==="running")toggleAudio();
+  },[toggleAudio]);
   const onMidiData = useRef<(port: MidiInputLike, data: ArrayLike<number>) => void>(() => {});
   const [portMonitor] = useState(() => monitorMidiInputs(setMidiInputs,
     (port, data) => onMidiData.current(port, data),
@@ -3062,6 +3081,7 @@ export default function Multiversos860Page() {
           });
           if (mappedIndex === String(MASTER_FADER)) setMasterVolume(Math.round(second * 100 / 127));
           else if (mappedIndex !== undefined) updateControl(Number(mappedIndex), second / 127);
+          else if (first === 64) piano?.sustainMidi?.(input.id, channel, second >= 64);
         }
       };
 
@@ -3475,7 +3495,7 @@ export default function Multiversos860Page() {
 
   return (
     <main className={styles.console}>
-      <TempoProvider><ModuleZero synthStream={synthStream} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
+      <TempoProvider><ModuleZero enterSolo={enterSolo} synthStream={synthStream} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
           <span className={styles.brandMark}>&#9670;</span>
@@ -3728,12 +3748,14 @@ export default function Multiversos860Page() {
                   ].filter(Boolean).join(" ")}
                   onPointerDown={(event) => {
                     event.currentTarget.setPointerCapture(event.pointerId);
+                    if(pianoRouting.current){pianoRouting.current.computerNote("pointer:"+event.pointerId,key.note,true);return;}
                     captureNote(key.note);
                     startNote(key.note, 0.9);
                   }}
-                  onPointerUp={() => releaseNote(key.note)}
-                  onPointerCancel={() => releaseNote(key.note)}
-                  onLostPointerCapture={() => releaseNote(key.note)}
+                  onLostPointerCapture={event=>{
+                    pianoRouting.current?.computerNote("pointer:"+event.pointerId,key.note,false);
+                    if(!pianoRouting.current || pressedNotesRef.current.has(key.note))releaseNote(key.note);
+                  }}
                   aria-label={"Tocar " + noteName(key.note)}
                 >
                   <span>{key.label}</span>

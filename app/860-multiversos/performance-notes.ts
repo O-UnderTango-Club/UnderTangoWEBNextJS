@@ -38,6 +38,7 @@ export function noteSceneFrequency(scene: NoteScene, index: number, splitIndex =
 
 export type PerformanceInput = {
   midiNote: (inputId: string, channel: number, note: number, velocity: number) => void;
+  sustainMidi?: (inputId: string, channel: number, down: boolean) => void;
   releaseMidi: (inputId: string, channel?: number) => void;
   computerNote: (key: string, note: number, pressed: boolean) => void;
   releaseAll?: () => void;

@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
+import { drawAsciiCamera } from "./ascii-camera";
 
 type Props = {
   analyser: { current: AnalyserNode | null };
-  attack: { current: { count: number; velocity: number; frequency: number } };
+  attack?: { current: { count: number; velocity: number; frequency: number } };
+  treatment?: "contour" | "ascii";
   paused: boolean;
 };
 
 const columns = 112;
 const rows = 64;
 
-export function AudienceProjection({ analyser, attack, paused }: Props) {
+export function AudienceProjection({ analyser, attack, paused, treatment = "contour" }: Props) {
   const camera = useRef<HTMLVideoElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
   const [attempt, setAttempt] = useState(0);
@@ -72,13 +74,14 @@ export function AudienceProjection({ analyser, attack, paused }: Props) {
     const video = camera.current, surface = overlay.current;
     const ink = surface?.getContext("2d");
     if (!video || !surface || !ink || paused || !live) return;
+    if (treatment === "ascii") return drawAsciiCamera(video, surface, analyser);
     const sampler = document.createElement("canvas");
     sampler.width = columns; sampler.height = rows;
     const pixels = sampler.getContext("2d", { willReadFrequently: true });
     if (!pixels) return;
     const previous = new Uint8Array(columns * rows);
     const bins = new Uint8Array(512);
-    let raf = 0, last = 0, bass = 0, treble = 0, impulse = 0, seen = attack.current.count;
+    let raf = 0, last = 0, bass = 0, treble = 0, impulse = 0, seen = attack?.current.count ?? 0;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
@@ -99,7 +102,7 @@ export function AudienceProjection({ analyser, attack, paused }: Props) {
       for (let i = 24; i < 140; i++) high += bins[i];
       bass += (low - bass) * (1 - Math.exp(-dt * 9));
       treble += (high / (116 * 255) - treble) * (1 - Math.exp(-dt * 8));
-      if (attack.current.count !== seen) { seen = attack.current.count; impulse = attack.current.velocity; }
+      if (attack && attack.current.count !== seen) { seen = attack.current.count; impulse = attack.current.velocity; }
       impulse *= Math.exp(-dt * 3);
       const force = Math.min(1, bass + treble + impulse);
       video.style.filter = `saturate(${1 + force * .85}) contrast(${1 + bass * .12})`;
@@ -130,10 +133,10 @@ export function AudienceProjection({ analyser, attack, paused }: Props) {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [analyser, attack, live, paused]);
+  }, [analyser, attack, live, paused, treatment]);
 
   return <div className="audience-projection" aria-label="Proyección del público">
-    <video ref={camera} muted playsInline aria-label="Cámara del público" />
+    <video ref={camera} muted playsInline aria-label="Cámara del público" style={treatment === "ascii" ? {opacity:0} : undefined}/>
     <canvas ref={overlay} aria-hidden="true" />
     {status && <div className="audience-camera-status" role="status">{status}
       {retry && <button type="button" onClick={() => setAttempt(value => value + 1)}>Reintentar cámara</button>}

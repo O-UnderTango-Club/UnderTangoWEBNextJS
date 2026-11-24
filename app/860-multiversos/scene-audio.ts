@@ -44,7 +44,11 @@ function inverseTransform(real: Float64Array, imaginary: Float64Array) {
   }
 }
 
-function makeNoiseBuffers(context: AudioContext) {
+const noiseCache = new WeakMap<BaseAudioContext, { id: NoiseColor; buffer: AudioBuffer }[]>();
+
+export function sceneNoiseBuffers(context: BaseAudioContext) {
+  const cached = noiseCache.get(context);
+  if (cached) return cached;
   const size = 2 ** 17;
   const cosines = new Float64Array(size / 2), sines = new Float64Array(size / 2);
   for (let bin = 1; bin < size / 2; bin++) {
@@ -54,7 +58,7 @@ function makeNoiseBuffers(context: AudioContext) {
   }
 
   // Shared phases keep the texture continuous as the spectral slope changes.
-  return NOISE_IDS.map((id) => {
+  const buffers = NOISE_IDS.map((id) => {
     const real = new Float64Array(size), imaginary = new Float64Array(size);
     for (let bin = 1; bin < size / 2; bin++) {
       const hz = Math.max(30, bin * context.sampleRate / size);
@@ -76,6 +80,8 @@ function makeNoiseBuffers(context: AudioContext) {
     for (let i = 0; i < size; i++) data[i] = real[i] * scale;
     return { id, buffer };
   });
+  noiseCache.set(context, buffers);
+  return buffers;
 }
 
 function chord(output: GainNode, notes: FrequencyVector, startsAt: number, endsAt: number, shape: (gain: AudioParam) => void) {
@@ -103,7 +109,7 @@ function chord(output: GainNode, notes: FrequencyVector, startsAt: number, endsA
 
 export function scheduleContinuationAudio(output: GainNode, timing: SceneTiming[], earliestStart: number, pair: NoisePair) {
   const context = output.context as AudioContext;
-  const buffers = timing.some(({ scene }) => scene !== "cross") ? makeNoiseBuffers(context) : [];
+  const buffers = timing.some(({ scene }) => scene !== "cross") ? sceneNoiseBuffers(context) : [];
   let position = Math.max(earliestStart, context.currentTime + 0.07);
   const scenes: TimedScene[] = timing.map((scene) => {
     const startsAt = position;

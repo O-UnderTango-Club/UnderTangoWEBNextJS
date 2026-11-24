@@ -21,7 +21,8 @@ type Mode = "matrix" | "live";
 type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; source: AudioBufferSourceNode; dispose: () => void };
 
-export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monitor,synthStream, scene, routing, liveSet, countingTake, input, master, paused, startScene, ready}: {
+export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monitor,synthStream, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready}: {
+  codaScene: number | null;
   liveSet: LiveSetScene | null; countingTake: {current:boolean}; routing:{current:PerformanceInput|null};
   transportMidi: TransportMidi; playGeneral: () => void;
   connectMidi:(rescan?:boolean)=>Promise<void>;
@@ -360,9 +361,10 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,monit
         };
         source.start(when, clip.once ? 0 : offset);
       }
-      voice.gain.gain.setTargetAtTime(clip.muted ? 0 : mixGain * clip.volume / 100, ctx.currentTime, 0.012);
+      const codaLevel = codaScene === null ? 1 : (111 - codaScene) / 22;
+      voice.gain.gain.setTargetAtTime(clip.muted ? 0 : codaLevel * mixGain * clip.volume / 100, ctx.currentTime, codaScene === null ? 0.012 : 0.45);
     }
-  }, [master,clips,bpm,clock]);
+  }, [master,clips,bpm,clock,codaScene]);
 
 
   function halt(id:number){

@@ -1,5 +1,7 @@
 /** The performance instruments feed the same scene bus as the score and sample recorder. */
+import { SHOW_INTERLUDES } from "./show-score";
 export const SCENE_INSTRUMENT_NAMES = {
+  ...SHOW_INTERLUDES,
   16: "Armónicos de 111 Hz", 17: "Clavecín temperado", 19: "Timbre al tacto",
   32: "Bajo de pulso", 33: "Pads abiertos", 34: "Batería electrónica", 35: "Arpegio",
   36: "Acordes cortos", 37: "Bajo ácido", 38: "Melodía de sierra", 39: "Ensamble por registros",
@@ -35,6 +37,24 @@ function kit(note: number): Color {
 }
 function orchestration(scene: InstrumentScene, note: number): {color: Color; rhythm?: Rhythm} {
   switch (scene) {
+    case 40: return {color:"pluck",rhythm:offbeat};
+    case 41: return {color:"pad"};
+    case 43: return {color:"hollow",rhythm:arpeggio};
+    case 44: return {color:"pluck",rhythm:goa};
+    case 46: return {color:"strings"};
+    case 47: return {color:"stab",rhythm:garage};
+    case 48: return {color:"hollow",rhythm:offbeat};
+    case 49: return {color:note<54?"bass":"strings"};
+    case 50: return {color:"doubleBass"};
+    case 51: return {color:"metal",rhythm:breakHat};
+    case 52: return {color:kit(note),rhythm:downbeats};
+    case 53: return {color:"pad",rhythm:arpeggio};
+    case 54: return {color:"acid",rhythm:garage};
+    case 55: return {color:"strings",rhythm:offbeat};
+    case 56: return {color:note<56?"kick":"tom",rhythm:downbeats};
+    case 57: return {color:"bass",rhythm:roll};
+    case 58: return {color:"pluck",rhythm:arpeggio};
+    case 59: return {color:note<52?"kick":"lead",rhythm:note<52?downbeats:goa};
     case 16: return {color:"hollow"};
     case 17: return {color:"pluck"};
     case 19: case 77: return {color:"hollow"};

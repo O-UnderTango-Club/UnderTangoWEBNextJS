@@ -1,23 +1,23 @@
-export const LIVE_SET_SCENES = [32,33,34,35,36,37,38,39,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89] as const;
+import { SHOW_EXTENDED_SECONDS } from "./show-score";
+
+export const LIVE_SET_SCENES = [32,33,34,35,36,37,38,39,40,41,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89] as const;
 export type LiveSetScene = typeof LIVE_SET_SCENES[number];
-export const EXTENDED_SCENES = [15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,...LIVE_SET_SCENES.slice(0,8),42,45,60,61,62,...LIVE_SET_SCENES.slice(8)] as const;
+export const EXTENDED_SCENES = [
+  15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+  41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,
+  67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,
+  93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,
+] as const;
 export type ExtendedScene = typeof EXTENDED_SCENES[number];
 export function isLiveSetScene(scene: ExtendedScene | null): scene is LiveSetScene {
-  return scene !== null && (scene >= 32 && scene <= 39 || scene >= 63);
+  return (LIVE_SET_SCENES as readonly (number|null)[]).includes(scene);
 }
-export type TimbreScene = Exclude<ExtendedScene, 15 | 16 | 17 | 18 | 19 | LiveSetScene>;
-export const TIMBRE_NAMES: Record<TimbreScene, string> = {
+export const TIMBRE_NAMES = {
   20: "Armónicos", 21: "Filtro resonante", 22: "Saturación", 23: "Trémolo", 24: "Modulación en anillo",
   25: "Chorus", 26: "Flanger", 27: "Phaser", 28: "Eco", 29: "Reverberación", 30: "Ecos en estéreo", 31: "Ondas concéntricas", 42: "El punto pensado", 45: "Espiral expansiva", 60: "Primera voluntad · Hardstyle", 61: "Seguimos de pie", 62: "Letras de pie",
-};
-export const EXTENDED_DEFAULT_SECONDS: Record<ExtendedScene, number> = {
-  15: 32, 16: 16, 17: 14, 18: 32, 19: 6,
-  20: 15,21: 15,22: 15,23: 15,24: 15,25: 15,26: 15,27: 15,28: 15,29: 15,30: 15,31: 24,
-  32: 40,33: 32,34: 32,35: 28,36: 24,37: 32,38: 28,39: 40,42: 42,45: 40,
-  60: 24,61: 48,62: 24,63: 24,64: 24,65: 24,66: 24,67: 24,68: 32,69: 32,
-  70: 32,71: 48,72: 32,73: 40,74: 40,75: 32,76: 40,77: 32,78: 48,79: 56,
-  80: 32,81: 36,82: 32,83: 32,84: 36,85: 28,86: 32,87: 40,88: 180,89: 24,
-};
+} as const;
+export type TimbreScene = keyof typeof TIMBRE_NAMES;
+export const EXTENDED_DEFAULT_SECONDS: Record<ExtendedScene, number> = SHOW_EXTENDED_SECONDS;
 export function isTimbreScene(scene: ExtendedScene | null): scene is TimbreScene {
   return scene !== null && Object.prototype.hasOwnProperty.call(TIMBRE_NAMES,scene);
 }

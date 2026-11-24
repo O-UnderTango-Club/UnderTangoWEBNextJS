@@ -1,7 +1,7 @@
 "use client";
 
 import { useSavedSetting } from "./saved-setting";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
 import { scheduleContinuationAudio } from "./scene-audio";
@@ -12,7 +12,10 @@ import { PerformanceProjection, usePerformanceInput } from "./performance-view";
 import { useEarlyInstrument } from "./early-instrument";
 import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isLiveSetScene, isTimbreScene, type ExtendedScene } from "./extended-scenes";
-import { SCENE_INSTRUMENT_NAMES } from "./scene-instrument";
+import { SHOW_OPENING, SHOW_SCORE, SHOW_TRANSITIONS, type CodaScene } from "./show-score";
+import { durationBounds, editShowDuration, resolveShowDurations } from "./show-durations";
+import { previousSceneDurations } from "./previous-durations";
+import { CodaProjection } from "./coda-projection";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
 import { TypeProjection } from "./type-projection";
 import { AudienceProjection } from "./audience-projection";
@@ -367,7 +370,11 @@ type FrequencyPoint = [x: number, y: number];
 const FREQUENCY_VIEW = { width: 640, height: 360, x: 320, y: 180, yaw: 0.64, tilt: 0.62, scale: 102 };
 const FREQUENCY_STOP_YAW = FREQUENCY_VIEW.yaw + 1.72;
 const FREQUENCY_TRAIL_TRAVEL = 380;
-const FREQUENCY_TRAIL_TURN_SECONDS = 3;
+const FREQUENCY_TRAIL_TURN_SECONDS = SHOW_TRANSITIONS.trailTurn;
+function scoreTime(seconds: number) {
+  const rounded = Math.round(seconds);
+  return Math.floor(rounded / 60) + ":" + String(rounded % 60).padStart(2, "0");
+}
 
 function temporalTrailFrame(progress: number, roll: number) {
   const halfSpan = FREQUENCY_TRAIL_TRAVEL * progress / 2;
@@ -890,11 +897,6 @@ const EMPTY_SET_OUTLINE: GlyphSegment[][] = [
 ];
 
 const SCENE_ZERO_DEFAULT_SECONDS = 8;
-const SCENE_ONE_DEFAULT_SECONDS = 22;
-const SCENE_LINE_DEFAULT_SECONDS = 15;
-const SCENE_HARMONIC_DEFAULT_SECONDS = 18;
-const SCENE_SPACE_DEFAULT_SECONDS = 7;
-const SCENE_TIME_DEFAULT_SECONDS = 16;
 const SCENE_TIME_DEFAULT_SAMPLE_MS = 250;
 const SCENE_ONE_LIGHT_SHARE = 16 / 22;
 
@@ -1482,19 +1484,25 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
 
-  const [durationSeconds, setDurationSeconds] = useSavedSetting("durationSeconds", SCENE_ZERO_DEFAULT_SECONDS);
-  const [oneSeconds, setOneSeconds] = useSavedSetting("oneSeconds", SCENE_ONE_DEFAULT_SECONDS);
-  const [lineSeconds, setLineSeconds] = useSavedSetting("lineSeconds", SCENE_LINE_DEFAULT_SECONDS);
-  const [harmonicSeconds, setHarmonicSeconds] = useSavedSetting("harmonicSeconds", SCENE_HARMONIC_DEFAULT_SECONDS);
-  const [spaceSeconds, setSpaceSeconds] = useSavedSetting("spaceSeconds", SCENE_SPACE_DEFAULT_SECONDS);
-  const [timeSeconds, setTimeSeconds] = useSavedSetting("timeSeconds", SCENE_TIME_DEFAULT_SECONDS);
-  const [restSeconds, setRestSeconds] = useSavedSetting("restSeconds", 4);
-  const [noteSeconds, setNoteSeconds] = useSavedSetting<Record<NoteScene, number>>("noteSeconds", { ten: 12, eleven: 12, twelve: 12, thirteen: 12, fourteen: 28 });
-  const [extendedSeconds, setExtendedSeconds] = useSavedSetting("extendedSeconds", EXTENDED_DEFAULT_SECONDS);
+  const [savedSeconds, setSavedSeconds] = useSavedSetting<number[]>("sceneSeconds111", () => SHOW_SCORE.map(cue => cue.seconds));
+  const durations = useMemo(() => resolveShowDurations(savedSeconds), [savedSeconds]);
+  const limits = useMemo(() => durations.map((_,i) => durationBounds(i + 1,durations)), [durations]);
+  const [previousTimes] = useState(previousSceneDurations);
+  const [restFraction, setRestFraction] = useSavedSetting("restFraction111", 0.4);
   const [splitNote, setSplitNote] = useSavedSetting("splitNote", FIRST_MIDI_NOTE);
   const [learningSplit, setLearningSplit] = useState(false);
-  const [continuationSeconds, setContinuationSeconds] = useSavedSetting<Record<ContinuationScene, number>>("continuationSeconds", () =>
-    Object.fromEntries(CONTINUATION_SCENES.map(({ mode, seconds }) => [mode, seconds])) as Record<ContinuationScene, number>);
+  const editSeconds = (number: number, seconds: number) => setSavedSeconds(current =>
+    editShowDuration(number, seconds, resolveShowDurations(current)));
+  const openingScale = (durations[0] - SHOW_TRANSITIONS.pointHold - SHOW_TRANSITIONS.lineHold)
+    / (SHOW_OPENING.opening + SHOW_OPENING.beacon + SHOW_OPENING.line);
+  const durationSeconds = SHOW_OPENING.opening * openingScale;
+  const oneSeconds = SHOW_OPENING.beacon * openingScale;
+  const lineSeconds = SHOW_OPENING.line * openingScale;
+  const harmonicSeconds = durations[1], spaceSeconds = durations[2], timeSeconds = durations[3] - SHOW_TRANSITIONS.trailTurn;
+  const restSeconds = Math.max(1, Math.min(durations[8] - 1, Math.round(durations[8] * restFraction)));
+  const continuationSeconds = {cross: durations[4], sphere: durations[5], noise: durations[6], return: durations[7], breath: durations[8] - restSeconds};
+  const noteSeconds = {ten: durations[9], eleven: durations[10], twelve: durations[11], thirteen: durations[12], fourteen: durations[13]};
+  const extendedSeconds = useMemo(() => Object.fromEntries(EXTENDED_SCENES.map(number => [number, durations[number - 1]])), [durations]);
   const [noisePair, setNoisePair] = useSavedSetting<NoisePair>("noisePair", DEFAULT_PAIR);
   const [playingNoisePair, setPlayingNoisePair] = useState<NoisePair>(DEFAULT_PAIR);
   const [timeSamplingMs, setTimeSamplingMs] = useSavedSetting("timeSamplingMs", SCENE_TIME_DEFAULT_SAMPLE_MS);
@@ -1504,6 +1512,8 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
   const [transportBusy, setTransportBusy] = useState(false);
   const [cue, setCue] = useState<SceneZeroCue | null>(null);
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
+  const [scheduledRest, setScheduledRest] = useState<number>(SHOW_OPENING.rest);
+  const previousDeadline = useRef<{cue: SceneZeroCue; seconds: number} | null>(null);
   const [pulseCount, setPulseCount] = useState(0);
   const [pulseRate, setPulseRate] = useState(2);
   const audioRef = useRef<AudioContext | null>(null);
@@ -1539,15 +1549,15 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
     scene: noteScene, ownsInput: noteScene !== null || stage === "preparing", splitNote, learnSplit,
     clock: cue?.context ?? null, outputRef, pausedRef, routing: pianoRouting, onStrike: chordLoop.strike,
   });
-  const enterNumberedScene = useCallback((mode: NumberedScene, context: AudioContext, asPreview: boolean) => {
-    setCue({ context, beginsAt: context.currentTime });
+  const enterNumberedScene = useCallback((mode: NumberedScene, context: AudioContext, asPreview: boolean, beginsAt = context.currentTime) => {
+    setCue({ context, beginsAt });
     setPreviewMode(asPreview ? mode : null);
     setStage(mode);
   }, []);
   const nextTimedScene = extendedScene ? EXTENDED_SCENES[EXTENDED_SCENES.indexOf(extendedScene) + 1]
     : noteScene === "fourteen" ? 15 : noteScene ? NOTE_SCENES[noteScene].next
-      : stage === "breath-hold" && restSeconds > 0 ? "ten" : null;
-  const nextAfterSeconds = extendedScene ? extendedSeconds[extendedScene] : noteScene ? noteSeconds[noteScene] : activeDurationMs / 1000 + restSeconds;
+      : stage === "breath-hold" ? "ten" : null;
+  const nextAfterSeconds = extendedScene ? extendedSeconds[extendedScene] : noteScene ? noteSeconds[noteScene] : activeDurationMs / 1000 + scheduledRest;
 
   useEffect(() => {
     if (noteScene !== "eleven") return;
@@ -1585,15 +1595,17 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
   }, [stop]);
 
   useEffect(() => {
-    if ((!nextTimedScene && extendedScene !== 89) || nextAfterSeconds === 0 || !cue || paused) return;
+    if ((!nextTimedScene && extendedScene !== 111) || nextAfterSeconds === 0 || !cue || paused) return;
     const deadline = cue.beginsAt + nextAfterSeconds;
+    const edited = previousDeadline.current?.cue === cue && previousDeadline.current.seconds !== nextAfterSeconds;
+    const nextBeginsAt = edited ? Math.max(deadline, cue.context.currentTime) : deadline;
+    previousDeadline.current = {cue, seconds:nextAfterSeconds};
     let timer: number | undefined;
     const advance = () => {
       if (pausedRef.current || audioRef.current !== cue.context) return;
       const remaining = deadline - cue.context.currentTime;
       if (remaining > 0.005) timer = window.setTimeout(advance, Math.max(8, remaining * 1000));
-      else if (countingTake.current) timer = window.setTimeout(advance, 100);
-      else if (nextTimedScene) enterNumberedScene(nextTimedScene, cue.context, previewMode !== null);
+      else if (nextTimedScene) enterNumberedScene(nextTimedScene, cue.context, previewMode !== null, nextBeginsAt);
       else reset();
     };
     advance();
@@ -1683,12 +1695,13 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
     setTransportBusy(false);
     setCue(null);
     const openingMs = durationSeconds * 1000;
+    setScheduledRest(restSeconds);
     const oneMs = oneSeconds * 1000;
     const lightMs = oneMs * SCENE_ONE_LIGHT_SHARE;
     const oneStartsAt = mode === "opening" ? openingMs : 0;
     const questionMs = oneStartsAt + lightMs;
     const pointMs = oneStartsAt + oneMs;
-    const lineStartsAt = mode === "line" ? 0 : pointMs + 2500;
+    const lineStartsAt = mode === "line" ? 0 : pointMs + SHOW_TRANSITIONS.pointHold * 1000;
     const gongLead = lineSeconds / 5;
     const rampSeconds = lineSeconds - gongLead;
     const fadeOutAt = lineStartsAt / 1000 + gongLead / 3;
@@ -1947,7 +1960,7 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
         pitchGain.gain.linearRampToValueAtTime(0.12, beginning + duration);
         pitch.connect(pitchGain); pitchGain.connect(chordBus);
         pitch.start(pitchStart);
-        playHarmonics(chordBus, beginning + duration + 4, pitch);
+        playHarmonics(chordBus, beginning + duration + SHOW_TRANSITIONS.lineHold, pitch);
         const draw = () => {
           if (run !== runRef.current || audioRef.current !== context) return;
           const elapsed = context.currentTime - beginning;
@@ -2003,37 +2016,31 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
     stage === "space" || stage === "temporal" || stage === "time";
   const continuation = activeScene && isContinuationScene(activeScene) ? activeScene : null;
   const splitLabel = MIDI_PITCH_NAMES[splitNote % 12] + (Math.floor(splitNote / 12) - 1);
-  const restLabel = restSeconds === 0 ? "Hasta avanzar" : `${restSeconds} s`;
+  const restLabel = `${restSeconds} s`;
   const sceneControls = [
-    { mode: "opening", title: "Escena Ø → {}", id: "zero-duration", label: "Duración de la transición de luz y sonido", duration: durationSeconds, min: 1, max: 30, setDuration: setDurationSeconds },
-    { mode: "beacon", title: "Escena {} → 0", id: "one-duration", label: "Duración de la escena de conjunto vacío a cero", duration: oneSeconds, min: 6, max: 60, setDuration: setOneSeconds },
-    { mode: "line", title: "Escena 0 → 1", id: "line-duration", label: "Duración de la escena de cero a uno", duration: lineSeconds, min: 6, max: 60, setDuration: setLineSeconds },
-    { mode: "harmonics", title: "Escena 1 → 2", id: "harmonic-duration", label: "Duración de la escena de uno a dos", duration: harmonicSeconds, min: 6, max: 60, setDuration: setHarmonicSeconds },
-    { mode: "space", title: "Escena 2 → 3", id: "space-duration", label: "Duración de la escena de dos a tres", duration: spaceSeconds, min: 3, max: 30, setDuration: setSpaceSeconds },
-    { mode: "time", title: "Escena 3 → 4", id: "time-duration", label: "Duración de la escena de tres a cuatro", duration: timeSeconds, min: 4, max: 60, setDuration: setTimeSeconds },
-    ...CONTINUATION_SCENES.map(({ mode, title }) => ({
-      mode, title, id: `${mode}-duration`, label: `Duración de ${title.toLowerCase()}`,
-      duration: continuationSeconds[mode], min: 4, max: 60,
-      setDuration: (seconds: number) => setContinuationSeconds((current) => ({ ...current, [mode]: seconds })),
-    })),
-    ...NOTE_SCENE_IDS.map((mode) => {
-      const number = NOTE_SCENES[mode].number;
-      const control = { mode, title: `Escena ${number}`, id: `scene-${mode}` };
-      return { ...control, label: `Duración de la escena ${number}`, duration: noteSeconds[mode], min: mode === "fourteen" ? 0 : 1, max: 120,
-        setDuration: (seconds: number) => setNoteSeconds((current) => ({ ...current, [mode]: seconds })) };
-    }),
-    ...EXTENDED_SCENES.map((mode) => ({ mode, title: `Escena ${mode}`, id: `scene-${mode}`, label: `Duración de la escena ${mode}`,
-      duration: extendedSeconds[mode], min: 0, max: mode === 88 ? 600 : 120,
-      setDuration: (seconds: number) => setExtendedSeconds((current) => ({ ...current, [mode]: seconds })),
-    })),
+    {mode: "opening", title: "Escena Ø → {}", id: "zero-duration"},
+    {mode: "beacon", title: "Escena {} → 0", id: "one-duration"},
+    {mode: "line", title: "Escena 0 → 1", id: "line-duration"},
+    {mode: "harmonics", title: "Escena 1 → 2", id: "harmonic-duration"},
+    {mode: "space", title: "Escena 2 → 3", id: "space-duration"},
+    {mode: "time", title: "Escena 3 → 4", id: "time-duration"},
+    ...CONTINUATION_SCENES.map(({mode, title}) => ({mode, title, id: `${mode}-duration`})),
+    ...NOTE_SCENE_IDS.map(mode => ({mode, title: `Escena ${NOTE_SCENES[mode].number}`, id: `scene-${mode}`})),
+    ...EXTENDED_SCENES.map(mode => ({mode, title: `Escena ${mode}`, id: `scene-${mode}`})),
   ] as const;
-  const sceneIndex = sceneControls.findIndex(({ mode }) => mode === activeScene);
-  const sceneTitle = breathing ? "Plano 9" : sceneControls[sceneIndex]?.title;
-  const sceneNumber = extendedScene ?? (noteScene ? NOTE_SCENES[noteScene].number : null);
+  const numberedControls = sceneControls.filter(control => control.mode !== "beacon" && control.mode !== "line");
+  const numberedMode = activeScene === "beacon" || activeScene === "line" ? "opening" : activeScene;
+  const sceneIndex = numberedControls.findIndex(control => control.mode === numberedMode);
+  const sceneNumber = sceneIndex >= 0 ? sceneIndex + 1 : null;
+  const sceneTitle = breathing ? "Plano 9" : sceneControls.find(control => control.mode === activeScene)?.title;
   const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
-  const extendedDark = extendedScene === 16 || extendedScene === 17 || isTimbreScene(extendedScene) || liveSet !== null;
-  const minutes = (sceneControls.reduce((sum, control) => sum + control.duration, restSeconds) / 60).toFixed(1);
-  const manualScenes = sceneControls.filter(control => !control.duration).length + Number(restSeconds === 0);
+  const coda = extendedScene !== null && extendedScene >= 90 ? extendedScene as CodaScene : null;
+  const extendedDark = coda !== null || extendedScene === 16 || extendedScene === 17 || isTimbreScene(extendedScene) || liveSet !== null;
+  const totalSeconds = durations.reduce((sum, seconds) => sum + seconds, 0);
+  const cueStarts = useMemo(() => {
+    let start = 0;
+    return durations.map(seconds => { const cue = start; start += seconds; return cue; });
+  }, [durations]);
   const playMode = (mode: ModuleZeroScene, asPreview: boolean, startPaused = false) => {
     if ((typeof mode === "number" || isNoteScene(mode)) && (breathing || noteScene || extendedScene) && cue) {
       enterNumberedScene(mode, cue.context, asPreview);
@@ -2042,7 +2049,7 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
     void start(mode, asPreview, startPaused);
   };
   const moveScene = (offset: number) => {
-    const scene = sceneControls[Math.max(0, sceneIndex) + offset];
+    const scene = numberedControls[Math.max(0, sceneIndex) + offset];
     if (scene) playMode(scene.mode, previewMode !== null, paused);
   };
   const pointPosition = (index: number) => {
@@ -2329,6 +2336,8 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
       .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls input[type=range] { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
       .zero-controls .zero-master input { margin: .35rem 0 0; }
+      .zero-scene-seconds {white-space:nowrap;font-size:.84rem;}
+      .zero-scene-seconds input {width:4.5rem;padding:.35rem .25rem;color:inherit;background:#191d28;border:1px solid #4c5468;border-radius:4px;text-align:right;font:inherit;}
       .zero-sampling { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; font-size: .75rem; }
       .zero-sampling output { color: #e5e9f9; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-noise-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; margin: 0 0 .75rem; padding: 0; border: 0; min-width: 0; }
@@ -2398,7 +2407,8 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
         beginsAt={cue?.beginsAt ?? 0} />}
       {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
       {(extendedScene === 60 || extendedScene === 61 || extendedScene === 62) && cue && <HardstyleTrack clock={cue.context} output={outputRef.current} paused={paused} />}
-      {extendedScene && !liveSet && cue && (extendedScene === 42 || extendedScene === 62
+      {coda && cue && <CodaProjection scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={outputRef.current} paused={paused} routing={pianoRouting} />}
+      {extendedScene && !liveSet && !coda && cue && (extendedScene === 42 || extendedScene === 62
         ? <TypeProjection scene={extendedScene} beginsAt={cue.beginsAt} clock={cue.context} paused={paused} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} />
         : extendedScene === 61
         ? <AudienceProjection analyser={spiralAnalyser} attack={extended.attack} paused={paused} />
@@ -2409,30 +2419,47 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} liveSet={liveSet} countingTake={countingTake} analyser={liveSet || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
-      {sceneNumber !== null ? <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>
-        : <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
+      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} codaScene={coda} liveSet={liveSet} countingTake={countingTake} analyser={liveSet || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      {sceneNumber !== null && <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>}
+      {sceneNumber !== null && sceneNumber < 10 && <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
     </div>
     <aside className="zero-controls" aria-label="Controles de las escenas">
       <div className="zero-settings" ref={settingsRef}>
-        <details className="zero-scene"><summary>Duración prevista · {minutes} min{manualScenes ? ` + ${manualScenes} pasos manuales` : " aprox."}</summary>
-          <p>El plan de ensayo reparte el tiempo desde la escena 14 hasta el ambiente final. En la 88 podés elegir «Hasta avanzar» para dar la entrada de sala al terminar de cantar.</p>
-          <button disabled={!ready} onClick={()=>{setExtendedSeconds({...EXTENDED_DEFAULT_SECONDS});setNoteSeconds(old=>({...old,fourteen:28}));}}>Aplicar tiempos de ensayo (14–89)</button>
-        </details>
-        {sceneControls.map((control) => {
-          const { mode, title, id, duration } = control;
-          const seconds = duration === 0 ? (mode === 89 ? "Hasta detener" : "Hasta avanzar") : `${duration} ${duration === 1 ? "segundo" : "segundos"}`;
-          const isActive = mode === activeScene;
-          return <div key={mode} className="zero-scene" role="region" aria-labelledby={`${id}-title`}
+        <div className="zero-scene">
+          <h2>Duración de la obra</h2>
+          <p><strong data-show-total={totalSeconds}>{scoreTime(totalSeconds)}</strong> · 111 escenas · margen de 20:00 a 40:00</p>
+          <details><summary>Ajustes de duración</summary>
+            {sceneNumber !== null && sceneNumber < 10 && <p>La apertura ya está en marcha. Los cambios de las escenas 1–9 entran al volver a reproducirlas.</p>}
+            <button type="button" onClick={() => {setSavedSeconds(SHOW_SCORE.map(cue => cue.seconds)); setRestFraction(.4);}}>Restablecer 30:00</button>
+            {previousTimes && <button type="button" onClick={() => setSavedSeconds(previousTimes)}>Recuperar mis tiempos anteriores</button>}
+          </details>
+        </div>
+        {numberedControls.map(({mode, id}, index) => {
+          const isActive = mode === numberedMode;
+          const score = SHOW_SCORE[index], seconds = durations[index];
+          const {min,max} = limits[index];
+          return <div key={mode} className="zero-scene" role="region" data-scene={score.number} aria-labelledby={`${id}-title`}
             ref={isActive ? activeSceneRef : undefined} aria-current={isActive ? "step" : undefined}>
             <div className="zero-title">
-              <h2 id={`${id}-title`}>{title}</h2>
-              <output htmlFor={id}>{seconds}</output>
+              <h2 id={`${id}-title`}>Escena {score.number}</h2>
+              <label className="zero-scene-seconds"><input key={seconds} type="number" min={min} max={max}
+                aria-label={`Segundos de la escena ${score.number}`} defaultValue={seconds}
+                onBlur={event => {const field = event.currentTarget;
+                  if (Number.isFinite(field.valueAsNumber)) {
+                    const value = Math.min(max,Math.max(min,Math.round(field.valueAsNumber)));
+                    field.value = String(value); editSeconds(score.number,value);
+                  } else field.value = String(seconds);
+                }} onKeyDown={event => {if(event.key === "Enter")event.currentTarget.blur();}} /> s</label>
             </div>
-            {typeof mode === "number" && isLiveSetScene(mode) && <small>{SCENE_INSTRUMENT_NAMES[mode]}</small>}
-            <input id={id} aria-label={control.label} type="range" min={control.min} max={control.max} step={1} value={control.duration}
-              aria-valuetext={seconds} disabled={!canStart}
-              onChange={(event) => control.setDuration(Number(event.currentTarget.value))} />
+            <small>{scoreTime(cueStarts[index])} · {score.title}</small>
+            <input id={id} type="range" min={min} max={max} step={1} value={seconds}
+              aria-label={`Ajustar duración de la escena ${score.number}`} aria-valuetext={`${seconds} segundos`}
+              onChange={event => editSeconds(score.number,event.currentTarget.valueAsNumber)} />
+            {mode === "opening" && <details><summary>Fases de apertura</summary>
+              {sceneControls.slice(0,3).map((phase,i) => <div key={phase.id}>
+                <span>{phase.title} · {Number([durationSeconds,oneSeconds,lineSeconds][i].toFixed(1))} s </span>
+                <button type="button" disabled={!canStart} onClick={() => playMode(phase.mode, true)}>Probar fase</button>
+              </div>)}</details>}
             {mode === "time" && <>
               <div className="zero-sampling">
                 <label htmlFor="time-sampling">Intervalo de muestreo</label>
@@ -2462,11 +2489,11 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
                 <label htmlFor="rest-duration">Respiro en el plano 9</label>
                 <output htmlFor="rest-duration">{restLabel}</output>
               </div>
-              <input id="rest-duration" type="range" min={0} max={60} step={1} value={restSeconds}
-                aria-valuetext={restLabel} disabled={!canStart} onChange={(event) => setRestSeconds(Number(event.currentTarget.value))} />
+              <input id="rest-duration" type="range" min={1} max={seconds-1} step={1} value={restSeconds}
+                aria-valuetext={restLabel} onChange={event => setRestFraction(event.currentTarget.valueAsNumber / seconds)} />
             </>}
             {mode === "fourteen" && <ChordLoopControls loop={chordLoop} active={isActive} paused={paused} />}
-            {typeof mode === "number" && isActive && <ExtendedPerformanceControls performance={extended} scene={mode} paused={paused} />}
+            {typeof mode === "number" && mode < 90 && isActive && <ExtendedPerformanceControls performance={extended} scene={mode} paused={paused} />}
             {isActive && noteScene && noteScene !== "fourteen" && <div className="zero-scene-input">
               <p>{noteScene === "ten" ? "Usá cualquier tecla MIDI o 1–9 en la computadora. Después del tiempo elegido entra la escena 11."
                 : noteScene === "eleven" ? "En la computadora, 1–4 para la nota grave y 5–9 para la aguda."
@@ -2523,7 +2550,7 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
           </button>
           <button type="button" aria-label="Escena siguiente" title="Escena siguiente"
-            disabled={sceneIndex === sceneControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(1)}>
+            disabled={sceneIndex === numberedControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
           </button>
         </div>

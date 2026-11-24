@@ -144,8 +144,7 @@ const style = `
 .sample-bank .pad-title{font:550 clamp(.72rem,1.24vw,1.05rem)/1.15 system-ui;overflow-wrap:anywhere;}
 .sample-bank[data-layers=true] small{flex-basis:100%;font:500 .71rem system-ui;color:#d5e7da;}
 .sample-bank[data-layers=true] [data-take=true]{box-shadow:inset 0 0 0 2px #8cdec3;background:#1b332f;}
-.zero-stage:has(>.live-set) {display:grid;grid-template-rows:minmax(0,1fr) fit-content(50%);background:#080a11 !important;}
-.zero-stage:has(>.live-set) > .scene-mixer {position:relative;grid-row:2;width:100%;max-height:100%;}
+.zero-stage:has(>.live-set) {background:#080a11 !important;}
 .zero-stage:has(>.live-set) .zero-scene-number {color:#e6e7e9;}
 .live-set {position:relative;grid-row:1;width:100%;height:100%;min-height:0;overflow:hidden;isolation:isolate;container-type:size;color:#e3eceb;background:radial-gradient(ellipse at 58% 67%,#142025 0,#0b1116 52%,#06080b 95%);font-family:inherit;}
 .live-set[data-family=psy] {background:radial-gradient(ellipse at 50% 52%,#1d1029 0,#0c101b 47%,#06070c 95%);}

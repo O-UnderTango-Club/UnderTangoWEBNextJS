@@ -1,5 +1,5 @@
 export type DeckSide = "A" | "B";
-export type DjCommand = { action: "browse"; step: number } | { action: "load" | "play" | "cue"; side: DeckSide };
+export type DjCommand = { action: "scene"; step: -1 | 1 } | { action: "load" | "play" | "cue"; side: DeckSide };
 export const DJ_CONTROL = "860-dj-control";
 export const isInpulse200 = (name?: string) => /inpulse[\s_-]*200[\s_-]*mk[\s_-]*3/i.test(name ?? "");
 
@@ -8,7 +8,7 @@ export function herculesCommand(inputId: string, data: ArrayLike<number>, held: 
   const [status, control, value] = Array.from(data);
   const send = (detail: DjCommand) => window.dispatchEvent(new CustomEvent(DJ_CONTROL, {detail}));
   if (status === 0xb0 && control === 1) {
-    if (value > 0 && value !== 64) send({action:"browse", step:value < 64 ? 1 : -1});
+    if (value > 0 && value !== 64) send({action:"scene", step:value < 64 ? 1 : -1});
     return true;
   }
   const channel = status & 15, kind = status & 0xf0;

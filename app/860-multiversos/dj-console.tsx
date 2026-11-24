@@ -68,7 +68,7 @@ function Deck({side,track,load,canLoad,output}: {side:DeckSide;track?:Track;load
   useLayoutEffect(()=>{
     function command(e:Event) {
       const c=(e as CustomEvent<DjCommand>).detail;
-      if (c.action==="browse" || c.side!==side) return;
+      if (c.action==="scene" || c.side!==side) return;
       if(c.action==="play")void toggle();
       if(c.action==="cue")stop();
     }
@@ -136,12 +136,8 @@ export function DjConsole({output,inputs}: {output:AudioBus;inputs:MidiDevice[]}
   useEffect(()=>{
     const receive=(e:Event)=>{
       const c=(e as CustomEvent<DjCommand>).detail;
-      // A controller can send Browse, Load and Play before the next browser paint.
+      // A controller can send Load and Play before the next browser paint.
       if(c.action==="load")flushSync(()=>load(c.side));
-      if(c.action==="browse" && library.length){
-        const i=library.findIndex(t=>t.id===selected.current);
-        select(library[(i+c.step+library.length)%library.length].id);
-      }
     };
     window.addEventListener(DJ_CONTROL,receive);return ()=>window.removeEventListener(DJ_CONTROL,receive);
   });

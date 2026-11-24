@@ -49,6 +49,21 @@ function Modal({children,onClose,busy,compact=false,embedded=false}:{children:Re
   if(embedded)return <section className={css.inlineEditor} aria-label="Editar acción">{children}</section>;
   return <dialog ref={ref} className={`${css.dialog} ${compact?css.quickDialog:""}`} aria-labelledby="editor-heading" onCancel={e=>{e.preventDefault();if(!busy)onClose();}}>{children}</dialog>;
 }
+function FinishStepButton({name,disabled,onConfirm}:{name:string;disabled:boolean;onConfirm:()=>void}){
+  const [confirming,setConfirming]=useState(false);
+  return <button type="button" disabled={disabled}
+    className={`${css.button} ${css.finishStep}`} data-confirming={confirming}
+    aria-label={confirming?`¿Estás seguro? Finalizar «${name}»`:`Finalizar «${name}»`}
+    onBlur={()=>setConfirming(false)}
+    onKeyDown={event=>{
+      if(event.key==="Escape")setConfirming(false);
+      if(event.repeat&&(event.key==="Enter"||event.key===" "))event.preventDefault();
+    }}
+    onClick={()=>{
+      if(confirming)onConfirm();
+      setConfirming(!confirming);
+    }}>{confirming?"¿Estás seguro?":"Finalizar"}</button>;
+}
 export default function Panel(){
   const [sessionEmail,setSessionEmail]=useState<string|null>(null),[authLoading,setAuthLoading]=useState(true);
   const [data,setData]=useState<Data>(),[busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
@@ -60,7 +75,7 @@ export default function Panel(){
   const individual=data?.rankingMode==="action";
   const refreshRef=useRef(false);
   const attempts=useRef(new Map<string,string>());
-  const dailyLock=useRef(false);
+  const completionLock=useRef(false);
   function identified(intent:Record<string,unknown>){
     const signature=JSON.stringify(intent);
     let requestId=attempts.current.get(signature);
@@ -69,19 +84,19 @@ export default function Panel(){
   }
   const refresh=useCallback(async(fresh=false)=>{
     if(refreshRef.current)return;refreshRef.current=true;setRefreshing(true);
-    try{const value=await api(fresh?"?refresh=1":"");setSessionEmail(value.actor);setData(value);setError("");}
+    try{const value:Data=await api(fresh?"?refresh=1":"");setSessionEmail(value.actor);setData(value);setError("");return value;}
     catch(e){if(e instanceof ApiError&&[401,403].includes(e.status)){setSessionEmail(null);setData(undefined);setEditor(undefined);setError("Este navegador todavía no está habilitado para el panel.");}else{setError(e instanceof ApiError?e.message:"No se pudo conectar. Revisá tu conexión y volvé a intentar.");}throw e;}
     finally{refreshRef.current=false;setRefreshing(false);setAuthLoading(false);}
   },[]);
   useEffect(()=>{refresh().catch(()=>{});},[refresh]);
   useEffect(()=>{
-    if(!sessionEmail||editor)return;
+    if(!sessionEmail||editor||busy)return;
     const update=()=>{if(document.visibilityState==="visible")refresh().catch(()=>{});};
     const nextActivation=Math.min(Date.parse(nextPanelDay()),...(data?.tasks.filter(task=>task.stage==="scheduled").map(task=>Date.parse(task.nextAvailableAt||task.activateAt)).filter(time=>Number.isFinite(time)&&time>Date.now())||[]));
     const delay=Number.isFinite(nextActivation)?Math.max(0,Math.min(120000,nextActivation-Date.now()+500)):120000;
     const timer=setTimeout(update,delay);document.addEventListener("visibilitychange",update);window.addEventListener("online",update);
     return()=>{clearTimeout(timer);document.removeEventListener("visibilitychange",update);window.removeEventListener("online",update);};
-  },[sessionEmail,editor,refresh,data]);
+  },[sessionEmail,editor,busy,refresh,data]);
   useEffect(()=>setLimit(36),[tab,search]);
   function openRanking(front:string){setSearch("");setTaskProject("");if(individual){setTaskFront(front);setTab("all");}else{setProjectFront(front);setTab("projects");}}
   function openProjectTasks(projectId:string){setTaskFront("");setTaskProject(projectId);setSearch("");setTab("all");}
@@ -110,27 +125,34 @@ export default function Panel(){
     setBusy(true);setError("");try{const creatingProject=editor!.kind==="project"&&!editor!.id;const result=await api("",identified({kind:editor!.kind,id:editor!.id,revision:editor!.revision,snapshotRevision:editor!.snapshotRevision,changes}));if(editor!.kind==="group")setExpandedGroup(result.id);setEditor(undefined);setNotice(`Cambio guardado y confirmado en ${data?.source==="supabase"?"Supabase":"Airtable"}.`);try{await refresh(true);if(creatingProject){setNotice("Proyecto creado y confirmado. Podés agregar su primera acción; cancelar no elimina el proyecto.");newTask(result.id,result.revision);}}catch{setNotice("El cambio se guardó. Falta actualizar la vista; pulsá Actualizar.");}}finally{setBusy(false);}
   }
   async function migrate(){setBusy(true);setError("");try{const result=await api("/migrate",{});setNotice(`Migración lista: ${result.counts.tasks} acciones, ${result.counts.projects} proyectos, ${result.counts.events} disparadores y ${result.counts.cases} casos en Supabase.`);await refresh(true);}catch(e){setError(e instanceof Error?e.message:"No se pudo migrar.");}finally{setBusy(false);}}
-  async function finishToday(t:Task){
-    if(dailyLock.current||busy||refreshing||error||data?.readOnly||data?.source!=="supabase")return;
-    dailyLock.current=true;setBusy(true);setError("");
+  async function finishTask(t:Task,mode:"today"|"step"="today"){
+    if(completionLock.current||busy||refreshRef.current||error||data?.readOnly||data?.source!=="supabase")return;
+    if(mode==="step"&&(!t.groupId||t.isGroup||["done","cancelled"].includes(t.stage)))return;
+    completionLock.current=true;setBusy(true);setError("");
     try{
-      await api("",identified({kind:"task",id:t.id,revision:data.revisions[t.id],snapshotRevision:data.snapshotRevision,changes:{doneToday:true}}));
+      const changes=mode==="step"?{stage:"done"}:{doneToday:true};
+      await api("",identified({kind:"task",id:t.id,revision:data.revisions[t.id],snapshotRevision:data.snapshotRevision,changes}));
       setEditor(undefined);
-      setNotice(`Por hoy ya estamos con «${t.name}». Tu avance quedó guardado; vuelve mañana, sin finalizarse ni cambiar de posición.`);
-      try{await refresh(true);}catch{setNotice("El cierre de hoy quedó guardado. Falta actualizar la vista; pulsá Actualizar.");}
+      const notice=mode==="step"?`Finalizaste «${t.name}».`:`Por hoy ya estamos con «${t.name}». Tu avance quedó guardado; vuelve mañana, sin finalizarse ni cambiar de posición.`;
+      setNotice(notice);
+      try{
+        const updated=await refresh(true);
+        const group=mode==="step"&&updated?.tasks.find(row=>row.id===t.groupId);
+        if(group&&["done","cancelled"].includes(group.stage))setNotice(`${notice} El grupo «${group.name}» pasó al historial.`);
+      }catch{setNotice(`${notice} Pulsá Actualizar para ver el cambio.`);}
     }catch(e){setError(e instanceof Error?e.message:"No se pudo guardar. Actualizá y volvé a intentar.");}
-    finally{dailyLock.current=false;setBusy(false);}
+    finally{completionLock.current=false;setBusy(false);}
   }
   async function finishProjectToday(projectId:string){
-    if(dailyLock.current||busy||refreshing||error||data?.readOnly||data?.source!=="supabase")return;
+    if(completionLock.current||busy||refreshing||error||data?.readOnly||data?.source!=="supabase")return;
     const project=data.projects.find(p=>p.id===projectId);if(!project)return;
-    dailyLock.current=true;setBusy(true);setError("");
+    completionLock.current=true;setBusy(true);setError("");
     try{
       await api("",identified({kind:"project",id:projectId,revision:data.revisions[projectId],snapshotRevision:data.snapshotRevision,changes:{doneToday:true}}));
       setNotice('Por hoy está bien con «'+project.name+'». Sus acciones quedan para mañana; las fechas posteriores se conservan.');
       try{await refresh(true);}catch{setNotice("El descanso del proyecto quedó guardado. Falta actualizar la vista; pulsá Actualizar.");}
     }catch(e){setError(e instanceof Error?e.message:"No se pudo guardar el descanso del proyecto. Actualizá y volvé a intentar.");}
-    finally{dailyLock.current=false;setBusy(false);}
+    finally{completionLock.current=false;setBusy(false);}
   }
   async function createProjectForTask(name:string){
     const opened=editor;
@@ -163,7 +185,7 @@ export default function Panel(){
   });
   const taskCard=(t:Task,projectId?:string):ReactNode=>{
     const editing=editor?.kind==="task"&&editor.id===t.id&&!editor.mode;
-    return t.isGroup?<ActionGroup position={positionOf(data!.tasks,t)} key={t.id} initialExpanded={expandedGroup===t.id} onBeginEdit={()=>beginInlineGroup(t)} onSaveGroup={changes=>saveInlineGroup(t,changes)} onCreateTask={(name,project,front)=>createInlineGroupTask(t,name,project,front)} group={t} data={data!} renderTask={taskCard} onEdit={()=>editTask(t,undefined,true)} statusEditing={editor?.kind==="task"&&editor.id===t.id&&editor.mode==="status"} statusEditor={inlineEditor(t,"status")} statusLabel={labels[t.stage]} onPosition={()=>editPosition(t)} onToday={()=>void finishToday(t)} disabled={busy||refreshing||!!error||!!data?.readOnly}/>:<article key={t.id} className={css.card} aria-label={t.name}>
+    return t.isGroup?<ActionGroup position={positionOf(data!.tasks,t)} key={t.id} initialExpanded={expandedGroup===t.id} onBeginEdit={()=>beginInlineGroup(t)} onSaveGroup={changes=>saveInlineGroup(t,changes)} onCreateTask={(name,project,front)=>createInlineGroupTask(t,name,project,front)} group={t} data={data!} renderTask={taskCard} onEdit={()=>editTask(t,undefined,true)} statusEditing={editor?.kind==="task"&&editor.id===t.id&&editor.mode==="status"} statusEditor={inlineEditor(t,"status")} statusLabel={labels[t.stage]} onPosition={()=>editPosition(t)} onToday={()=>void finishTask(t)} disabled={busy||refreshing||!!error||!!data?.readOnly}/>:<article key={t.id} className={css.card} aria-label={t.name}>
     {individual&&<><div className={css.cardProject}><div className={css.actionLabel}>Acción</div>{!t.groupId&&!["done","cancelled"].includes(t.stage)&&<button className={css.positionButton} disabled={busy||!!error||refreshing||data?.readOnly} onClick={()=>editPosition(t)} aria-label={"Cambiar posición de "+t.name}><strong>{t.rank>0?frontPosition(t.front,positionOf(data!.tasks,t)):"Sin posición"}</strong><span>Posición de acción</span></button>}</div><h3>{t.name}</h3></>}
     {!editing&&<><details className={css.cardProjects}><summary>Contexto del proyecto</summary>{data!.projects.filter(p=>t.projectIds.includes(p.id)&&p.id!==projectId).map(p=><div key={p.id} className={css.cardProject}>
       <div className={css.projectName}><strong>Proyecto</strong><span>{p.name}</span></div>
@@ -175,7 +197,10 @@ export default function Panel(){
     {inlineEditor(t,"status")}
     {t.released&&<p className={css.muted}>Dependencias resueltas · lista para continuar</p>}{!!t.issues.length&&<ul className={css.smallList}>{t.issues.map((s,i)=><li key={i}>{s}</li>)}</ul>}{!!t.blockers.length&&<p className={css.help}>Espera: {t.blockers.join("; ")}</p>}
     {t.weekdays!==ALL_DAYS&&<p className={css.help}>Días: {weekdayLabel(t.weekdays)}.</p>}{t.groupId&&t.parentWeekdays!==ALL_DAYS&&<p className={css.help}>Días del grupo: {weekdayLabel(t.parentWeekdays)}.</p>}{t.stage==="scheduled"&&<p className={css.help}>Disponible desde el {activationLabel(t.nextAvailableAt||t.activateAt)}, si sus condiciones están resueltas. Conserva {frontPosition(t.front,positionOf(data!.tasks,t))} y no ocupa un cupo ejecutable.</p>}<div className={css.meta}><span>{t.owner||"Sin responsable"}</span><span>{t.priority}</span><span>{date(t.due)}</span></div>
-    {t.stage==="recurring"&&<p className={css.help}>Recurrente: «Por hoy ya estamos» registra el avance y la deja para el próximo día habilitado desde mañana, conservando su posición.</p>}<div className={css.actions}>{data?.source==="supabase"&&["ready","recurring","doing"].includes(t.stage)&&<button className={css.primary} disabled={busy||!!error||refreshing||data.readOnly||!!t.issues.length} onClick={()=>finishToday(t)} title="Guardar el avance de hoy y volver desde mañana en sus días habilitados. No finaliza la acción.">Por hoy ya estamos</button>}<button className={css.button} disabled={busy||!!error||refreshing} aria-expanded={editing} onClick={()=>editing?setEditor(undefined):editTask(t)}>Editar acción</button>{data?.actionGroups&&!t.groupId&&!["done","cancelled"].includes(t.stage)&&<button className={css.button} disabled={busy||!!error||refreshing||data.readOnly} onClick={()=>transformTask(t)}>Transformar en grupo de acciones</button>}{t.stage==="ready"&&<button className={css.primary} disabled={busy||!!error||refreshing||!!t.issues.length} onClick={()=>editTask(t,"doing",true)}>Empezar</button>}{t.stage==="doing"&&<button className={css.primary} disabled={busy||!!error||refreshing} onClick={()=>editTask(t,"done",true)}>Finalizar</button>}{safeDoc(t.doc)&&<a href={safeDoc(t.doc)} target="_blank" rel="noreferrer">Documento ↗</a>}</div>
+    {t.stage==="recurring"&&<p className={css.help}>Recurrente: «Por hoy ya estamos» registra el avance y la deja para el próximo día habilitado desde mañana, conservando su posición.</p>}<div className={css.actions}>{data?.source==="supabase"&&["ready","recurring","doing"].includes(t.stage)&&<button className={css.primary} disabled={busy||!!error||refreshing||data.readOnly||!!t.issues.length} onClick={()=>finishTask(t)} title="Guardar el avance de hoy y volver desde mañana en sus días habilitados. No finaliza la acción.">Por hoy ya estamos</button>}<button className={css.button} disabled={busy||!!error||refreshing} aria-expanded={editing} onClick={()=>editing?setEditor(undefined):editTask(t)}>Editar acción</button>{data?.actionGroups&&!t.groupId&&!["done","cancelled"].includes(t.stage)&&<button className={css.button} disabled={busy||!!error||refreshing||data.readOnly} onClick={()=>transformTask(t)}>Transformar en grupo de acciones</button>}{t.stage==="ready"&&<button className={css.primary} disabled={busy||!!error||refreshing||!!t.issues.length} onClick={()=>editTask(t,"doing",true)}>Empezar</button>}{t.groupId&&data?.source==="supabase"&&!["done","cancelled"].includes(t.stage)?
+      <FinishStepButton key={data.snapshotRevision} name={t.name} disabled={busy||refreshing||!!error||!!data.readOnly}
+        onConfirm={()=>void finishTask(t,"step")}/>:
+      t.stage==="doing"&&<button className={css.primary} disabled={busy||!!error||refreshing} onClick={()=>editTask(t,"done",true)}>Finalizar</button>}{safeDoc(t.doc)&&<a href={safeDoc(t.doc)} target="_blank" rel="noreferrer">Documento ↗</a>}</div>
     {inlineEditor(t,"edit")}
   </article>;
   };
@@ -214,7 +239,7 @@ export default function Panel(){
         finally{setBusy(false);}
       }}>Guardar estado</button></div>
     </Modal>}
-    {editor&&data&&!(editor.kind==="task"&&editor.id&&editor.mode!=="position"&&editor.mode!=="deadline")&&(editor.kind==="group"?<GroupForm key={editor.id||editor.initial.sourceTaskId||"new"} data={data} id={editor.id} sourceTaskId={editor.initial.sourceTaskId} onCreateTask={createDependencyTask} busy={busy} onClose={()=>setEditor(undefined)} onSave={save}/>:editor.mode?<QuickForm onToday={editor.mode==="deadline"&&!refreshing&&!error?finishToday:undefined} key={`${editor.mode}-${editor.id}`} editor={editor} data={data} busy={busy} onClose={()=>setEditor(undefined)} onSave={save} onCreateEvent={createWaitEvent} onCreateProject={createProjectForTask} onCreateTask={createDependencyTask}/>:<EditForm key={`${editor.kind}-${editor.id||"new"}`} editor={editor} data={data} busy={busy} onClose={()=>setEditor(undefined)} onSave={save} onCreateProject={createProjectForTask} onCreateTask={createDependencyTask} onCreateEvent={createWaitEvent}/>)}
+    {editor&&data&&!(editor.kind==="task"&&editor.id&&editor.mode!=="position"&&editor.mode!=="deadline")&&(editor.kind==="group"?<GroupForm key={editor.id||editor.initial.sourceTaskId||"new"} data={data} id={editor.id} sourceTaskId={editor.initial.sourceTaskId} onCreateTask={createDependencyTask} busy={busy} onClose={()=>setEditor(undefined)} onSave={save}/>:editor.mode?<QuickForm onToday={editor.mode==="deadline"&&!refreshing&&!error?finishTask:undefined} key={`${editor.mode}-${editor.id}`} editor={editor} data={data} busy={busy} onClose={()=>setEditor(undefined)} onSave={save} onCreateEvent={createWaitEvent} onCreateProject={createProjectForTask} onCreateTask={createDependencyTask}/>:<EditForm key={`${editor.kind}-${editor.id||"new"}`} editor={editor} data={data} busy={busy} onClose={()=>setEditor(undefined)} onSave={save} onCreateProject={createProjectForTask} onCreateTask={createDependencyTask} onCreateEvent={createWaitEvent}/>)}
   </main>;
 }
 function QuickForm({embedded=false,onToday,editor,data,busy,onClose,onSave,onCreateEvent,onCreateProject,onCreateTask}:{onToday?:(task:Task)=>Promise<void>;embedded?:boolean;editor:Editor;data:Data;busy:boolean;onClose:()=>void;onSave:(changes:Record<string,any>)=>Promise<void>;onCreateEvent:(name:string)=>Promise<string>;onCreateProject:(name:string)=>Promise<string>;onCreateTask:CreateDependency}){

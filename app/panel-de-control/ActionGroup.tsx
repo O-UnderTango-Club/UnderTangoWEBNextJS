@@ -8,7 +8,9 @@ export default function ActionGroup({position,group,data,renderTask,onEdit,statu
   const [expanded,setExpanded]=useState(initialExpanded),[editing,setEditing]=useState<'add'|'order'|'details'|undefined>(),[message,setMessage]=useState('');
   const members=group.memberIds.map(id=>data.tasks.find(t=>t.id===id)!);
   const next=members.find(t=>t.id===group.nextId);
-  const completed=members.filter(t=>['done','cancelled'].includes(t.stage)).length;
+  const pending=members.filter(t=>!['done','cancelled'].includes(t.stage));
+  const resolved=members.filter(t=>['done','cancelled'].includes(t.stage));
+  const completed=resolved.length;
   const closed=['done','cancelled'].includes(group.stage);
   const label=statusLabel||({ready:'Acción inmediata',recurring:'Acción recurrente',scheduled:'Programada',doing:'En curso',waiting:'En espera',done:'Finalizada',cancelled:'Descartada'} as const)[group.stage];
   return <article className={css.card} aria-label={`Grupo ${group.name}`}>
@@ -19,7 +21,12 @@ export default function ActionGroup({position,group,data,renderTask,onEdit,statu
     {statusEditor}
     <div className={css.actions}><button className={css.button} disabled={!!editing} aria-expanded={expanded} aria-controls={`group-${group.id}`} onClick={()=>setExpanded(!expanded)}>{expanded?'Cerrar pasos':'Ver pasos'}</button>{onSaveGroup&&!closed&&<><button className={css.button} disabled={disabled||!!editing||statusEditing} onClick={()=>{onBeginEdit?.();setExpanded(true);setEditing('details');setMessage('');}}>Editar detalles</button><button className={css.button} disabled={disabled||!!editing||statusEditing||members.length<2} onClick={()=>{onBeginEdit?.();setExpanded(true);setEditing('order');setMessage('');}}>Ordenar acciones</button></>}{['ready','doing'].includes(group.stage)&&<button className={css.button} disabled={disabled||!!editing||statusEditing} onClick={onToday}>Por hoy está bien</button>}</div>
     {message&&<p role="status">{message}</p>}
-    <div id={`group-${group.id}`} hidden={!expanded}>{editing&&onSaveGroup?<GroupForm key={group.id} data={data} id={group.id} embedded focusAdd={editing==='add'} busy={disabled} onCreateTask={onCreateTask} onClose={()=>{setEditing(undefined);setMessage('Borrador del grupo cancelado. Se conserva el orden guardado.');}} onSave={async changes=>{await onSaveGroup(changes);setEditing(undefined);setMessage('Grupo guardado. Las acciones se muestran en el orden confirmado.');}}/>:expanded&&<ol className={css.groupSteps}>{members.map(t=><li key={t.id}>{renderTask(t)}</li>)}</ol>}</div>
+    <div id={`group-${group.id}`} hidden={!expanded}>{editing&&onSaveGroup?<GroupForm key={group.id} data={data} id={group.id} embedded focusAdd={editing==='add'} busy={disabled} onCreateTask={onCreateTask} onClose={()=>{setEditing(undefined);setMessage('Borrador del grupo cancelado. Se conserva el orden guardado.');}} onSave={async changes=>{await onSaveGroup(changes);setEditing(undefined);setMessage('Grupo guardado. Las acciones se muestran en el orden confirmado.');}}/>:expanded&&<>
+      <ol className={css.groupSteps}>{(closed?members:pending).map(t=><li key={t.id}>{renderTask(t)}</li>)}</ol>
+      {!closed&&completed>0&&<details><summary>Pasos resueltos ({completed})</summary>
+        <ol className={css.groupSteps}>{resolved.map(t=><li key={t.id}>{renderTask(t)}</li>)}</ol>
+      </details>}
+    </>}</div>
     {onSaveGroup&&!editing&&!closed&&<div className={css.actions}><button className={css.button} disabled={disabled||statusEditing} onClick={()=>{onBeginEdit?.();setExpanded(true);setEditing('add');setMessage('');}}>Agregar otra acción</button></div>}
   </article>;
 }

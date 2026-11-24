@@ -1451,6 +1451,15 @@ const MODULE_ZERO_SCENE_BY_STAGE = {
 
 const MIDI_PITCH_NAMES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "Sol", "La♭", "La", "Si♭", "Si"];
 
+async function resumeAudioOutput(context: AudioContext) {
+  const previousTime = context.currentTime;
+  await context.resume();
+  // On a cold output, Chrome can resolve resume before note-on and note-off get distinct timestamps.
+  while (context.state === "running" && context.currentTime === previousTime) {
+    await new Promise<void>(resolve => window.setTimeout(resolve, 12));
+  }
+}
+
 function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
   synthStream: MediaStream|null; masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
@@ -1641,7 +1650,7 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
         pianoRouting.current?.releaseAll?.();
         await context.suspend();
       }
-      else await context.resume();
+      else await resumeAudioOutput(context);
       if (run === runRef.current) setPaused(next);
     } catch {
       if (run === runRef.current) pausedRef.current = !next;
@@ -1685,13 +1694,14 @@ function ModuleZero({ synthStream, masterVolume, setMasterVolume, learnFader, le
       const sceneMaster = context.createGain();
       sceneMaster.gain.value = masterVolumeRef.current / 100;
       masterOutput.connect(sceneMaster);
-      sceneMonitor.current=protectPeaks(sceneMaster,SPEAKER_CEILING);
-      sceneMonitor.current.connect(context.destination);
+      const monitor = protectPeaks(sceneMaster, SPEAKER_CEILING);
+      monitor.connect(context.destination);
+      if (startPaused) await context.suspend();
+      else await resumeAudioOutput(context);
+      if (run !== runRef.current || audioRef.current !== context) return;
+      sceneMonitor.current = monitor;
       mixMaster.current = sceneMaster;
       outputRef.current = masterOutput;
-      if (startPaused) await context.suspend();
-      else await context.resume();
-      if (run !== runRef.current || audioRef.current !== context) return;
 
       if (typeof mode === "number" || isNoteScene(mode)) {
         enterNumberedScene(mode, context, previewOnly);

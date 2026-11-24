@@ -92,7 +92,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
   function chooseDestination(slot:number, explicit=false) {
     if (reservedSlots.current.has(slot) || queued.current.some(take=>take.slot===slot)) return;
     if (!explicit && occupied.current.has(slot)) return;
-    if (target.current!==slot) selectSlot(slot);
+    selectSlot(slot);
   }
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;micRequest.current?.abort();for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
   const stereo=useRef<GainNode|null>(null);

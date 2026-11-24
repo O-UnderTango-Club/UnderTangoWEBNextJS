@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useSavedSetting } from "./saved-setting";
 
 import { TRANSPORT_NAMES as names, type TransportAction } from "./control-map";
+import { MIDI_REASSIGNMENT, reassignMidi, sameMidiSignal, type MidiReassignment } from "./midi-reassignment";
 
 export function useTransportMidi(connectMidi: (rescan?: boolean) => Promise<void>) {
   const [play, setPlay] = useSavedSetting("generalPlayButton", "");
+  const [pauseScene, setPauseScene] = useSavedSetting("generalPauseButton", "");
   const [stopScene, setStopScene] = useSavedSetting("generalStopButton", "");
   const [record, setRecord] = useSavedSetting("mixerRecordButton", "");
   const [legacyRecord, setLegacyRecord] = useSavedSetting("mixerLiveButton", "");
@@ -13,8 +15,9 @@ export function useTransportMidi(connectMidi: (rescan?: boolean) => Promise<void
   const [clear, setClear] = useSavedSetting("mixerClearButton", "");
   const [aliases, setAliases] = useSavedSetting<Partial<Record<TransportAction, string>>>("mixerTransportAliases", {});
   const [learning, setLearning] = useState<TransportAction | null>(null);
-  const [conflict, setConflict] = useState("");
-  const buttons = { play, stopScene, record: record || legacyRecord, playAll, stop, clear };
+  const buttons = { play, pauseScene, stopScene, record: record || legacyRecord, playAll, stop, clear };
+  const setters = {play:setPlay, pauseScene:setPauseScene, stopScene:setStopScene, record:setRecord,
+    playAll:setPlayAll, stop:setStop, clear:setClear};
 
   useEffect(() => {
     const otherControl = (event: Event) => {
@@ -26,38 +29,48 @@ export function useTransportMidi(connectMidi: (rescan?: boolean) => Promise<void
 
   function match(id: string, alias?: string) {
     return (Object.keys(buttons) as TransportAction[]).find(action =>
-      alias && aliases[action] ? aliases[action] === alias : buttons[action] === id);
+      !!buttons[action] && sameMidiSignal(buttons[action], aliases[action], {id,alias,owner:"transport"}));
   }
+  function releaseSignal(signal: MidiReassignment, keep?: TransportAction) {
+    const removed=(Object.keys(buttons) as TransportAction[]).filter(action =>
+      action!==keep && !!buttons[action] && sameMidiSignal(buttons[action],aliases[action],signal));
+    if (!removed.length) return;
+    for (const action of removed) setters[action]("");
+    if (removed.includes("record")) setLegacyRecord("");
+    setAliases(current => {
+      const next={...current};
+      for (const action of removed) delete next[action];
+      return next;
+    });
+  }
+  useEffect(() => {
+    const receive=(event:Event) => {
+      const signal=(event as CustomEvent<MidiReassignment>).detail;
+      if (signal.owner!=="transport") releaseSignal(signal);
+    };
+    window.addEventListener(MIDI_REASSIGNMENT,receive);
+    return () => window.removeEventListener(MIDI_REASSIGNMENT,receive);
+  });
 
   function toggle(action: TransportAction) {
     window.dispatchEvent(new CustomEvent("860-midi-learn", { detail: "transport" }));
-    setConflict("");
     if (learning !== action) void connectMidi(true);
     setLearning(learning === action ? null : action);
   }
 
   function bind(id: string, alias?: string) {
     if (!learning) return;
-    const assigned = match(id, alias);
-    if (assigned && assigned !== learning) {
-      setConflict(`Ese botón ya controla ${names[assigned]}.`);
-      return;
-    }
-    if (learning === "record") {
-      setRecord(id);
-      setLegacyRecord("");
-    } else if (learning === "stop") setStop(id);
-    else if (learning === "playAll") setPlayAll(id);
-    else if (learning === "stopScene") setStopScene(id);
-    else if (learning === "clear") setClear(id);
-    else setPlay(id);
+    const signal={id,alias,owner:"transport" as const};
+    releaseSignal(signal,learning);
+    reassignMidi(signal);
+    setters[learning](id);
+    if (learning==="record") setLegacyRecord("");
     setAliases(current => ({ ...current, [learning]: alias || "" }));
     setLearning(null);
-    setConflict("");
   }
 
-  const hint = learning && (conflict || `Pulsá el botón MIDI para ${names[learning]}.`);
-  return { buttons, match, learning, toggle, bind, setConflict, hint };
+  const hint = learning && `Pulsá el botón MIDI para ${names[learning]}.`;
+  return { buttons, match, learning, toggle, bind, hint };
 }
 
 export type TransportMidi = ReturnType<typeof useTransportMidi>;

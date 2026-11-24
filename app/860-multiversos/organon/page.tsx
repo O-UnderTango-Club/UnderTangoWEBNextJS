@@ -80,6 +80,7 @@ export default function Organon() {
       <p>Última revisión de este navegador · <time dateTime={map.fecha}>{date(map.fecha)}</time></p>
       <p>{archive.fileSaved ? "Cada reasignación actualiza Controles-860.json en el almacenamiento privado de este navegador." : "El mapa está en este perfil. Descargá una copia para conservar el archivo."}</p>
       <Table rows={{
+        [TRANSPORT_NAMES.pauseScene]: "Sin asignar",
         [TRANSPORT_NAMES.stopScene]: "Sin asignar",
         [TRANSPORT_NAMES.playAll]: "Sin asignar",
         [TRANSPORT_NAMES.clear]: "Sin asignar",

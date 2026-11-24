@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { departments } from "../central/departments";
+import { centralActionView, daysUntil, isOpenAction, type CentralMode } from "../../src/lib/central-actions";
 import type { Board } from "../../src/lib/panel-model";
 import styles from "./control.module.css";
 
@@ -36,15 +37,10 @@ async function controlRequest(intent?: Intent) {
   if (!response.ok) throw new RequestError(value.error || "No se pudo guardar el cambio.", response.status);
   return value;
 }
-type Mode = "overview" | "urgent" | "dates" | "priority";
 const colors = ["#cf8369", "#d4aa58", "#8bb0a2", "#948bc1", "#c17891", "#7ba9c1", "#a9ad6e", "#d39b6a", "#a4a7d7", "#83b8af"];
-const stages: Record<string, string> = { ready: "Disponible", recurring: "Recurrente", doing: "En curso", scheduled: "Programada", waiting: "En espera" };
-const frontNames = ["Primario", "Secundario", "Terciario"];
+const stages: Record<Task["stage"], string> = { ready: "Disponible", recurring: "Recurrente", doing: "En curso", scheduled: "Programada", waiting: "En espera", done: "Finalizada", cancelled: "Cancelada" };
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Cordoba", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-function daysLeft(value: string) { return Math.round((Date.parse(`${value.slice(0, 10)}T00:00:00Z`) - Date.parse(`${today()}T00:00:00Z`)) / 86400000); }
-function dateLabel(value: string) { if (!value) return "Sin fecha límite"; const d = daysLeft(value); return `${new Date(`${value.slice(0, 10)}T12:00:00Z`).toLocaleDateString("es-AR", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" })}${d < 0 ? " · vencida" : d === 0 ? " · hoy" : ""}`; }
-const high = (t: Task) => /alta|urgente|cr[ií]tica/i.test(t.priority || "");
-const urgent = (t: Task) => !!t.due && daysLeft(t.due) <= 7;
+function dateLabel(value: string, day: string) { if (!value) return "Sin fecha límite"; const d = daysUntil(value, day); return `${new Date(`${value.slice(0, 10)}T12:00:00Z`).toLocaleDateString("es-AR", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" })}${d < 0 ? " · vencida" : d === 0 ? " · hoy" : ""}`; }
 
 type Face = { points: [number, number][]; code: string; depth: number; color: string };
 function Sphere({ selected, choose, counts }: { selected: string | null; choose: (s: string) => void; counts: Record<string, number> }) {
@@ -100,8 +96,9 @@ export default function Control() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>("overview");
+  const [mode, setMode] = useState<CentralMode>("overview");
   const [showRest, setShowRest] = useState(false);
+  const [openedGroup, setOpenedGroup] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const [armed, setArmed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -167,7 +164,6 @@ export default function Control() {
       retryIntent.current = undefined;
       setArmed(null);
       setOpened(null);
-      if (operation === "finish") setData(current => current && { ...current, tasks: current.tasks.filter(item => item.id !== task?.id) });
       setNotice(operation === "undo" ? "Último cambio deshecho." : operation === "finish" ? `«${task?.name}» quedó finalizada.` : `«${task?.name}» queda para su próximo día habilitado.`);
       await refresh(true);
       messageRef.current?.focus();
@@ -184,77 +180,116 @@ export default function Control() {
     }
   }
 
-  const { actions, counts }=useMemo(()=>{const map=new Map((data?.assignments||[]).map(x=>[x.id,x.department])); const actions=(data?.tasks||[]).filter(t=>!t.isGroup&&!['done','cancelled'].includes(t.stage)).map(t=>({ ...t, department:map.get(t.id)||null }));const counts:Record<string,number>={};for(const t of actions)counts[t.department||"unassigned"]=(counts[t.department||"unassigned"]||0)+1;return { actions,counts };},[data]);
-  const filtered=actions.filter(t=>(!selected||(selected==="unassigned"?!t.department:t.department===selected))&&(mode==="overview"||mode==="urgent"&&urgent(t)||mode==="dates"&&!!t.due||mode==="priority"&&high(t)));
-  const sorted=[...filtered].sort((a,b)=>{if(mode==="urgent"||mode==="dates")return (a.due||"9999").localeCompare(b.due||"9999")||a.name.localeCompare(b.name,"es");return frontNames.indexOf(a.front)-frontNames.indexOf(b.front)||(a.rank||9999)-(b.rank||9999)||a.name.localeCompare(b.name,"es");});
-  const highlighted=new Set((data?.fronts||[]).flatMap(f=>f.tasks));
-  const highlightedMembers=new Set((data?.tasks||[]).filter(t=>t.isGroup&&highlighted.has(t.id)&&t.nextId).map(t=>t.nextId));
-  const preferred=mode==="overview"?sorted.filter(t=>highlighted.has(t.id)||highlightedMembers.has(t.id)):sorted;
-  const rest=mode==="overview"?sorted.filter(t=>!preferred.includes(t)):[];
+  const day = today();
+  const { visible, rest, total, counts, departmentById } = useMemo(() => centralActionView(
+    data?.tasks || [], data?.assignments || [], data?.fronts || [], selected, mode, day,
+  ), [data, selected, mode, day]);
   const selectedDept=departments.find(d=>d.number===selected);
   const choose = (code: string | null) => {
     setSelected(code);
     setShowRest(false);
+    setOpenedGroup(null);
     setOpened(null);
     setArmed(null);
   };
   const locked = loading || saving || !!error || !!data?.readOnly;
-  const card = (task: typeof actions[number]) => {
-    const expanded = opened === task.id;
+  const card = (task: Task, members: Task[] = [], due = task.due): ReactNode => {
+    const expanded = (task.isGroup ? openedGroup : opened) === task.id;
     const confirming = armed === task.id;
     const recurring = task.baseStage === "recurring";
     const description = task.description.trim();
     const eligibleToday = ["ready", "recurring", "doing"].includes(task.stage)
       && !task.issues.length && !task.blockers.length;
-    const department = departments.find(item => item.number === task.department);
+    const department = departments.find(item => item.number === departmentById.get(task.id));
+    const toggle = () => {
+      if (task.isGroup) {
+        setOpenedGroup(expanded ? null : task.id);
+        setOpened(null);
+      } else {
+        setOpened(expanded ? null : task.id);
+      }
+      setArmed(null);
+    };
     return (
-      <article className={styles.card} key={task.id}>
+      <article className={styles.card} key={task.id} aria-label={task.isGroup ? `Grupo ${task.name}` : task.name}>
         <div className={styles.cardTop}>
-          <span>{department ? `${department.number} · ${department.keyword}` : "Sin departamento"}</span>
-          <span>{stages[task.stage] || task.stage}{recurring && task.stage !== "recurring" ? " · recurrente" : ""}</span>
+          <span>{task.isGroup && "Grupo de acciones · "}{department ? `${department.number} · ${department.keyword}` : "Sin departamento"}</span>
+          <span>{stages[task.stage]}{recurring && task.stage !== "recurring" ? " · recurrente" : ""}</span>
         </div>
         <h3>
-          <button className={styles.actionTitle} type="button" aria-expanded={expanded} aria-controls={`controls-${task.id}`}
-            onClick={() => { setOpened(expanded ? null : task.id); setArmed(null); }}>
+          {isOpenAction(task) || description ? <button className={styles.actionTitle} type="button" aria-expanded={expanded} aria-controls={`controls-${task.id}`}
+            onClick={toggle}>
             <span>{task.name}</span><span aria-hidden="true">{expanded ? "−" : "+"}</span>
-          </button>
+          </button> : task.name}
         </h3>
         <div className={styles.meta}>
-          <span className={urgent(task) ? styles.warn : ""}>{dateLabel(task.due)}</span>
+          {task.isGroup && <span>{members.length} {members.length === 1 ? "acción" : "acciones"} en el grupo</span>}
+          <span className={due && daysUntil(due, day) <= 7 ? styles.warn : ""}>
+            {due !== task.due && "Vence un paso · "}{dateLabel(due, day)}
+          </span>
           {task.priority && <span>Prioridad {task.priority.toLowerCase()}</span>}
-          <span>{task.front}{task.rank ? ` · ${task.rank}` : ""}</span>
+          {!task.groupId && <span>{task.front}{task.rank ? ` · ${task.rank}` : ""}</span>}
         </div>
         {task.owner && <p className={styles.owner}>{task.owner}</p>}
         {task.stage === "waiting" && task.blockers.length > 0 && <p className={styles.owner}>Espera: {task.blockers.join(", ")}</p>}
         {task.issues.length > 0 && <p className={styles.warn}>Revisar: {task.issues.join(" · ")}</p>}
-        <div className={styles.actionControls} id={`controls-${task.id}`} hidden={!expanded}>
+        {task.isGroup ? (
+          <div id={`controls-${task.id}`} hidden={!expanded}>
+            {expanded && (members.length ? (
+              <ol className={styles.groupMembers} aria-label={`Acciones de ${task.name}`}>
+                {members.map(member => <li key={member.id} value={member.groupOrder || undefined}>{card(member)}</li>)}
+              </ol>
+            ) : <p className={styles.owner}>Este grupo todavía no tiene acciones.</p>)}
+          </div>
+        ) : <div className={styles.actionControls} id={`controls-${task.id}`} hidden={!expanded}>
           {expanded && description && (
             <details className={styles.actionDetails}>
               <summary>Más información</summary>
               <p>{description.replace(/(?:\\r)?\\n/g, "\n")}</p>
             </details>
           )}
-          <button type="button" disabled={locked || !eligibleToday} onClick={() => void save("doneToday", task)}>
-            Por hoy ya estamos
-          </button>
-          {!recurring && <button type="button" disabled={locked} data-confirming={confirming}
-            onClick={() => confirming ? void save("finish", task) : setArmed(task.id)}>
-            {confirming ? "Confirmar finalización" : "Finalizada"}
-          </button>}
-          {!eligibleToday && <p>El cierre por hoy está disponible para acciones que podés ejecutar ahora.</p>}
-          {confirming && <p role="status">Tocá de nuevo para finalizar esta acción.</p>}
-        </div>
+          {isOpenAction(task) && <>
+            <button type="button" disabled={locked || !eligibleToday} onClick={() => void save("doneToday", task)}>
+              Por hoy ya estamos
+            </button>
+            {!recurring && <button type="button" disabled={locked} data-confirming={confirming}
+              onClick={() => confirming ? void save("finish", task) : setArmed(task.id)}>
+              {confirming ? "Confirmar finalización" : "Finalizada"}
+            </button>}
+            {!eligibleToday && <p>El cierre por hoy está disponible para acciones que podés ejecutar ahora.</p>}
+            {confirming && <p role="status">Tocá de nuevo para finalizar esta acción.</p>}
+          </>}
+        </div>}
       </article>
     );
   };
+  const entryCard = ({ task, members, due }: (typeof visible)[number]) => card(task, members, due);
   return <main className={styles.main}><header className={styles.header}><a href="/panel-de-control">Ø UnderTango · Panel de control</a><button onClick={()=>void refresh()} disabled={loading || saving}>{loading?"Actualizando…":"Actualizar"}</button></header><section className={styles.intro}><p className={styles.eyebrow}>Una mirada para empezar</p><h1>Central de <em>control</em></h1><p>Todo el sistema a la vista. Elegí un departamento y descubrí por dónde avanzar.</p></section>
     {error&&<div className={styles.message} role="alert"><strong>No pudimos abrir la información.</strong><p>{error}</p><a href="/panel-de-control">Abrir el panel de control</a></div>}
-    {data&&<><div className={styles.workspace}><section className={styles.orbit} aria-label="Departamentos de UnderTango"><div className={styles.orbitHead}><div><span className={styles.eyebrow}>Ø Sistema operativo</span><h2>Explorá la esfera</h2></div><span>{actions.length} acciones abiertas</span></div><Sphere selected={selected} choose={choose} counts={counts}/><p className={styles.hint}>Arrastrá para girar · Tocá un sector para abrirlo</p><div className={styles.departmentList} aria-label="Elegir departamento">{departments.map((d,i)=><button key={d.number} className={selected===d.number?styles.chosen:""} onClick={()=>choose(d.number)} aria-pressed={selected===d.number}><span style={{background:colors[i]}} />{d.number} {d.keyword}<b>{counts[d.number]||0}</b></button>)}<button className={selected==="unassigned"?styles.chosen:""} onClick={()=>choose("unassigned")} aria-pressed={selected==="unassigned"}><span className={styles.gray}/>Sin departamento<b>{counts.unassigned||0}</b></button></div></section>
+    {data&&<><div className={styles.workspace}><section className={styles.orbit} aria-label="Departamentos de UnderTango"><div className={styles.orbitHead}><div><span className={styles.eyebrow}>Ø Sistema operativo</span><h2>Explorá la esfera</h2></div><span>{total} {total === 1 ? "acción o grupo abierto" : "acciones y grupos abiertos"}</span></div><Sphere selected={selected} choose={choose} counts={counts}/><p className={styles.hint}>Arrastrá para girar · Tocá un sector para abrirlo</p><div className={styles.departmentList} aria-label="Elegir departamento">{departments.map((d,i)=><button key={d.number} className={selected===d.number?styles.chosen:""} onClick={()=>choose(d.number)} aria-pressed={selected===d.number}><span style={{background:colors[i]}} />{d.number} {d.keyword}<b>{counts[d.number]||0}</b></button>)}<button className={selected==="unassigned"?styles.chosen:""} onClick={()=>choose("unassigned")} aria-pressed={selected==="unassigned"}><span className={styles.gray}/>Sin departamento<b>{counts.unassigned||0}</b></button></div></section>
     <section className={styles.detail}><div className={styles.detailTop}><div><p className={styles.eyebrow}>{selectedDept?`Departamento ${selectedDept.number}`:selected==="unassigned"?"Pendientes de clasificación":"Visión general"}</p><h2>{selectedDept?.title|| (selected==="unassigned"?"Sin departamento":"Todo UnderTango")}</h2></div>{selected&&<button onClick={()=>choose(null)}>Ver todo</button>}</div><p className={styles.description}>{selectedDept?.description||"Elegí una perspectiva para ordenar las acciones abiertas."}</p>
     {selectedDept?.number === "84" && selectedDept.link ? (
       <p><a href={selectedDept.link.href} style={{ color: "#ffbd9e", textDecoration: "underline" }}>{selectedDept.link.label} →</a></p>
     ) : null}
-    <div className={styles.tabs} role="group" aria-label="Perspectiva de acciones">{([["overview","Para avanzar"],["urgent","Urgentes"],["dates","Con fecha límite"],["priority","Prioridad alta"]] as [Mode,string][]).map(([id,label])=><button key={id} aria-pressed={mode===id} className={mode===id?styles.active:""} onClick={()=>{setMode(id);setShowRest(false);setOpened(null);setArmed(null);}}>{label}</button>)}</div><p className={styles.viewNote}>{mode==="overview"?"Hasta tres acciones ejecutables por frente, según el orden del panel. El resto queda disponible debajo.":mode==="urgent"?"Vencidas o con fecha límite dentro de los próximos 7 días, incluidas las que están en espera.":mode==="dates"?"Todas las acciones con fecha límite, ordenadas por fecha.":"Acciones marcadas con prioridad alta, independientemente de su fecha."}</p><div className={styles.cards}>{(mode==="overview"?preferred:sorted).map(card)}{!(mode==="overview"?preferred:sorted).length&&<p className={styles.empty}>{mode==="overview"?"No hay acciones ejecutables de los primeros puestos en esta selección.":"No hay acciones que coincidan con esta vista."}</p>}</div>{rest.length>0&&<div className={styles.more}><button onClick={()=>{setShowRest(!showRest);setOpened(null);setArmed(null);}} aria-expanded={showRest}>{showRest?"Ocultar":"Ver"} otras {rest.length} acciones abiertas</button>{showRest&&<div className={styles.cards}>{rest.map(card)}</div>}</div>}<a className={styles.panelLink} href="/panel-de-control">Abrir el panel de control</a></section></div><footer className={styles.footer}>
+    <div className={styles.tabs} role="group" aria-label="Perspectiva de acciones">
+      {([["overview","Para avanzar"],["urgent","Urgentes"],["dates","Con fecha límite"],["priority","Prioridad alta"]] as [CentralMode,string][]).map(([id,label]) => (
+        <button key={id} aria-pressed={mode === id} className={mode === id ? styles.active : ""} onClick={() => {
+          setMode(id); setShowRest(false); setOpenedGroup(null); setOpened(null); setArmed(null);
+        }}>{label}</button>
+      ))}
+    </div>
+    <p className={styles.viewNote}>{mode === "overview" ? "Hasta tres acciones ejecutables por frente, según el orden del panel. El resto queda disponible debajo." : mode === "urgent" ? "Vencidas o con fecha límite dentro de los próximos 7 días, incluidas las que están en espera." : mode === "dates" ? "Todas las acciones con fecha límite, ordenadas por fecha." : "Acciones marcadas con prioridad alta, independientemente de su fecha."}</p>
+    <div className={styles.cards}>
+      {visible.map(entryCard)}
+      {!visible.length && <p className={styles.empty}>{mode === "overview" ? "No hay acciones ejecutables de los primeros puestos en esta selección." : "No hay acciones que coincidan con esta vista."}</p>}
+    </div>
+    {rest.length > 0 && <div className={styles.more}>
+      <button onClick={() => { setShowRest(!showRest); setOpened(null); setArmed(null); }} aria-expanded={showRest}>
+        {showRest ? "Ocultar" : "Ver"} {rest.length === 1 ? "otra acción" : `otras ${rest.length} acciones`} del ranking
+      </button>
+      {showRest && <div className={styles.cards}>{rest.map(entryCard)}</div>}
+    </div>}
+    <a className={styles.panelLink} href="/panel-de-control">Abrir el panel de control</a></section></div><footer className={styles.footer}>
       <button type="button" className={styles.undo} disabled={locked || !data.latestChange}
         aria-label="Deshacer último cambio" title="Deshacer último cambio" onClick={() => void save("undo")}>
         <span aria-hidden="true">↶</span> Deshacer

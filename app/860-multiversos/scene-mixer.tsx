@@ -441,7 +441,9 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
       const {id,alias,value,type,reserved,label}=e.detail;
       // Web MIDI port IDs can change between the published score and a local file.
       // The dispatcher supplies a name alias only for a uniquely identified input.
-      let assignment=bankMap[id] ?? (alias ? bankMap[alias] ?? Object.values(bankMap).find(item=>item.alias===alias) : undefined);
+      const exact = bankMap[id];
+      let assignment = exact && (!alias || !exact.alias || exact.alias === alias) ? exact : undefined;
+      if (!assignment && alias) assignment = bankMap[alias] ?? Object.values(bankMap).find(item => item.alias === alias);
       if(transportMidi.learning) {
         if(type !== "bend" && (reserved || assignment)) {
           e.preventDefault(); transportMidi.setConflict("Ese control ya tiene otra asignación MIDI.");

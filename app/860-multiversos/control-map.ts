@@ -88,13 +88,17 @@ function normalized(raw: unknown): Settings {
   }
   // Older versions stored port IDs only. Preserve them and add a portable alias
   // wherever the score actually recorded a device name.
-  const devices = new Map<string, string>();
-  for (const b of Object.values(settings.ccMap)) if (b.inputName) devices.set(b.inputId, b.inputName);
+  const devices = new Map<string, string | null>();
+  const addDevice = (id: string, name: string) => {
+    if (!devices.has(id)) devices.set(id, name);
+    else if (devices.get(id) !== name) devices.set(id, null);
+  };
+  for (const b of Object.values(settings.ccMap)) if (b.inputName) addDevice(b.inputId, b.inputName);
   for (const [id, item] of Object.entries(settings.sampleBankMidi)) {
     const parts = signal(id);
     const device = /^(.*) · (?:CC \d+|Nota \d+|Pitch Bend) · canal \d+$/.exec(item.label)?.[1];
     if (device && parts.length === 4 && typeof parts[1] === "number") {
-      devices.set(String(parts[0]), device);
+      addDevice(String(parts[0]), device);
       if (!item.alias) item.alias = JSON.stringify(["name", device, ...parts.slice(1)]);
     }
   }
@@ -163,15 +167,18 @@ function sharedFaders(settings: Settings): string[] {
   }
   return found;
 }
-function currentMap(): ControlMap {
+function readSettings(last: ControlMap | null): Settings {
   const raw: Record<string, unknown> = {};
-  const last: ControlMap | null = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "null");
   for (const key of settingNames) {
     const stored = localStorage.getItem(SETTINGS_PREFIX + key);
     if (stored !== null) raw[key] = JSON.parse(stored);
     else if (last?.settings && Object.hasOwn(last.settings, key)) raw[key] = last.settings[key];
   }
-  const settings = normalized(raw);
+  return normalized(raw);
+}
+function currentMap(): ControlMap {
+  const last: ControlMap | null = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "null");
+  const settings = readSettings(last);
   const asignaciones = describeControls(settings);
   if (last && JSON.stringify(last.settings) === JSON.stringify(settings) && JSON.stringify(last.tecladoYHercules) === JSON.stringify(FIXED_CONTROLS)) return last;
   const fecha = new Date().toISOString();
@@ -181,7 +188,13 @@ function currentMap(): ControlMap {
   localStorage.setItem(JOURNAL_KEY, JSON.stringify(map));
   return map;
 }
-export function recoveredControl(name: SettingName): unknown {
+export function readControlSetting(name: SettingName, raw: string | null): unknown {
+  // Old maps may have a reliable device name only in the sample label or synth binding.
+  if (name === "sampleBankMidi" || name === "mixerTransportAliases") {
+    try { return readSettings(JSON.parse(localStorage.getItem(JOURNAL_KEY) || "null"))[name]; }
+    catch { /* Other unavailable settings should not prevent reading this individual binding. */ }
+  }
+  if (raw !== null) return JSON.parse(raw);
   return JSON.parse(localStorage.getItem(JOURNAL_KEY) || "null")?.settings?.[name];
 }
 export type Archive = {map: ControlMap; fileSaved: boolean};

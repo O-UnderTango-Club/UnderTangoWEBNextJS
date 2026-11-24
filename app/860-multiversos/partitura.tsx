@@ -3089,8 +3089,11 @@ export default function Multiversos860Page() {
           window.dispatchEvent(new CustomEvent("860-record-midi",{cancelable:true,detail:{id,alias,on:true,pulse:true}}));
           return;
         }
-        const fromPort = (binding?: CcBinding) => !!binding && (binding.inputId === input.id ||
-          (uniqueName === binding.inputName && !midiInputs.some(port => port.id === binding.inputId)));
+        const fromPort = (binding?: CcBinding) => {
+          if (!binding) return false;
+          if (binding.inputId === input.id) return !binding.inputName || !input.name || binding.inputName === input.name;
+          return !!uniqueName && uniqueName === binding.inputName;
+        };
         const alias = uniqueName ? JSON.stringify(["name",uniqueName,channel,controlType,controlType==="bend"?0:first]) : "";
         if (controlType && midiLearnRef.current === null) {
           const id = JSON.stringify([input.id,channel,controlType,controlType==="bend"?0:first]);

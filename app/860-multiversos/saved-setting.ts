@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState, type SetStateAction } from "react";
-import { archiveControls, isControlSetting, recoveredControl, RECOVERED_CONTROLS, SETTINGS_PREFIX } from "./control-map";
+import { archiveControls, isControlSetting, readControlSetting, RECOVERED_CONTROLS, SETTINGS_PREFIX } from "./control-map";
 
 export function useSavedSetting<T>(name: string, initial: T | (() => T)) {
   const key = SETTINGS_PREFIX + name;
@@ -10,7 +10,7 @@ export function useSavedSetting<T>(name: string, initial: T | (() => T)) {
     const fallback = typeof initialValue === "function" ? (initialValue as () => T)() : initialValue;
     try {
       const raw = localStorage.getItem(key);
-      const saved = raw !== null ? JSON.parse(raw) : isControlSetting(name) ? recoveredControl(name) : undefined;
+      const saved = isControlSetting(name) ? readControlSetting(name, raw) : raw !== null ? JSON.parse(raw) : undefined;
       if (saved === undefined) return fallback;
       if (Array.isArray(fallback)) {
         return Array.isArray(saved) && saved.length === fallback.length ? saved as T : fallback;

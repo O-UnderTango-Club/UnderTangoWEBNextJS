@@ -6,10 +6,12 @@ const SILENCE_FLOOR = .0002;
 const FRAMES_PER_TASK = 1 << 18;
 const cachedPeaks = new WeakMap<AudioBuffer, Float32Array>();
 
-export const SampleWaveform = memo(function SampleWaveform({id, slot, buffer, muted, stopped, cursors}: {
+export const SampleWaveform = memo(function SampleWaveform({id, slot, buffer, meter, bars, muted, stopped, cursors}: {
   id: number;
   slot: number;
   buffer: AudioBuffer;
+  meter: number;
+  bars: number;
   muted: boolean;
   stopped: boolean;
   cursors: Map<number, HTMLSpanElement>;
@@ -69,7 +71,8 @@ export const SampleWaveform = memo(function SampleWaveform({id, slot, buffer, mu
   }, [buffer]);
 
   return <div className="sample-wave" role="img" aria-label={`Forma de onda de S${slot + 1}`}
-    title="Los huecos son silencio. La línea marca la posición del loop."
+    title="Los huecos son silencio. La línea amarilla marca la posición entre los pulsos y compases."
+    style={{backgroundSize:`${100/bars}% 100%, ${100/(bars*meter)}% 100%`}}
     data-muted={muted || undefined} data-stopped={stopped || undefined}>
     <canvas ref={canvas} width={COLUMNS} height={HEIGHT} aria-hidden="true" />
     <span ref={register} className="sample-wave-cursor" aria-hidden="true" />

@@ -16,7 +16,9 @@ El [Órganon de la partitura](https://www.undertangoclub.com/860-multiversos/org
 
 En la lupera A9, el fader de volumen de un casillero vacío y disponible lo elige para la próxima grabación. En un casillero ocupado se puede mezclar, mutear o reproducir conservando el destino elegido. El nombre S1–S9 o el botón MIDI **Elegir destino** permite saltar a cualquier casillero disponible para grabar. La grabación manual empieza en S1 por defecto. Cada toma deja elegido el siguiente número, incluso si está ocupado, y después de S9 vuelve a S1. Verificá la vuelta de S9 a S1 con el banco lleno y el salto de S8 a S9 tras una selección manual.
 
-Las escenas 32 a 39 graban en S1 a S8 respectivamente. Verificá el reemplazo con los nueve casilleros ocupados y la recuperación de la toma anterior. El botón **▶ Todos** de la lupera tiene su propia asignación MIDI. Reinicia juntos los loops del banco y conserva sus volúmenes y silencios. El **Play general** sigue controlando la partitura.
+Las escenas 32 a 39 graban en S1 a S8 respectivamente. Verificá el reemplazo con los nueve casilleros ocupados y la recuperación de la toma anterior. El botón **▶ Todos** de la lupera tiene su propia asignación MIDI. Reanuda juntos los loops del banco en el pulso vigente y conserva sus volúmenes y silencios. El **Play general** sigue controlando la partitura.
+
+Las luces, las ondas de la lupera y su reproducción comparten el origen del compás. **En vivo** registra el audio en el lugar del ciclo donde se tocó. Un sonido que entra en el segundo compás se dibuja y vuelve a sonar en ese compás. Probá también una toma que cruza del último compás al primero.
 
 El teclado, MIDI y el botón de sonido tocan el instrumento de la escena indicada. Al pausar se puede tocar ese mismo instrumento mientras el reloj y las grabaciones esperan. Sin escena activa, el teclado queda en silencio.
 

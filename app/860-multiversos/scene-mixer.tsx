@@ -24,14 +24,19 @@ type Mode = "matrix" | "live";
 const BANK_SIZE = 9;
 type RecordingBatch = { version:number; lastCompleted:number };
 type Recording = { kind:Mode; slot:number; batch:RecordingBatch; order:number };
-type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; layer?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
+type Clip = {
+  slot:number; stopped:boolean; once?:boolean; launchBeat?:number; layer?:number; mode:Mode;
+  id:number; scene:string; buffer:AudioBuffer; meter:number; bars:number; muted:boolean; volume:number;
+};
 type Voice = {
   bpm:number; gain:GainNode; source:AudioBufferSourceNode; dispose:()=>void;
   phaseTime:number; phaseOffset:number; duration:number;
 };
 
-function voicePosition(voice:Voice, time:number) {
-  return voice.phaseOffset + Math.max(0,time - voice.phaseTime) * voice.source.playbackRate.value;
+function phaseInCycle(time:number, cycle:number) {
+  const wrap=time%cycle;
+  const phase=wrap<0 ? wrap+cycle : wrap;
+  return phase<1e-9 || cycle-phase<1e-9 ? 0 : phase;
 }
 
 export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pauseScene,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
@@ -172,7 +177,8 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
   const tone = useRef<PerformanceInput|null>(null);
   const stopTone = useCallback(() => { tone.current?.computerNote("mixer-preview",60,false); tone.current = null; }, []);
   const beat = 60 / bpm;
-  const cycle = beat * meter * bars;
+  const beatsPerCycle = meter * bars;
+  const cycle = beat * beatsPerCycle;
   const cancel = useCallback(() => {
     countingTake.current=false;setCountIn(null);
     generation.current++;
@@ -195,8 +201,8 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
           delete cursor.dataset.playback;
           continue;
         }
-        const position=voicePosition(voice,now);
-        const progress=(voice.source.loop ? position % voice.duration : Math.min(position,voice.duration)) / voice.duration;
+        const position=voice.phaseOffset + Math.max(0,now-voice.phaseTime)*voice.source.playbackRate.value;
+        const progress=phaseInCycle(position,voice.duration)/voice.duration;
         cursor.style.transform=`translateX(${progress * 100}%)`;
         const playback=now<voice.phaseTime ? "waiting" : playing ? "playing" : "paused";
         if (cursor.dataset.playback!==playback) cursor.dataset.playback=playback;
@@ -211,13 +217,12 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
       const left = Math.ceil((matrixStart.current-now)/beat);
       setCountIn(countingTake.current && left>=1 && left<=meter ? meter+1-left : null);
       setWaiting(pending.current.has("matrix") && now<matrixStart.current);
-      const grid=countingTake.current && layer.current ? layer.current.base : origin;
-      setPosition(Math.floor(Math.max(0,now-grid)/beat) % (meter*bars));
+      setPosition(Math.floor(phaseInCycle(Math.max(0,(now-origin)/beat),beatsPerCycle)));
 
       frame=requestAnimationFrame(draw);
     };
     draw();return ()=>cancelAnimationFrame(frame);
-  },[clock,input,paused,beat,meter,bars]);
+  },[clock,input,paused,beat,meter,beatsPerCycle]);
 
   const play = useCallback(() => {
     if (!canPlayNote || tone.current) return;
@@ -277,6 +282,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
       if(kind==="matrix"){matrixStart.current=base;setWaiting(base>start);}
       if(plan)countingTake.current=true;
       const length=Math.round(ctx.sampleRate*cycle);
+      const offset=Math.round(phaseInCycle(base-origin,cycle)*ctx.sampleRate)%length;
       const capture=makeCapture(Math.round(base*ctx.sampleRate),length,Math.round(end*ctx.sampleRate),onLoop);
       const node=capture.node;
       const gain=ctx.createGain();gain.gain.value=0.75;
@@ -317,7 +323,13 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
           return;
         }
         const buffer=ctx.createBuffer(2,length,ctx.sampleRate);
-        channels.forEach((samples,ch)=>buffer.getChannelData(ch).set(samples));
+        // Lay the take on the shared cycle, wrapping captured frames after the next downbeat.
+        channels.forEach((samples,ch)=>{
+          const channel=buffer.getChannelData(ch);
+          const firstPart=length-offset;
+          channel.set(samples.subarray(0,firstPart),offset);
+          if(offset)channel.set(samples.subarray(firstPart));
+        });
         const id=++serial.current;
         launchContext.current.set(buffer,ctx);
         const stopped=stopAtStart!==stopGeneration.current;
@@ -330,7 +342,12 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
           batch.lastCompleted=order;
           showDestination((slot+1)%BANK_SIZE);
         }
-        setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,layer:plan?.scene,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:old?.volume ?? bankVolumes.current.get(slot) ?? volume,muted:old?.muted ?? false}]);if(!pending.current.size)setState("idle");
+        setClips(all=>[...all.filter(c=>c.slot!==slot),{
+          id,slot,stopped,layer:plan?.scene,mode:kind,scene:label,buffer,meter,bars,
+          launchBeat:kind==="matrix" ? startBeat+beatsPerCycle : undefined,
+          volume:old?.volume ?? bankVolumes.current.get(slot) ?? volume,muted:old?.muted ?? false,
+        }]);
+        if(!pending.current.size)setState("idle");
       };
       setState("recording");
     } catch {
@@ -410,46 +427,44 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
       v.dispose(); voices.current.delete(id);
     }
     const now=ctx.currentTime;
+    const origin=clock(ctx);
     const mixGain=1/Math.sqrt(Math.max(1,clips.reduce((sum,c)=>sum+(c.stopped||c.muted?0:(c.volume/100)**2),0)));
     for (const clip of clips) {
       if(clip.stopped)continue;
       let voice = voices.current.get(clip.id);
       if(voice && voice.bpm!==bpm){
-        if(clip.once){
-          voice.phaseOffset=voicePosition(voice,now);
-          voice.phaseTime=Math.max(voice.phaseTime,now);
-          voice.source.playbackRate.value=bpm/clip.recordedBpm;
-          voice.bpm=bpm;
-        } else {
-          voice.dispose();voices.current.delete(clip.id);voice=undefined;
-        }
+        voice.dispose();voices.current.delete(clip.id);voice=undefined;
       }
       if (!voice) {
-        if (clip.once && launchContext.current.get(clip.buffer) !== ctx) { stopClip(clip.id); continue; }
+        const inContext=launchContext.current.get(clip.buffer)===ctx;
+        if (clip.once && !inContext) { stopClip(clip.id); continue; }
+        const launchBeat=inContext ? clip.launchBeat ?? 0 : 0;
+        const when=Math.max(now,origin+launchBeat*beat);
+        const clipBeats=clip.meter*clip.bars;
+        const cycleSeconds=clipBeats*beat;
+        const end=clip.once ? origin+(launchBeat+clipBeats)*beat : undefined;
+        if (end!==undefined && end<=when) { stopClip(clip.id); continue; }
+        const rate=clip.buffer.duration/cycleSeconds;
+        const offset=phaseInCycle(when-origin,cycleSeconds)*rate;
         const source = ctx.createBufferSource(), gain = ctx.createGain();
         gain.gain.value = 0;
-        source.buffer = clip.buffer; source.loop = !clip.once;
-        const origin=clock(ctx);
-        const when=Math.max(now,origin+(launchContext.current.get(clip.buffer)===ctx ? clip.launchBeat ?? 0 : 0)*60/bpm);
-        const beatNow=(when-origin)*bpm/60;
-        const seconds=(beatNow-clip.startBeat)*60/clip.recordedBpm;
-        const offset=Math.abs(seconds)<1e-7 ? 0 : ((seconds%clip.buffer.duration)+clip.buffer.duration)%clip.buffer.duration;
-        source.playbackRate.value=bpm/clip.recordedBpm;
+        source.buffer = clip.buffer; source.loop = true;
+        source.playbackRate.value=rate;
         source.connect(gain).connect(master);
-        const firstFrame=clip.once ? 0 : offset;
-        voice = {bpm,gain,source,phaseTime:when,phaseOffset:firstFrame,duration:clip.buffer.duration,
+        voice = {bpm,gain,source,phaseTime:when,phaseOffset:offset,duration:clip.buffer.duration,
           dispose:()=>{source.onended=null;source.stop();source.disconnect();gain.disconnect();}};
         voices.current.set(clip.id,voice);
         if (clip.once) source.onended = () => {
           if (voices.current.get(clip.id)?.source === source) stopClip(clip.id);
         };
-        source.start(when, firstFrame);
+        source.start(when, offset);
+        if (end!==undefined) source.stop(end);
         firstPasses.current.get(clip.id)?.handoff();firstPasses.current.delete(clip.id);
       }
       const codaLevel = codaScene === null ? 1 : (111 - codaScene) / 22;
       voice.gain.gain.setTargetAtTime(clip.muted ? 0 : codaLevel * mixGain * clip.volume / 100, ctx.currentTime, codaScene === null ? 0.012 : 0.45);
     }
-  }, [master,clips,bpm,clock,codaScene]);
+  }, [master,clips,bpm,beat,clock,codaScene]);
 
 
   function halt(id:number){
@@ -461,7 +476,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
   function playAll(){
     if (!master || paused || (!clips.length && !voice.hasTake)) return;
     const ctx=master.context;
-    // Give every source the same audio-clock deadline, including the first buffer frame.
+    // Give every source the same audio-clock deadline without moving the grid.
     const when=ctx.currentTime + .04;
     const onset=(when - clock(ctx))/beat;
     voice.replay(when);
@@ -469,7 +484,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
       halt(clip.id);
       launchContext.current.set(clip.buffer,ctx);
     }
-    setClips(all=>all.map(clip=>({...clip,stopped:false,once:false,startBeat:onset,launchBeat:onset})));
+    setClips(all=>all.map(clip=>({...clip,stopped:false,once:false,launchBeat:onset})));
   }
   function stopAll(){
     voice.stop();
@@ -505,14 +520,14 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
   function launch(id:number, mode:"play"|"once"|"next"){
     if(!master || paused)return;
     const ctx=master.context;
-    const now=(ctx.currentTime-clock(ctx))/beat;
-    const beatsPerRound=meter*bars;
-    const start=mode==="next"?(Math.floor(now/beatsPerRound)+1)*beatsPerRound:now;
     const clip=clips.find(c=>c.id===id);
     if(!clip)return;
+    const now=(ctx.currentTime-clock(ctx))/beat;
+    const beatsPerRound=clip.meter*clip.bars;
+    const start=mode==="next"?(Math.floor(now/beatsPerRound)+1)*beatsPerRound:now+(mode==="once"?.03/beat:0);
     launchContext.current.set(clip.buffer,ctx);
     halt(id);
-    setClips(all=>all.map(c=>c.id===id?{...c,stopped:false,muted:false,once:mode==="once",startBeat:start,launchBeat:start}:c));
+    setClips(all=>all.map(c=>c.id===id?{...c,stopped:false,muted:false,once:mode==="once",launchBeat:start}:c));
   }
   function stopClip(id:number){
     halt(id);
@@ -676,7 +691,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
       {transportMidi.learning && !["play","pauseScene","stopScene"].includes(transportMidi.learning) && <small role="status">{transportMidi.hint}</small>}
       <button title="Volver a S1" aria-label="Destino automático" onClick={()=>selectSlot(null)}>{selected===null?"Auto":`Destino S${selected+1}`}</button>
       <label title="Grabar los compases configurados desde el próximo tiempo 1"><input type="checkbox" checked={matrix} disabled={state!=="idle"} onChange={e=>setMatrix(e.target.checked)}/> Matriz</label>
-      <label title="Grabar desde que apretás hasta que soltás"><input type="checkbox" checked={live} disabled={state!=="idle"} onChange={e=>setLive(e.target.checked)}/> En vivo</label>
+      <label title="Grabar desde que apretás hasta que soltás, en su lugar dentro del compás"><input type="checkbox" checked={live} disabled={state!=="idle"} onChange={e=>setLive(e.target.checked)}/> En vivo</label>
       <output>{state==="recording" ? [pending.current.has("live")?"En vivo grabando":"",pending.current.has("matrix")?(waiting?"Matriz espera el 1":"Matriz grabando"):""].filter(Boolean).join(" · ") : shared?"Audio compartido":"Estéreo de 860"}</output>
       <div className="tempo-lights" role="img" aria-label={input ? `Compás ${Math.floor(position/meter)+1} de ${bars}, pulso ${position%meter+1} de ${meter}` : `${bars} compases de ${meter} pulsos`}>
         {Array.from({length:bars},(_,bar)=><span className="tempo-bar" key={bar} aria-hidden="true">
@@ -734,7 +749,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
           ? <path d="M4 10h12" fill="none" stroke="currentColor" strokeWidth="2" />
           : <><path d="M2 8h3l5-4v12l-5-4H2z" fill="currentColor"/><path d="M12 7a5 5 0 0 1 0 6m2-8a8 8 0 0 1 0 10" fill="none" stroke="currentColor" strokeWidth="1.5"/></>}</svg>
       </button>
-      <button title="Reproducir en el próximo tiempo 1" aria-label="Reproducir en el próximo tiempo 1" disabled={!master||paused} onClick={()=>launch(clip.id,"next")}>▶₁</button>
+      <button title="Reproducir al comienzo del próximo ciclo de este loop" aria-label="Reproducir en el próximo tiempo 1" disabled={!master||paused} onClick={()=>launch(clip.id,"next")}>▶₁</button>
       <span className="sample-info" id={`sample-info-${slot}`} title={description}>{description}</span>
       <input aria-label={"Volumen del sonido " + clip.id} type="range" min="0" max="100" value={clip.volume}
         onChange={e => { const volume = Number(e.target.value); setClips(all => all.map(c => c.id === clip.id ? {...c,volume} : c)); }} />
@@ -745,7 +760,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
       }}>⟲</button>}
       <button disabled={reservedSlots.current.has(slot)} title="Eliminar sample" aria-label={"Eliminar sonido " + clip.id} onClick={() => {halt(clip.id);previous.current.delete(slot);occupied.current.delete(slot);setMessage("");setClips(all => all.filter(c => c.id !== clip.id));}}>×</button>
       <SampleWaveform key={clip.id} id={clip.id} slot={slot} buffer={clip.buffer} cursors={waveCursors.current}
-        stopped={clip.stopped || !master} muted={clip.muted || clip.volume===0} />
+        meter={clip.meter} bars={clip.bars} stopped={clip.stopped || !master} muted={clip.muted || clip.volume===0} />
     </div>;})}</div>
   </div></>;
 }

@@ -3,7 +3,7 @@ export const CONTROL_FORMAT = "undertango-860/controles-v1";
 export const SETTINGS_PREFIX = "860-multiversos:settings:v1:";
 export const JOURNAL_KEY = "860-multiversos:organon:v1";
 export const RECOVERED_CONTROLS = "860-controles-recuperados";
-export const BANK_ACTIONS = { volume: "Volumen", stop: "Stop", play: "Play inmediato", once: "Una vuelta", next: "Play en el 1", toggle: "Play / stop" } as const;
+export const BANK_ACTIONS = { volume: "Volumen", stop: "Stop", play: "Play inmediato", once: "Una vuelta", next: "Play en el 1", toggle: "Play / stop", select: "Elegir destino" } as const;
 export const PIANO_KEYS: Record<string, number> = {
   a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66, g: 67, y: 68, h: 69, u: 70, j: 71, k: 72,
 };
@@ -64,7 +64,7 @@ function validSignal(id: unknown, optional = false): boolean {
 function validSetting(name: SettingName, value: unknown): boolean {
   switch (name) {
     case "sampleBankMidi":
-      return object(value) && Object.keys(value).length <= 54 && Object.entries(value).every(([id, item]) =>
+      return object(value) && Object.keys(value).length <= 9 * Object.keys(BANK_ACTIONS).length && Object.entries(value).every(([id, item]) =>
         validSignal(id) && object(item) && integer(item.slot, 0, 8) && short(item.action) && Object.hasOwn(BANK_ACTIONS, item.action) &&
         short(item.label) && (item.alias === undefined || validSignal(item.alias, true)));
     case "ccMap":

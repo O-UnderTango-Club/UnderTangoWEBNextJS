@@ -89,6 +89,11 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
   const requesting = requestKind !== null;
   const alive=useRef(true);
   const queued=useRef<{kind:Mode;slot:number;version:number}[]>([]);
+  function chooseDestination(slot:number, explicit=false) {
+    if (reservedSlots.current.has(slot) || queued.current.some(take=>take.slot===slot)) return;
+    if (!explicit && occupied.current.has(slot)) return;
+    if (target.current!==slot) selectSlot(slot);
+  }
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;micRequest.current?.abort();for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
   const stereo=useRef<GainNode|null>(null);
   useEffect(()=>{
@@ -282,7 +287,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
             .find(candidate=>!occupied.current.has(candidate) && !reservedSlots.current.has(candidate));
           selectSlot(next ?? null);
         }
-        setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,layer:plan?.scene,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:old?.volume ?? volume,muted:old?.muted ?? false}]);if(!pending.current.size)setState("idle");
+        setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,layer:plan?.scene,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:old?.volume ?? bankVolumes.current.get(slot) ?? volume,muted:old?.muted ?? false}]);if(!pending.current.size)setState("idle");
       };
       setState("recording");
     } catch {
@@ -483,17 +488,17 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
       const {slot,action}=assignment;
       const clip=clips.find(c=>c.slot===slot);
       if(action==="volume"){
-        selectSlot(slot);
+        chooseDestination(slot);
         const volume=Math.round(value*100);
         bankVolumes.current.set(slot,volume);
-        if(clip)setClips(all=>all.map(c=>c.id===clip.id?{...c,volume}:c));
+        if(occupied.current.has(slot))setClips(all=>all.map(c=>c.slot===slot?{...c,volume}:c));
         return;
       }
       if(!value){downControls.current.delete(id);return;}
       if(downControls.current.has(id))return;
       downControls.current.add(id);
-      selectSlot(slot);
-      if(!clip)return;
+      if(action==="select"){chooseDestination(slot,true);return;}
+      if(!clip){chooseDestination(slot);return;}
       if(action==="stop" || (action==="toggle" && !clip.stopped))stopClip(clip.id);
       else launch(clip.id,action==="toggle" ? "play" : action);
     }
@@ -529,7 +534,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
       pending.current.delete(mode);
     }
     const plan={scene:liveSet,slot,startBeat,base,beat,meter,bars};
-    layer.current=plan;selectSlot(slot);setLayerState("Próximo compás");
+    layer.current=plan;chooseDestination(slot);setLayerState("Próximo compás");
     record("matrix",slot,selectionVersion.current,plan);
   });
   useEffect(() => {
@@ -631,14 +636,14 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
       const padName=isLayer(liveSet) ? (isTake ? LAYERS[liveSet-32].name : recordedName ?? LAYERS[slot]?.name ?? "Libre") : "";
       const padStatus=isTake ? (activeCount!==null ? "Entrada "+activeCount+" / "+meter : takeStatus) : "";
       if(!clip)return <button className="sample-empty" aria-label={`Espacio ${slot+1} libre`} aria-pressed={selected===slot}
-        data-selected={selected===slot} data-take={isTake || undefined} onClick={()=>selectSlot(slot)} key={slot}>S{slot+1}{padName && <span className="pad-title">{padName}</span>}{padStatus && <small>{padStatus}</small>}</button>;
+        data-selected={selected===slot} data-take={isTake || undefined} onClick={()=>chooseDestination(slot)} key={slot}>S{slot+1}{padName && <span className="pad-title">{padName}</span>}{padStatus && <small>{padStatus}</small>}</button>;
       const waitingForPlay=master && launchContext.current.get(clip.buffer)===master.context && clip.launchBeat!==undefined && master.context.currentTime<clock(master.context)+clip.launchBeat*beat;
       const status = clip.stopped ? "Detenido" : waitingForPlay ? "Espera del 1" : clip.once ? "Una vuelta" : "En marcha";
       const description = `${status} · ${clip.mode==="matrix"?"Matriz":"En vivo"} · ${clip.scene} · ${clip.buffer.duration.toFixed(1)} s`;
       return <div className="scene-mixer-row" role="group" aria-label={`Sample ${slot+1}`} key={slot}
-        data-selected={selected===slot} data-take={isTake || undefined} onPointerDownCapture={()=>selectSlot(slot)} onClickCapture={()=>selectSlot(slot)} onFocusCapture={()=>selectSlot(slot)}>
-      <button className="sample-select" aria-label={`Seleccionar S${slot+1}`} aria-pressed={selected===slot} title={description}
-        aria-describedby={`sample-info-${slot}`} onClick={()=>selectSlot(slot)}>S{slot+1}{padName && <span className="pad-title">{padName}</span>}{isTake && padStatus && <small>{padStatus}</small>}</button>
+        data-selected={selected===slot} data-take={isTake || undefined}>
+      <button className="sample-select" aria-label={`Seleccionar S${slot+1}`} aria-pressed={selected===slot} title={`Grabar la próxima toma sobre S${slot+1}`}
+        aria-describedby={`sample-info-${slot}`} onClick={()=>chooseDestination(slot,true)}>S{slot+1}{padName && <span className="pad-title">{padName}</span>}{isTake && padStatus && <small>{padStatus}</small>}</button>
       <button title="Detener sample" aria-label="Detener sample" onClick={()=>stopClip(clip.id)}>■</button>
       <button title="Reproducir ahora en loop" aria-label="Reproducir ahora" disabled={!master||paused} onClick={()=>launch(clip.id,"play")}>▶</button>
       <button title="Reproducir una sola vuelta" aria-label="Reproducir una sola vuelta" disabled={!master||paused}
@@ -652,7 +657,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
       <button title="Reproducir en el próximo tiempo 1" aria-label="Reproducir en el próximo tiempo 1" disabled={!master||paused} onClick={()=>launch(clip.id,"next")}>▶₁</button>
       <span className="sample-info" id={`sample-info-${slot}`} title={description}>{description}</span>
       <input aria-label={"Volumen del sonido " + clip.id} type="range" min="0" max="100" value={clip.volume}
-        onChange={e => { selectSlot(slot);const volume = Number(e.target.value); setClips(all => all.map(c => c.id === clip.id ? {...c,volume} : c)); }} />
+        onChange={e => { const volume = Number(e.target.value); setClips(all => all.map(c => c.id === clip.id ? {...c,volume} : c)); }} />
       {previous.current.has(slot) && <button title="Recuperar la toma anterior" aria-label="Deshacer toma" disabled={reservedSlots.current.has(slot)} onClick={()=>{
         const old=previous.current.get(slot);if(!old)return;
         previous.current.delete(slot);halt(clip.id);

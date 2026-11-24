@@ -15,6 +15,18 @@
 }
 .actionTitle:hover { color: #e1c58a; }
 .actionTitle > span:last-child { color: #d0ac6c; }
+.groupMembers {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding-inline-start: 1.7rem;
+}
+.groupMembers li::marker { color: #d3b87f; font-weight: 700; }
+.groupMembers .card {
+  padding: 12px;
+  background: #1b1d1d;
+  overflow-wrap: anywhere;
+}
 .actionControls {
   display: flex;
   flex-wrap: wrap;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { centralSnapshotTasks, isOpenAction } from "../../../src/lib/central-actions";
 import { sameOrigin } from "../../../src/lib/panel-access";
 import { authorize, mutate, PanelError, responseBoard, snapshot } from "../../../src/lib/panel-server";
 import { operationsConfig, operationsSelected } from "../../../src/lib/panel-operations";
@@ -50,8 +51,8 @@ export async function GET(request: Request) {
     if (!Array.isArray(assignments) || assignments.some(x => !x || typeof x.id !== "string" || (x.department !== null && (typeof x.department !== "string" || !/^8\d$/.test(x.department))))) {
       throw new PanelError("La lectura de departamentos está incompleta.", 503);
     }
-    const tasks = board.tasks.filter(task => task.stage !== "done" && task.stage !== "cancelled");
-    const revisions = Object.fromEntries(tasks.map(task => [task.id, board.revisions[task.id]]));
+    const tasks = centralSnapshotTasks(board.tasks);
+    const revisions = Object.fromEntries(tasks.filter(isOpenAction).map(task => [task.id, board.revisions[task.id]]));
     return NextResponse.json({
       tasks, revisions, snapshotRevision: board.snapshotRevision, readOnly: board.readOnly,
       fronts: board.fronts, updatedAt: board.updatedAt, assignments, latestChange,

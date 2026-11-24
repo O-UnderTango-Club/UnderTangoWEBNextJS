@@ -1,4 +1,7 @@
 export const EXTENDED_STYLE = `
+  .voice-loop-strip { display:flex; flex-wrap:wrap; align-items:center; gap:.3rem .65rem; padding:.4rem .65rem; border-bottom:1px solid #534b60; color:#f4f0f7; }
+  .voice-loop-strip output { color:#d5c2ed; font-variant-numeric:tabular-nums; }
+  .voice-loop-strip small { max-width:16rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .zero-stage[data-extended-dark] .zero-scene-number { color: #eee9fa; }
   .extended-instrument { width: min(95%, 1120px); padding-top: clamp(26px, 6dvh, 56px); }
   .extended-cubes { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(.4rem, 1.1vw, 1rem); }

@@ -11,6 +11,7 @@ import { SCENE_INSTRUMENT_NAMES } from "./scene-instrument";
 import type { LiveSetScene } from "./extended-scenes";
 import type { PerformanceInput } from "./performance-notes";
 import { useRoomInstrument } from "./room-instrument";
+import { getVoiceMicrophone, useVoiceLoop, VOICE_CUES, type VoiceScene } from "./voice-loop";
 
 const BANK_ACTIONS = {volume:"Volumen",stop:"Stop",play:"Play inmediato",once:"Una vuelta",next:"Play en el 1",toggle:"Play / stop"} as const;
 type BankAction = keyof typeof BANK_ACTIONS;
@@ -21,7 +22,8 @@ type Mode = "matrix" | "live";
 type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; source: AudioBufferSourceNode; dispose: () => void };
 
-export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomAnalyser,monitor,synthStream, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready}: {
+export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomAnalyser,monitor,synthStream, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+  voiceScene: VoiceScene | null; cue: {context: AudioContext; beginsAt: number} | null; seconds: number;
   roomAnalyser: {current:AnalyserNode|null};
   codaScene: number | null;
   liveSet: LiveSetScene | null; countingTake: {current:boolean}; routing:{current:PerformanceInput|null};
@@ -67,20 +69,23 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
   const matrixStart=useRef(0);
   const [waiting,setWaiting]=useState(false);
   const mic = useRef<MediaStream|null>(null);
-  const finaleMic = useRef(false);
-  const micRequest = useRef(0);
+  const sceneMic = useRef(false);
+  const micRequest = useRef<AbortController | null>(null);
+  const voice = useVoiceLoop(voiceScene, cue, seconds, room ? mic.current : null, input, bpm);
+  const showRoomInput = liveSet === 89 && room && voice.phase !== "playing";
   const roomMeter = useRoomInstrument(liveSet === 89 && !paused, room ? mic.current : null, input);
   useEffect(()=>{
-    roomAnalyser.current=liveSet===89 && room ? roomMeter.current : null;
+    roomAnalyser.current=showRoomInput ? roomMeter.current : null;
     return ()=>{roomAnalyser.current=null;};
-  },[liveSet,room,paused,input,roomMeter,roomAnalyser]);
+  },[showRoomInput,paused,input,roomMeter,roomAnalyser]);
   const [countIn,setCountIn] = useState<number|null>(null);
   const external = useRef<MediaStream|null>(null);
   const [shared,setShared] = useState(false);
-  const [requesting,setRequesting] = useState(false);
+  const [requestKind,setRequestKind] = useState<"room"|"computer"|null>(null);
+  const requesting = requestKind !== null;
   const alive=useRef(true);
   const queued=useRef<{kind:Mode;slot:number;version:number}[]>([]);
-  useEffect(()=>{alive.current=true;return ()=>{alive.current=false;for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
+  useEffect(()=>{alive.current=true;return ()=>{alive.current=false;micRequest.current?.abort();for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
   // The scene and the lower synth own different AudioContexts. Bridge the synth
   // for recording only; its normal speaker output stays connected exactly once.
   const stereo=useRef<GainNode|null>(null);
@@ -111,22 +116,30 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     const ref=kind==="room"?mic:external;
     const update=kind==="room"?setRoom:setShared;
     if(!enabled){ref.current?.getTracks().forEach(t=>t.stop());ref.current=null;update(false);return;}
-    setRequesting(true);setMessage("");
-    const request = micRequest.current;
+    setRequestKind(kind);setMessage("");
+    const request = kind === "room" ? new AbortController() : null;
+    if (request) {
+      micRequest.current?.abort();
+      micRequest.current = request;
+      sceneMic.current = voiceScene !== null;
+    }
     try {
-      const stream=kind==="room" ? await navigator.mediaDevices.getUserMedia({audio:true}) :
+      const stream=request ? (voiceScene ? await getVoiceMicrophone(request.signal) : await navigator.mediaDevices.getUserMedia({audio:true})) :
         await navigator.mediaDevices.getDisplayMedia({video:true,audio:true,systemAudio:"include",selfBrowserSurface:"exclude"} as DisplayMediaStreamOptions);
-      if(kind==="room" && request!==micRequest.current){stream.getTracks().forEach(t=>t.stop());return;}
+      if(request?.signal.aborted){stream.getTracks().forEach(t=>t.stop());return;}
       if(!alive.current || !stream.getAudioTracks().length){
         stream.getTracks().forEach(t=>t.stop());
         if(alive.current)setMessage("Elegí una fuente con la opción Compartir audio activada.");
         return;
       }
       ref.current=stream;update(true);
-      if(kind==="room")finaleMic.current=liveSet===89;
       stream.getAudioTracks()[0].onended=()=>{stream.getTracks().forEach(t=>t.stop());if(ref.current===stream){ref.current=null;update(false);}};
-    } catch {setMessage(kind==="room"?"Micrófono desactivado. Revisá el permiso de Sala.":"Se mantiene el estéreo de 860.");}
-    finally {if(alive.current)setRequesting(false);}
+    } catch {
+      if(alive.current && !request?.signal.aborted)
+        setMessage(kind==="room"?"No se pudo abrir el micrófono. Revisá la entrada y el permiso de Sala.":"Se mantiene el estéreo de 860.");
+    } finally {
+      if(alive.current && !request?.signal.aborted) setRequestKind(null);
+    }
   }
   const tone = useRef<PerformanceInput|null>(null);
   const stopTone = useCallback(() => { tone.current?.computerNote("mixer-preview",60,false); tone.current = null; }, []);
@@ -377,6 +390,10 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     voices.current.delete(id);
   }
   function stopAll(){
+    voice.stop();
+    stopBank();
+  }
+  function stopBank(){
     stopGeneration.current++;
     queued.current=[];
     for(const id of voices.current.keys())halt(id);
@@ -449,21 +466,45 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     return ()=>window.removeEventListener("860-bank-midi",receive);
   });
   useEffect(()=>{
-    if(liveSet===88 || liveSet===89){cancel();stopAll();}
+    if(liveSet===88 || liveSet===89){cancel();stopBank();}
     return ()=>{
       if(countingTake.current)cancel();
-      if(liveSet===89){
-        micRequest.current++;
-        if(finaleMic.current){mic.current?.getTracks().forEach(t=>t.stop());mic.current=null;finaleMic.current=false;setRoom(false);}
-      }
     };
   },[liveSet]);
+  useEffect(() => {
+    if (!voiceScene) return;
+    return () => {
+      if (sceneMic.current) {
+        micRequest.current?.abort();
+        setRequestKind(current => current === "room" ? null : current);
+        mic.current?.getTracks().forEach(track => track.stop());
+        mic.current = null;
+        sceneMic.current = false;
+        setRoom(false);
+      }
+    };
+  }, [voiceScene]);
+  const voiceStatus = {off:"Activá el micrófono", listening:"Escuchando", recording:"Grabando la voz",
+    playing:voiceScene === 31 ? "Frase en loop · eco estéreo" : "Vocal en loop · coro grave",
+    stopped:"Toma detenida", empty:"Toma sin señal", late:"Fin de la escena", error:"No se pudo grabar"};
   return <>{liveSet && analyser && <LiveSetProjection scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
-    analyser={liveSet===89 && room ? roomMeter : analyser} paused={paused} meter={meter} bars={bars} bpm={bpm}
+    analyser={showRoomInput ? roomMeter : analyser} paused={paused} meter={meter} bars={bars} bpm={bpm}
     position={position} recording={state==="recording" && !waiting} waiting={waiting} countIn={countIn}
     canCountRecord={!!master && !paused && state==="idle" && !requesting} onCountRecord={()=>pressRecord(true)}
-    room={room} roomBusy={requesting || state!=="idle"} onRoom={()=>void chooseSource("room",!room)}/>}
+    room={showRoomInput}/>}
   <div className="scene-mixer" role="region" aria-label="Lupera de objetos sonoros">
+    {voiceScene && <div className="voice-loop-strip" role="group" aria-label="Loop de voz">
+      <strong>{voiceScene === 31 ? "Voz en ondas" : "Coro de sala"}</strong>
+      <output aria-live="polite">{paused ? "En pausa" : requestKind === "room" ? "Abriendo micrófono…" : voiceStatus[voice.phase]}</output>
+      <span>{VOICE_CUES[voiceScene]}</span>
+      <button type="button" disabled={requesting || state !== "idle"} aria-pressed={room}
+        onClick={() => void chooseSource("room", !room)}>{room ? "Desactivar micrófono de sala" : "Activar micrófono de sala"}</button>
+      {room && <><small>{mic.current?.getAudioTracks()[0]?.label}</small>
+        {voice.phase === "listening"
+          ? <button type="button" disabled={paused} onClick={voice.record}>Grabar ahora</button>
+          : <button type="button" disabled={paused} onClick={voice.retake}>Nueva toma</button>}
+      </>}
+    </div>}
     <div className="scene-mixer-tools">
       <button className="scene-record" aria-label="Grabar" title="Grabar con los modos seleccionados" disabled={paused||requesting||(!matrix && !live)}
         onPointerDown={e=>{if(e.button!==0)return;e.currentTarget.setPointerCapture(e.pointerId);pressRecord();}}

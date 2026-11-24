@@ -24,6 +24,7 @@ import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
+import { VOICE_CUES } from "./voice-loop";
 import { ProjectionSignalContext, useProjectionSignals, useSceneSignals } from "./projection-signals";
 import { StimulusBar } from "./stimulus-bar";
 import { warmRecorder } from "./measure-recorder";
@@ -2434,7 +2435,9 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} codaScene={coda} liveSet={liveSet} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
+      <SceneMixer connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} codaScene={coda} liveSet={liveSet}
+        voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
+        countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} synthStream={synthStream} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
         notes={noteScene ? noteInput.sounding : undefined} loop={loopFrame} tuning={extended.a4}
         resting={breathing} interactiveObject={showObject} />}
@@ -2470,6 +2473,7 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
                 }} onKeyDown={event => {if(event.key === "Enter")event.currentTarget.blur();}} /> s</label>
             </div>
             <small>{scoreTime(cueStarts[index])} · {score.title}</small>
+            {(mode === 31 || mode === 89) && <p><strong>Loop de voz.</strong> {VOICE_CUES[mode]}</p>}
             <input id={id} type="range" min={min} max={max} step={1} value={seconds}
               aria-label={`Ajustar duración de la escena ${score.number}`} aria-valuetext={`${seconds} segundos`}
               onChange={event => editSeconds(score.number,event.currentTarget.valueAsNumber)} />

@@ -8,7 +8,7 @@ export function visualStimuli(scene: number): readonly Stimulus[] {
   if (scene <= 12) return ["piano"];
   if (scene === 13) return ["piano", "clock"];
   if (scene === 17) return ["clock", "tuning"];
-  if (scene === 31) return ["piano", "loop", "clock"];
+  if (scene === 31) return ["audio", "piano", "loop", "clock"];
   if (scene <= 30) return ["piano", "loop"];
   if (scene === 44 || scene === 54 || scene === 78) return ["audio", "piano", "tempo", "clock"];
   if (scene === 42 || scene === 62) return ["audio", "piano", "clock"];

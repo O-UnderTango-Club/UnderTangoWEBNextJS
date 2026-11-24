@@ -21,8 +21,6 @@ type LiveSetProps = {
   canCountRecord: boolean;
   onCountRecord: () => void;
   room: boolean;
-  roomBusy: boolean;
-  onRoom: () => void;
 };
 
 function SoundDrawing({scene, analyser, paused, bpm}: Pick<LiveSetProps,"scene"|"analyser"|"paused"|"bpm">) {
@@ -164,11 +162,6 @@ export function LiveSetProjection(props: LiveSetProps) {
       <button type="button" className="live-set-count" onClick={props.onCountRecord} disabled={!props.canCountRecord || countIn!==null || paused}>● Grabar con cuenta</button>
     </div>}
     {scene===88 && <div className="live-set-note">Piano y voz</div>}
-    {scene===89 && <div className="live-set-note">
-      <button type="button" className="live-set-count" disabled={props.roomBusy} aria-pressed={props.room} onClick={props.onRoom}>
-        {props.room ? "Desactivar micrófono de sala" : "Activar micrófono de sala"}
-      </button>
-    </div>}
     {suggestedBpm!==null && <div className="live-set-tempo">
       <span>{bpm} BPM</span>
       {bpm!==suggestedBpm && <button type="button" className="live-set-count" disabled={locked}

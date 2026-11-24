@@ -20,3 +20,8 @@
 .flyer{display:block;width:100%;height:auto;border-radius:.75rem}
 .page .date{color:#fff;font-weight:700}
 @media(max-width:44rem){.grid,.campaign{grid-template-columns:1fr}.campaign .hero{padding-top:1rem;padding-bottom:0}}
+
+/* The shared home animation must not hide sections on this standalone route. */
+.page section{opacity:1;transform:none;transition:none}
+.page section h2{text-align:left;display:block}
+.page section h2::after{content:none}

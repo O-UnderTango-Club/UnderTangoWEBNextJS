@@ -7,6 +7,7 @@ import { useSavedSetting } from "./saved-setting";
 import { useTempo } from "./tempo";
 import { TransportMidiButton, type TransportMidi } from "./transport-midi";
 import { LiveSetProjection } from "./live-set-projection";
+import { LAYERS, isLayer, countLayer, firstRepeat, type LayerPlan } from "./layer-take";
 import { SCENE_INSTRUMENT_NAMES } from "./scene-instrument";
 import type { LiveSetScene } from "./extended-scenes";
 import type { PerformanceInput } from "./performance-notes";
@@ -15,11 +16,11 @@ import { getVoiceMicrophone, useVoiceLoop, VOICE_CUES, type VoiceScene } from ".
 
 const BANK_ACTIONS = {volume:"Volumen",stop:"Stop",play:"Play inmediato",once:"Una vuelta",next:"Play en el 1",toggle:"Play / stop"} as const;
 type BankAction = keyof typeof BANK_ACTIONS;
-type Assignment = {slot:number;action:BankAction;label:string};
+type Assignment = {slot:number;action:BankAction;label:string;alias?:string};
 type BankMessage = {id:string;alias?:string;value:number;type:"cc"|"note"|"bend";reserved:boolean;label:string};
 
 type Mode = "matrix" | "live";
-type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
+type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; layer?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; source: AudioBufferSourceNode; dispose: () => void };
 
 export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomAnalyser,monitor,synthStream, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
@@ -79,6 +80,10 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     return ()=>{roomAnalyser.current=null;};
   },[showRoomInput,paused,input,roomMeter,roomAnalyser]);
   const [countIn,setCountIn] = useState<number|null>(null);
+  const armed = useRef<typeof cue>(null);
+  const layer = useRef<LayerPlan|null>(null);
+  const firstPasses = useRef(new Map<number,ReturnType<typeof firstRepeat>>());
+  const [layerState,setLayerState]=useState("");
   const external = useRef<MediaStream|null>(null);
   const [shared,setShared] = useState(false);
   const [requestKind,setRequestKind] = useState<"room"|"computer"|null>(null);
@@ -163,9 +168,10 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     const draw=()=> {
       const now=input.context.currentTime;
       const left = Math.ceil((matrixStart.current-now)/beat);
-      setCountIn(countingTake.current && left>=1 && left<=4 ? 5-left : null);
+      setCountIn(countingTake.current && left>=1 && left<=meter ? meter+1-left : null);
       setWaiting(pending.current.has("matrix") && now<matrixStart.current);
-      setPosition(Math.floor(Math.max(0,now-origin)/beat) % (meter*bars));
+      const grid=countingTake.current && layer.current ? layer.current.base : origin;
+      setPosition(Math.floor(Math.max(0,now-grid)/beat) % (meter*bars));
 
       frame=requestAnimationFrame(draw);
     };
@@ -188,11 +194,11 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", stopTone); };
   }, [play, stopTone]);
 
-  function pressRecord(withCount=false){
+  function pressRecord(){
     if(paused || requesting || queued.current.length)return;
     const modes:Mode[]=[];
-    if((matrix || withCount) && !pending.current.has("matrix"))modes.push("matrix");
-    if(live && !withCount && !pending.current.has("live"))modes.push("live");
+    if(matrix && !pending.current.has("matrix"))modes.push("matrix");
+    if(live && !pending.current.has("live"))modes.push("live");
     if(!modes.length)return;
     const first=target.current;
     if(first!==null && reservedSlots.current.has(first)){
@@ -211,9 +217,9 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
       if(ready)startScene();
       return;
     }
-    for(const {kind,slot,version} of plan)record(kind,slot,version,withCount);
+    for(const {kind,slot,version} of plan)record(kind,slot,version);
   }
-  function record(kind:Mode,slot:number,version:number,withCount=false) {
+  function record(kind:Mode,slot:number,version:number,plan?:LayerPlan) {
     if(!scene || !input || !master || pending.current.has(kind) || reservedSlots.current.has(slot))return;
     if(paused || requesting)return;
     const ctx=input.context as AudioContext;
@@ -227,11 +233,11 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
       const origin=clock(ctx);
       const start=ctx.currentTime;
       const pressBeat=(start-origin)/beat;
-      const startBeat=kind==="matrix" ? Math.ceil((pressBeat+(withCount?4:0))/meter)*meter : pressBeat;
+      const startBeat=plan?.startBeat ?? (kind==="matrix" ? Math.ceil(pressBeat/meter)*meter : pressBeat);
       const base=origin+startBeat*beat;
       const end=base+cycle;
       if(kind==="matrix"){matrixStart.current=base;setWaiting(base>start);}
-      if(withCount)countingTake.current=true;
+      if(plan)countingTake.current=true;
       const length=Math.round(ctx.sampleRate*cycle);
       const capture=makeCapture(Math.round(base*ctx.sampleRate),length,Math.round(end*ctx.sampleRate),onLoop);
       const node=capture.node;
@@ -242,12 +248,16 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
       const sources:AudioNode[]=[];
       const desktop=shared ? external.current : null;
       const surface=desktop?.getVideoTracks()[0]?.getSettings().displaySurface;
-      if(!desktop || surface==="browser")sources.push(stereo.current ?? master);
+      if(!desktop || surface==="browser")sources.push(plan ? input : stereo.current ?? master);
       if(desktop)sources.push(ctx.createMediaStreamSource(desktop));
       if(room && mic.current)sources.push(ctx.createMediaStreamSource(mic.current));
       for(const source of sources)source.connect(gate);
       const protectedTake=protectPeaks(gate,RECORDING_CEILING);
       protectedTake.connect(node);
+      const click=plan ? countLayer(ctx,master,plan) : null;
+      const volume=currentClips.current.find(c=>c.slot===slot)?.volume ?? bankVolumes.current.get(slot) ?? 75;
+      const weight=currentClips.current.reduce((sum,c)=>sum+(c.slot!==slot && !c.stopped && !c.muted?(c.volume/100)**2:0), (volume/100)**2);
+      const bridge=plan ? firstRepeat(ctx,protectedTake,master,base,cycle,volume/100/Math.sqrt(Math.max(1,weight))) : null;
       let released=false;
       const dispose=()=>{
         if(released)return;
@@ -255,17 +265,24 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
         for(const source of sources)source.disconnect(gate);
         gate.disconnect();protectedTake.disconnect();capture.stop();gain.disconnect();
       };
-      pending.current.set(kind,{silence:()=>{gate.gain.setValueAtTime(0,ctx.currentTime);capture.finish(Math.round(ctx.currentTime*ctx.sampleRate));},cancel:()=>{reservedSlots.current.delete(slot);dispose();}});
+      pending.current.set(kind,{silence:()=>{gate.gain.setValueAtTime(0,ctx.currentTime);capture.finish(Math.round(ctx.currentTime*ctx.sampleRate));},cancel:()=>{click?.();bridge?.stop();reservedSlots.current.delete(slot);dispose();}});
       const label=scene;
       function onLoop(channels:Float32Array[]){
         if(released || attempt!==generation.current)return;
-        if(withCount){countingTake.current=false;setCountIn(null);}
+        if(plan){countingTake.current=false;setCountIn(null);}
         dispose();pending.current.delete(kind);
+        if(plan && !channels.some(ch=>ch.some(value=>Math.abs(value)>.0002))){
+          reservedSlots.current.delete(slot);bridge?.stop();setLayerState("Sin señal");
+          if(!pending.current.size)setState("idle");
+          return;
+        }
         const buffer=ctx.createBuffer(2,length,ctx.sampleRate);
         channels.forEach((samples,ch)=>buffer.getChannelData(ch).set(samples));
         const id=++serial.current;
         launchContext.current.set(buffer,ctx);
         const stopped=stopAtStart!==stopGeneration.current;
+        if(bridge){if(stopped)bridge.stop();else firstPasses.current.set(id,bridge);}
+        if(plan)setLayerState(stopped?"Detenido":"En loop");
         const old=currentClips.current.find(c=>c.slot===slot);
         if(old)previous.current.set(slot,old);
         reservedSlots.current.delete(slot);occupied.current.add(slot);
@@ -274,7 +291,7 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
             .find(candidate=>!occupied.current.has(candidate) && !reservedSlots.current.has(candidate));
           selectSlot(next ?? null);
         }
-        setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:old?.volume ?? bankVolumes.current.get(slot) ?? 75,muted:false}]);if(!pending.current.size)setState("idle");
+        setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,layer:plan?.scene,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume,muted:false}]);if(!pending.current.size)setState("idle");
       };
       setState("recording");
     } catch {
@@ -336,7 +353,8 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
   });
   useEffect(() => {
     const active = voices.current;
-    return () => { for (const v of active.values()) { v.dispose(); } active.clear(); };
+    const bridges=firstPasses.current;
+    return () => { for (const v of active.values()) { v.dispose(); } active.clear();for(const v of bridges.values())v.stop();bridges.clear(); };
   }, [master]);
   useEffect(() => {
     if (!master) {
@@ -378,6 +396,7 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
           if (voices.current.get(clip.id)?.source === source) stopClip(clip.id);
         };
         source.start(when, clip.once ? 0 : offset);
+        firstPasses.current.get(clip.id)?.handoff();firstPasses.current.delete(clip.id);
       }
       const codaLevel = codaScene === null ? 1 : (111 - codaScene) / 22;
       voice.gain.gain.setTargetAtTime(clip.muted ? 0 : codaLevel * mixGain * clip.volume / 100, ctx.currentTime, codaScene === null ? 0.012 : 0.45);
@@ -394,6 +413,8 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     stopBank();
   }
   function stopBank(){
+    if(countingTake.current)endLayerTake();
+    for(const pass of firstPasses.current.values())pass.stop();firstPasses.current.clear();
     stopGeneration.current++;
     queued.current=[];
     for(const id of voices.current.keys())halt(id);
@@ -418,8 +439,10 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
   useEffect(()=>{
     function receive(event:Event){
       const e=event as CustomEvent<BankMessage>;
-      const {id,value,type,reserved,label}=e.detail;
-      let assignment=bankMap[id];
+      const {id,alias,value,type,reserved,label}=e.detail;
+      // Web MIDI port IDs can change between the published score and a local file.
+      // The dispatcher supplies a name alias only for a uniquely identified input.
+      let assignment=bankMap[id] ?? (alias ? bankMap[alias] ?? Object.values(bankMap).find(item=>item.alias===alias) : undefined);
       if(transportMidi.learning) {
         if(type !== "bend" && (reserved || assignment)) {
           e.preventDefault(); transportMidi.setConflict("Ese control ya tiene otra asignación MIDI.");
@@ -432,11 +455,13 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
           e.preventDefault();setMessage("Ese control ya maneja otro parámetro de 860. Elegí otro.");return;
         }
         e.preventDefault();
-        assignment={slot:bankSlot,action:bankLearn,label};
+        assignment={slot:bankSlot,action:bankLearn,label,alias};
         const selected=assignment;
         setBankMap(current=>{
           const next={...current};
-          for(const key of Object.keys(next))if(next[key].slot===selected.slot && next[key].action===selected.action)delete next[key];
+          for(const [key,item] of Object.entries(next)){
+            if((item.slot===selected.slot && item.action===selected.action) || (alias && (key===alias || item.alias===alias)))delete next[key];
+          }
           next[id]=selected;
           return next;
         });
@@ -467,10 +492,34 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
   });
   useEffect(()=>{
     if(liveSet===88 || liveSet===89){cancel();stopBank();}
-    return ()=>{
-      if(countingTake.current)cancel();
-    };
   },[liveSet]);
+  function endLayerTake(){
+    if(!countingTake.current)return;
+    countingTake.current=false;
+    pending.current.get("matrix")?.cancel();pending.current.delete("matrix");
+    setWaiting(false);setCountIn(null);setLayerState("Detenido");
+    if(!pending.current.size)setState("idle");
+  }
+  useEffect(()=>() => {endLayerTake();armed.current=null;layer.current=null;},[cue,liveSet]);
+  useEffect(()=>{
+    if(!isLayer(liveSet) || !cue || !input || !master || paused || requesting || armed.current===cue)return;
+    armed.current=cue;setLayerState("");
+    if(pending.current.has("matrix")){setLayerState("Matriz ocupada");return;}
+    const preferred=liveSet-32, existing=currentClips.current.find(c=>c.layer===liveSet)?.slot;
+    const slots=[existing,preferred,...Array.from({length:9},(_,i)=>i)];
+    const slot=slots.find((s):s is number=>s!==undefined && !reservedSlots.current.has(s) && (s===existing || !occupied.current.has(s)));
+    if(slot===undefined){setLayerState("Banco completo");return;}
+    const origin=clock(cue.context);
+    const now=Math.max(cue.beginsAt,cue.context.currentTime);
+    // Start the count on the shared downbeat so successive layers have the same beat one.
+    const elapsedBeats=(now-origin)/beat;
+    const countBeat=Math.ceil((elapsedBeats-.035)/meter)*meter;
+    const startBeat=countBeat+meter,base=origin+startBeat*beat;
+    if(cycle>180 || base+cycle>cue.beginsAt+seconds+.001){setLayerState("La toma supera la duración de la escena");return;}
+    const plan={scene:liveSet,slot,startBeat,base,beat,meter,bars};
+    layer.current=plan;selectSlot(slot);setLayerState("Próximo compás");
+    record("matrix",slot,selectionVersion.current,plan);
+  });
   useEffect(() => {
     if (!voiceScene) return;
     return () => {
@@ -487,10 +536,21 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
   const voiceStatus = {off:"Activá el micrófono", listening:"Escuchando", recording:"Grabando la voz",
     playing:voiceScene === 31 ? "Frase en loop · eco estéreo" : "Vocal en loop · coro grave",
     stopped:"Toma detenida", empty:"Toma sin señal", late:"Fin de la escena", error:"No se pudo grabar"};
+  const currentTake=layer.current?.scene===liveSet && armed.current===cue ? layer.current : null;
+  const activeCount=currentTake && countingTake.current ? countIn : null;
+  const recordedLayer=currentTake && clips.find(c=>c.slot===currentTake.slot && c.layer===liveSet);
+  let takeStatus=armed.current===cue ? layerState : "";
+  if(currentTake && countingTake.current)takeStatus=activeCount!==null ? "Cuenta de entrada" : waiting ? "Próximo compás" : "Grabando";
+  else if(takeStatus==="En loop" && !recordedLayer)takeStatus="Sin sample";
+  else if(takeStatus==="En loop" && recordedLayer){
+    if(recordedLayer.stopped)takeStatus="Detenido";
+    else if(recordedLayer.muted)takeStatus="Silenciado";
+    else if(recordedLayer.once)takeStatus="Una vuelta";
+  }
   return <>{liveSet && analyser && <LiveSetProjection scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
     analyser={showRoomInput ? roomMeter : analyser} paused={paused} meter={meter} bars={bars} bpm={bpm}
-    position={position} recording={state==="recording" && !waiting} waiting={waiting} countIn={countIn}
-    canCountRecord={!!master && !paused && state==="idle" && !requesting} onCountRecord={()=>pressRecord(true)}
+    position={activeCount===null ? position : activeCount-1} recording={state==="recording" && !waiting} waiting={waiting} countIn={activeCount}
+    slot={currentTake?.slot ?? null} takeStatus={takeStatus}
     room={showRoomInput}/>}
   <div className="scene-mixer" role="region" aria-label="Lupera de objetos sonoros">
     {voiceScene && <div className="voice-loop-strip" role="group" aria-label="Loop de voz">
@@ -549,18 +609,22 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
         onKeyUp={stopTone}>Tocar · P</button>
       {message && <small role="status">{message}</small>}
     </div>
-    <div className="sample-bank" aria-label="Banco de nueve samples">
+    <div className="sample-bank" data-layers={isLayer(liveSet)||undefined} aria-label="Banco de nueve samples">
     {Array.from({length:9},(_,slot)=>{
       const clip=clips.find(c=>c.slot===slot);
+      const isTake=isLayer(liveSet) && currentTake?.slot===slot;
+      const recordedName=clip?.layer ? LAYERS[clip.layer-32].name : clip?.scene;
+      const padName=isLayer(liveSet) ? (isTake ? LAYERS[liveSet-32].name : recordedName ?? LAYERS[slot]?.name ?? "Libre") : "";
+      const padStatus=isTake ? (activeCount!==null ? "Entrada "+activeCount+" / "+meter : takeStatus) : "";
       if(!clip)return <button className="sample-empty" aria-label={`Espacio ${slot+1} libre`} aria-pressed={selected===slot}
-        data-selected={selected===slot} onClick={()=>selectSlot(slot)} key={slot}>S{slot+1}</button>;
+        data-selected={selected===slot} data-take={isTake || undefined} onClick={()=>selectSlot(slot)} key={slot}>S{slot+1}{padName && <span className="pad-title">{padName}</span>}{padStatus && <small>{padStatus}</small>}</button>;
       const waitingForPlay=master && launchContext.current.get(clip.buffer)===master.context && clip.launchBeat!==undefined && master.context.currentTime<clock(master.context)+clip.launchBeat*beat;
       const status = clip.stopped ? "Detenido" : waitingForPlay ? "Espera del 1" : clip.once ? "Una vuelta" : "En marcha";
       const description = `${status} · ${clip.mode==="matrix"?"Matriz":"En vivo"} · ${clip.scene} · ${clip.buffer.duration.toFixed(1)} s`;
       return <div className="scene-mixer-row" role="group" aria-label={`Sample ${slot+1}`} key={slot}
-        data-selected={selected===slot} onPointerDownCapture={()=>selectSlot(slot)} onClickCapture={()=>selectSlot(slot)} onFocusCapture={()=>selectSlot(slot)}>
+        data-selected={selected===slot} data-take={isTake || undefined} onPointerDownCapture={()=>selectSlot(slot)} onClickCapture={()=>selectSlot(slot)} onFocusCapture={()=>selectSlot(slot)}>
       <button className="sample-select" aria-label={`Seleccionar S${slot+1}`} aria-pressed={selected===slot} title={description}
-        aria-describedby={`sample-info-${slot}`} onClick={()=>selectSlot(slot)}>S{slot+1}</button>
+        aria-describedby={`sample-info-${slot}`} onClick={()=>selectSlot(slot)}>S{slot+1}{padName && <span className="pad-title">{padName}</span>}{isTake && padStatus && <small>{padStatus}</small>}</button>
       <button title="Detener sample" aria-label="Detener sample" onClick={()=>stopClip(clip.id)}>■</button>
       <button title="Reproducir ahora en loop" aria-label="Reproducir ahora" disabled={!master||paused} onClick={()=>launch(clip.id,"play")}>▶</button>
       <button title="Reproducir una sola vuelta" aria-label="Reproducir una sola vuelta" disabled={!master||paused}

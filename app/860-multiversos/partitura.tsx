@@ -24,6 +24,8 @@ import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
+import { DjConsole } from "./dj-console";
+import { herculesCommand, isInpulse200 } from "./dj-midi";
 import { VOICE_CUES } from "./voice-loop";
 import { REPERTOIRE, RepertoireCue } from "./repertoire-cue";
 import { ProjectionSignalContext, useProjectionSignals, useSceneSignals } from "./projection-signals";
@@ -1472,7 +1474,8 @@ async function resumeAudioOutput(context: AudioContext) {
   }
 }
 
-function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
+function ModuleZero({ synthStream, enterSolo, deckAudio, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
+  deckAudio: () => Promise<AudioNode>;
   synthStream: MediaStream|null; masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
   enterSolo: () => void;
@@ -2297,6 +2300,22 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
         min-height: 0; overflow: hidden; padding: 0; border-left: 1px solid #30333d;
       }
       .zero-control-bar { padding: .85rem var(--zero-controls-padding) .4rem; border-top: 1px solid #30333d; }
+      .zero-controls {position:relative;container:operator / size;}
+      .dj-drawer {position:relative;margin-top:.4rem;color:#e5e9f3;font:500 .81rem/1.35 system-ui,sans-serif;}
+      .dj-drawer summary {cursor:pointer;background:#202635;border:1px solid #414a5c;border-radius:.3rem;padding:.48rem .6rem;}
+      .dj-sheet {position:absolute;z-index:9;bottom:calc(100% + 3px);inset-inline:calc(0px - var(--zero-controls-padding));box-sizing:border-box;
+        max-height:min(68dvh,68cqh);overflow:auto;overscroll-behavior:contain;display:grid;gap:.45rem;padding:.7rem var(--zero-controls-padding);
+        background:#151a26;border-block:1px solid #5c657b;box-shadow:0 -.3rem 1.1rem #06081177;}
+      .dj-sheet label,.dj-deck {display:grid;gap:.28rem;min-width:0;}
+      .dj-sheet select,.dj-sheet input[type=file] {width:100%;max-width:100%;min-width:0;font:inherit;color:inherit;}
+      .dj-sheet select {background:#202635;padding:.35rem;border:1px solid #4c566b;border-radius:.25rem;}
+      .dj-deck {border-top:2px solid #73cbbd;padding:.5rem 0 .2rem;}
+      .dj-deck[data-side=B] {border-color:#bb9bee;}
+      .dj-track {margin:0;font-size:.85rem;overflow-wrap:anywhere;}
+      .dj-deck-head,.dj-transport {display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;}
+      .dj-deck-head strong {margin-right:auto;}.dj-transport output{font-size:.7rem;font-variant-numeric:tabular-nums;}
+      .zero-controls .dj-deck button {padding:.1rem .5rem;min-height:28px;}
+      .zero-controls .dj-deck input[type=range] {margin:.14rem 0;height:20px;}
       .zero-midi { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .65rem; }
       .zero-midi p { margin: 0; color: #dce6ff; font-size: .76rem; overflow-wrap: anywhere; }
       .zero-controls .zero-midi button { font-size: .75rem; padding: .25rem .55rem; }
@@ -2611,6 +2630,7 @@ function ModuleZero({ synthStream, enterSolo, masterVolume, setMasterVolume, lea
           <input type="checkbox" role="switch" checked={showSubtitles}
             onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
         </label>
+        <DjConsole output={deckAudio} inputs={midiInputs}/>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
     </aside>
@@ -2796,6 +2816,7 @@ export default function Multiversos860Page() {
     if (engine.context.state !== "running") await engine.context.resume();
     setAudioActive(true);
     setAudioMessage("AUDIO LISTO · VCA ABIERTO AL TECLADO");
+    return engine.analyser;
   }, []);
 
   const updateControl = useCallback((index: number, nextValue: number) => {
@@ -2986,9 +3007,11 @@ export default function Multiversos860Page() {
     if(engineRef.current?.context.state==="running")toggleAudio();
   },[toggleAudio]);
   const onMidiData = useRef<(port: MidiInputLike, data: ArrayLike<number>) => void>(() => {});
+  const djHeld = useRef(new Set<string>());
   const [portMonitor] = useState(() => monitorMidiInputs(setMidiInputs,
     (port, data) => onMidiData.current(port, data),
-    id => { pianoRouting.current?.releaseMidi(id); window.dispatchEvent(new Event("860-midi-disconnect")); }));
+    id => { for (const key of djHeld.current) if (JSON.parse(key)[0]===id) djHeld.current.delete(key);
+      pianoRouting.current?.releaseMidi(id); window.dispatchEvent(new Event("860-midi-disconnect")); }));
   const refreshMidiInputs = useCallback((retry = false) => {
     const access = midiAccessRef.current;
     if (!access || !midiMountedRef.current) return;
@@ -3067,7 +3090,7 @@ export default function Multiversos860Page() {
         }
         const fromPort = (binding?: CcBinding) => !!binding && (binding.inputId === input.id ||
           (uniqueName === binding.inputName && !midiInputs.some(port => port.id === binding.inputId)));
-        const alias = uniqueName ? JSON.stringify(["name",uniqueName,channel,controlType,first]) : "";
+        const alias = uniqueName ? JSON.stringify(["name",uniqueName,channel,controlType,controlType==="bend"?0:first]) : "";
         if (controlType && midiLearnRef.current === null) {
           const id = JSON.stringify([input.id,channel,controlType,controlType==="bend"?0:first]);
           const reserved = Object.values(ccMapRef.current).some(b=>fromPort(b) &&
@@ -3080,6 +3103,10 @@ export default function Multiversos860Page() {
           const id = JSON.stringify([input.id,channel,kind===0xb0?"cc":"note",first]);
           const event = new CustomEvent("860-record-midi",{cancelable:true,detail:{id,alias,on:kind!==0x80 && second>0}});
           if(!window.dispatchEvent(event)) return;
+        }
+        if (isInpulse200(input.name)) {
+          if (midiLearnRef.current === null && herculesCommand(input.id,data,djHeld.current)) return;
+          if (kind === 0x90 || kind === 0x80) return;
         }
         if (kind === 0x90 && second > 0) {
           if (midiLearnRef.current === MASTER_FADER) setFaderSignal((input.name || "MIDI") + " · Nota " + first + " recibida. Para volumen, mové un fader o Pitch Bend.");
@@ -3552,7 +3579,7 @@ export default function Multiversos860Page() {
 
   return (
     <main className={styles.console}>
-      <TempoProvider><ModuleZero enterSolo={enterSolo} synthStream={synthStream} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
+      <TempoProvider><ModuleZero deckAudio={ensureAudio} enterSolo={enterSolo} synthStream={synthStream} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
       <header className={styles.topbar}>
         <a className={styles.brand} href="/" aria-label="UnderTango Club, inicio">
           <span className={styles.brandMark}>&#9670;</span>

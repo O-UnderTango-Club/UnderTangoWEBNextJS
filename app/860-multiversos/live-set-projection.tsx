@@ -4,6 +4,7 @@ import { useTempo } from "./tempo";
 import { ResonantVisuals } from "./resonant-visuals";
 import { useProjectionSignals } from "./projection-signals";
 import { StimulusBar } from "./stimulus-bar";
+import { LAYERS } from "./layer-take";
 
 type MeterRef = {current: AnalyserNode | null};
 type LiveSetProps = {
@@ -18,8 +19,8 @@ type LiveSetProps = {
   recording: boolean;
   waiting: boolean;
   countIn: number | null;
-  canCountRecord: boolean;
-  onCountRecord: () => void;
+  slot: number | null;
+  takeStatus: string;
   room: boolean;
 };
 
@@ -110,7 +111,39 @@ function SoundDrawing({scene, analyser, paused, bpm}: Pick<LiveSetProps,"scene"|
   return <canvas ref={surface} className="live-set-drawing" aria-hidden="true" />;
 }
 
+function LayerMark({index,pulse,meter}: {index:number;pulse:number;meter:number}) {
+  const canvas=useRef<HTMLCanvasElement>(null);
+  useEffect(()=>{
+    const g=canvas.current?.getContext("2d");if(!g)return;
+    const w=340,h=82;g.clearRect(0,0,w,h);g.lineCap="round";g.lineJoin="round";
+    g.strokeStyle=g.fillStyle=LAYERS[index].color;
+    for(let i=0;i<meter;i++){
+      const x=(i+.5)*w/meter,active=i===pulse-1,s=active?1:.68;
+      g.globalAlpha=active?1:.38;g.lineWidth=active?3:1.5;g.beginPath();
+      switch(index){
+        case 0: g.ellipse(x,45,24*s,11*s,0,0,2*Math.PI);g.stroke();g.beginPath();g.ellipse(x,45,11*s,5*s,0,0,2*Math.PI);g.fill();break;
+        case 1: for(let j=0;j<3;j++){g.beginPath();g.ellipse(x,43,(13+j*7)*s,(10+j*5)*s,0,0,2*Math.PI);g.stroke();}break;
+        case 2: for(let j=0;j<8;j++){const a=j*Math.PI/4;g.moveTo(x+Math.cos(a)*9,42+Math.sin(a)*9);g.lineTo(x+Math.cos(a)*27*s,42+Math.sin(a)*27*s);}g.stroke();break;
+        case 3: g.moveTo(x-21,63-i*6);for(let j=0;j<3;j++){g.lineTo(x-9+j*13,63-i*6-j*8);g.lineTo(x-9+j*13,55-i*6-j*8);}g.stroke();break;
+        case 4: for(let j=0;j<3;j++)g.fillRect(x-18,29+9*j,(28+4*j)*s,4);break;
+        case 5: for(let j=0;j<=46;j++){const y=44+(19-j*.28)*Math.sin(j*.22+i);if(j)g.lineTo(x-23+j,y);else g.moveTo(x-23,y);}g.stroke();break;
+        case 6: g.moveTo(x-22,56);for(let j=0;j<3;j++){g.lineTo(x-10+j*12,56-29*s);g.lineTo(x-10+j*12,56);}g.stroke();break;
+        default: for(let j=0;j<4;j++){const y=64-(10+((i+j)%4)*9)*s;g.moveTo(x-15+j*10,64);g.lineTo(x-15+j*10,y);}g.stroke();
+      }
+    }
+  },[index,pulse,meter]);
+  return <canvas className="layer-mark" aria-hidden="true" ref={canvas} width={340} height={82}/>;
+}
+
 const style = `
+.layer-mark{width:min(43%,20rem);height:clamp(20px,11cqh,64px);}
+.live-set .layer-caption{font:600 clamp(.85rem,2.4cqw,1.65rem)/1.1 system-ui;}
+.sample-bank[data-layers=true] .sample-empty,.sample-bank[data-layers=true] .sample-select{color:#f0f3f5;text-align:left;background:#1e2631;}
+.sample-bank[data-layers=true] button.sample-empty,.sample-bank[data-layers=true] .sample-select{display:flex;align-items:baseline;flex-wrap:wrap;gap:.3rem;min-height:clamp(36px,5.5dvh,58px);height:auto;font:700 clamp(.85rem,1.4vw,1.25rem)/1.12 system-ui;padding:.4rem;}
+.sample-bank[data-layers=true] .sample-select{flex:1 0 100%;}
+.sample-bank .pad-title{font:550 clamp(.72rem,1.24vw,1.05rem)/1.15 system-ui;overflow-wrap:anywhere;}
+.sample-bank[data-layers=true] small{flex-basis:100%;font:500 .71rem system-ui;color:#d5e7da;}
+.sample-bank[data-layers=true] [data-take=true]{box-shadow:inset 0 0 0 2px #8cdec3;background:#1b332f;}
 .zero-stage:has(>.live-set) {display:grid;grid-template-rows:minmax(0,1fr) fit-content(50%);background:#080a11 !important;}
 .zero-stage:has(>.live-set) > .scene-mixer {position:relative;grid-row:2;width:100%;max-height:100%;}
 .zero-stage:has(>.live-set) .zero-scene-number {color:#e6e7e9;}
@@ -155,11 +188,14 @@ export function LiveSetProjection(props: LiveSetProps) {
       : <SoundDrawing scene={scene} analyser={analyser} paused={paused} bpm={bpm} />}
     {scene!==68 && <StimulusBar scene={scene} paused={paused} room={scene===89 && props.room} />}
     <div className="live-set-heading">{scene===88 ? "El último café" : title}</div>
-    {layers && <div className="live-set-center">
-      <strong aria-label={countIn!==null ? "Cuenta de entrada "+countIn : "Pulso "+pulse}>{countIn ?? pulse}</strong>
-      <small>{countIn!==null ? "Cuenta de entrada" : (props.recording ? "Grabando · " : props.waiting ? "En espera · " : "")+"Compás "+bar+" / "+bars} · {bpm} BPM</small>
+    {layers && <div className="live-set-center" data-take-status={props.takeStatus} data-slot={props.slot===null?undefined:props.slot+1}>
+      {props.takeStatus==="Próximo compás" && props.slot!==null
+        ? <strong aria-label={"Preparar sample "+(props.slot+1)}>S{props.slot+1}</strong>
+        : <strong aria-label={countIn!==null ? "Cuenta de entrada "+countIn : "Pulso "+pulse}>{countIn ?? pulse}</strong>}
+      <div className="layer-caption">{props.slot!==null && "S"+(props.slot+1)+" · "}{props.takeStatus}</div>
+      <LayerMark index={scene-32} pulse={countIn??pulse} meter={meter}/>
+      <small>{props.recording && countIn===null ? "Compás "+bar+" / "+bars+" · " : ""}{meter} pulsos · {bpm} BPM</small>
       <div className="live-beats" aria-hidden="true">{Array.from({length:bars},(_,b)=><span key={b}>{Array.from({length:meter},(_,p)=><i key={p} data-active={b*meter+p===position}/>)}</span>)}</div>
-      <button type="button" className="live-set-count" onClick={props.onCountRecord} disabled={!props.canCountRecord || countIn!==null || paused}>● Grabar con cuenta</button>
     </div>}
     {scene===88 && <div className="live-set-note">Piano y voz</div>}
     {suggestedBpm!==null && <div className="live-set-tempo">

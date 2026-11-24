@@ -77,7 +77,7 @@ export function PrimeraVoluntad({ clock, analyser, attack, paused, press, releas
   }, [clock, analyser, attack, paused]);
 
   return <div className="voluntad-stage">
-    <button className="voluntad-poster" type="button" ref={frame} aria-label="Tocar Primera voluntad" disabled={paused}
+    <button className="voluntad-poster" type="button" ref={frame} aria-label="Tocar Primera voluntad"
       onPointerDown={event => {
         if (event.button !== 0) return;
         event.currentTarget.setPointerCapture(event.pointerId);

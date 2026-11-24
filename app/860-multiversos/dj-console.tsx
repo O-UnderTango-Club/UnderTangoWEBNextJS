@@ -7,41 +7,49 @@ import { useSavedSetting } from "./saved-setting";
 import type { MidiDevice } from "./midi-inputs";
 
 type Track = { id:string; name:string; url:string };
-type AudioBus = () => Promise<AudioNode>;
+type AudioBus = GainNode | null;
 const fragments:Track[] = Object.entries(REPERTOIRE).flatMap(([id, clip]) => clip ? [{id:"860-"+id, name:clip.title+" · fragmento", url:clip.file}] : []);
 const time = (s:number) => Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
 
 function Deck({side,track,load,canLoad,output}: {side:DeckSide;track?:Track;load:()=>void;canLoad:boolean;output:AudioBus}) {
   const audio = useRef<HTMLAudioElement>(null);
   const node = useRef<MediaElementAudioSourceNode|null>(null);
+  const resumeAt = useRef(0);
+  // Each media element can belong to just one AudioContext. Keep the track
+  // and its cue when moving between the running score and a paused scene.
+  const [route,setRoute] = useState({output, version:0});
+  if (route.output !== output) setRoute({output, version:route.version+1});
   const request = useRef(0), starting = useRef(false), cue = useRef(0);
   const [position,setPosition] = useState(0), [duration,setDuration] = useState(0);
   const [playing,setPlaying] = useState(false), [error,setError] = useState("");
   const contextState = useCallback(() => {
     if (node.current && node.current.context.state !== "running") audio.current?.pause();
   },[]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el=audio.current;
+    setPlaying(false);
     return () => {
-      request.current++;
+      request.current++; starting.current=false;
+      if (el && el.readyState >= 1) resumeAt.current=el.currentTime;
       el?.pause();
       if (node.current) {
         node.current.context.removeEventListener("statechange",contextState);
         node.current.disconnect(); node.current=null;
       }
     };
-  },[contextState]);
+  },[contextState,route.version]);
   function pause() {
     request.current++; starting.current=false; audio.current?.pause();
   }
   async function toggle() {
     const el=audio.current;
-    if (!el || !track) return;
+    if (!el || !track || !output) return;
     if (starting.current || !el.paused) {pause();return;}
     const token=++request.current;
     starting.current=true;setError("");
     try {
-      const bus=await output();
+      const bus=output;
+      if (bus.context.state !== "running") return;
       if (token!==request.current) return;
       if (!node.current) {
         node.current=(bus.context as AudioContext).createMediaElementSource(el);
@@ -69,8 +77,9 @@ function Deck({side,track,load,canLoad,output}: {side:DeckSide;track?:Track;load
   return <div className="dj-deck" role="region" aria-label={"Deck "+side} data-side={side} data-playing={playing}>
     <div className="dj-deck-head"><strong>Deck {side}</strong><button type="button" onClick={load} disabled={!canLoad} aria-label={"Cargar en deck "+side}>Cargar {side}</button></div>
     <p className="dj-track">{track?.name ?? "Sin tema cargado"}</p>
-    <audio ref={audio} preload="metadata" src={track?.url}
-      onLoadedMetadata={e=>{const n=e.currentTarget.duration;setDuration(Number.isFinite(n)?n:0);}}
+    <audio key={route.version} ref={audio} preload="metadata" src={track?.url}
+      onLoadedMetadata={e=>{const n=e.currentTarget.duration;setDuration(Number.isFinite(n)?n:0);
+        if(resumeAt.current>0 && Number.isFinite(n)) e.currentTarget.currentTime=Math.min(resumeAt.current,n);}}
       onTimeUpdate={e=>setPosition(e.currentTarget.currentTime)}
       onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)}
       onError={()=>{if(track)setError("Este archivo no se puede reproducir.");}} />
@@ -78,7 +87,7 @@ function Deck({side,track,load,canLoad,output}: {side:DeckSide;track?:Track;load
       value={Math.min(position,duration)} aria-valuetext={time(position)+" de "+time(duration)}
       onChange={e=>{if(audio.current){cue.current=Number(e.target.value);audio.current.currentTime=cue.current;setPosition(cue.current);}}}/>
     <div className="dj-transport"><button type="button" aria-label={(playing?"Pausar":"Reproducir")+" deck "+side}
-      disabled={!track} onClick={()=>void toggle()}>{playing?"Ⅱ Pausa":"▶ Play"}</button>
+      disabled={!track || !output} title={output ? undefined : "Elegí una escena para reproducir"} onClick={()=>void toggle()}>{playing?"Ⅱ Pausa":"▶ Play"}</button>
       <button type="button" title="Volver al punto elegido" aria-label={"Detener deck "+side} disabled={!track} onClick={stop}>■ Cue</button>
       <output>{time(position)} / {time(duration)}</output></div>
     {error && <small role="status">{error}</small>}
@@ -141,6 +150,7 @@ export function DjConsole({output,inputs}: {output:AudioBus;inputs:MidiDevice[]}
   return <details className="dj-drawer"><summary>Consola DJ · A / B</summary>
     <div className="dj-sheet">
       <small role="status">{port?.status==="open"?"Inpulse 200 MK3 conectada":port?.status==="failed"?"Puerto Hercules ocupado · revisá DJUCED":"Consola A/B · control en pantalla"}</small>
+      {!output && <small>Podés cargar pistas ahora. Para escucharlas, elegí una escena.</small>}
       <label>Biblioteca <select value={choice} aria-label="Tema de la biblioteca" onChange={e=>select(e.target.value)}>
         {library.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
       <label className="dj-files">Agregar audio <input type="file" multiple accept="audio/*,.mp3,.wav" aria-label="Agregar archivos de audio"

@@ -22,14 +22,14 @@ type Mode = "matrix" | "live";
 type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; layer?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; source: AudioBufferSourceNode; dispose: () => void };
 
-export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomAnalyser,monitor,synthStream, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
   voiceScene: VoiceScene | null; cue: {context: AudioContext; beginsAt: number} | null; seconds: number;
   roomAnalyser: {current:AnalyserNode|null};
   codaScene: number | null;
   liveSet: LiveSetScene | null; countingTake: {current:boolean}; routing:{current:PerformanceInput|null};
-  transportMidi: TransportMidi; playGeneral: () => void;
+  canPlayNote: boolean; transportMidi: TransportMidi; playGeneral: () => void;
   connectMidi:(rescan?:boolean)=>Promise<void>;
-  analyser?:{current:AnalyserNode|null}; monitor:AudioNode|null; synthStream:MediaStream|null; startScene:()=>void; ready:boolean; scene?: string; input: GainNode | null; master: GainNode | null; paused: boolean;
+  analyser?:{current:AnalyserNode|null}; monitor:AudioNode|null; startScene:()=>void; ready:boolean; scene?: string; input: GainNode | null; master: GainNode | null; paused: boolean;
 }) {
   const [clips, setClips] = useState<Clip[]>([]);
   const {bpm,setBpm,clock,setLocked}=useTempo();
@@ -65,7 +65,7 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
   const occupied=useRef(new Set<number>());
   const stopGeneration=useRef(0);
   const generation = useRef(0);
-  const pending=useRef(new Map<Mode,{silence:()=>void;cancel:()=>void}>());
+  const pending=useRef(new Map<Mode,{slot:number;silence:()=>void;cancel:()=>void}>());
   const matrixStart=useRef(0);
   const [waiting,setWaiting]=useState(false);
   const mic = useRef<MediaStream|null>(null);
@@ -90,8 +90,6 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
   const alive=useRef(true);
   const queued=useRef<{kind:Mode;slot:number;version:number}[]>([]);
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;micRequest.current?.abort();for(const stream of [mic.current,external.current])stream?.getTracks().forEach(t=>t.stop());};},[]);
-  // The scene and the lower synth own different AudioContexts. Bridge the synth
-  // for recording only; its normal speaker output stays connected exactly once.
   const stereo=useRef<GainNode|null>(null);
   useEffect(()=>{
     if(!monitor)return;
@@ -101,13 +99,6 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     // Meter and recorder own their outgoing edges and release them independently.
     return ()=>{monitor.disconnect(bus);stereo.current=null;};
   },[monitor]);
-  useEffect(()=>{
-    const bus=stereo.current;
-    if(!bus || !synthStream)return;
-    const synth=(bus.context as AudioContext).createMediaStreamSource(synthStream);
-    synth.connect(bus);
-    return ()=>synth.disconnect();
-  },[master,synthStream]);
   useEffect(()=>{
     const bus=stereo.current;
     if(!bus || !analyser)return;
@@ -178,10 +169,10 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
   },[clock,input,paused,beat,meter,bars]);
 
   const play = useCallback(() => {
-    if (!input || !scene || paused || tone.current) return;
+    if (!canPlayNote || tone.current) return;
     tone.current = routing.current;
     tone.current?.computerNote("mixer-preview",60,true);
-  }, [input, scene, paused, routing]);
+  }, [canPlayNote, routing]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code === "KeyP" && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey &&
@@ -254,9 +245,10 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
       const protectedTake=protectPeaks(gate,RECORDING_CEILING);
       protectedTake.connect(node);
       const click=plan ? countLayer(ctx,master,plan) : null;
-      const volume=currentClips.current.find(c=>c.slot===slot)?.volume ?? bankVolumes.current.get(slot) ?? 75;
+      const replaced=currentClips.current.find(c=>c.slot===slot);
+      const volume=replaced?.volume ?? bankVolumes.current.get(slot) ?? 75;
       const weight=currentClips.current.reduce((sum,c)=>sum+(c.slot!==slot && !c.stopped && !c.muted?(c.volume/100)**2:0), (volume/100)**2);
-      const bridge=plan ? firstRepeat(ctx,protectedTake,master,base,cycle,volume/100/Math.sqrt(Math.max(1,weight))) : null;
+      const bridge=plan ? firstRepeat(ctx,protectedTake,master,base,cycle,(replaced?.muted ? 0 : volume/100)/Math.sqrt(Math.max(1,weight))) : null;
       let released=false;
       const dispose=()=>{
         if(released)return;
@@ -264,13 +256,14 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
         for(const source of sources)source.disconnect(gate);
         gate.disconnect();protectedTake.disconnect();capture.stop();gain.disconnect();
       };
-      pending.current.set(kind,{silence:()=>{gate.gain.setValueAtTime(0,ctx.currentTime);capture.finish(Math.round(ctx.currentTime*ctx.sampleRate));},cancel:()=>{click?.();bridge?.stop();reservedSlots.current.delete(slot);dispose();}});
+      pending.current.set(kind,{slot,silence:()=>{gate.gain.setValueAtTime(0,ctx.currentTime);capture.finish(Math.round(ctx.currentTime*ctx.sampleRate));},cancel:()=>{click?.();bridge?.stop();reservedSlots.current.delete(slot);dispose();}});
       const label=scene;
       function onLoop(channels:Float32Array[]){
         if(released || attempt!==generation.current)return;
         if(plan){countingTake.current=false;setCountIn(null);}
         dispose();pending.current.delete(kind);
-        if(plan && !channels.some(ch=>ch.some(value=>Math.abs(value)>.0002))){
+        const old=currentClips.current.find(c=>c.slot===slot);
+        if(plan && !old && !channels.some(ch=>ch.some(value=>Math.abs(value)>.0002))){
           reservedSlots.current.delete(slot);bridge?.stop();setLayerState("Sin señal");
           if(!pending.current.size)setState("idle");
           return;
@@ -282,15 +275,14 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
         const stopped=stopAtStart!==stopGeneration.current;
         if(bridge){if(stopped)bridge.stop();else firstPasses.current.set(id,bridge);}
         if(plan)setLayerState(stopped?"Detenido":"En loop");
-        const old=currentClips.current.find(c=>c.slot===slot);
-        if(old)previous.current.set(slot,old);
+        if(old){ previous.current.set(slot,old); halt(old.id); }
         reservedSlots.current.delete(slot);occupied.current.add(slot);
         if(version===selectionVersion.current){
           const next=Array.from({length:9},(_,i)=>(slot+i+1)%9)
             .find(candidate=>!occupied.current.has(candidate) && !reservedSlots.current.has(candidate));
           selectSlot(next ?? null);
         }
-        setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,layer:plan?.scene,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume,muted:false}]);if(!pending.current.size)setState("idle");
+        setClips(all=>[...all.filter(c=>c.slot!==slot),{id,slot,stopped,layer:plan?.scene,mode:kind,scene:label,buffer,recordedBpm:bpm,startBeat,launchBeat:startBeat+meter*bars,volume:old?.volume ?? volume,muted:old?.muted ?? false}]);if(!pending.current.size)setState("idle");
       };
       setState("recording");
     } catch {
@@ -345,6 +337,7 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
       }
       if (action === "play") playGeneral();
       else if (action === "record") pressRecord();
+      else if (action === "playAll") playAll();
       else if (action === "stop") stopAll();
     };
     window.addEventListener("860-record-midi",receive);
@@ -365,6 +358,7 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     for (const [id,v] of voices.current) if (!clips.some(c => c.id === id)) {
       v.dispose(); voices.current.delete(id);
     }
+    const now=ctx.currentTime;
     const mixGain=1/Math.sqrt(Math.max(1,clips.reduce((sum,c)=>sum+(c.stopped||c.muted?0:(c.volume/100)**2),0)));
     for (const clip of clips) {
       if(clip.stopped)continue;
@@ -383,10 +377,10 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
         gain.gain.value = 0;
         source.buffer = clip.buffer; source.loop = !clip.once;
         const origin=clock(ctx);
-        const when=Math.max(ctx.currentTime,origin+(launchContext.current.get(clip.buffer)===ctx ? clip.launchBeat ?? 0 : 0)*60/bpm);
+        const when=Math.max(now,origin+(launchContext.current.get(clip.buffer)===ctx ? clip.launchBeat ?? 0 : 0)*60/bpm);
         const beatNow=(when-origin)*bpm/60;
         const seconds=(beatNow-clip.startBeat)*60/clip.recordedBpm;
-        const offset=((seconds%clip.buffer.duration)+clip.buffer.duration)%clip.buffer.duration;
+        const offset=Math.abs(seconds)<1e-7 ? 0 : ((seconds%clip.buffer.duration)+clip.buffer.duration)%clip.buffer.duration;
         source.playbackRate.value=bpm/clip.recordedBpm;
         source.connect(gain).connect(master);
         voice = {bpm,gain,source,dispose:()=>{source.onended=null;source.stop();source.disconnect();gain.disconnect();}};
@@ -404,8 +398,23 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
 
 
   function halt(id:number){
+    firstPasses.current.get(id)?.stop();
+    firstPasses.current.delete(id);
     voices.current.get(id)?.dispose();
     voices.current.delete(id);
+  }
+  function playAll(){
+    if (!master || paused || (!clips.length && !voice.hasTake)) return;
+    const ctx=master.context;
+    // Give every source the same audio-clock deadline, including the first buffer frame.
+    const when=ctx.currentTime + .04;
+    const onset=(when - clock(ctx))/beat;
+    voice.replay(when);
+    for (const clip of clips) {
+      halt(clip.id);
+      launchContext.current.set(clip.buffer,ctx);
+    }
+    setClips(all=>all.map(clip=>({...clip,stopped:false,once:false,startBeat:onset,launchBeat:onset})));
   }
   function stopAll(){
     voice.stop();
@@ -504,12 +513,8 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
   useEffect(()=>() => {endLayerTake();armed.current=null;layer.current=null;},[cue,liveSet]);
   useEffect(()=>{
     if(!isLayer(liveSet) || !cue || !input || !master || paused || requesting || armed.current===cue)return;
-    armed.current=cue;setLayerState("");
-    if(pending.current.has("matrix")){setLayerState("Matriz ocupada");return;}
-    const preferred=liveSet-32, existing=currentClips.current.find(c=>c.layer===liveSet)?.slot;
-    const slots=[existing,preferred,...Array.from({length:9},(_,i)=>i)];
-    const slot=slots.find((s):s is number=>s!==undefined && !reservedSlots.current.has(s) && (s===existing || !occupied.current.has(s)));
-    if(slot===undefined){setLayerState("Banco completo");return;}
+    const slot=liveSet-32;
+    armed.current=cue;
     const origin=clock(cue.context);
     const now=Math.max(cue.beginsAt,cue.context.currentTime);
     // Start the count on the shared downbeat so successive layers have the same beat one.
@@ -517,6 +522,12 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
     const countBeat=Math.ceil((elapsedBeats-.035)/meter)*meter;
     const startBeat=countBeat+meter,base=origin+startBeat*beat;
     if(cycle>180 || base+cycle>cue.beginsAt+seconds+.001){setLayerState("La toma supera la duración de la escena");return;}
+    // The scored layer owns its matrix take and its slot, even when the bank is full.
+    for (const [mode,take] of pending.current) {
+      if (mode!=="matrix" && take.slot!==slot) continue;
+      take.cancel();
+      pending.current.delete(mode);
+    }
     const plan={scene:liveSet,slot,startBeat,base,beat,meter,bars};
     layer.current=plan;selectSlot(slot);setLayerState("Próximo compás");
     record("matrix",slot,selectionVersion.current,plan);
@@ -573,6 +584,8 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
         onKeyDown={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();if(!e.repeat)pressRecord();}}}
         onKeyUp={e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();releaseLive();}}}>●</button>
       <TransportMidiButton midi={transportMidi} action="record" />
+      <button type="button" aria-label="Reproducir todos los loops" disabled={!master || paused || (!clips.length && !voice.hasTake)} onClick={playAll}>▶ Todos</button>
+      <TransportMidiButton midi={transportMidi} action="playAll" />
       <button aria-label="Detener todos los clips" title="Detener todos los clips" onClick={stopAll}>■</button>
       <TransportMidiButton midi={transportMidi} action="stop" />
       {transportMidi.learning && transportMidi.learning !== "play" && <small role="status">{transportMidi.hint}</small>}
@@ -605,7 +618,7 @@ export function SceneMixer({connectMidi,transportMidi,playGeneral,analyser,roomA
             {entry && <button aria-label={`Quitar asignación de ${BANK_ACTIONS[action]}`} onClick={()=>{setBankLearn(null);setBankMap(current=>{const next={...current};delete next[entry[0]];return next;});}}>×</button>}</span>;
         })}
       </details>
-      <button disabled={!scene || paused} aria-label="Tocar sonido de escena" onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); play(); }}
+      <button disabled={!canPlayNote} aria-label="Tocar sonido de escena" onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); play(); }}
         onPointerUp={stopTone} onLostPointerCapture={stopTone} onKeyDown={e => { if (e.key === " " || e.key === "Enter") play(); }}
         onKeyUp={stopTone}>Tocar · P</button>
       {message && <small role="status">{message}</small>}

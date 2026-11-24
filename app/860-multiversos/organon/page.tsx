@@ -79,7 +79,7 @@ export default function Organon() {
     {map && <>
       <p>Última revisión de este navegador · <time dateTime={map.fecha}>{date(map.fecha)}</time></p>
       <p>{archive.fileSaved ? "Cada reasignación actualiza Controles-860.json en el almacenamiento privado de este navegador." : "El mapa está en este perfil. Descargá una copia para conservar el archivo."}</p>
-      <Table rows={map.asignaciones} label="Asignaciones del operador"/>
+      <Table rows={{...map.asignaciones, "Reproducir todos los loops": map.asignaciones["Reproducir todos los loops"] ?? "Sin asignar"}} label="Asignaciones del operador"/>
       {map.coincidencias?.map(line => <p key={line}>{line}</p>)}
       <div className={styles.actions}>
         <button onClick={() => void download()}>Descargar {CONTROL_FILE}</button>

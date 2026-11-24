@@ -5,9 +5,9 @@ import {
 } from "./performance-notes";
 import { RestingSphere } from "./scene-visuals";
 
-export function usePerformanceInput({ scene, ownsInput, clock, outputRef, pausedRef, routing, splitNote, learnSplit, onStrike }: {
-  scene: NoteScene | null; ownsInput: boolean; clock: AudioContext | null; pausedRef: { current: boolean };
-  outputRef: { current: GainNode | null }; routing: { current: PerformanceInput | null };
+export function usePerformanceInput({ scene, ownsInput, output, routing, splitNote, learnSplit, onStrike }: {
+  scene: NoteScene | null; ownsInput: boolean; output: GainNode | null;
+  routing: { current: PerformanceInput | null };
   splitNote: number; learnSplit: (note: number) => boolean; onStrike: NoteStrike;
 }) {
   const [sounding, setSounding] = useState<NoteFrequency[]>([]);
@@ -16,8 +16,7 @@ export function usePerformanceInput({ scene, ownsInput, clock, outputRef, paused
 
   useEffect(() => {
     if (!ownsInput) return;
-    const output = outputRef.current;
-    const player = scene && clock && output ? createPerformanceNotes(output, setSounding, onStrike) : null;
+    const player = scene && output ? createPerformanceNotes(output, setSounding, onStrike) : null;
     notesRef.current = player;
     const send = (key: string, index: number, velocity: number, splitIndex?: number, face: NoteFace = "front") => {
       if (!scene || !player) return;
@@ -25,14 +24,14 @@ export function usePerformanceInput({ scene, ownsInput, clock, outputRef, paused
         player.release(key);
         return;
       }
-      if (pausedRef.current) return;
+      if (output?.context.state !== "running") return;
       const frequency = noteSceneFrequency(scene, index, splitIndex, face);
       if (frequency !== undefined) player.press(key, frequency, velocity);
     };
     const midiPrefix = (inputId: string) => `midi:${JSON.stringify(inputId)}:`;
     const destination: PerformanceInput = {
       midiNote: (id, channel, note, velocity) => {
-        if (scene === "eleven" && velocity > 0 && !pausedRef.current && learnSplit(note)) return;
+        if (scene === "eleven" && velocity > 0 && output?.context.state === "running" && learnSplit(note)) return;
         let face: NoteFace = "front";
         if (hasNoteCube(scene)) {
           if (note >= MIDI_START_BY_FACE.top) face = "top";
@@ -81,18 +80,18 @@ export function usePerformanceInput({ scene, ownsInput, clock, outputRef, paused
       if (notesRef.current === player) notesRef.current = null;
       releaseAll();
     };
-  }, [clock, learnSplit, onStrike, outputRef, ownsInput, pausedRef, routing, scene, splitNote]);
+  }, [output, learnSplit, onStrike, ownsInput, routing, scene, splitNote]);
 
   return {
     sounding,
     press: (id: string, frequency: NoteFrequency) => {
-      if (!pausedRef.current) notesRef.current?.press(id, frequency, 0.85);
+      if (output?.context.state === "running") notesRef.current?.press(id, frequency, 0.85);
     },
     release: (id: string) => notesRef.current?.release(id),
     releaseAll: () => notesRef.current?.releaseFrom(""),
     pulse: (frequency: NoteFrequency) => {
       const player = notesRef.current;
-      if (!player || pausedRef.current) return;
+      if (!player || output?.context.state !== "running") return;
       const id = `button:${++clickId.current}`;
       player.press(id, frequency, 0.85);
       window.setTimeout(() => player.release(id), 190);
@@ -105,14 +104,14 @@ type NoteProjectionProps = {
   clock: AudioContext | null; beginsAt: number;
 };
 
-function NoteButtons({ scene, paused, input, face = "front" }: Pick<NoteProjectionProps, "scene" | "paused" | "input"> & { face?: NoteFace }) {
+function NoteButtons({ scene, input, face = "front" }: Pick<NoteProjectionProps, "scene" | "paused" | "input"> & { face?: NoteFace }) {
   const frequencies = NOTE_FACE_FREQUENCIES[face];
   return NOTE_SCENES[scene].keys.map((key) => {
     const frequency = frequencies[key - 1];
     const keyLabel = scene === "eleven" ? (key === 1 ? "1–4" : "5–9") : key;
     const description = scene === "ten" || face === "top" ? "" : scene === "eleven" ? `, teclas ${keyLabel}`
       : face === "right" ? `, Mayús más ${keyLabel}` : `, tecla ${keyLabel}`;
-    return <button key={frequency} type="button" className="zero-note-key" disabled={paused}
+    return <button key={frequency} type="button" className="zero-note-key"
       aria-label={`${frequency} hercios${description}`} data-sounding={input.sounding.includes(frequency)}
       onPointerDown={(event) => {
         if (event.button !== 0) return;

@@ -2,12 +2,13 @@ import {useEffect,useRef} from "react";
 import type {PerformanceInput} from "./performance-notes";
 import type {Timbre} from "./coda-ballot";
 
-export function useCodaInstrument(scene:number, sound:Timbre, clock:AudioContext, output:GainNode|null, paused:boolean,
+export function useCodaInstrument(scene:number, sound:Timbre, output:GainNode|null, paused:boolean,
     routing:{current:PerformanceInput|null}) {
   const current=useRef({scene,sound,paused});
   current.current={scene,sound,paused};
   useEffect(()=>{
     if(!output)return;
+    const clock=output.context;
     const bus=clock.createGain();
     bus.gain.value=.28;
     bus.connect(output);
@@ -19,7 +20,7 @@ export function useCodaInstrument(scene:number, sound:Timbre, clock:AudioContext
     let nextAt=clock.currentTime+1, phrase=0;
     function note(id:string,midi:number,velocity:number){
       active.get(id)?.();
-      if(!velocity || current.current.paused || clock.state!=="running")return;
+      if(!velocity || clock.state!=="running")return;
       if(ringing.size>=24)ringing.values().next().value?.();
       const {scene,sound}=current.current;
       const level=(.015+.28*((111-scene)/21)**1.5)*Math.max(.13,velocity);
@@ -77,5 +78,5 @@ export function useCodaInstrument(scene:number, sound:Timbre, clock:AudioContext
       window.removeEventListener("blur",allOff);window.clearInterval(timer);allOff();bus.disconnect();
       if(routing.current===dest)routing.current=null;
     };
-  },[clock,output,routing]);
+  },[output,routing,scene]);
 }

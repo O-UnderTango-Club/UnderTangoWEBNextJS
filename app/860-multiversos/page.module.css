@@ -1202,3 +1202,12 @@
   }
 }
 .organonLink { display: inline-block; padding: .4rem 0; color: inherit; font-size: .8rem; text-decoration: underline; }
+
+.scoreTitle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

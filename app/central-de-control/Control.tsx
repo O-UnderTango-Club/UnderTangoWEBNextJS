@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { departments } from "../central/departments";
 import { centralActionView, daysUntil, isOpenAction, type CentralMode } from "../../src/lib/central-actions";
-import type { Board } from "../../src/lib/panel-model";
+import { ALL_DAYS, validWeekdays, type Board } from "../../src/lib/panel-model";
+import WeekdayPicker from "../panel-de-control/WeekdayPicker";
 import styles from "./control.module.css";
 
 type Task = Board["tasks"][number];
-type ActionOperation = "finish" | "doneToday";
+type ActionOperation = "finish" | "doneToday" | "weekdays";
+type DayEditor = { id: string; value: number; initial: number; revision: string; snapshotRevision: string };
 type LatestChange = { requestId: string; taskId: string; operation: ActionOperation };
 type Data = {
   tasks: Task[];
@@ -20,7 +22,7 @@ type Data = {
   latestChange: LatestChange | null;
 };
 type Intent =
-  | { operation: ActionOperation; requestId: string; taskId: string; revision: string; snapshotRevision: string }
+  | { operation: ActionOperation; requestId: string; taskId: string; revision: string; snapshotRevision: string; weekdays?: number }
   | { operation: "undo"; requestId: string; originalId: string };
 
 class RequestError extends Error {
@@ -101,6 +103,7 @@ export default function Control() {
   const [openedGroup, setOpenedGroup] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const [armed, setArmed] = useState<string | null>(null);
+  const [dayEditor, setDayEditor] = useState<DayEditor | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [changeError, setChangeError] = useState("");
@@ -149,8 +152,13 @@ export default function Control() {
         ? retry : { operation, originalId: last.requestId, requestId: crypto.randomUUID() };
     } else {
       if (!task || !data.revisions[task.id] || (operation === "finish" && task.baseStage === "recurring")) return;
-      intent = retry?.operation === operation && retry.taskId === task.id
-        ? retry : { operation, taskId: task.id, revision: data.revisions[task.id], snapshotRevision: data.snapshotRevision, requestId: crypto.randomUUID() };
+      const edit = operation === "weekdays" ? dayEditor : null;
+      if (operation === "weekdays" && (!edit || edit.id !== task.id || !validWeekdays(edit.value))) return;
+      const revision = edit?.revision ?? data.revisions[task.id];
+      const snapshotRevision = edit?.snapshotRevision ?? data.snapshotRevision;
+      intent = retry?.operation === operation && retry.taskId === task.id && retry.weekdays === edit?.value
+        && (!edit || (retry.revision === revision && retry.snapshotRevision === snapshotRevision))
+        ? retry : { operation, taskId: task.id, revision, snapshotRevision, requestId: crypto.randomUUID(), ...(edit && { weekdays: edit.value }) };
     }
 
     saveInFlight.current = true;
@@ -163,8 +171,9 @@ export default function Control() {
       if (receipt.ok !== true || receipt.requestId !== intent.requestId) throw new Error("Volvé a intentar para recuperar la confirmación del cambio.");
       retryIntent.current = undefined;
       setArmed(null);
+      setDayEditor(null);
       setOpened(null);
-      setNotice(operation === "undo" ? "Último cambio deshecho." : operation === "finish" ? `«${task?.name}» quedó finalizada.` : `«${task?.name}» queda para su próximo día habilitado.`);
+      setNotice(operation === "weekdays" ? `Días de «${task?.name}» guardados.` : operation === "undo" ? "Último cambio deshecho." : operation === "finish" ? `«${task?.name}» quedó finalizada.` : `«${task?.name}» queda para su próximo día habilitado.`);
       await refresh(true);
       messageRef.current?.focus();
     } catch (cause) {
@@ -172,6 +181,7 @@ export default function Control() {
       if (cause instanceof RequestError && cause.status < 500) {
         retryIntent.current = undefined;
         setArmed(null);
+        if (cause.status === 409) setDayEditor(null);
         await refresh(true);
       }
     } finally {
@@ -186,6 +196,7 @@ export default function Control() {
   ), [data, selected, mode, day]);
   const selectedDept=departments.find(d=>d.number===selected);
   const choose = (code: string | null) => {
+    setDayEditor(null);
     setSelected(code);
     setShowRest(false);
     setOpenedGroup(null);
@@ -193,7 +204,7 @@ export default function Control() {
     setArmed(null);
   };
   const locked = loading || saving || !!error || !!data?.readOnly;
-  const card = (task: Task, members: Task[] = [], due = task.due): ReactNode => {
+  const card = (task: Task, members: Task[] = [], due = task.due, otherDays: Task[] = []): ReactNode => {
     const expanded = (task.isGroup ? openedGroup : opened) === task.id;
     const confirming = armed === task.id;
     const recurring = task.baseStage === "recurring";
@@ -202,6 +213,7 @@ export default function Control() {
       && !task.issues.length && !task.blockers.length;
     const department = departments.find(item => item.number === departmentById.get(task.id));
     const toggle = () => {
+      setDayEditor(null);
       if (task.isGroup) {
         setOpenedGroup(expanded ? null : task.id);
         setOpened(null);
@@ -223,7 +235,7 @@ export default function Control() {
           </button> : task.name}
         </h3>
         <div className={styles.meta}>
-          {task.isGroup && <span>{members.length} {members.length === 1 ? "acción" : "acciones"} en el grupo</span>}
+          {task.isGroup && <span>{members.length + otherDays.length} {members.length + otherDays.length === 1 ? "acción" : "acciones"} en el grupo</span>}
           <span className={due && daysUntil(due, day) <= 7 ? styles.warn : ""}>
             {due !== task.due && "Vence un paso · "}{dateLabel(due, day)}
           </span>
@@ -233,13 +245,29 @@ export default function Control() {
         {task.owner && <p className={styles.owner}>{task.owner}</p>}
         {task.stage === "waiting" && task.blockers.length > 0 && <p className={styles.owner}>Espera: {task.blockers.join(", ")}</p>}
         {task.issues.length > 0 && <p className={styles.warn}>Revisar: {task.issues.join(" · ")}</p>}
+        {expanded && isOpenAction(task) && (dayEditor?.id === task.id ? (
+          <form className={styles.dayEditor} aria-label={`Editar días de ${task.name}`}
+            onSubmit={event => { event.preventDefault(); void save("weekdays", task); }}>
+            <WeekdayPicker value={dayEditor.value} department={department?.number ?? null} disabled={locked}
+              onChange={value => setDayEditor({ ...dayEditor, value })}/>
+            <div><button type="submit" disabled={locked || !validWeekdays(dayEditor.value) || dayEditor.value === dayEditor.initial}>Guardar días</button>
+              <button type="button" disabled={saving} onClick={() => setDayEditor(null)}>Cancelar</button></div>
+          </form>
+        ) : <button className={styles.editDays} type="button" disabled={locked} onClick={() => {
+          const value = task.weekdays ?? ALL_DAYS;
+          setArmed(null);
+          setDayEditor({id: task.id, value, initial: value, revision: data!.revisions[task.id], snapshotRevision: data!.snapshotRevision});
+        }}>Editar días</button>)}
         {task.isGroup ? (
           <div id={`controls-${task.id}`} hidden={!expanded}>
             {expanded && (members.length ? (
               <ol className={styles.groupMembers} aria-label={`Acciones de ${task.name}`}>
                 {members.map(member => <li key={member.id} value={member.groupOrder || undefined}>{card(member)}</li>)}
               </ol>
-            ) : <p className={styles.owner}>Este grupo todavía no tiene acciones.</p>)}
+            ) : !otherDays.length && <p className={styles.owner}>Este grupo todavía no tiene acciones.</p>)}
+            {expanded && otherDays.length > 0 && <details><summary>Pasos de otros días ({otherDays.length})</summary>
+              <ol className={styles.groupMembers}>{otherDays.map(member => <li key={member.id} value={member.groupOrder || undefined}>{card(member)}</li>)}</ol>
+            </details>}
           </div>
         ) : <div className={styles.actionControls} id={`controls-${task.id}`} hidden={!expanded}>
           {expanded && description && (
@@ -263,7 +291,7 @@ export default function Control() {
       </article>
     );
   };
-  const entryCard = ({ task, members, due }: (typeof visible)[number]) => card(task, members, due);
+  const entryCard = ({ task, members, due, otherDays }: (typeof visible)[number]) => card(task, members, due, otherDays);
   return <main className={styles.main}><header className={styles.header}><a href="/panel-de-control">Ø UnderTango · Panel de control</a><button onClick={()=>void refresh()} disabled={loading || saving}>{loading?"Actualizando…":"Actualizar"}</button></header><section className={styles.intro}><p className={styles.eyebrow}>Una mirada para empezar</p><h1>Central de <em>control</em></h1><p>Todo el sistema a la vista. Elegí un departamento y descubrí por dónde avanzar.</p></section>
     {error&&<div className={styles.message} role="alert"><strong>No pudimos abrir la información.</strong><p>{error}</p><a href="/panel-de-control">Abrir el panel de control</a></div>}
     {data&&<><div className={styles.workspace}><section className={styles.orbit} aria-label="Departamentos de UnderTango"><div className={styles.orbitHead}><div><span className={styles.eyebrow}>Ø Sistema operativo</span><h2>Explorá la esfera</h2></div><span>{total} {total === 1 ? "acción o grupo abierto" : "acciones y grupos abiertos"}</span></div><Sphere selected={selected} choose={choose} counts={counts}/><p className={styles.hint}>Arrastrá para girar · Tocá un sector para abrirlo</p><div className={styles.departmentList} aria-label="Elegir departamento">{departments.map((d,i)=><button key={d.number} className={selected===d.number?styles.chosen:""} onClick={()=>choose(d.number)} aria-pressed={selected===d.number}><span style={{background:colors[i]}} />{d.number} {d.keyword}<b>{counts[d.number]||0}</b></button>)}<button className={selected==="unassigned"?styles.chosen:""} onClick={()=>choose("unassigned")} aria-pressed={selected==="unassigned"}><span className={styles.gray}/>Sin departamento<b>{counts.unassigned||0}</b></button></div></section>
@@ -274,7 +302,7 @@ export default function Control() {
     <div className={styles.tabs} role="group" aria-label="Perspectiva de acciones">
       {([["overview","Para avanzar"],["urgent","Urgentes"],["dates","Con fecha límite"],["priority","Prioridad alta"]] as [CentralMode,string][]).map(([id,label]) => (
         <button key={id} aria-pressed={mode === id} className={mode === id ? styles.active : ""} onClick={() => {
-          setMode(id); setShowRest(false); setOpenedGroup(null); setOpened(null); setArmed(null);
+          setMode(id); setShowRest(false); setOpenedGroup(null); setOpened(null); setArmed(null); setDayEditor(null);
         }}>{label}</button>
       ))}
     </div>

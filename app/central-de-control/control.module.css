@@ -91,3 +91,10 @@
 .undo span { font-size: 19px; vertical-align: middle; }
 .footer p { margin: 0; }
 .feedback:empty { display: none; }
+.dayEditor { display: grid; gap: 10px; margin: 12px 0; }
+.dayEditor > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.dayEditor fieldset { min-width: 0; }
+.editDays, .dayEditor button { min-height: 44px; padding: 7px 14px; color: #f4f1e9; background: #252625; border: 1px solid #64645d; border-radius: 8px; }
+.dayEditor p { color: #c7cabf; }
+.dayEditor [role=alert] { color: #ffb6a7; }
+.editDays:disabled, .dayEditor button:disabled { opacity: .55; }

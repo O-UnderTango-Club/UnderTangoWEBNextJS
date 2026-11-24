@@ -1813,6 +1813,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .sample-mute svg {width:15px;height:15px;}
       .sample-info {flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.66rem;color:#c4c7d3;}
       .sample-wave {order:2;flex:0 0 100%;position:relative;min-width:0;height:21px;overflow:hidden;border:1px solid #4d4a5b;border-radius:3px;background:#100f17;}
+      .sample-wave {background-image:linear-gradient(90deg,#676078 1px,transparent 1px),linear-gradient(90deg,#342f41 1px,transparent 1px);}
       .sample-wave canvas {display:block;width:100%;height:100%;}
       .sample-wave[data-muted] canvas {opacity:.45;}
       .sample-wave-cursor {position:absolute;inset:0;pointer-events:none;border-inline-start:2px solid #fbd27d;}

@@ -13,8 +13,7 @@ const credits:Record<number,[string,string]> = {
   108:["A quienes escucharon y eligieron","Gracias"],
 };
 const style = `
-.zero-stage:has(>.coda-stage){display:grid;grid-template-rows:minmax(0,1fr) fit-content(50%);background:#05060a!important;}
-.zero-stage:has(>.coda-stage)>.scene-mixer{position:relative;grid-row:2;width:100%;max-height:100%;}
+.zero-stage:has(>.coda-stage){background:#05060a!important;}
 .zero-stage:has(>.coda-stage) .zero-scene-number{color:#ede9df;}
 .coda-stage{container-type:size;isolation:isolate;position:relative;grid-row:1;min-height:0;height:100%;width:100%;overflow:hidden;color:#f0ede8;background:#06080c;}
 .coda-field{position:absolute;inset:0;opacity:var(--coda-light);transition:opacity 2s;overflow:hidden;}

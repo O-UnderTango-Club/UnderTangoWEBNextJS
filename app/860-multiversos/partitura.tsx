@@ -1785,11 +1785,17 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         background: #11131a; color: #f2f3f7; isolation: isolate;
         font-family: system-ui, sans-serif;
       }
+      .zero-performance {
+        display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) fit-content(46%);
+        min-width: 0; min-height: 0;
+      }
       .zero-stage {
         position: relative; display: grid; place-items: center; min-width: 0; min-height: 0;
-        width: 100%; padding: 0; border: 0; overflow: hidden; isolation: isolate;
+        grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+        width: 100%; height: 100%; padding: 0; border: 0; overflow: hidden; isolation: isolate;
+        container: scene-display / size;
       }
-      .scene-mixer { position:absolute; bottom:0; inset-inline:0; z-index:4; max-height:50%; overflow:auto; overscroll-behavior:contain; background:#15151ded; color:white; font: .76rem system-ui; }
+      .scene-mixer { min-width:0; min-height:0; overflow:auto; overscroll-behavior:contain; background:#15151d; color:white; font: .76rem system-ui; }
       .scene-mixer-tools,.scene-mixer-row { display:flex; align-items:center; gap:.5rem; padding:.24rem .55rem; flex-wrap:wrap; }
       .scene-mixer-tools .scene-record {color:#ff696f;font-size:1.15rem;line-height:1;min-width:2.5rem;}
       .scene-mixer-tools details[open] {display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;}
@@ -1803,6 +1809,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .tempo-bar i:first-child[data-current=true] {background:#fff;box-shadow:0 0 0 2px #ffdb82;}
       .scene-mixer-tools progress {width:5rem;}
       .scene-mixer-tools { position:sticky; top:0; background:#15151d; z-index:1; }
+      .scene-mixer-tools:has(details[open]) { position:relative; }
       .sample-bank {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,auto);grid-auto-flow:column;container:sample-bank / inline-size;}
       .sample-bank > div {border:1px solid #44444f;min-width:0;}
       .sample-bank > [data-selected=true] {box-shadow:inset 0 0 0 2px #fbd27d;background:#332d25;}
@@ -1812,11 +1819,11 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .sample-bank .scene-mixer-row button {flex:none;display:grid;place-items:center;min-width:24px;height:24px;padding:0 .18rem;font:600 .68rem/1 system-ui;}
       .sample-mute svg {width:15px;height:15px;}
       .sample-info {flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.66rem;color:#c4c7d3;}
-      .sample-wave {order:2;flex:0 0 100%;position:relative;min-width:0;height:21px;overflow:hidden;border:1px solid #4d4a5b;border-radius:3px;background:#100f17;}
+      .sample-wave {order:2;flex:0 0 100%;position:relative;min-width:0;height:12px;overflow:hidden;border:1px solid #4d4a5b;border-radius:3px;background:#100f17;}
       .sample-wave {background-image:linear-gradient(90deg,#676078 1px,transparent 1px),linear-gradient(90deg,#342f41 1px,transparent 1px);}
       .sample-wave canvas {display:block;width:100%;height:100%;}
       .sample-wave[data-muted] canvas {opacity:.45;}
-      .sample-wave-cursor {position:absolute;inset:0;pointer-events:none;border-inline-start:2px solid #fbd27d;}
+      .sample-wave-cursor {position:absolute;inset:0;pointer-events:none;border-inline-start:1px solid #fbd27d;}
       .sample-wave[data-stopped] .sample-wave-cursor,.sample-wave-cursor:not([data-playback]) {visibility:hidden;}
       .sample-wave-cursor[data-playback=waiting] {border-inline-start-style:dashed;}
       .sample-wave-cursor[data-playback=paused],.sample-wave[data-muted] .sample-wave-cursor {border-inline-start-color:#a3a0ad;}
@@ -1830,14 +1837,13 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       }
       .scene-mixer button { padding:.25rem .6rem; border:1px solid #737482; background:#252631; color:white; border-radius:4px; cursor:pointer; }
       .scene-mixer button[aria-pressed=true] { background:#664481; }
-      .zero-stage:has(.scene-mixer) .zero-subtitle { bottom:auto; top:.5rem; }
       @media(max-width:760px){.zero-stage:has(>.stimulus-bar)>.zero-subtitle {top:2.6rem;}}
       .zero-start, .zero-object { position: absolute; inset: 0; width: 100%; height: 100%; }
       .zero-start { border: 0; padding: 0; background: transparent; cursor: pointer; }
       .zero-object { cursor: grab; touch-action: none; }
       .zero-object:active { cursor: grabbing; }
       .zero-subtitle {
-        position: absolute; inset-inline: 0; bottom: .5rem; z-index: 2;
+        position: absolute; inset-inline: 0; top: .5rem; z-index: 2;
         display: flex; justify-content: center; padding-inline: .5rem; pointer-events: none;
       }
       .zero-subtitle span {
@@ -1850,16 +1856,13 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         z-index: 2; color: #191b22; font: 400 clamp(1.5rem, 3.25vw, 2.8rem)/1 Georgia, serif;
         font-variant-numeric: tabular-nums; pointer-events: none;
       }
-      .zero-stage:has(.zero-subtitle span) .zero-harmonic-frame:has(.zero-time-caption) {
-        translate: 0 clamp(-4rem, calc((100dvh - 880px) / 5), 0px);
-      }
       .zero-question {
         position: absolute; width: min(87%, 900px); margin: 0; text-align: center;
         color: #111; font: 400 clamp(1.5rem, 3.5vw, 3.6rem)/1.3 Georgia, serif;
         animation: zeroSpaceFade .55s ease both;
       }
       .zero-point { width: clamp(8px, 1.05vw, 16px); aspect-ratio: 1; border-radius: 50%; background: #000; }
-      .zero-harmonic-frame { position: relative; width: min(94%, 800px, 116dvh); aspect-ratio: 16 / 9; pointer-events: none; }
+      .zero-harmonic-frame { position: relative; width: min(94%, 800px, 116dvh, 144cqh); aspect-ratio: 16 / 9; pointer-events: none; }
       .zero-harmonic-diagram, .zero-frequency-space, .zero-frequency-space canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
       .zero-note-scene[data-note-scene=ten] .zero-resting-sphere {
         transform: translateX(17%) scale(.90);
@@ -1868,7 +1871,15 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .zero-note-scene:is([data-note-scene=twelve], [data-note-scene=thirteen], [data-note-scene=fourteen]) .zero-resting-sphere {
         transform: translateX(-20%) scale(.78);
       }
-      .zero-stage:has([data-note-scene=fourteen]) { grid-template-rows: minmax(0, 1fr) auto; }
+      .zero-stage:has(>.zero-loop-timeline) {
+        --scene-timeline-height: min(clamp(82px, 27cqh, 175px), 40cqh);
+        --scene-timeline-gap: min(10px, 2cqh);
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+      .zero-stage:has(>.zero-loop-timeline) > .zero-harmonic-frame {
+        width: min(94%, 800px, calc((100cqh - var(--scene-timeline-height) - var(--scene-timeline-gap)) * 1.5));
+      }
+      .zero-stage > .zero-loop-timeline { height: var(--scene-timeline-height); margin-bottom: var(--scene-timeline-gap); }
       .zero-loop-timeline {
         --loop-beat-width: clamp(7rem, 15vw, 12.5rem); --loop-playhead: 25%; --loop-ruler-height: 1.4rem;
         display: grid; grid-template-rows: auto minmax(0, 1fr); grid-row: 2;
@@ -1921,10 +1932,6 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .zero-loop-light {
         position: absolute; left: 50%; width: 6px; height: 6px; translate: -50% -50%; border-radius: 50%;
         background: currentColor; box-shadow: 0 0 6px currentColor, 0 0 13px currentColor;
-      }
-      @media (max-width: 760px) and (max-height: 660px) {
-        .zero-note-scene[data-note-scene=fourteen] { width: min(94%, 57dvh); }
-        .zero-loop-timeline { height: clamp(88px, 20dvh, 118px); }
       }
       @media (max-width: 490px) {
         .zero-loop-readout { gap: .45rem; padding-inline: .45rem; }
@@ -2127,14 +2134,21 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       }
       @media (max-width: 760px) {
         .zero-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); }
-        .zero-harmonic-frame { width: min(94%, 800px, 76dvh); }
-        .zero-controls { --zero-controls-padding: .75rem; border-left: 0; border-top: 1px solid #30333d; }
+        .zero-harmonic-frame { width: min(94%, 800px, 76dvh, 144cqh); }
+        .zero-controls {
+          --zero-controls-padding: .75rem;
+          grid-template-rows: minmax(7rem, 42%) auto; overflow: auto; overscroll-behavior: contain;
+          border-left: 0; border-top: 1px solid #30333d;
+        }
         .zero-scene { padding-top: 1rem; }
       }
       ${EXTENDED_STYLE}
     `}</style>
-    <ProjectionSignalContext.Provider value={signals}><div className="zero-stage" role="group" aria-label="Proyección del módulo cero" data-extended-dark={extendedDark ? "true" : undefined}
-      style={{background:extendedDark ? "#130f20" : light ? "#fff" : "#000"}}>
+    <ProjectionSignalContext.Provider value={signals}><div className="zero-performance">
+      <SceneMixer stageBackground={extendedDark ? "#130f20" : light ? "#fff" : "#000"} extendedDark={extendedDark}
+        canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={reset} codaScene={coda} liveSet={liveSet}
+        voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
+        countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused}>
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} beacon={stage === "beacon"} cue={cue} paused={paused} />}
       {question && <p className="zero-question" style={{ animationPlayState: paused ? "paused" : "running" }}>¿Cuál es la entidad mínima capaz de ser imaginada?</p>}
@@ -2166,14 +2180,12 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={reset} codaScene={coda} liveSet={liveSet}
-        voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
-        countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
         notes={noteScene ? noteInput.sounding : undefined} loop={loopFrame} tuning={extended.a4}
         resting={breathing} interactiveObject={showObject} />}
       {sceneNumber !== null && <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>}
       {sceneNumber !== null && sceneNumber < 10 && <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
+      </SceneMixer>
     </div></ProjectionSignalContext.Provider>
     <aside className="zero-controls" aria-label="Controles de las escenas">
       <div className="zero-settings" ref={settingsRef}>

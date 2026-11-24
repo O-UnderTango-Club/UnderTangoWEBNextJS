@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { protectPeaks, RECORDING_CEILING } from "./peak-protection";
 import { captureFactory } from "./measure-recorder";
@@ -39,7 +39,8 @@ function phaseInCycle(time:number, cycle:number) {
   return phase<1e-9 || cycle-phase<1e-9 ? 0 : phase;
 }
 
-export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pauseScene,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+export function SceneMixer({children, stageBackground, extendedDark, canPlayNote,connectMidi,transportMidi,playGeneral,pauseScene,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+  children: ReactNode; stageBackground: string; extendedDark: boolean;
   voiceScene: VoiceScene | null; cue: {context: AudioContext; beginsAt: number} | null; seconds: number;
   roomAnalyser: {current:AnalyserNode|null};
   codaScene: number | null;
@@ -652,11 +653,16 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pa
     else if(recordedLayer.muted)takeStatus="Silenciado";
     else if(recordedLayer.once)takeStatus="Una vuelta";
   }
-  return <>{liveSet && analyser && <LiveSetProjection scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
-    analyser={showRoomInput ? roomMeter : analyser} paused={paused} meter={meter} bars={bars} bpm={bpm}
-    position={activeCount===null ? position : activeCount-1} recording={state==="recording" && !waiting} waiting={waiting} countIn={activeCount}
-    slot={currentTake?.slot ?? null} takeStatus={takeStatus}
-    room={showRoomInput}/>}
+  return <>
+  <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" data-extended-dark={extendedDark || undefined}
+    style={{background:stageBackground}}>
+    {children}
+    {liveSet && analyser && <LiveSetProjection scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
+      analyser={showRoomInput ? roomMeter : analyser} paused={paused} meter={meter} bars={bars} bpm={bpm}
+      position={activeCount===null ? position : activeCount-1} recording={state==="recording" && !waiting} waiting={waiting} countIn={activeCount}
+      slot={currentTake?.slot ?? null} takeStatus={takeStatus}
+      room={showRoomInput}/>}
+  </div>
   <div className="scene-mixer" role="region" aria-label="Lupera de objetos sonoros">
     {voiceScene && <div className="voice-loop-strip" role="group" aria-label="Loop de voz">
       <strong>{voiceScene === 31 ? "Voz en ondas" : "Coro de sala"}</strong>

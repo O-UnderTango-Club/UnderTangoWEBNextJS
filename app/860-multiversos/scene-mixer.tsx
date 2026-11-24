@@ -22,12 +22,12 @@ type Mode = "matrix" | "live";
 type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; layer?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; source: AudioBufferSourceNode; dispose: () => void };
 
-export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
   voiceScene: VoiceScene | null; cue: {context: AudioContext; beginsAt: number} | null; seconds: number;
   roomAnalyser: {current:AnalyserNode|null};
   codaScene: number | null;
   liveSet: LiveSetScene | null; countingTake: {current:boolean}; routing:{current:PerformanceInput|null};
-  canPlayNote: boolean; transportMidi: TransportMidi; playGeneral: () => void;
+  canPlayNote: boolean; transportMidi: TransportMidi; playGeneral: () => void; stopScene: () => void;
   connectMidi:(rescan?:boolean)=>Promise<void>;
   analyser?:{current:AnalyserNode|null}; monitor:AudioNode|null; startScene:()=>void; ready:boolean; scene?: string; input: GainNode | null; master: GainNode | null; paused: boolean;
 }) {
@@ -59,6 +59,18 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
   useEffect(()=>{setLocked(state!=="idle");return ()=>setLocked(false);},[state,setLocked]);
   const [position,setPosition] = useState(0);
   const [message,setMessage] = useState("");
+  const [clearArmed,setClearArmed] = useState(false);
+  const clearPress = useRef<{button:string;until:number;timer:number} | null>(null);
+  const disarmClear = useCallback(() => {
+    if (!clearPress.current) return;
+    window.clearTimeout(clearPress.current.timer);
+    clearPress.current=null;
+    setClearArmed(false);
+  },[]);
+  useEffect(() => {
+    disarmClear();
+    return disarmClear;
+  },[cue,transportMidi.learning,disarmClear]);
   const voices = useRef(new Map<number, Voice>());
   const launchContext=useRef(new WeakMap<AudioBuffer,BaseAudioContext>());
   const serial = useRef(0);
@@ -309,7 +321,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
   },[ready,scene,input,master]);
   const pressed=useRef(new Set<string>());
   useEffect(() => {
-    const clear = () => { pressed.current.clear(); downControls.current.clear(); releaseLive(); };
+    const clear = () => { pressed.current.clear(); downControls.current.clear(); releaseLive(); disarmClear(); };
     const otherLearn = (event: Event) => {
       if ((event as CustomEvent).detail !== "mixer") { setBankLearn(null); setMessage(""); }
     };
@@ -321,13 +333,13 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
       window.removeEventListener("860-midi-disconnect", clear);
       window.removeEventListener("blur", clear);
     };
-  }, []);
+  }, [disarmClear]);
   useEffect(()=>{
     const receive=(event:Event)=>{
-      const e=event as CustomEvent<{id:string;alias?:string;on:boolean;pulse?:boolean}>;
+      const e=event as CustomEvent<{id:string;alias?:string;on:boolean;pulse?:"play"|"stopScene"}>;
       const {id,alias,on,pulse}=e.detail;
       const action=transportMidi.match(id,alias);
-      if (pulse && (transportMidi.learning ?? action) !== "play") return;
+      if (pulse && (transportMidi.learning ?? action) !== pulse) return;
       if (!transportMidi.learning && !action) return;
       e.preventDefault();
       if (!on) {
@@ -341,9 +353,11 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
         return;
       }
       if (action === "play") playGeneral();
+      else if (action === "stopScene" && !ready) stopScene();
       else if (action === "record") pressRecord();
       else if (action === "playAll") playAll();
       else if (action === "stop") stopAll();
+      else if (action === "clear") clearBank(id);
     };
     window.addEventListener("860-record-midi",receive);
     return ()=>window.removeEventListener("860-record-midi",receive);
@@ -424,6 +438,25 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
   function stopAll(){
     voice.stop();
     stopBank();
+  }
+  function clearBank(button:string) {
+    const previousPress=clearPress.current;
+    disarmClear();
+    if (!occupied.current.size && !pending.current.size && !queued.current.length) return;
+    const now=performance.now();
+    if (previousPress?.button===button && now<=previousPress.until) {
+      stopBank();
+      cancel();
+      previous.current.clear();
+      occupied.current.clear();
+      reservedSlots.current.clear();
+      selectSlot(null);
+      setClips([]);
+      setMessage("Lupera vacía · S1 a S9 libres");
+      return;
+    }
+    clearPress.current={button,until:now+3000,timer:window.setTimeout(disarmClear,3000)};
+    setClearArmed(true);
   }
   function stopBank(){
     if(countingTake.current)endLayerTake();
@@ -593,7 +626,14 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,an
       <TransportMidiButton midi={transportMidi} action="playAll" />
       <button aria-label="Detener todos los clips" title="Detener todos los clips" onClick={stopAll}>■</button>
       <TransportMidiButton midi={transportMidi} action="stop" />
-      {transportMidi.learning && transportMidi.learning !== "play" && <small role="status">{transportMidi.hint}</small>}
+      <button type="button" aria-label="Vaciar lupera" aria-describedby={clearArmed ? "confirmar-vaciado-a9" : undefined}
+        title="Dos pulsaciones para vaciar S1 a S9"
+        disabled={!clips.length && state==="idle" && !queued.current.length}
+        onClick={()=>clearBank("pantalla")}
+        onKeyDown={e=>{if(e.repeat && (e.key==="Enter" || e.key===" "))e.preventDefault();}}>Vaciar</button>
+      <TransportMidiButton midi={transportMidi} action="clear" />
+      {clearArmed && <small id="confirmar-vaciado-a9" role="status">Pulsá el mismo botón otra vez para vaciar S1 a S9.</small>}
+      {transportMidi.learning && transportMidi.learning !== "play" && transportMidi.learning !== "stopScene" && <small role="status">{transportMidi.hint}</small>}
       <button title="Usar el próximo espacio libre" aria-label="Destino automático" onClick={()=>selectSlot(null)}>{selected===null?"Auto":`Destino S${selected+1}`}</button>
       <label title="Grabar los compases configurados desde el próximo tiempo 1"><input type="checkbox" checked={matrix} disabled={state!=="idle"} onChange={e=>setMatrix(e.target.checked)}/> Matriz</label>
       <label title="Grabar desde que apretás hasta que soltás"><input type="checkbox" checked={live} disabled={state!=="idle"} onChange={e=>setLive(e.target.checked)}/> En vivo</label>

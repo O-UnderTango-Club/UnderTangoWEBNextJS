@@ -4,6 +4,11 @@ export const SETTINGS_PREFIX = "860-multiversos:settings:v1:";
 export const JOURNAL_KEY = "860-multiversos:organon:v1";
 export const RECOVERED_CONTROLS = "860-controles-recuperados";
 export const BANK_ACTIONS = { volume: "Volumen", stop: "Stop", play: "Play inmediato", once: "Una vuelta", next: "Play en el 1", toggle: "Play / stop", select: "Elegir destino" } as const;
+export const TRANSPORT_NAMES = {
+  play: "Play general", stopScene: "Stop general", record: "Grabar",
+  playAll: "Reproducir todos los loops", stop: "Detener todos", clear: "Vaciar lupera",
+} as const;
+export type TransportAction = keyof typeof TRANSPORT_NAMES;
 export const PIANO_KEYS: Record<string, number> = {
   a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66, g: 67, y: 68, h: 69, u: 70, j: 71, k: 72,
 };
@@ -28,16 +33,18 @@ type Settings = {
   sampleBankMidi: Record<string, BankAssignment>;
   ccMap: Record<string, CcBinding>;
   generalPlayButton: string;
+  generalStopButton: string;
   mixerRecordButton: string;
   mixerLiveButton: string;
   mixerPlayAllButton: string;
   mixerStopButton: string;
-  mixerTransportAliases: Partial<Record<"play" | "record" | "playAll" | "stop", string>>;
+  mixerClearButton: string;
+  mixerTransportAliases: Partial<Record<TransportAction, string>>;
   midiLayouts: {numeric: boolean; tempered: boolean};
   splitNote: number;
 };
 const defaults: Settings = {
-  sampleBankMidi: {}, ccMap: {}, generalPlayButton: "", mixerRecordButton: "", mixerLiveButton: "", mixerPlayAllButton: "", mixerStopButton: "",
+  sampleBankMidi: {}, ccMap: {}, generalPlayButton: "", generalStopButton: "", mixerRecordButton: "", mixerLiveButton: "", mixerPlayAllButton: "", mixerStopButton: "", mixerClearButton: "",
   mixerTransportAliases: {}, midiLayouts: {numeric: false, tempered: true}, splitNote: 60,
 };
 type SettingName = keyof Settings;
@@ -58,7 +65,7 @@ function validSignal(id: unknown, optional = false): boolean {
   if (!id && optional) return true;
   const parts = signal(id);
   if (parts[0] === "name" && (parts.length === 5 || parts[2] === "transport")) parts.shift();
-  return short(parts[0]) && !!parts[0] && ((parts.length === 3 && parts[1] === "transport" && parts[2] === "play") ||
+  return short(parts[0]) && !!parts[0] && ((parts.length === 3 && parts[1] === "transport" && (parts[2] === "play" || parts[2] === "stopScene")) ||
     (parts.length === 4 && integer(parts[1], 0, 15) && ["cc", "note", "bend"].includes(String(parts[2])) && integer(parts[3], 0, 127)));
 }
 function validSetting(name: SettingName, value: unknown): boolean {
@@ -72,7 +79,7 @@ function validSetting(name: SettingName, value: unknown): boolean {
         short(b.inputId) && (b.inputName === undefined || short(b.inputName)) && integer(b.cc, -1, 127) &&
         (b.bendChannel === undefined || integer(b.bendChannel, 0, 15)));
     case "mixerTransportAliases":
-      return object(value) && Object.entries(value).every(([k, id]) => ["play", "record", "playAll", "stop"].includes(k) && validSignal(id, true));
+      return object(value) && Object.entries(value).every(([k, id]) => Object.hasOwn(TRANSPORT_NAMES, k) && validSignal(id, true));
     case "midiLayouts":
       return object(value) && typeof value.numeric === "boolean" && typeof value.tempered === "boolean";
     case "splitNote": return integer(value, 0, 127);
@@ -104,7 +111,7 @@ function normalized(raw: unknown): Settings {
     }
   }
   settings.mixerTransportAliases = { ...settings.mixerTransportAliases };
-  const buttons = { play: settings.generalPlayButton, record: settings.mixerRecordButton || settings.mixerLiveButton, playAll: settings.mixerPlayAllButton, stop: settings.mixerStopButton };
+  const buttons = transportBindings(settings);
   for (const name of Object.keys(buttons) as (keyof typeof buttons)[]) {
     const parts = signal(buttons[name]);
     const device = devices.get(String(parts[0]));
@@ -126,7 +133,7 @@ export function parseControlFile(text: string) {
 function labelSignal(id: string) {
   const parts = signal(id);
   if (parts[0] === "name" && (parts.length === 5 || parts[2] === "transport")) parts.shift();
-  if (parts[1] === "transport") return parts[0] + " · MIDI Start / Continue";
+  if (parts[1] === "transport") return parts[0] + (parts[2] === "stopScene" ? " · MIDI Stop" : " · MIDI Start / Continue");
   return parts[0] + " · " + (parts[2] === "bend" ? "Pitch Bend" : (parts[2] === "cc" ? "CC " : "Nota ") + parts[3]) + " · canal " + (Number(parts[1]) + 1);
 }
 const synth = ["NUBE", "VCO", "SUB", "CORTE", "Q", "PULSO", "DERIVA", "ECO", "ESPACIO"];
@@ -139,16 +146,17 @@ export function describeControls(s: Settings): Rows {
     rows[slot === "-1" ? "Máster" : "Síntesis histórica · " + synth[Number(slot)]] =
       (b.inputName || b.inputId) + " · " + (b.cc < 0 ? "Pitch Bend · canal " + (Number(b.bendChannel) + 1) : "CC " + b.cc);
   }
-  const buttons = [
-    ["Play general", s.generalPlayButton, s.mixerTransportAliases.play],
-    ["Grabar", s.mixerRecordButton || s.mixerLiveButton, s.mixerTransportAliases.record],
-    ["Reproducir todos los loops", s.mixerPlayAllButton, s.mixerTransportAliases.playAll],
-    ["Detener todos", s.mixerStopButton, s.mixerTransportAliases.stop],
-  ];
-  for (const [label, id, alias] of buttons) if (label && id) rows[label] = labelSignal(alias || id);
+  const buttons = transportBindings(s);
+  for (const action of Object.keys(buttons) as TransportAction[]) {
+    if (buttons[action]) rows[TRANSPORT_NAMES[action]] = labelSignal(s.mixerTransportAliases[action] || buttons[action]);
+  }
   rows["División del teclado MIDI"] = "Nota " + s.splitNote;
   rows["Distribución MIDI"] = [s.midiLayouts.tempered && "Temperada", s.midiLayouts.numeric && "Numérica"].filter(Boolean).join(" + ") || "Desactivada";
   return rows;
+}
+function transportBindings(s: Settings): Record<TransportAction, string> {
+  return { play:s.generalPlayButton, stopScene:s.generalStopButton, record:s.mixerRecordButton || s.mixerLiveButton,
+    playAll:s.mixerPlayAllButton, stop:s.mixerStopButton, clear:s.mixerClearButton };
 }
 export function changes(before: Rows, after: Rows): string[] {
   return [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(k => before[k] !== after[k])

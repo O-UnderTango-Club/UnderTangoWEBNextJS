@@ -22,4 +22,6 @@ El teclado, MIDI y el botón de sonido tocan el instrumento de la escena indicad
 
 **Stop general** tiene su propio botón MIDI junto al stop de la partitura. **Vaciar lupera** requiere dos pulsaciones del mismo botón dentro de tres segundos. Una pulsación muestra la confirmación. La segunda detiene el banco, cancela sus tomas en curso y libera S1 a S9, incluido el historial de deshacer de esas tomas. Verificá el stop y el vaciado con audio de prueba en un perfil descartable.
 
+**Pausa general** tiene su asignación MIDI junto a Pausar. Play general reanuda la partitura. Al aprender un control, la nueva función reemplaza la que tenía ese mismo dispositivo, canal y señal. Verificá el cambio en el Órganon y comprobá ambos destinos.
+
 El archivo se actualiza cuando cambian las asignaciones. Su historial conserva hasta 64 revisiones recientes por perfil. Los cambios de teclas incorporadas se registran al abrir la nueva versión de la partitura. Al modificar esos controles, actualizá la referencia en `control-map.ts` en el mismo cambio y verificá exportación, reapertura y recuperación.

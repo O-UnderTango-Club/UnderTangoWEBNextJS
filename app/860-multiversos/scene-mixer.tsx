@@ -7,6 +7,7 @@ import { BANK_ACTIONS, type BankAssignment as Assignment } from "./control-map";
 
 import { useTempo } from "./tempo";
 import { TransportMidiButton, type TransportMidi } from "./transport-midi";
+import { MIDI_REASSIGNMENT, reassignMidi, sameMidiSignal, type MidiReassignment } from "./midi-reassignment";
 import { LiveSetProjection } from "./live-set-projection";
 import { LAYERS, isLayer, countLayer, firstRepeat, type LayerPlan } from "./layer-take";
 import { SCENE_INSTRUMENT_NAMES } from "./scene-instrument";
@@ -25,12 +26,12 @@ type Recording = { kind:Mode; slot:number; batch:RecordingBatch; order:number };
 type Clip = { slot:number; stopped:boolean; once?:boolean; launchBeat?:number; layer?:number; mode:Mode; id: number; scene: string; buffer: AudioBuffer; recordedBpm:number; startBeat:number; muted: boolean; volume: number };
 type Voice = { bpm:number; gain: GainNode; source: AudioBufferSourceNode; dispose: () => void };
 
-export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,pauseScene,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
   voiceScene: VoiceScene | null; cue: {context: AudioContext; beginsAt: number} | null; seconds: number;
   roomAnalyser: {current:AnalyserNode|null};
   codaScene: number | null;
   liveSet: LiveSetScene | null; countingTake: {current:boolean}; routing:{current:PerformanceInput|null};
-  canPlayNote: boolean; transportMidi: TransportMidi; playGeneral: () => void; stopScene: () => void;
+  canPlayNote: boolean; transportMidi: TransportMidi; playGeneral: () => void; pauseScene: () => void; stopScene: () => void;
   connectMidi:(rescan?:boolean)=>Promise<void>;
   analyser?:{current:AnalyserNode|null}; monitor:AudioNode|null; startScene:()=>void; ready:boolean; scene?: string; input: GainNode | null; master: GainNode | null; paused: boolean;
 }) {
@@ -356,6 +357,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
         return;
       }
       if (action === "play") playGeneral();
+      else if (action === "pauseScene") pauseScene();
       else if (action === "stopScene" && !ready) stopScene();
       else if (action === "record") pressRecord();
       else if (action === "playAll") playAll();
@@ -486,6 +488,11 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
     setClips(all=>all.map(c=>c.id===id?{...c,stopped:true}:c));
   }
   useEffect(()=>{
+    function releaseBankSignal(event: Event) {
+      const signal=(event as CustomEvent<MidiReassignment>).detail;
+      if (signal.owner==="bank" || !Object.entries(bankMap).some(([key,item])=>sameMidiSignal(key,item.alias,signal))) return;
+      setBankMap(current=>Object.fromEntries(Object.entries(current).filter(([key,item])=>!sameMidiSignal(key,item.alias,signal))));
+    }
     function receive(event:Event){
       const e=event as CustomEvent<BankMessage>;
       const {id,alias,value,type,reserved,label}=e.detail;
@@ -494,30 +501,25 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
       const exact = bankMap[id];
       let assignment = exact && (!alias || !exact.alias || exact.alias === alias) ? exact : undefined;
       if (!assignment && alias) assignment = bankMap[alias] ?? Object.values(bankMap).find(item => item.alias === alias);
-      if(transportMidi.learning) {
-        if(type !== "bend" && (reserved || assignment)) {
-          e.preventDefault(); transportMidi.setConflict("Ese control ya tiene otra asignación MIDI.");
-        }
-        return;
-      }
+      if(transportMidi.learning) return;
       if(bankLearn){
         if(bankLearn==="volume"?type==="note":type==="bend" || value===0)return;
-        if(reserved || transportMidi.match(id,e.detail.alias)){
-          e.preventDefault();setMessage("Ese control ya maneja otro parámetro de 860. Elegí otro.");return;
-        }
         e.preventDefault();
+        const signal={id,alias,owner:"bank" as const};
+        reassignMidi(signal);
         assignment={slot:bankSlot,action:bankLearn,label,alias};
         const selected=assignment;
         setBankMap(current=>{
           const next={...current};
           for(const [key,item] of Object.entries(next)){
-            if((item.slot===selected.slot && item.action===selected.action) || (alias && (key===alias || item.alias===alias)))delete next[key];
+            if((item.slot===selected.slot && item.action===selected.action) || sameMidiSignal(key,item.alias,signal))delete next[key];
           }
           next[id]=selected;
           return next;
         });
         setBankLearn(null);setMessage("");
-        if(assignment.action!=="volume"){downControls.current.add(id);return;}
+        if(assignment.action!=="volume")downControls.current.add(id);
+        return;
       }
       if(!assignment || reserved || transportMidi.match(id,e.detail.alias))return;
       e.preventDefault();
@@ -539,7 +541,11 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
       else launch(clip.id,action==="toggle" ? "play" : action);
     }
     window.addEventListener("860-bank-midi",receive);
-    return ()=>window.removeEventListener("860-bank-midi",receive);
+    window.addEventListener(MIDI_REASSIGNMENT,releaseBankSignal);
+    return ()=>{
+      window.removeEventListener("860-bank-midi",receive);
+      window.removeEventListener(MIDI_REASSIGNMENT,releaseBankSignal);
+    };
   });
   useEffect(()=>{
     if(liveSet===88 || liveSet===89){cancel();stopBank();}
@@ -636,7 +642,7 @@ export function SceneMixer({canPlayNote,connectMidi,transportMidi,playGeneral,st
         onKeyDown={e=>{if(e.repeat && (e.key==="Enter" || e.key===" "))e.preventDefault();}}>Vaciar</button>
       <TransportMidiButton midi={transportMidi} action="clear" />
       {clearArmed && <small id="confirmar-vaciado-a9" role="status">Pulsá el mismo botón otra vez para vaciar S1 a S9.</small>}
-      {transportMidi.learning && transportMidi.learning !== "play" && transportMidi.learning !== "stopScene" && <small role="status">{transportMidi.hint}</small>}
+      {transportMidi.learning && !["play","pauseScene","stopScene"].includes(transportMidi.learning) && <small role="status">{transportMidi.hint}</small>}
       <button title="Volver a S1" aria-label="Destino automático" onClick={()=>selectSlot(null)}>{selected===null?"Auto":`Destino S${selected+1}`}</button>
       <label title="Grabar los compases configurados desde el próximo tiempo 1"><input type="checkbox" checked={matrix} disabled={state!=="idle"} onChange={e=>setMatrix(e.target.checked)}/> Matriz</label>
       <label title="Grabar desde que apretás hasta que soltás"><input type="checkbox" checked={live} disabled={state!=="idle"} onChange={e=>setLive(e.target.checked)}/> En vivo</label>

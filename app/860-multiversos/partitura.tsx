@@ -35,6 +35,7 @@ import { ProjectionSignalContext, useProjectionSignals, useSceneSignals } from "
 import { StimulusBar } from "./stimulus-bar";
 import { warmRecorder } from "./measure-recorder";
 import { TransportMidiButton, useTransportMidi } from "./transport-midi";
+import { MIDI_REASSIGNMENT, reassignMidi, type MidiReassignment } from "./midi-reassignment";
 import { EXTENDED_STYLE } from "./extended-style";
 
 import { monitorMidiInputs, type MidiInputLike, type MidiDevice } from "./midi-inputs";
@@ -2157,7 +2158,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      <SceneMixer canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} stopScene={reset} codaScene={coda} liveSet={liveSet}
+      <SceneMixer canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={reset} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
         countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused} />
       {sceneNumber !== null && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
@@ -2290,10 +2291,13 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
             </button>
             <TransportMidiButton action="play" midi={transportMidi} />
           </div>
-          <button type="button" aria-label="Pausar" title="Pausar"
-            disabled={ready || preparing || paused || transportBusy} onClick={() => void changePaused(true)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
-          </button>
+          <div className="zero-general-play">
+            <button type="button" aria-label="Pausar" title="Pausar"
+              disabled={ready || preparing || paused || transportBusy} onClick={() => void changePaused(true)}>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
+            </button>
+            <TransportMidiButton action="pauseScene" midi={transportMidi} />
+          </div>
           <div className="zero-general-play">
             <button type="button" aria-label="Detener" title="Stop general de escena" disabled={ready} onClick={reset}>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
@@ -2305,7 +2309,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
           </button>
         </div>
-        {(transportMidi.learning === "play" || transportMidi.learning === "stopScene") && <small role="status">{transportMidi.hint}</small>}
+        {transportMidi.learning && ["play","pauseScene","stopScene"].includes(transportMidi.learning) && <small role="status">{transportMidi.hint}</small>}
         <div className="zero-master">
           <button type="button" aria-label={soundAction} title={soundAction}
             onClick={() => setMasterVolume(muted ? audibleVolumeRef.current : 0)}>
@@ -2445,7 +2449,8 @@ export default function Multiversos860Page() {
           const id = JSON.stringify([input.id,channel,controlType,controlType==="bend"?0:first]);
           const masterFader = ccMapRef.current[MASTER_FADER];
           const reserved = !!masterFader && fromPort(masterFader) &&
-            (controlType==="bend" ? masterFader.bendChannel===channel : controlType==="cc" && masterFader.cc===first);
+            (controlType==="bend" ? masterFader.bendChannel===channel : controlType==="cc" && masterFader.cc===first &&
+              (masterFader.ccChannel===undefined || masterFader.ccChannel===channel));
           const value = controlType==="bend"?(first+128*second)/16383:kind===0x80?0:second/127;
           if(!window.dispatchEvent(new CustomEvent("860-bank-midi",{cancelable:true,
             detail:{id,alias,value,type:controlType,reserved,label:(input.name||"MIDI")+" · "+(controlType==="bend"?"Pitch Bend":(controlType==="cc"?"CC ":"Nota ")+first)+" · canal "+(channel+1)}})))return;
@@ -2472,6 +2477,7 @@ export default function Multiversos860Page() {
         const learning = midiLearnRef.current === MASTER_FADER;
         if (kind === 0xe0 && (learning || (fromPort(master) && master?.bendChannel === channel))) {
           if (learning) {
+            reassignMidi({id:JSON.stringify([input.id,channel,"bend",0]),alias,owner:"master"});
             setCcMap(current => ({ ...current, [MASTER_FADER]: {inputId: input.id, inputName: input.name, cc: -1, bendChannel: channel} }));
             midiLearnRef.current = null;
             setMidiLearnFor(null);
@@ -2485,18 +2491,20 @@ export default function Multiversos860Page() {
           if (first === 120 || first === 123) piano?.releaseMidi(input.id, channel);
           if (first >= 120) return;
           const waitingFor = midiLearnRef.current;
-          if (learning || (fromPort(master) && master?.cc === first)) {
+          const controlsMaster=fromPort(master) && master?.cc===first && (master.ccChannel===undefined || master.ccChannel===channel);
+          if (learning || controlsMaster) {
             setMasterVolume(Math.round(second * 100 / 127));
             setFaderSignal(input.name + " · CC " + first + " · " + second + "/127");
           }
           if (waitingFor !== null) {
+            reassignMidi({id:JSON.stringify([input.id,channel,"cc",first]),alias,owner:"master"});
             setCcMap((current) => {
               const next = { ...current };
               Object.keys(next).forEach((key) => {
                 const binding = next[Number(key)];
                 if (binding && fromPort(binding) && binding.cc === first) delete next[Number(key)];
               });
-              next[waitingFor] = { inputId: input.id, inputName: input.name, cc: first };
+              next[waitingFor] = { inputId: input.id, inputName: input.name, cc: first, ccChannel: channel };
               ccMapRef.current = next;
               return next;
             });
@@ -2504,7 +2512,7 @@ export default function Multiversos860Page() {
             setMidiLearnFor(null);
             return;
           }
-          if (first === 64 && !(fromPort(master) && master?.cc === first)) piano?.sustainMidi?.(input.id, channel, second >= 64);
+          if (first === 64 && !controlsMaster) piano?.sustainMidi?.(input.id, channel, second >= 64);
         }
       };
 
@@ -2530,9 +2538,31 @@ export default function Multiversos860Page() {
 
   useEffect(() => {
     const reset = (event: Event) => { if ((event as CustomEvent).detail !== "synth") { midiLearnRef.current = null; setMidiLearnFor(null); } };
+    const releaseMaster = (event: Event) => {
+      const {id,alias,owner}=(event as CustomEvent<MidiReassignment>).detail;
+      if (owner==="master") return;
+      const binding=ccMapRef.current[MASTER_FADER];
+      if (!binding) return;
+      const [inputId,channel,type,number]=JSON.parse(id);
+      const deviceName=alias ? JSON.parse(alias)[1] : undefined;
+      const samePort=binding.inputName && deviceName ? binding.inputName===deviceName : binding.inputId===inputId;
+      const sameControl=type==="cc" ? binding.cc===number && (binding.ccChannel===undefined || binding.ccChannel===channel)
+        : type==="bend" && binding.cc===-1 && binding.bendChannel===channel;
+      if (!samePort || !sameControl) return;
+      setCcMap(current=>{
+        const next={...current};
+        delete next[MASTER_FADER];
+        ccMapRef.current=next;
+        return next;
+      });
+    };
     window.addEventListener("860-midi-learn", reset);
-    return () => window.removeEventListener("860-midi-learn", reset);
-  }, []);
+    window.addEventListener(MIDI_REASSIGNMENT,releaseMaster);
+    return () => {
+      window.removeEventListener("860-midi-learn",reset);
+      window.removeEventListener(MIDI_REASSIGNMENT,releaseMaster);
+    };
+  }, [setCcMap]);
   const beginMidiLearn = (index: number) => {
     window.dispatchEvent(new CustomEvent("860-midi-learn",{detail:"synth"}));
     void connectMidi(true);

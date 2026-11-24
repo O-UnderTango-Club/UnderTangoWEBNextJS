@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#080c14"><title>Un Ø aparece · Primera voluntad</title>
+<style>
+:root{color-scheme:dark;--bg:#080c14;--ink:#f4f3ff;--mint:#b1f0d7;--muted:#c5c9dc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 95% 15%,#211843,transparent 63%),var(--bg);color:var(--ink);font:1rem/1.5 system-ui,sans-serif;min-height:100svh}main{width:min(100% - 2rem,56rem);margin:auto;padding:clamp(1rem,5vw,3.6rem) 0 2rem}h1,h2{font-family:Georgia,serif;line-height:1.05;margin:.25em 0}h1{font-size:clamp(2.5rem,8vw,5rem)}h2{font-size:clamp(1.9rem,6vw,3.6rem)}p{margin:.55em 0}a{color:var(--mint)}button{border:1px solid #76869a;color:var(--ink);background:#1b2032;min-height:46px;padding:.5rem 1rem;border-radius:.6rem;font:inherit;font-weight:650;cursor:pointer}button.primary{background:var(--mint);color:#0e2822;border-color:var(--mint)}button:disabled{opacity:.55;cursor:wait}a:focus-visible,button:focus-visible{outline:2px solid #ffdc85;outline-offset:4px}.eyebrow{letter-spacing:.15em;text-transform:uppercase;color:var(--mint);font-size:.75rem;font-weight:700}.muted{color:var(--muted);font-size:.88rem}.controls{display:flex;flex-wrap:wrap;gap:.55rem;margin:.8rem 0}.stage{position:relative;isolation:isolate;overflow:hidden;border:1px solid #536175;border-radius:1rem;aspect-ratio:16/9;background:#121829;margin-top:1.1rem;max-height:64svh}.stage video,.stage canvas,.finish,.tint{position:absolute;inset:0;width:100%;height:100%;display:block}.stage video{object-fit:cover}.stage canvas{touch-action:manipulation}.stage .tint{pointer-events:none;opacity:0;background:radial-gradient(ellipse at var(--x,50%) var(--y,57%),#99ffdf 3%,#675eff 31%,#d1398d00 76%);mix-blend-mode:screen;transition:opacity .75s ease}.stage.altered .tint{opacity:.6}.stage.altered video{filter:hue-rotate(73deg) saturate(1.8) contrast(1.12) brightness(.76)}.stage video{transition:filter .7s ease}.finish{display:grid;align-content:center;padding:clamp(1rem,6vw,4rem);background:#0a0f1bed;pointer-events:none}.finish[hidden],video[hidden]{display:none}.finish p{max-width:38ch}.controls [hidden]{display:none}footer{margin-top:1.2rem}.status{min-height:1.5em}.visibility-note{max-width:70ch}@media(max-width:35rem){.stage{aspect-ratio:4/5}.controls button{flex-grow:1}}@media(prefers-reduced-motion:reduce){.stage .tint,.stage video{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<a href="/847/primera-voluntad">← Volver a la ficha</a>
+<p class="eyebrow">Multiversos 2026 · Ø UnderTango Club</p>
+<h1>Un Ø aparece</h1>
+<p>Primero fue ruido. Después, algo quiso sonar.</p>
+<div class="controls">
+<button id="camera" class="primary" type="button">Usar la cámara</button>
+<button id="demo" type="button">Ver sin cámara</button>
+<button id="place" type="button" hidden>Colocar el Ø en el centro</button>
+<button id="stop" type="button" hidden>Cerrar cámara</button>
+</div>
+<p class="muted visibility-note">La cámara es opcional. La imagen se procesa en tu dispositivo: no se graba ni se sube. En este prototipo, el Ø queda en el punto de la imagen que elijas; no sigue la mesa cuando movés el teléfono.</p>
+<p id="status" role="status" class="status">Elegí cómo querés entrar.</p>
+<div id="stage" class="stage">
+<video id="feed" autoplay playsinline muted hidden></video>
+<div class="tint" aria-hidden="true"></div>
+<canvas id="surface" aria-label="Vista de la experiencia. Tocá donde quieras colocar el objeto."></canvas>
+<section id="finish" class="finish" hidden>
+<p class="eyebrow">Ø Primera voluntad</p><h2>El 2 de diciembre nos vemos en la Cabaña de los Muñecos</h2><p>Puerto Iguazú · Festival Multiversos</p>
+</section>
+</div>
+<footer class="muted">Miércoles 2 de diciembre de 2026 · La Cabaña de los Muñecos · Puerto Iguazú</footer>
+</main>
+<script>
+(() => {
+  'use strict';
+  const get = id => document.getElementById(id);
+  const stage=get('stage'), feed=get('feed'), canvas=get('surface'), finish=get('finish'), status=get('status');
+  const camera=get('camera'), demo=get('demo'), place=get('place'), stop=get('stop');
+  const ctx=canvas.getContext('2d');
+  if(!ctx){status.textContent='Este navegador no puede dibujar la experiencia.';camera.disabled=true;demo.disabled=true;return;}
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let token=0, stream=null, frame=0, mode='idle', anchor={x:.5,y:.57}, dims={w:1,h:1};
+  const samples=[];
+  for(let i=0;i<92;i++)for(let j=0;j<9;j++){
+    const a=i*Math.PI*2/92,b=j*Math.PI*2/9;
+    samples.push([(1+.18*Math.cos(b))*Math.cos(a),(1+.18*Math.cos(b))*Math.sin(a),.18*Math.sin(b),i,j]);
+  }
+  for(let i=0;i<85;i++)for(let j=0;j<3;j++)samples.push([-1.07+2.14*i/84,(-.04+.04*j),.055+.03*j,i,j+10]);
+  function syncSize(){
+    const r=stage.getBoundingClientRect(), dpr=Math.min(devicePixelRatio||1,2);
+    dims={w:r.width,h:r.height};canvas.width=Math.round(r.width*dpr);canvas.height=Math.round(r.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(mode==='idle'||mode==='waiting')paint(0,false);
+  }
+  if(typeof ResizeObserver==='function')new ResizeObserver(syncSize).observe(stage);else addEventListener('resize',syncSize);
+  function releaseCamera(){
+    if(stream){stream.getTracks().forEach(track=>track.stop());stream=null;}
+    feed.pause();feed.srcObject=null;feed.hidden=true;stop.hidden=true;
+  }
+  function reset(){
+    token++;cancelAnimationFrame(frame);releaseCamera();camera.disabled=false;place.hidden=true;
+    finish.hidden=true;stage.classList.remove('altered');mode='idle';paint(0,false);
+  }
+  function paint(ms,active){
+    const {w,h}=dims;ctx.clearRect(0,0,w,h);
+    const ox=w*anchor.x,oy=h*anchor.y,s=Math.min(w,h)*.175;
+    if(!active){
+      ctx.fillStyle='#c5c9dc'; ctx.globalAlpha=.48;
+      for(let i=0;i<47;i++){const x=(i*79.13)%w,y=(i*29.79)%h;ctx.fillRect(x,y,i%9===0?2:1,1);}
+      ctx.globalAlpha=1; return;
+    }
+    const t=reduced?0:ms/1000, yAngle=.27+.42*Math.sin(t*1.35), xAngle=-.16+.2*Math.cos(t*1.13);
+    const cy=Math.cos(yAngle),sy=Math.sin(yAngle),cx=Math.cos(xAngle),sx=Math.sin(xAngle),a=.75;
+    const xy=samples.map(([x,y,z,i,j])=>{
+      if(j>=10){
+        const r=x; x=r*Math.cos(a)-y*Math.sin(a); y=r*Math.sin(a)+y*Math.cos(a);
+      }
+      const x1=x*cy+z*sy,z1=-x*sy+z*cy,y1=y*cx-z1*sx,z2=y*sx+z1*cx;
+      const p=4/(4-z2);
+      const fade=reduced?1:Math.min(1,.64+t*1.1), wiggle=(1-fade)*s*.55;
+      return [ox+x1*s*p+Math.sin(i*3.2+j)*wiggle,oy-y1*s*p+Math.cos(i*5+j)*wiggle,z2,i,j];
+    }).sort((a,b)=>a[2]-b[2]);
+    const altered=ms>=1000;
+    for(const [x,y,z,i,j] of xy){
+      ctx.globalAlpha=Math.min(.95,.51+z*.4);
+      ctx.fillStyle=altered?(i%9<3?'#f5adff':i%9<6?'#80ffd7':'#8aa7ff'):(j%3===0?'#b1edff':'#b5a9ff');
+      ctx.beginPath();ctx.arc(x,y,Math.max(.75,s*.018*(1+z*.45)),0,2*Math.PI);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  function play(x=.5,y=.57){
+    if(mode==='playing')return;
+    anchor={x:Math.max(.1,Math.min(.9,x)),y:Math.max(.14,Math.min(.86,y))};
+    stage.style.setProperty('--x',anchor.x*100+'%');stage.style.setProperty('--y',anchor.y*100+'%');
+    finish.hidden=true;place.hidden=true;mode='playing';status.textContent='El Ø apareció.';
+    const start=performance.now();let transformed=false;
+    function tick(now){
+      if(mode!=='playing')return;
+      const elapsed=now-start;
+      if(elapsed>=1000&&!transformed){transformed=true;stage.classList.add('altered');status.textContent='La imagen cambia de color.';}
+      paint(elapsed,true);
+      if(elapsed>=4300){
+        mode='done';releaseCamera();finish.hidden=false;
+        status.textContent='El 2 de diciembre nos vemos en la Cabaña de los Muñecos';
+      }else frame=requestAnimationFrame(tick);
+    }
+    frame=requestAnimationFrame(tick);
+  }
+  camera.addEventListener('click',async()=>{
+    reset();const request=token;camera.disabled=true;
+    status.textContent='Esperando permiso para usar la cámara…';
+    try{
+      if(!isSecureContext||!navigator.mediaDevices?.getUserMedia)throw Error('Cámara no disponible');
+      const next=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:960},height:{ideal:720}},audio:false});
+      if(request!==token){next.getTracks().forEach(track=>track.stop());return;}
+      stream=next;feed.srcObject=stream;feed.hidden=false;await feed.play();
+      if(request!==token)return;
+      mode='waiting';place.hidden=false;stop.hidden=false;camera.disabled=false;
+      status.textContent='Apuntá a la mesa y tocá la imagen donde quieras colocar el Ø.';
+    }catch{
+      if(request!==token)return;
+      reset();status.textContent='No se pudo abrir la cámara. Podés ver la experiencia sin cámara.';
+    }
+  });
+  demo.addEventListener('click',()=>{reset();play();});
+  stop.addEventListener('click',()=>{reset();status.textContent='Cámara cerrada. Podés volver a empezar.';});
+  place.addEventListener('click',()=>{if(mode==='waiting')play();});
+  canvas.addEventListener('pointerup',e=>{
+    if(mode!=='waiting')return;
+    const r=canvas.getBoundingClientRect();play((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height);
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&(stream||camera.disabled)){reset();status.textContent='Cámara cerrada al cambiar de pestaña.';}});
+  addEventListener('pagehide',reset);syncSize();
+})();
+</script>
+</body>
+</html>

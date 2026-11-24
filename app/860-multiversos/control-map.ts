@@ -172,7 +172,8 @@ function sharedFaders(settings: Settings): string[] {
     if (key[2] !== "cc" && key[2] !== "bend") continue;
     for (const [slot, b] of Object.entries(settings.ccMap)) {
       if (slot !== "-1") continue;
-      const sameDevice = key[0] === b.inputId || (b.inputName && a.label.startsWith(b.inputName + " · "));
+      const device = a.alias ? signal(a.alias)[1] : undefined;
+      const sameDevice = device && b.inputName ? device===b.inputName : key[0]===b.inputId;
       const sameSignal = key[2] === "cc" ? b.cc === key[3] && (b.ccChannel===undefined || b.ccChannel===key[1]) : b.cc < 0 && b.bendChannel === key[1];
       if (sameDevice && sameSignal) found.push("S" + (a.slot + 1) + " · " + BANK_ACTIONS[a.action] + " comparte " + a.label +
         " con el máster. El banco cede ese control.");

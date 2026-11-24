@@ -1,6 +1,7 @@
 "use client";
 
 import { useSavedSetting } from "./saved-setting";
+import { PIANO_KEYS as computerPianoKeys, type CcBinding } from "./control-map";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
@@ -45,7 +46,6 @@ import { monitorMidiInputs, type MidiInputLike, type MidiDevice } from "./midi-i
 
 const MASTER_FADER = -1;
 
-type CcBinding = { inputId: string; inputName?: string; cc: number; bendChannel?: number };
 type RecordedPattern = Array<number | null>;
 type SceneSnapshot = {
   values?: number[];
@@ -2631,6 +2631,7 @@ function ModuleZero({ synthStream, enterSolo, deckAudio, masterVolume, setMaster
             onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
         </label>
         <DjConsole output={deckAudio} inputs={midiInputs}/>
+        <a className={styles.organonLink} href="/860-multiversos/organon" target="_blank" rel="noopener">Órganon · Mapa de controles ↗</a>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
     </aside>
@@ -3171,10 +3172,7 @@ export default function Multiversos860Page() {
 
 
   useEffect(() => {
-    const keyMap: Record<string, number> = {
-      a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66,
-      g: 67, y: 68, h: 69, u: 70, j: 71, k: 72,
-    };
+    const keyMap = computerPianoKeys;
     const held = new Set<string>();
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { protectPeaks, RECORDING_CEILING } from "./peak-protection";
 import { captureFactory } from "./measure-recorder";
 import { useSavedSetting } from "./saved-setting";
+import { BANK_ACTIONS, type BankAssignment as Assignment } from "./control-map";
 
 import { useTempo } from "./tempo";
 import { TransportMidiButton, type TransportMidi } from "./transport-midi";
@@ -14,9 +15,7 @@ import type { PerformanceInput } from "./performance-notes";
 import { useRoomInstrument } from "./room-instrument";
 import { getVoiceMicrophone, useVoiceLoop, VOICE_CUES, type VoiceScene } from "./voice-loop";
 
-const BANK_ACTIONS = {volume:"Volumen",stop:"Stop",play:"Play inmediato",once:"Una vuelta",next:"Play en el 1",toggle:"Play / stop"} as const;
 type BankAction = keyof typeof BANK_ACTIONS;
-type Assignment = {slot:number;action:BankAction;label:string;alias?:string};
 type BankMessage = {id:string;alias?:string;value:number;type:"cc"|"note"|"bend";reserved:boolean;label:string};
 
 type Mode = "matrix" | "live";

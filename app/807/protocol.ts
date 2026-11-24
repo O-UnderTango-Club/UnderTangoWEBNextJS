@@ -1,6 +1,6 @@
 export const protocolTitle = "807 · Protocolo maestro";
 export const protocolUrl = "https://www.undertangoclub.com/807";
-export const reviewedAt = "28 de septiembre de 2026";
+export const reviewedAt = "24 de noviembre de 2026";
 export const introduction = "El punto de entrada al trabajo de UnderTango. Fuentes oficiales, protocolos y contexto mínimo para que una persona o una IA pueda continuar una tarea.";
 export const accessNote = "Este directorio es público. Los documentos, repositorios privados y datos operativos conservan sus permisos. Tener un enlace no concede acceso: cada asistente necesita su conexión autorizada. Si una fuente no abre, indicar cuál falta y continuar sólo con lo que se pueda comprobar. Nunca compartir contraseñas, claves ni sesiones en un chat o documento.";
 
@@ -25,6 +25,7 @@ export const resources: Resource[] = [
 
 const repository = "https://github.com/O-UnderTango-Club/undertango-operating-system/blob/main/";
 export const protocols: Resource[] = [
+  { name: "860 Multiversos · Órganon de controles", href: "https://www.undertangoclub.com/860-multiversos/organon", purpose: "Al trabajar con 860, cotejar las teclas, faders y transportes con Controles-860.json. El proyecto Multiversos enlaza la copia de Drive para el ensayo y la recuperación.", access: "Mapa privado de cada navegador · protocolo público" },
   { name: "Documentos Notion → web", href: `${repository}PROTOCOLO_DOCUMENTOS_NOTION_WEB.md`, purpose: "Fuente editable única, publicación, permisos y verificación de la actualización automática.", access: "GitHub privado" },
   { name: "Operar en Supabase", href: `${repository}PROTOCOLO_SUPABASE.md`, purpose: "Antes de crear o modificar registros: fuentes, validaciones, auditoría y estados.", access: "GitHub privado" },
   { name: "Sistema nervioso operativo", href: `${repository}PROTOCOLO_SISTEMA_NERVIOSO.md`, purpose: "Distribución del trabajo y la información entre las herramientas.", access: "GitHub privado" },

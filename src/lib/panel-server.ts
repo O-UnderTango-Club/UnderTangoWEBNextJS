@@ -1,3 +1,5 @@
+import { readDeadlines } from "./panel-deadlines-server";
+import { agendaStatuses } from "./panel-deadlines";
 import { planGroup, isMember, isGroup } from "./action-groups";
 import { createHash } from "node:crypto";
 import { deviceActor } from "./panel-access";
@@ -116,7 +118,7 @@ export function mutate(input: any, actor: string) {
   const result=writeQueue.then(work,work); writeQueue=result.catch(()=>{}); return result;
 }
 async function performMutation(input: any, actor: string) {
-  if(!input||!["task","project","event","group"].includes(input.kind)) throw new PanelError("Operación desconocida.");
+  if(!input||!["task","project","event","group","deadline"].includes(input.kind)) throw new PanelError("Operación desconocida.");
   const operational=usesOperations();
   if(operational){
     if(typeof input.requestId!=="string"||! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId)
@@ -128,6 +130,20 @@ async function performMutation(input: any, actor: string) {
   }
   const data=await snapshot(true), kind=input.kind as "task"|"project"|"event"|"group";
   if(operational&&(!("globalRevision" in data)||input.snapshotRevision!==data.globalRevision)) throw new PanelError("El panel cambió desde que abriste el editor. Actualizá y revisá antes de guardar.",409);
+  if(input.kind==="deadline"){
+    if(!operational||!("globalRevision" in data))throw new PanelError("La agenda requiere Supabase.");
+    const agenda=await readDeadlines();
+    const item=agenda.items.find(row=>row.id===input.id);
+    const status=input.changes?.status;
+    if(!item||item.taskId||!["agenda","operation","case"].includes(item.source)||!agendaStatuses.includes(status))
+      throw new PanelError("Revisá la fecha y el estado de agenda.");
+    const existing=item.source==="agenda";
+    const fields=existing?{status}:{status,title:item.title,kind:item.kind,source_key:item.id,
+      [item.source==="operation"?"operation_id":"case_id"]:item.sourceId};
+    return operationsCall(()=>commitOperations(input.requestId,actor,input,input.snapshotRevision,[
+      {table:"agenda_items",id:existing?item.id:null,create:!existing,fields}
+    ]));
+  }
   const rows=(kind==="task"||kind==="group")?data.tasks:kind==="project"?data.projects:data.events;
   const table=kind==="task"?TABLES.tasks:kind==="project"?TABLES.projects:TABLES.events;
   const current=input.id?rows.find(r=>r.id===input.id):undefined;

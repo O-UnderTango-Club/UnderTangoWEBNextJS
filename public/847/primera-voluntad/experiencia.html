@@ -1,58 +1,286 @@
 <!doctype html>
 <html lang="es-AR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="robots" content="noindex,nofollow">
-  <meta name="theme-color" content="#090b10">
-  <title>Un Ø aparece · Primera voluntad</title>
-  <style>
-    :root { color-scheme: dark; font: 100%/1.5 system-ui, sans-serif; color: #f2f1e9; background: #090b10; }
-    * { box-sizing: border-box; }
-    body { margin: 0; }
-    [hidden] { display: none !important; }
-    .stage { position: relative; width: 100%; height: 100vh; height: 100dvh; overflow: hidden; background: #090b10; }
-    .stage[data-phase="idle"], .stage[data-phase="done"] { display: none; }
-    .stage > * { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
-    video { object-fit: cover; }
-    .details { max-width: 44rem; margin: auto; padding: clamp(1.5rem, 6vw, 4rem) max(1.25rem, env(safe-area-inset-right)) max(3rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left)); }
-    h1, h2 { margin: 0 0 .6em; font: 500 clamp(2.2rem, 6vw, 3.8rem)/1.08 Georgia, serif; text-wrap: balance; }
-    #finish { margin-bottom: 2rem; }
-    #finish h2 { color: #bbf4dc; }
-    p { margin: .65rem 0; }
-    .status { color: #bbf4dc; }
-    .controls { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1.1rem 0; }
-    button { min-height: 46px; padding: .55rem .95rem; background: #152122; border: 1px solid #728781; border-radius: .5rem; color: inherit; font: inherit; cursor: pointer; }
-    a { display: inline-block; margin-top: 1.1rem; color: #b3e8d2; }
-    :focus-visible { outline: 2px solid #f6ce81; outline-offset: 4px; }
-    @media (max-width: 30rem) { .controls button { flex: 1 1 8rem; } }
-  </style>
-</head>
-<body>
-  <main>
-    <section id="stage" class="stage" data-phase="permission" aria-label="Escena de Un Ø aparece">
-      <video id="feed" autoplay muted playsinline hidden></video>
-      <canvas id="scene" aria-hidden="true" hidden></canvas>
-      <canvas id="surface" aria-hidden="true"></canvas>
-    </section>
-    <section class="details" aria-label="Sobre la experiencia">
-      <div id="finish" hidden>
-        <h2>El 2 de diciembre nos vemos en la Cabaña de los Muñecos</h2>
-        <p>Puerto Iguazú · Festival Multiversos</p>
-      </div>
-      <h1>Un Ø aparece</h1>
-      <p id="status" class="status" role="status">Esperando permiso para usar la cámara…</p>
-      <div class="controls">
-        <button type="button" id="camera">Usar la cámara</button>
-        <button type="button" id="demo">Ver sin cámara</button>
-        <button type="button" id="sound">Activar sonido</button>
-        <button type="button" id="stop">Cerrar experiencia</button>
-      </div>
-      <p>El código encuentra un borde en tu encuadre. Incliná el teléfono y el recorrido del Ø cambia con él.</p>
-      <p>Si querés oír los pasos, podés tocar la imagen. El sonido se genera en el teléfono. La cámara se procesa en tu dispositivo, sin micrófono, grabación ni envío.</p>
-      <a href="/847/primera-voluntad">← Volver a la ficha</a>
-    </section>
-  </main>
-  <script type="module" src="./experience.mjs"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#090b10" />
+    <title>Un Ø aparece · Primera voluntad</title>
+    <style>
+      @font-face {
+        font-family: Uberlin;
+        src: url('/assets/fonts/Uberlin%20X-Bold.ttf') format('truetype');
+        font-weight: 800;
+        font-display: swap;
+      }
+      :root {
+        color-scheme: dark;
+        font:
+          100%/1.5 system-ui,
+          sans-serif;
+        color: #f3f3f5;
+        background: #090b10;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .stage {
+        position: relative;
+        isolation: isolate;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+        background: #090b10;
+      }
+      .stage[data-phase='idle'] {
+        display: none;
+      }
+      .visual {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        pointer-events: none;
+      }
+      video {
+        object-fit: cover;
+      }
+      .cue {
+        position: absolute;
+        top: max(1.15rem, env(safe-area-inset-top));
+        left: max(1.2rem, env(safe-area-inset-left));
+        right: max(1.2rem, env(safe-area-inset-right));
+        width: max-content;
+        max-width: calc(
+          100% - max(1.2rem, env(safe-area-inset-left)) - max(1.2rem, env(safe-area-inset-right)) -
+            0.5rem
+        );
+        transform: translate(var(--dx, 0px), var(--dy, 0px));
+        pointer-events: none;
+      }
+      .plate {
+        position: relative;
+        isolation: isolate;
+        padding: 0.72rem 0.9rem 0.86rem;
+        display: grid;
+        align-items: center;
+        grid-template-columns: minmax(0, 1fr);
+        max-width: 37rem;
+        border-left: 2px solid #b8f6eb;
+      }
+      .plate::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: linear-gradient(
+          112deg,
+          rgba(11, 12, 28, 0.94),
+          rgba(21, 18, 46, 0.83) 78%,
+          rgba(21, 18, 46, 0.72)
+        );
+      }
+      .meta {
+        margin: 0 0 0.38rem;
+        color: #cbf9f0;
+        font:
+          650 clamp(0.68rem, 1.8vmin, 0.84rem) / 1.35 system-ui,
+          sans-serif;
+        letter-spacing: 0.055em;
+      }
+      .title {
+        margin: 0;
+        max-width: 17ch;
+        text-wrap: balance;
+        overflow-wrap: break-word;
+        font:
+          800 clamp(1.75rem, 6.4vmin, 3.6rem) / 0.99 Uberlin,
+          system-ui,
+          sans-serif;
+        letter-spacing: -0.025em;
+        color: #fff;
+      }
+      .cue[data-cue='3'] .title {
+        font-size: clamp(1.36rem, 4.7vmin, 2.75rem);
+        max-width: 24ch;
+        line-height: 1.04;
+      }
+      .art {
+        display: none;
+        position: relative;
+        overflow: hidden;
+        width: clamp(3.2rem, 12vmin, 6.5rem);
+        aspect-ratio: 0.82;
+        background: #11101b;
+      }
+      .art img {
+        position: absolute;
+        width: 180%;
+        max-width: none;
+        height: auto;
+        left: -40%;
+        top: -50%;
+      }
+      .cue[data-cue='1'] .plate,
+      .cue[data-cue='3'] .plate {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 0.8rem;
+      }
+      .cue[data-cue='1'] .art,
+      .cue[data-cue='3'] .art {
+        display: block;
+      }
+      .stage-tools {
+        position: absolute;
+        right: max(1rem, env(safe-area-inset-right));
+        bottom: max(1rem, env(safe-area-inset-bottom));
+        display: flex;
+        gap: 0.48rem;
+      }
+      button {
+        min-height: 46px;
+        padding: 0.55rem 0.95rem;
+        background: #152122;
+        border: 1px solid #728781;
+        border-radius: 0.5rem;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      .stage-tools button {
+        position: relative;
+        width: 46px;
+        padding: 0;
+        border-radius: 50%;
+        background: #0e1321e8;
+        border: 1px solid #c5d6df96;
+        font:
+          1.5rem/1 system-ui,
+          sans-serif;
+      }
+      #speaker[aria-pressed='false']::after {
+        content: '';
+        position: absolute;
+        width: 1.26rem;
+        height: 2px;
+        background: #fff;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(-52deg);
+      }
+      .details {
+        max-width: 44rem;
+        margin: auto;
+        padding: clamp(1.5rem, 6vw, 4rem) max(1.25rem, env(safe-area-inset-right))
+          max(3rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+      }
+      .details h1,
+      .details h2 {
+        margin: 0 0 0.6em;
+        font:
+          800 clamp(2.2rem, 6vw, 3.8rem) / 1.02 Uberlin,
+          system-ui,
+          sans-serif;
+        text-wrap: balance;
+      }
+      #finish {
+        margin-bottom: 2rem;
+        color: #bbf4dc;
+      }
+      p {
+        margin: 0.65rem 0;
+      }
+      .status {
+        color: #bbf4dc;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin: 1.1rem 0;
+      }
+      a {
+        display: inline-block;
+        margin-top: 1.1rem;
+        color: #b3e8d2;
+      }
+      :focus-visible {
+        outline: 2px solid #f6ce81;
+        outline-offset: 4px;
+      }
+      @media (orientation: landscape) and (max-height: 32rem) {
+        .cue {
+          top: max(0.55rem, env(safe-area-inset-top));
+        }
+        .plate {
+          max-width: 63vw;
+          padding: 0.5rem 0.75rem;
+        }
+        .art {
+          width: 3.2rem;
+        }
+      }
+      @media (max-width: 30rem) {
+        .controls button {
+          flex: 1 1 8rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section id="stage" class="stage" data-phase="permission" aria-label="Escena de Un Ø aparece">
+        <video id="feed" class="visual" autoplay muted playsinline hidden></video>
+        <canvas id="scene" class="visual" aria-hidden="true" hidden></canvas>
+        <canvas id="surface" class="visual" aria-hidden="true"></canvas>
+        <div id="cue" class="cue" hidden aria-live="polite" aria-atomic="true">
+          <div class="plate">
+            <div class="art"><img src="/847/primera-voluntad.svg" alt="" /></div>
+            <div>
+              <p id="cue-meta" class="meta"></p>
+              <h2 id="cue-title" class="title"></h2>
+            </div>
+          </div>
+        </div>
+        <div id="stage-tools" class="stage-tools" hidden>
+          <button id="speaker" type="button" aria-label="Activar música y pasos" aria-pressed="false">
+            ♪
+          </button>
+          <button id="dismiss" type="button" aria-label="Cerrar la experiencia">×</button>
+        </div>
+      </section>
+      <section class="details" aria-label="Sobre la experiencia">
+        <div id="finish" hidden>
+          <h2>El 2 de diciembre nos vemos en la Cabaña de los Muñecos</h2>
+          <p>Puerto Iguazú · Festival Multiversos</p>
+        </div>
+        <h1>Un Ø aparece</h1>
+        <p id="status" class="status" role="status">Esperando permiso para usar la cámara…</p>
+        <div class="controls">
+          <button type="button" id="camera">Usar la cámara</button
+          ><button type="button" id="demo">Ver sin cámara</button>
+          <button type="button" id="sound">Activar música y pasos</button
+          ><button type="button" id="stop">Cerrar experiencia</button>
+        </div>
+        <p>
+          Apuntá a las juntas del piso o a los lados de un pasillo. El Ø viaja siguiendo su perspectiva.
+          Mové, girá o acercá el teléfono para cambiar el recorrido.
+        </p>
+        <p>
+          La música de fondo es «trance psicomusical», de Ø UnderTango Club. Tocá la imagen para activar
+          el sonido. El video se procesa en tu dispositivo, sin micrófono, grabación ni envío.
+        </p>
+        <a href="/847/primera-voluntad">← Volver a la ficha</a>
+      </section>
+    </main>
+    <script type="module" src="./experience.mjs"></script>
+  </body>
 </html>

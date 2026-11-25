@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { longestLine, sameLine } from '../public/847/primera-voluntad/line-detector.mjs';
+import { longestLine, sameLine, visibleLines } from '../public/847/primera-voluntad/line-detector.mjs';
 
-import { SignMotion } from '../public/847/primera-voluntad/motion.mjs';
+import { readFloor, SignMotion } from '../public/847/primera-voluntad/motion.mjs';
 import { visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
 
-const width = 192, height = 138;
+import { cameraMotion, carryPoint } from '../public/847/primera-voluntad/camera-motion.mjs';
+
+const width = 192,
+  height = 138;
 
 function frame(segments = [], noise = 0) {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -14,7 +17,8 @@ function frame(segments = [], noise = 0) {
     for (let x = 0; x < width; x++) {
       let light = 40;
       for (const [ax, ay, bx, by, intensity = 195] of segments) {
-        const dx = bx - ax, dy = by - ay;
+        const dx = bx - ax,
+          dy = by - ay;
         const t = Math.min(1, Math.max(0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
         const distance = Math.hypot(x - ax - t * dx, y - ay - t * dy);
         const coverage = Math.max(0, Math.min(1, 2.1 - distance));
@@ -22,7 +26,7 @@ function frame(segments = [], noise = 0) {
       }
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
       const i = (y * width + x) * 4;
-      const value = light + noise * (seed / 2**32 - .5);
+      const value = light + noise * (seed / 2 ** 32 - 0.5);
       data[i] = data[i + 1] = data[i + 2] = value;
       data[i + 3] = 255;
     }
@@ -41,7 +45,15 @@ function expectSegment(line, [ax, ay, bx, by]) {
 test('a blank image, noise and isolated short edges do not start a route', () => {
   assert.equal(longestLine(frame()), null);
   assert.equal(longestLine(frame([], 80)), null);
-  assert.equal(longestLine(frame([[12, 20, 30, 20], [80, 38, 96, 46]])), null);
+  assert.equal(
+    longestLine(
+      frame([
+        [12, 20, 30, 20],
+        [80, 38, 96, 46],
+      ])
+    ),
+    null
+  );
 });
 
 test('the longest visible segment wins over a brighter, shorter edge', () => {
@@ -58,8 +70,9 @@ test('a diagonal retains its finite endpoints', () => {
 
 test('slopes between voting angles retain the length of the real edge', () => {
   for (const degrees of [8.3, 18.8, 31.1, 55.7, 79.3, 93.9, 137.6]) {
-    const a = degrees * Math.PI / 180;
-    const dx = 60 * Math.cos(a), dy = 60 * Math.sin(a);
+    const a = (degrees * Math.PI) / 180;
+    const dx = 60 * Math.cos(a),
+      dy = 60 * Math.sin(a);
     const segment = [96 - dx, 69 - dy, 96 + dx, 69 + dy];
     expectSegment(longestLine(frame([segment], 5)), segment);
   }
@@ -71,60 +84,147 @@ test('separated collinear fragments do not outvote a continuous vertical edge', 
 });
 
 test('tracking accepts a tilted edge and swapped endpoints, and rejects unrelated edges', () => {
-  const first = { a: {x:.1, y:.5}, b: {x:.9, y:.5} };
-  assert.ok(sameLine(first, {a:{x:.89,y:.51}, b:{x:.11,y:.49}}, width, height));
-  assert.ok(sameLine(first, {a:{x:.1,y:.18}, b:{x:.9,y:.82}}, width, height));
+  const first = { a: { x: 0.1, y: 0.5 }, b: { x: 0.9, y: 0.5 } };
+  assert.ok(sameLine(first, { a: { x: 0.89, y: 0.51 }, b: { x: 0.11, y: 0.49 } }, width, height));
+  assert.ok(sameLine(first, { a: { x: 0.1, y: 0.18 }, b: { x: 0.9, y: 0.82 } }, width, height));
   for (const next of [
-    {a:{x:.1,y:.73}, b:{x:.9,y:.73}},
-    {a:{x:.48,y:.1}, b:{x:.52,y:.9}},
-    {a:{x:.2,y:.5}, b:{x:.4,y:.5}},
-  ]) assert.equal(sameLine(first, next, width, height), false);
+    { a: { x: 0.1, y: 0.73 }, b: { x: 0.9, y: 0.73 } },
+    { a: { x: 0.48, y: 0.1 }, b: { x: 0.52, y: 0.9 } },
+    { a: { x: 0.2, y: 0.5 }, b: { x: 0.4, y: 0.5 } },
+  ])
+    assert.equal(sameLine(first, next, width, height), false);
 });
 
-test('the first accepted frame places the sign and reversed camera tilt reverses its roll', () => {
-  const downRight = { a: {x:.09,y:.45}, b: {x:.91,y:.54} };
-  const downLeft = { a: {x:.91,y:.42}, b: {x:.09,y:.57} };
-  const sign = new SignMotion(downRight, 390, 844);
-  assert.equal(sign.phase, 'roll');
-  assert.equal(sign.fraction, .5);
-  for (let i = 0; i < 12; i++) sign.advance(1/60);
-  assert.ok(sign.fraction > .5);
-  sign.observe(downLeft);
-  for (let i = 0; i < 20; i++) sign.advance(1/60);
-  const x = sign.x;
-  for (let i = 0; i < 9; i++) sign.advance(1/60);
-  assert.ok(sign.x < x - 8);
-  assert.ok(sign.guide.ty < 0);
-  assert.equal(sign.phase, 'roll');
+test('separate floor seams locate a vanishing point in the visible frame', () => {
+  const image = frame([
+    [76, 42, 13, 131],
+    [107, 45, 181, 131],
+    [90, 54, 84, 129],
+    [10, 104, 183, 104],
+  ]);
+  const lines = visibleLines(image);
+  assert.ok(lines.length >= 3);
+  const floor = readFloor(lines, width, height);
+  assert.equal(floor.kind, 'convergence');
+  assert.ok(Math.hypot(floor.vanish.x - 90, floor.vanish.y - 22) < 13, JSON.stringify(floor));
+  assert.equal(readFloor([], width, height), null);
+  assert.equal(readFloor(visibleLines(frame([[15, 74, 178, 74]])), width, height).kind, 'edge');
 });
 
-test('the endpoint launches a tumbling sign, with bounded rebounds on both axes', () => {
-  const sign = new SignMotion({a:{x:.04,y:.45}, b:{x:.96,y:.63}}, 390, 844);
-  let hits = 0, launch = null, wallX = false, wallY = false;
-  for (let frame = 0; frame < 340; frame++) {
-    const phase = sign.phase, vx = sign.vx, vy = sign.vy;
-    const hit = sign.advance(1/60);
-    if (phase === 'roll' && sign.phase === 'flight') {
-      assert.ok(hit);
-      assert.equal(sign.fraction, 1);
-      assert.ok(sign.vx < 0 && sign.vy < 0);
-      launch = frame;
-    } else if (sign.phase === 'flight') {
-      assert.ok(sign.x >= sign.radius && sign.x <= 390 - sign.radius);
-      assert.ok(sign.y >= sign.radius && sign.y <= 844 - sign.radius);
-      if (hit) {
-        hits++;
-        wallX ||= vx * sign.vx < 0;
-        wallY ||= vy * sign.vy < 0;
-      }
-    }
+function texturedImage() {
+  const w = 128,
+    h = 96,
+    gray = new Uint8Array(w * h);
+  let seed = 42;
+  gray.fill(44);
+  for (let n = 0; n < 200; n++) {
+    const next = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 2 ** 32;
+    };
+    const x = Math.floor(next() * (w - 8)),
+      y = Math.floor(next() * (h - 7)),
+      shade = Math.round(55 + 190 * next());
+    for (let j = 0; j < 5; j++) for (let i = 0; i < 7; i++) gray[(y + j) * w + x + i] = shade;
   }
-  assert.ok(launch > 0 && launch < 90);
-  assert.ok(hits >= 3 && wallX && wallY);
-  assert.ok(sign.tumble > 6);
+  return { width: w, height: h, gray };
+}
+function resample(frame, angle, scale, dx, dy) {
+  const { width: w, height: h, gray } = frame,
+    result = new Uint8Array(w * h).fill(44);
+  const a = Math.cos(angle) / scale,
+    b = Math.sin(angle) / scale;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const u = x - w / 2 - dx,
+        v = y - h / 2 - dy,
+        px = a * u + b * v + w / 2,
+        py = -b * u + a * v + h / 2;
+      const i = Math.floor(px),
+        j = Math.floor(py);
+      if (i < 0 || j < 0 || i + 1 >= w || j + 1 >= h) continue;
+      const fx = px - i,
+        fy = py - j;
+      result[y * w + x] =
+        (1 - fy) * ((1 - fx) * gray[j * w + i] + fx * gray[j * w + i + 1]) +
+        fy * ((1 - fx) * gray[(j + 1) * w + i] + fx * gray[(j + 1) * w + i + 1]);
+    }
+  return { width: w, height: h, gray: result };
+}
+const floorFixture = () => ({
+  kind: 'convergence',
+  near: { x: 240, y: 700 },
+  vanish: { x: 150, y: 220 },
+  spread: 240,
+  angle: 0,
+});
+test('panning either way, rolling and zooming the same floor move the sign before its own next step', () => {
+  const frame = texturedImage();
+  for (const [dx, dy, angle, scale] of [
+    [5, -3, 0, 1],
+    [17, -12, 0, 1],
+    [-6, 4, 0, 1],
+    [0, 0, 0.08, 1],
+    [0, 0, -0.075, 1],
+    [0, 0, 0, 1.075],
+    [0, 0, 0, 0.93],
+  ]) {
+    const flow = cameraMotion(frame, resample(frame, angle, scale, dx, dy));
+    assert.ok(flow, JSON.stringify([dx, dy, angle, scale]));
+    assert.ok(
+      Math.abs(flow.dx * frame.width - dx) < 1 && Math.abs(flow.dy * frame.height - dy) < 1,
+      JSON.stringify(flow)
+    );
+    assert.ok(Math.abs(Math.atan2(flow.b, flow.a) - angle) < 0.023);
+    assert.ok(Math.abs(Math.hypot(flow.a, flow.b) - scale) < 0.024);
+    const sign = new SignMotion(floorFixture(), 400, 800),
+      oldRadius = sign.radius;
+    const expected = carryPoint(
+      sign.x,
+      sign.y,
+      {
+        a: scale * Math.cos(angle),
+        b: scale * Math.sin(angle),
+        dx: dx / frame.width,
+        dy: dy / frame.height,
+      },
+      400,
+      800
+    );
+    sign.carry(flow);
+    assert.ok(Math.hypot(sign.x - expected.x, sign.y - expected.y) < 6);
+    assert.ok(Math.abs(sign.radius / oldRadius - scale) < 0.024);
+  }
+});
+test('a static frame gives identity, and a uniform frame supplies no camera motion', () => {
+  const im = texturedImage();
+  assert.deepEqual(cameraMotion(im, im), { a: 1, b: 0, dx: 0, dy: 0 });
+  const flat = { ...im, gray: new Uint8Array(im.gray.length).fill(82) };
+  assert.equal(cameraMotion(flat, flat), null);
+});
+test('forward and return travel share a perspective projection and keep reversing on the floor', () => {
+  const sign = new SignMotion(floorFixture(), 400, 800);
+  let near = 0,
+    far = Infinity,
+    nearY = 0,
+    farY = 800,
+    turns = 0;
+  for (let i = 0; i < 2400; i++) {
+    if (sign.advance(1 / 60)) turns++;
+    if (sign.depth < 1.03) {
+      near = Math.max(near, sign.radius);
+      nearY = Math.max(nearY, sign.y);
+    }
+    if (sign.depth > 3.11) {
+      far = Math.min(far, sign.radius);
+      farY = Math.min(farY, sign.y);
+    }
+    assert.ok(sign.x - sign.radius >= 0 && sign.y <= 800);
+  }
+  assert.ok(turns >= 8 && near / far > 2.7 && nearY - farY > 200);
 });
 
 test('sampling and local distortions share the same object-fit cover crop', () => {
-  assert.deepEqual(visibleCrop(640, 480, 240, 480), {x:200, y:0, w:240, h:480});
-  assert.deepEqual(visibleCrop(480, 640, 480, 240), {x:0, y:200, w:480, h:240});
+  assert.deepEqual(visibleCrop(640, 480, 240, 480), { x: 200, y: 0, w: 240, h: 480 });
+  assert.deepEqual(visibleCrop(480, 640, 480, 240), { x: 0, y: 200, w: 480, h: 240 });
 });

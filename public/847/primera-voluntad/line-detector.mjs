@@ -7,19 +7,22 @@ const normals = Array.from({ length: angleCount }, (_, index) => {
   return { x: Math.cos(angle), y: Math.sin(angle) };
 });
 
-function edgeMap({ data, width, height }) {
+export function luminance({data, width, height}) {
+  const gray = new Uint8Array(width * height);
+  for (let i = 0, k = 0; i < gray.length; i++, k += 4) {
+    gray[i] = (77 * data[k] + 150 * data[k + 1] + 29 * data[k + 2]) >> 8;
+  }
+  return {gray, width, height};
+}
+
+function edgeMap({ gray, width, height }) {
   const size = width * height;
-  const gray = new Uint8Array(size);
   const horizontal = new Uint16Array(size);
   const smooth = new Uint8Array(size);
   const magnitude = new Uint32Array(size);
   const direction = new Int8Array(size);
   const edges = new Int8Array(size).fill(-1);
 
-  for (let i = 0; i < size; i++) {
-    const k = i * 4;
-    gray[i] = (77 * data[k] + 150 * data[k + 1] + 29 * data[k + 2]) >> 8;
-  }
   // A small Gaussian blur suppresses sensor noise before the Sobel gradients.
   for (let i = 1; i < size - 1; i++) {
     horizontal[i] = gray[i - 1] + 2 * gray[i] + gray[i + 1];
@@ -101,9 +104,9 @@ function longestRun(edges, width, height, angle, rho, minimumLength) {
   return { a: point(best.start), b: point(best.end), length: best.length, fit: best.fit };
 }
 
-export function longestLine(frame) {
+export function visibleLines(frame) {
   const { width, height } = frame;
-  const edges = edgeMap(frame);
+  const edges = edgeMap(frame.gray ? frame : luminance(frame));
   const minimumLength = Math.max(22, Math.min(width, height) * .28, Math.max(width, height) * .14);
   const radius = Math.ceil(Math.hypot(width, height));
   const rhoCount = 2 * radius + 1;
@@ -129,7 +132,7 @@ export function longestLine(frame) {
       const count = votes[offset + r];
       if (count < minimumLength * .35 || count < votes[offset + r - 1] || count < votes[offset + r + 1]) continue;
       const line = longestRun(edges, width, height, angle, r - radius, minimumLength);
-      if (line && line.length >= longest - 2) {
+      if (line) {
         longest = Math.max(longest, line.length);
         contenders.push(line);
       }
@@ -142,7 +145,29 @@ export function longestLine(frame) {
     if (line.length < longest - 2) continue;
     if (!best || line.fit > best.fit || (line.fit === best.fit && line.length > best.length)) best = line;
   }
-  return best;
+  if (!best) return [];
+  const distinct = [best];
+  contenders.sort((a, b) => b.length - a.length);
+  for (const line of contenders) {
+    if (!distinct.some(other => sameRidge(line, other, width, height))) distinct.push(line);
+    if (distinct.length === 10) break;
+  }
+  return distinct;
+}
+
+function sameRidge(first, next, width, height) {
+  const dx = (first.b.x - first.a.x) * width, dy = (first.b.y - first.a.y) * height;
+  const ex = (next.b.x - next.a.x) * width, ey = (next.b.y - next.a.y) * height;
+  const mx = (next.a.x + next.b.x - first.a.x - first.b.x) * width / 2;
+  const my = (next.a.y + next.b.y - first.a.y - first.b.y) * height / 2;
+  const len = Math.hypot(dx, dy);
+  return Math.abs(dx * ey - dy * ex) < .115 * len * Math.hypot(ex, ey) &&
+    Math.abs(dx * my - dy * mx) / len < 4 &&
+    Math.abs(dx * mx + dy * my) / len < (len + Math.hypot(ex, ey)) / 2;
+}
+
+export function longestLine(frame) {
+  return visibleLines(frame)[0] || null;
 }
 
 export function sameLine(first, next, width, height) {

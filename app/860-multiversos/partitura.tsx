@@ -5,7 +5,9 @@ import { PIANO_KEYS as computerPianoKeys, type CcBinding } from "./control-map";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
-import { scheduleContinuationAudio } from "./scene-audio";
+import { sceneNoiseBuffers, scheduleContinuationAudio } from "./scene-audio";
+import { collideIntoPitch, collisionTiming, loadQuestion, NOISE_KEYS, OPENING_QUESTION, pointTiming, speakQuestion, whiteOverture, type PointStrike } from "./opening-sound";
+import { OpeningProjection } from "./opening-projection";
 import { CONTINUATION_SCENES, DEFAULT_PAIR, NOISE_COLORS, NOISE_IDS, type ContinuationScene, type NoiseColor, type NoisePair } from "./scene-cues";
 import { ContinuationProjection } from "./scene-visuals";
 import { FIRST_MIDI_NOTE, NOTE_SCENES, NOTE_SCENE_IDS, isNoteScene, type NoteScene, type PerformanceInput } from "./performance-notes";
@@ -629,15 +631,11 @@ const EMPTY_SET_OUTLINE: GlyphSegment[][] = [
 
 const SCENE_ZERO_DEFAULT_SECONDS = 8;
 const SCENE_TIME_DEFAULT_SAMPLE_MS = 250;
-const SCENE_ONE_LIGHT_SHARE = 16 / 22;
 
 function smoothSceneLight(progress: number) {
   const t = Math.max(0, Math.min(1, progress));
   return t * t * (3 - 2 * t);
 }
-const SCENE_ZERO_MURMUR_ATTACK = Float32Array.from({ length: 129 }, (_, index) =>
-  1 - (1 - index / 128) ** 2,
-);
 
 function emptySetContours() {
   const position = (x: number, y: number): GlyphPoint => [(x - 390) / 365, (y - 258) / 365];
@@ -857,13 +855,24 @@ function createEmptySetRenderer(canvas: HTMLCanvasElement) {
         paintBackdrop(light);
         context.resetTransform();
         context.clearRect(0, 0, width, height);
+        if ((light.ambient === 0 && light.emission === 0) || (light.emission === 1 && light.wash === 1)) return;
         const scale = Math.min(width, height) * 0.315;
+        const cy = Math.cos(yaw + drag.yaw), sy = Math.sin(yaw + drag.yaw);
+        const cx = Math.cos(pitch + drag.pitch), sx = Math.sin(pitch + drag.pitch);
         context.translate(width / 2, height / 2);
         context.rotate(-roll);
-        context.scale(scale * Math.cos(yaw + drag.yaw), scale * Math.cos(pitch + drag.pitch));
-        const silver = Math.round(188 * light.ambient * (1 - light.emission) + 255 * light.emission);
-        context.fillStyle = `rgb(${silver}, ${silver}, ${silver})`;
-        context.fill(outline, "evenodd");
+        context.scale(scale, scale);
+        const facing = Math.sign(cy * cx) || 1;
+        for (let slice = 0; slice <= 16; slice++) {
+          const z = facing * .145 * (slice / 8 - 1);
+          context.save();
+          context.transform(cy, -sx * sy, 0, cx, sy * z, sx * cy * z);
+          const metal = slice === 16 ? 194 + 28 * Math.abs(cy * cx) : 85 + 52 * slice / 16;
+          const silver = Math.round(metal * light.ambient * (1 - light.emission) + 255 * light.emission);
+          context.fillStyle = `rgb(${silver}, ${silver}, ${silver})`;
+          context.fill(outline, "evenodd");
+          context.restore();
+        }
       },
       dispose() {},
     };
@@ -943,9 +952,8 @@ const SCENE_ZERO_DRAG_SCALE = 0.009;
 const SCENE_ZERO_COAST_SECONDS = 0.24;
 const SCENE_ZERO_MAX_DRAG_SPEED = 3.8;
 
-function EmptySetScene({ durationMs, beacon, cue, paused }: {
+function EmptySetScene({ durationMs, cue, paused }: {
   durationMs: number;
-  beacon: boolean;
   cue: SceneZeroCue;
   paused: boolean;
 }) {
@@ -979,18 +987,15 @@ function EmptySetScene({ durationMs, beacon, cue, paused }: {
     const paint = () => {
       const elapsedMs = (cue.context.currentTime - cue.beginsAt) * 1000;
       const progress = Math.min(1, Math.max(0, elapsedMs / durationMs));
-      const dimming = smoothSceneLight(progress * 2);
-      const wash = smoothSceneLight(progress * 2 - 1);
-      const light = beacon
-        ? { ambient: 1 - dimming, emission: 0.5 * (dimming + wash), wash }
-        : { ambient: progress, emission: 0, wash: 0 };
+      const wash = smoothSceneLight((progress - .72) / .24);
+      const light = { ambient: smoothSceneLight((progress - .035) / .53), emission: wash, wash };
       const seconds = movementSeconds.current;
       // Independent periods make the trajectory vary without jumps or a short repeating cycle.
       const variation = (frequency: number, phase: number) => Math.sin(seconds * frequency + phase) - Math.sin(phase);
       renderer.paint(light, [
-        -0.29 + 0.40 * seconds + 0.52 * variation(0.41, phaseY),
-        0.13 + 0.23 * seconds + 0.57 * variation(0.53, phaseX),
-        0.16 * seconds + 0.41 * variation(0.67, phaseZ),
+        -.66 + .63 * smoothSceneLight(progress / .6) + .20 * variation(.29, phaseY),
+        .16 + .12 * variation(.31, phaseX),
+        -.10 + .09 * variation(.24, phaseZ),
       ], orientation.current);
       return progress;
     };
@@ -1011,7 +1016,7 @@ function EmptySetScene({ durationMs, beacon, cue, paused }: {
       }
       previousFrame = now;
       const progress = paint();
-      if (progress < 1 || (autoRotate && !beacon)) schedulePaint();
+      if (progress < 1 && !paused) schedulePaint();
     };
     const schedulePaint = () => {
       if (frame === null) frame = window.requestAnimationFrame(tick);
@@ -1034,7 +1039,7 @@ function EmptySetScene({ durationMs, beacon, cue, paused }: {
       if (frame !== null) window.cancelAnimationFrame(frame);
       renderer.dispose();
     };
-  }, [beacon, durationMs, cue, rotate]);
+  }, [durationMs, cue, rotate, paused]);
 
   return <canvas ref={canvasRef} className="zero-object" role="img" tabIndex={0}
     aria-label="Conjunto vacío tridimensional. Arrastrá o usá las flechas para girarlo."
@@ -1216,27 +1221,24 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
   const [showStopwatch, setShowStopwatch] = useSavedSetting("showStopwatch", false);
-  const [openingClock, setOpeningClock] = useState({ beginsAt: 0, offset: 0 });
+  const strikes = useRef<PointStrike[]>([]);
+  const [voiceUnavailable, setVoiceUnavailable] = useState(false);
 
-  const [savedSeconds, setSavedSeconds] = useSavedSetting<number[]>("sceneSeconds111", () => SHOW_SCORE.map(cue => cue.seconds));
+  const [savedSeconds, setSavedSeconds] = useSavedSetting<number[]>("sceneSeconds112", () => previousSceneDurations() ?? SHOW_SCORE.map(cue => cue.seconds));
   const durations = useMemo(() => resolveShowDurations(savedSeconds), [savedSeconds]);
-  const limits = useMemo(() => durations.map((_,i) => durationBounds(i + 1,durations)), [durations]);
+  const limits = useMemo(() => durations.map((_,i) => durationBounds(i,durations)), [durations]);
   const [previousTimes] = useState(previousSceneDurations);
   const [restFraction, setRestFraction] = useSavedSetting("restFraction111", 0.4);
   const [splitNote, setSplitNote] = useSavedSetting("splitNote", FIRST_MIDI_NOTE);
   const [learningSplit, setLearningSplit] = useState(false);
   const editSeconds = (number: number, seconds: number) => setSavedSeconds(current =>
     editShowDuration(number, seconds, resolveShowDurations(current)));
-  const openingScale = (durations[0] - SHOW_TRANSITIONS.pointHold - SHOW_TRANSITIONS.lineHold)
-    / (SHOW_OPENING.opening + SHOW_OPENING.beacon + SHOW_OPENING.line);
-  const durationSeconds = SHOW_OPENING.opening * openingScale;
-  const oneSeconds = SHOW_OPENING.beacon * openingScale;
-  const lineSeconds = SHOW_OPENING.line * openingScale;
-  const harmonicSeconds = durations[1], spaceSeconds = durations[2], timeSeconds = durations[3] - SHOW_TRANSITIONS.trailTurn;
-  const restSeconds = Math.max(1, Math.min(durations[8] - 1, Math.round(durations[8] * restFraction)));
-  const continuationSeconds = {cross: durations[4], sphere: durations[5], noise: durations[6], return: durations[7], breath: durations[8] - restSeconds};
-  const noteSeconds = {ten: durations[9], eleven: durations[10], twelve: durations[11], thirteen: durations[12], fourteen: durations[13]};
-  const extendedSeconds = useMemo(() => Object.fromEntries(EXTENDED_SCENES.map(number => [number, durations[number - 1]])), [durations]);
+  const [zeroSeconds, oneSeconds, twoSeconds, spaceSeconds] = durations;
+  const timeSeconds = durations[4] - SHOW_TRANSITIONS.trailTurn;
+  const restSeconds = Math.max(1, Math.min(durations[9] - 1, Math.round(durations[9] * restFraction)));
+  const continuationSeconds = {cross: durations[5], sphere: durations[6], noise: durations[7], return: durations[8], breath: durations[9] - restSeconds};
+  const noteSeconds = {ten: durations[10], eleven: durations[11], twelve: durations[12], thirteen: durations[13], fourteen: durations[14]};
+  const extendedSeconds = useMemo(() => Object.fromEntries(EXTENDED_SCENES.map(number => [number, durations[number]])), [durations]);
   const [noisePair, setNoisePair] = useSavedSetting<NoisePair>("noisePair", DEFAULT_PAIR);
   const [playingNoisePair, setPlayingNoisePair] = useState<NoisePair>(DEFAULT_PAIR);
   const [timeSamplingMs, setTimeSamplingMs] = useSavedSetting("timeSamplingMs", SCENE_TIME_DEFAULT_SAMPLE_MS);
@@ -1249,8 +1251,6 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const [activeDurationMs, setActiveDurationMs] = useState(SCENE_ZERO_DEFAULT_SECONDS * 1000);
   const [scheduledRest, setScheduledRest] = useState<number>(SHOW_OPENING.rest);
   const previousDeadline = useRef<{cue: SceneZeroCue; seconds: number} | null>(null);
-  const [pulseCount, setPulseCount] = useState(0);
-  const [pulseRate, setPulseRate] = useState(2);
   const audioRef = useRef<AudioContext | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const activeSceneRef = useRef<HTMLDivElement | null>(null);
@@ -1266,7 +1266,6 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const waitingCues = useRef(new Set<() => void>());
   const pausedRef = useRef(false);
   const runRef = useRef(0);
-  const frameRef = useRef<number | null>(null);
   const learningSplitRef = useRef(false);
   const learnSplit = useCallback((note: number) => {
     if (!learningSplitRef.current || note < 1 || note > 127) return false;
@@ -1288,7 +1287,12 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const directionSeconds = extendedScene ? extendedSeconds[extendedScene] || (EXTENDED_DEFAULT_SECONDS[extendedScene] || 16) : 0;
   useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
   const earlyScene = typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
-  useEarlyInstrument(earlyScene, manualOutput, cue?.beginsAt ?? 0, activeDurationMs / 1000, playingNoisePair, scoreClock, pianoRouting);
+  const hitPoint = useCallback((hit: PointStrike) => {
+    strikes.current = [...strikes.current.filter(previous => previous.clock === hit.clock && hit.time - previous.time < 1.45).slice(-7), hit];
+    liveAttack.current = {count: liveAttack.current.count + 1, frequency: 54 * 2 ** ((hit.note % 19) / 20), velocity: hit.velocity};
+  }, [liveAttack]);
+  useLayoutEffect(() => { strikes.current = []; }, [cue, paused]);
+  useEarlyInstrument(earlyScene, manualOutput, cue?.beginsAt ?? 0, activeDurationMs / 1000, playingNoisePair, scoreClock, pianoRouting, hitPoint);
   const noteInput = usePerformanceInput({
     scene: noteScene, ownsInput: noteScene !== null || stage === "preparing", splitNote, learnSplit,
     output: manualOutput, routing: pianoRouting, onStrike: noteStrike,
@@ -1313,10 +1317,6 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
 
   const stop = useCallback(() => {
     runRef.current++;
-    if (frameRef.current !== null) {
-      window.cancelAnimationFrame(frameRef.current);
-      frameRef.current = null;
-    }
     timersRef.current.forEach(window.clearTimeout);
     timersRef.current.clear();
     waitingCues.current.clear();
@@ -1448,19 +1448,8 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
     setPaused(startPaused);
     setTransportBusy(false);
     setCue(null);
-    const openingMs = durationSeconds * 1000;
     setScheduledRest(restSeconds);
-    const oneMs = oneSeconds * 1000;
-    const lightMs = oneMs * SCENE_ONE_LIGHT_SHARE;
-    const oneStartsAt = mode === "opening" ? openingMs : 0;
-    const questionMs = oneStartsAt + lightMs;
-    const pointMs = oneStartsAt + oneMs;
-    const lineStartsAt = mode === "line" ? 0 : pointMs + SHOW_TRANSITIONS.pointHold * 1000;
-    const gongLead = lineSeconds / 5;
-    const rampSeconds = lineSeconds - gongLead;
-    const fadeOutAt = lineStartsAt / 1000 + gongLead / 3;
-    const showBeacon = mode === "beacon" || mode === "opening";
-    const waveSeconds = lineStartsAt / 1000 + gongLead + 0.5;
+    setVoiceUnavailable(false);
     setPreviewMode(previewOnly ? mode : null);
     setStage("preparing");
     try {
@@ -1569,12 +1558,12 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         showAt("space", time, () => enterDiagram("spatial", time, spaceSeconds));
         playTime(bus, time + spaceSeconds, voices);
       };
-      const playHarmonics = (bus: GainNode, time: number, root: OscillatorNode) => {
+      const playHarmonics = (bus: GainNode, time: number, root: OscillatorNode, harmonicSeconds: number) => {
         playModuleGong(context, masterOutput, time, 330, 0.58);
         playModuleGong(context, masterOutput, time + harmonicSeconds * HARMONIC_CUE.secondGong, 444, 0.55);
         const second = addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
         const third = addTone(bus, 333, time + harmonicSeconds * HARMONIC_CUE.trace333, harmonicSeconds * (HARMONIC_CUE.result - HARMONIC_CUE.trace333));
-        showAt("harmonics", time, () => enterDiagram("harmonics", time, harmonicSeconds));
+        atTime(time, () => setStage("harmonics"));
         playSpatial(bus, time + harmonicSeconds, [root, second, third]);
       };
 
@@ -1584,174 +1573,54 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         return;
       }
 
-      if (mode === "harmonics" || mode === "space" || mode === "time") {
-        const time = context.currentTime + 0.07;
+      if (mode === "space" || mode === "time") {
+        const time = context.currentTime + .07;
         const bus = createChordBus();
-        if (mode === "harmonics") playHarmonics(bus, time, addTone(bus, 111, time, 0.28));
-        else {
-          const voices = ORIGINAL_NOTES.map((hz) => addTone(bus, hz, time, 0.28));
-          if (mode === "space") playSpatial(bus, time, voices);
-          else playTime(bus, time, voices);
-        }
+        const voices = ORIGINAL_NOTES.map(hz => addTone(bus, hz, time, .28));
+        if (mode === "space") playSpatial(bus, time, voices);
+        else playTime(bus, time, voices);
         return;
       }
 
-      const render = new OfflineAudioContext(2, Math.ceil(context.sampleRate * waveSeconds), context.sampleRate);
-      const buffer = render.createBuffer(2, render.sampleRate * 4, render.sampleRate);
-      for (let channel = 0; channel < 2; channel++) {
-        const samples = buffer.getChannelData(channel);
-        for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
+      let voice: AudioBuffer | null = null;
+      if (mode === "opening" || mode === "beacon") {
+        try { voice = await loadQuestion(context); }
+        catch { if (run === runRef.current) setVoiceUnavailable(true); }
+        if (run !== runRef.current || audioRef.current !== context) return;
       }
-      const noise = render.createBufferSource(); noise.buffer = buffer; noise.loop = true;
-      const filter = render.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 430;
-      const breath = render.createGain(); breath.gain.value = 0.07;
-      const drift = render.createOscillator(); drift.frequency.value = 0.09;
-      const depth = render.createGain(); depth.gain.value = 0.035;
-      drift.connect(depth); depth.connect(breath.gain);
-      const tone = render.createOscillator(); tone.type = "sine"; tone.frequency.value = 55;
-      const toneGain = render.createGain(); toneGain.gain.value = 0.035;
-      const master = render.createGain(); master.gain.value = 0.55;
-      noise.connect(filter); filter.connect(breath); breath.connect(master);
-      tone.connect(toneGain); toneGain.connect(master); master.connect(render.destination);
-      noise.start(); tone.start(); drift.start();
-      const forward = await render.startRendering();
-      if (run !== runRef.current || audioRef.current !== context) return;
-      // Mantener el murmullo audible frente a los gongs sin alterar su textura.
-      let sumSquares = 0, peak = 0;
-      for (let channel = 0; channel < forward.numberOfChannels; channel++) {
-        const samples = forward.getChannelData(channel);
-        for (let i = 0; i < samples.length; i++) {
-          const sample = samples[i];
-          sumSquares += sample * sample;
-          peak = Math.max(peak, Math.abs(sample));
-        }
-      }
-      const rms = Math.sqrt(sumSquares / (forward.length * forward.numberOfChannels));
-      const boost = rms > 0 ? Math.min(5, 0.06 / rms, peak > 0 ? 0.6 / peak : 5) : 1;
-      for (let channel = 0; channel < forward.numberOfChannels; channel++) {
-        const samples = forward.getChannelData(channel);
-        for (let i = 0; i < samples.length; i++) samples[i] *= boost;
-      }
-      const wave = (beginsAt: number) => {
-        const source = context.createBufferSource(), gain = context.createGain();
-        const color = context.createBiquadFilter();
-        color.type = "lowpass";
-        source.buffer = forward;
-        gain.gain.value = 0;
-        const attack = mode === "opening" ? durationSeconds : 0.06;
-        gain.gain.setValueCurveAtTime(SCENE_ZERO_MURMUR_ATTACK, beginsAt, attack);
-        gain.gain.setValueAtTime(1, beginsAt + fadeOutAt);
-        gain.gain.linearRampToValueAtTime(0, beginsAt + waveSeconds);
-        color.frequency.setValueAtTime(mode === "line" ? 700 : 18000, beginsAt);
-        color.Q.setValueAtTime(mode === "line" ? 1.4 : 0.7, beginsAt);
-        if (showBeacon) {
-          color.frequency.setTargetAtTime(700, beginsAt + questionMs / 1000, 2);
-          color.Q.setTargetAtTime(1.4, beginsAt + questionMs / 1000, 2);
-        }
-        source.connect(color); color.connect(gain); gain.connect(masterOutput);
-        source.onended = () => { source.disconnect(); color.disconnect(); gain.disconnect(); };
-        source.start(beginsAt);
-        source.stop(beginsAt + waveSeconds);
+      const enterOpening = (stage: "opening" | "question" | "two", time: number, seconds: number) => {
+        setActiveDurationMs(seconds * 1000);
+        setCue({context, beginsAt: time});
+        setStage(stage);
       };
-
-      const beginsAt = context.currentTime + 0.06;
-      // The three opening phases share scene 1, including when one is tested directly.
-      const skipped = mode === "line" ? durationSeconds + oneSeconds + SHOW_TRANSITIONS.pointHold
-        : mode === "beacon" ? durationSeconds : 0;
-      setOpeningClock({ beginsAt, offset: skipped });
-      const atOffset = (offsetMs: number, action: (time: number) => void) => atTime(beginsAt + offsetMs / 1000, action);
-      const beginLight = (time: number) => {
-        setActiveDurationMs(lightMs);
-        setCue({ context, beginsAt: time });
-        setStage("beacon");
-      };
-
-      if (mode === "beacon") beginLight(beginsAt);
-      else if (mode !== "line") {
-        setActiveDurationMs(openingMs);
-        setCue({ context, beginsAt });
-        setStage("opening");
+      if (mode === "opening" || mode === "beacon") sceneNoiseBuffers(context);
+      let time = context.currentTime + .08;
+      if (mode === "opening") {
+        whiteOverture(masterOutput, time, zeroSeconds);
+        showAt("opening", time, at => enterOpening("opening", at, zeroSeconds));
+        time += zeroSeconds;
       }
-      wave(beginsAt);
-
-      if (showBeacon) {
-        if (mode === "opening") atOffset(oneStartsAt, beginLight);
-        atOffset(questionMs, () => setStage("question"));
-        const disconnectGong = playSceneOneGong(context, masterOutput, beginsAt + pointMs / 1000);
-        atOffset(pointMs, () => setStage("one"));
-        atOffset(pointMs + 11500, disconnectGong);
+      if (mode === "opening" || mode === "beacon") {
+        if (voice) speakQuestion(masterOutput, voice, time, oneSeconds);
+        showAt("beacon", time, at => enterOpening("question", at, oneSeconds));
+        const gongAt = time + pointTiming(oneSeconds).gong;
+        const releaseRoom = playSceneOneGong(context, masterOutput, gongAt);
+        atTime(gongAt, () => setStage("one"));
+        atTime(gongAt + 11.5, releaseRoom);
+        time += oneSeconds;
       }
-
+      showAt("line", time, at => enterOpening("two", at, twoSeconds));
       const chordBus = createChordBus();
-      const scheduleAcceleration = (beginning: number) => {
-        const duration = rampSeconds;
-        const percussionGain = context.createGain();
-        percussionGain.gain.setValueAtTime(1, beginning);
-        percussionGain.gain.setValueAtTime(1, beginning + duration * 0.75);
-        percussionGain.gain.linearRampToValueAtTime(0, beginning + duration + 0.4);
-        percussionGain.connect(masterOutput);
-        const beat = context.createBuffer(1, Math.floor(context.sampleRate * 0.012), context.sampleRate);
-        const samples = beat.getChannelData(0);
-        for (let i = 0; i < samples.length; i++) {
-          const time = i / context.sampleRate;
-          samples[i] = (Math.sin(2 * Math.PI * 220 * time) * 0.65 + (Math.random() * 2 - 1) * 0.35) * Math.exp(-time * 450);
-        }
-        const hits: number[] = [];
-        let position = 0;
-        while (position < duration) {
-          const rate = 2 * Math.pow(111 / 2, position / duration);
-          hits.push(position);
-          const source = context.createBufferSource(), gain = context.createGain();
-          source.buffer = beat;
-          gain.gain.value = 0.22 / Math.sqrt(Math.max(1, rate / 12));
-          source.connect(gain); gain.connect(percussionGain);
-          source.onended = () => { source.disconnect(); gain.disconnect(); };
-          source.start(beginning + position);
-          position += 1 / rate;
-        }
-        const pitch = context.createOscillator(), pitchGain = context.createGain();
-        pitch.type = "sine";
-        const pitchStart = beginning + duration * (2 / 3);
-        pitch.frequency.setValueAtTime(2 * Math.pow(111 / 2, 2 / 3), pitchStart);
-        pitch.frequency.exponentialRampToValueAtTime(111, beginning + duration);
-        pitchGain.gain.setValueAtTime(0, pitchStart);
-        pitchGain.gain.linearRampToValueAtTime(0.12, beginning + duration);
-        pitch.connect(pitchGain); pitchGain.connect(chordBus);
-        pitch.start(pitchStart);
-        playHarmonics(chordBus, beginning + duration + SHOW_TRANSITIONS.lineHold, pitch);
-        const draw = () => {
-          if (run !== runRef.current || audioRef.current !== context) return;
-          const elapsed = context.currentTime - beginning;
-          let count = 0;
-          while (count < hits.length && hits[count] <= elapsed) count++;
-          setPulseCount(count);
-          setPulseRate(2 * Math.pow(111 / 2, Math.min(1, Math.max(0, elapsed / duration))));
-          if (elapsed >= duration) {
-            setPulseRate(111); setStage("vertical"); frameRef.current = null;
-            return;
-          }
-          frameRef.current = window.requestAnimationFrame(draw);
-        };
-        atOffset(lineStartsAt + gongLead * 1000, () => {
-          setStage("multiplying");
-          frameRef.current = window.requestAnimationFrame(draw);
-        });
-      };
-      const gongAt = beginsAt + lineStartsAt / 1000;
-      playModuleGong(context, masterOutput, gongAt, 330);
-      showAt("line", gongAt, () => {
-        setPulseCount(0);
-        setPulseRate(2);
-        setStage("two");
-        scheduleAcceleration(gongAt + gongLead);
-      });
+      const root = collideIntoPitch(chordBus, time, twoSeconds);
+      const harmonicOffset = collisionTiming(twoSeconds).harmonics;
+      playHarmonics(chordBus, time + harmonicOffset, root, twoSeconds - harmonicOffset);
     } catch {
       if (run !== runRef.current) return;
       reset();
     }
   };
 
-  const showObject = stage === "opening" || stage === "beacon";
+  const showObject = stage === "opening";
   const muted = masterVolume === 0;
   const soundAction = muted ? "Restaurar sonido" : "Silenciar sonido";
   const preparing = stage === "preparing";
@@ -1769,31 +1638,28 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const canStart = ready || breathing || noteScene !== null || extendedScene !== null || (previewMode !== null && !preparing);
   const light = !showObject && stage !== "ready" && !preparing;
   const question = stage === "question";
-  const dots = stage === "two" || stage === "multiplying";
   const expression = stage === "vertical" || stage === "harmonics" || stage === "equation" || stage === "spatial" ||
     stage === "space" || stage === "temporal" || stage === "time";
   const continuation = activeScene && isContinuationScene(activeScene) ? activeScene : null;
   const splitLabel = MIDI_PITCH_NAMES[splitNote % 12] + (Math.floor(splitNote / 12) - 1);
   const restLabel = `${restSeconds} s`;
-  const sceneControls = [
-    {mode: "opening", title: "Escena Ø → {}", id: "zero-duration"},
-    {mode: "beacon", title: "Escena {} → 0", id: "one-duration"},
-    {mode: "line", title: "Escena 0 → 1", id: "line-duration"},
-    {mode: "harmonics", title: "Escena 1 → 2", id: "harmonic-duration"},
+  const numberedControls = [
+    {mode: "opening", title: "El conjunto vacío", id: "zero-duration"},
+    {mode: "beacon", title: "La entidad mínima", id: "one-duration"},
+    {mode: "line", title: "Del golpe al armónico", id: "line-duration"},
     {mode: "space", title: "Escena 2 → 3", id: "space-duration"},
     {mode: "time", title: "Escena 3 → 4", id: "time-duration"},
     ...CONTINUATION_SCENES.map(({mode, title}) => ({mode, title, id: `${mode}-duration`})),
     ...NOTE_SCENE_IDS.map(mode => ({mode, title: `Escena ${NOTE_SCENES[mode].number}`, id: `scene-${mode}`})),
     ...EXTENDED_SCENES.map(mode => ({mode, title: `Escena ${mode}`, id: `scene-${mode}`})),
   ] as const;
-  const numberedControls = sceneControls.filter(control => control.mode !== "beacon" && control.mode !== "line");
-  const numberedMode = activeScene === "beacon" || activeScene === "line" ? "opening" : activeScene;
+  const numberedMode = activeScene === "harmonics" ? "line" : activeScene;
   const sceneIndex = numberedControls.findIndex(control => control.mode === numberedMode);
-  const sceneNumber = sceneIndex >= 0 ? sceneIndex + 1 : null;
+  const sceneNumber = sceneIndex >= 0 ? SHOW_SCORE[sceneIndex].number : null;
   const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack);
   const loopFrame = sceneNumber===14 ? chordLoop.frame : extended.three
     ? (extended.loops.find(loop=>loop.frame?.running)?.frame ?? extended.loops[0].frame) : extended.manual.frame;
-  const sceneTitle = breathing ? "Plano 9" : sceneControls.find(control => control.mode === activeScene)?.title;
+  const sceneTitle = breathing ? "Plano 9" : numberedControls[sceneIndex]?.title;
   const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
   const coda = extendedScene !== null && extendedScene >= 90 ? extendedScene as CodaScene : null;
   const extendedDark = coda !== null || extendedScene === 16 || extendedScene === 17 || isTimbreScene(extendedScene) || liveSet !== null;
@@ -1821,11 +1687,8 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       Math.max(at < 0 ? -1 : 0, Math.min(numberedControls.length - 1, at + step)), sceneIndex);
     if (index !== sceneIndex && (stage !== "breath" || index < sceneIndex)) moveScene(index);
   });
-  const pointPosition = (index: number) => {
-    let n = index, fraction = 0, scale = 0.5;
-    while (n > 0) { fraction += (n % 2) * scale; n = Math.floor(n / 2); scale *= 0.5; }
-    return 10 + 180 * fraction;
-  };
+  const harmonicPhase = stage === "harmonics" ? collisionTiming(activeDurationMs / 1000).harmonics : 0;
+  const diagramCue = useMemo(() => cue && harmonicPhase ? {...cue, beginsAt: cue.beginsAt + harmonicPhase} : cue, [cue, harmonicPhase]);
   return <div role="region" aria-label="Módulo cero" className="zero-layout">
     <style>{`
       @keyframes zeroSpaceFade { from { opacity: 0; } to { opacity: 1; } }
@@ -1915,6 +1778,12 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       @container scene-display (max-width: 40rem) {
         .zero-stage:has(.zero-stopwatch) .stimulus-bar { max-width: calc(100% - 8rem); }
       }
+      .opening-field { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+      .opening-noises { display:flex; flex-wrap:wrap; gap:.3rem; margin:.4rem 0; }
+      .opening-noises kbd { font:600 .72rem/1.4 system-ui; color:#cddafe; }
+      .zero-controls .opening-noises button { min-height:32px; padding:.18rem .5rem; font-size:.73rem; touch-action:none; }
+      .opening-cue { margin:.4rem 0 .6rem; font-size:.8rem; line-height:1.45; color:#d7dfef; }
+      .zero-stage:has(.zero-object) .zero-scene-number { opacity:0; }
       .zero-question {
         position: absolute; width: min(87%, 900px); margin: 0; text-align: center;
         color: #111; font: 400 clamp(1.5rem, 3.5vw, 3.6rem)/1.3 Georgia, serif;
@@ -2209,14 +2078,10 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
         countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused}>
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
-      {showObject && cue && <EmptySetScene durationMs={activeDurationMs} beacon={stage === "beacon"} cue={cue} paused={paused} />}
-      {question && <p className="zero-question" style={{ animationPlayState: paused ? "paused" : "running" }}>¿Cuál es la entidad mínima capaz de ser imaginada?</p>}
-      {stage === "one" && <span role="img" aria-label="Punto negro" className="zero-point" />}
-      {dots && <svg aria-hidden="true" viewBox="0 0 200 40" style={{position:"absolute",width:"clamp(80px, 10vw, 180px)",height:"auto",overflow:"visible",transform:`rotate(${stage === "multiplying" ? 90 * Math.max(0, Math.min(1, Math.log(pulseRate / 2) / Math.log(111 / 2))) : 0}deg)`,pointerEvents:"none"}}>
-        <circle cx="10" cy="20" r="10" fill="#000" /><circle cx="190" cy="20" r="10" fill="#000" />
-        {stage === "multiplying" && Array.from({length:pulseCount}, (_, index) => <circle key={index} cx={pointPosition(index + 1)} cy="20" r="1.5" fill="#000" />)}
-      </svg>}
-      {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={cue} durationMs={activeDurationMs}
+      {showObject && cue && <EmptySetScene durationMs={activeDurationMs} cue={cue} paused={paused} />}
+      {(sceneNumber === 1 || stage === "two") && cue && <OpeningProjection scene={stage === "two" ? 2 : 1} cue={cue} seconds={activeDurationMs / 1000} strikes={strikes} />}
+      {question && <p className="zero-question" style={{ animationPlayState: paused ? "paused" : "running" }}>{OPENING_QUESTION}</p>}
+      {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={diagramCue} durationMs={activeDurationMs - harmonicPhase * 1000}
         sampleIntervalMs={activeSamplingMs} />}
       {continuation && cue && <ContinuationProjection scene={continuation} clock={cue.context} startsAt={cue.beginsAt}
         seconds={activeDurationMs / 1000} pair={playingNoisePair} hold={breathing}
@@ -2238,15 +2103,13 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         : extendedPlaying
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
-      {stage === "multiplying" && <span aria-live="off" style={{position:"absolute",bottom:showSubtitles ? "max(8%, 3rem)" : "8%",color:"#333",fontFamily:"monospace",fontSize:"clamp(12px, 1vw, 16px)",letterSpacing:".08em",pointerEvents:"none"}}>{pulseRate < 10 ? pulseRate.toFixed(1) : Math.round(pulseRate)} PERCUSIONES / SEGUNDO</span>}
-      {sceneNumber !== null && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
+      {sceneNumber !== null && sceneNumber > 0 && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
         notes={noteScene ? noteInput.sounding : undefined} loop={loopFrame} tuning={extended.a4}
         resting={breathing} interactiveObject={showObject} />}
       {(sceneNumber !== null || showStopwatch) && <div className="zero-scene-heading">
         {sceneNumber !== null && <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>}
         {showStopwatch && <ScoreStopwatch clock={sceneNumber === null ? null : audioRef.current}
-          beginsAt={sceneNumber === 1 ? openingClock.beginsAt : cue?.beginsAt ?? 0}
-          offset={sceneNumber === 1 ? openingClock.offset : cueStarts[sceneIndex] ?? 0} total={totalSeconds} paused={paused} />}
+          beginsAt={cue?.beginsAt ?? 0} offset={cueStarts[sceneIndex] ?? 0} total={totalSeconds} paused={paused} />}
       </div>}
       {sceneNumber !== null && sceneNumber < 10 && <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
       </SceneMixer>
@@ -2255,9 +2118,9 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       <div className="zero-settings" ref={settingsRef}>
         <div className="zero-scene">
           <h2>Duración de la obra</h2>
-          <p><strong data-show-total={totalSeconds}>{scoreTime(totalSeconds)}</strong> · 111 escenas · margen de 20:00 a 40:00</p>
+          <p><strong data-show-total={totalSeconds}>{scoreTime(totalSeconds)}</strong> · {SHOW_SCORE.length} escenas · margen de 20:00 a 40:00</p>
           <details><summary>Ajustes de duración</summary>
-            {sceneNumber !== null && sceneNumber < 10 && <p>La apertura ya está en marcha. Los cambios de las escenas 1–9 entran al volver a reproducirlas.</p>}
+            {sceneNumber !== null && sceneNumber < 10 && <p>La apertura ya está en marcha. Los cambios de las escenas 0–9 entran al volver a reproducirlas.</p>}
             <button type="button" onClick={() => {setSavedSeconds(SHOW_SCORE.map(cue => cue.seconds)); setRestFraction(.4);}}>Restablecer 30:00</button>
             {previousTimes && <button type="button" onClick={() => setSavedSeconds(previousTimes)}>Recuperar mis tiempos anteriores</button>}
           </details>
@@ -2288,11 +2151,19 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
             <input id={id} type="range" min={min} max={max} step={1} value={seconds}
               aria-label={`Ajustar duración de la escena ${score.number}`} aria-valuetext={`${seconds} segundos`}
               onChange={event => editSeconds(score.number,event.currentTarget.valueAsNumber)} />
-            {mode === "opening" && <details><summary>Fases de apertura</summary>
-              {sceneControls.slice(0,3).map((phase,i) => <div key={phase.id}>
-                <span>{phase.title} · {Number([durationSeconds,oneSeconds,lineSeconds][i].toFixed(1))} s </span>
-                <button type="button" disabled={!canStart} onClick={() => playMode(phase.mode, true)}>Probar fase</button>
-              </div>)}</details>}
+            {mode === "opening" && <>
+              <p className="opening-cue">Sostené una nota para sumar su ruido al blanco de la apertura.</p>
+              <div className="opening-noises" role="group" aria-label="Cuatro colores de ruido">{NOISE_KEYS.map(({key, midi, label, note}) =>
+                <button key={key} type="button" disabled={!isActive || !manualOutput} title={note + " · MIDI " + midi}
+                  onPointerDown={event => {event.currentTarget.setPointerCapture(event.pointerId); pianoRouting.current?.computerNote("color-" + key, midi, true);}}
+                  onLostPointerCapture={() => pianoRouting.current?.computerNote("color-" + key, midi, false)}
+                  onKeyDown={event => {if ((event.key === " " || event.key === "Enter") && !event.repeat) {event.preventDefault(); pianoRouting.current?.computerNote("color-" + key, midi, true);}}}
+                  onKeyUp={event => {if (event.key === " " || event.key === "Enter") {event.preventDefault(); pianoRouting.current?.computerNote("color-" + key, midi, false);}}}
+                  onBlur={() => pianoRouting.current?.computerNote("color-" + key, midi, false)}><kbd>{key}</kbd> · {label}</button>)}</div>
+            </>}
+            {mode === "beacon" && <p className="opening-cue">Cuando desaparezca el primer punto, tocá el piano o las teclas A–K. Cada ataque dibuja su propia onda. Podés pausar ahí para improvisar.</p>}
+            {mode === "beacon" && voiceUnavailable && <small role="status">La voz no se pudo cargar. La pregunta sigue en pantalla.</small>}
+            {mode === "line" && <p className="opening-cue">Dos puntos delimitan el golpe. Podés acentuar el recorrido con el teclado hasta que aparezca la línea de 111 Hz.</p>}
             {mode === "time" && <>
               <div className="zero-sampling">
                 <label htmlFor="time-sampling">Intervalo de muestreo</label>
@@ -2347,7 +2218,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
               onClick={() => void start("time")}>Reproducir desde 3 → 4</button>}
             {mode === "return" && <button type="button" className="zero-continue" disabled={!canStart}
               onClick={() => void start("return")}>Reproducir desde 7 → 8</button>}
-            {mode === "breath" && breathing && <button type="button" className="zero-continue" onClick={() => moveScene(1)}>Ir a escena 10</button>}
+            {mode === "breath" && breathing && <button type="button" className="zero-continue" onClick={() => moveScene(10)}>Ir a escena 10</button>}
           </div>;
         })}
       </div>
@@ -2389,7 +2260,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
             <TransportMidiButton action="stopScene" midi={transportMidi} />
           </div>
           <button type="button" aria-label="Escena siguiente" title="Escena siguiente"
-            disabled={sceneIndex === numberedControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(Math.max(0, sceneIndex) + 1)}>
+            disabled={sceneIndex === numberedControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(sceneIndex + 1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
           </button>
         </div>

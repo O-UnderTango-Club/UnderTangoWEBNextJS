@@ -15,6 +15,8 @@ export const PIANO_KEYS: Record<string, number> = {
 export const TOP_KEYS = ["KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period"];
 export const FIXED_CONTROLS = {
   "Teclas del instrumento de la escena · MIDI 60 a 72": Object.keys(PIANO_KEYS).join(" ").toUpperCase(),
+  "Escena 0 · Ruidos blanco, gris, rosa y marrón": "A S D F · Do Re Mi Fa (MIDI 60, 62, 64, 65)",
+  "Escena 1 · Ataque del punto": "Teclas del instrumento o notas MIDI después del gong",
   "Banco de notas · cara frontal": "1 a 9",
   "Cubo · cara derecha": "Mayús + 1 a 9",
   "Cubo extendido · cara superior": TOP_KEYS.map(key => key.replace("Key", "").replace("Comma", ",").replace("Period", ".")).join(" "),

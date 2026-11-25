@@ -4,6 +4,7 @@ export type Stimulus = "audio" | "piano" | "tempo" | "clock" | "loop" | "camera"
 // not by itself make a spectrum drawing sensitive to individual key attacks.
 export function visualStimuli(scene: number): readonly Stimulus[] {
   if (scene < 1 || scene > 111 || scene === 19 || scene === 90 || scene === 91) return [];
+  if (scene === 1 || scene === 2) return ["piano", "clock"];
   if (scene <= 9 || scene === 16) return ["clock"];
   if (scene <= 12) return ["piano"];
   if (scene === 13) return ["piano", "clock"];

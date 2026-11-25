@@ -1,25 +1,28 @@
 import {SHOW_SCORE, SHOW_OPENING, SHOW_TRANSITIONS} from "./show-score";
 import {resolveShowDurations} from "./show-durations";
+import { SETTINGS_PREFIX } from "./control-map";
 
 // The original panel stored each group independently and used zero for a manual cue.
 export function previousSceneDurations(): number[] | null {
   let found = false;
   function read(key:string):unknown {
     try {
-      const raw = localStorage.getItem("860-multiversos:settings:v1:" + key);
+      const raw = localStorage.getItem(SETTINGS_PREFIX + key);
       if (raw === null) return undefined;
       const value:unknown = JSON.parse(raw);
       found = true;
       return value;
     } catch { return undefined; }
   }
-  const seconds = SHOW_SCORE.map(cue => cue.seconds);
+  const previous = read("sceneSeconds111");
+  if (Array.isArray(previous) && previous.length === 111) return resolveShowDurations(previous);
+  const seconds = SHOW_SCORE.slice(1).map(cue => cue.seconds);
   const positive = (raw:unknown, fallback:number) =>
     typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : fallback;
   seconds[0] = positive(read("durationSeconds"),SHOW_OPENING.opening)
     + positive(read("oneSeconds"),SHOW_OPENING.beacon) + positive(read("lineSeconds"),SHOW_OPENING.line)
     + SHOW_TRANSITIONS.pointHold + SHOW_TRANSITIONS.lineHold;
-  seconds[1] = positive(read("harmonicSeconds"),seconds[1]);
+  seconds[1] = positive(read("harmonicSeconds"),SHOW_OPENING.harmonics);
   seconds[2] = positive(read("spaceSeconds"),seconds[2]);
   seconds[3] = positive(read("timeSeconds"),SHOW_OPENING.time) + SHOW_TRANSITIONS.trailTurn;
   const continuations = read("continuationSeconds");

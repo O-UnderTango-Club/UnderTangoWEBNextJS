@@ -2,7 +2,7 @@
 
 import { useSavedSetting } from "./saved-setting";
 import { PIANO_KEYS as computerPianoKeys, type CcBinding } from "./control-map";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
 import { scheduleContinuationAudio } from "./scene-audio";
@@ -80,6 +80,30 @@ const FREQUENCY_TRAIL_TURN_SECONDS = SHOW_TRANSITIONS.trailTurn;
 function scoreTime(seconds: number) {
   const rounded = Math.round(seconds);
   return Math.floor(rounded / 60) + ":" + String(rounded % 60).padStart(2, "0");
+}
+
+function ScoreStopwatch({ clock, beginsAt, offset, total, paused }: {
+  clock: AudioContext | null; beginsAt: number; offset: number; total: number; paused: boolean;
+}) {
+  const [seconds, setSeconds] = useState(0);
+  useLayoutEffect(() => {
+    let timer: number | undefined;
+    function update() {
+      const now = clock?.currentTime ?? 0;
+      const position = clock ? Math.min(total, offset + Math.max(0, now - beginsAt)) : 0;
+      const whole = Math.floor(position);
+      setSeconds(whole);
+      if (clock && !paused && whole < total) {
+        const nextTick = beginsAt + whole + 1 - offset;
+        timer = window.setTimeout(update, Math.max(20, (nextTick - now) * 1000));
+      }
+    }
+    update();
+    return () => window.clearTimeout(timer);
+  }, [clock, beginsAt, offset, total, paused]);
+  return <span className="zero-stopwatch" role="timer" aria-label="Tiempo transcurrido de la obra">
+    {scoreTime(seconds).padStart(5, "0")}
+  </span>;
 }
 
 function temporalTrailFrame(progress: number, roll: number) {
@@ -1191,6 +1215,8 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const extendedScene = typeof stage === "number" ? stage : null;
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
+  const [showStopwatch, setShowStopwatch] = useSavedSetting("showStopwatch", false);
+  const [openingClock, setOpeningClock] = useState({ beginsAt: 0, offset: 0 });
 
   const [savedSeconds, setSavedSeconds] = useSavedSetting<number[]>("sceneSeconds111", () => SHOW_SCORE.map(cue => cue.seconds));
   const durations = useMemo(() => resolveShowDurations(savedSeconds), [savedSeconds]);
@@ -1629,6 +1655,10 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       };
 
       const beginsAt = context.currentTime + 0.06;
+      // The three opening phases share scene 1, including when one is tested directly.
+      const skipped = mode === "line" ? durationSeconds + oneSeconds + SHOW_TRANSITIONS.pointHold
+        : mode === "beacon" ? durationSeconds : 0;
+      setOpeningClock({ beginsAt, offset: skipped });
       const atOffset = (offsetMs: number, action: (time: number) => void) => atTime(beginsAt + offsetMs / 1000, action);
       const beginLight = (time: number) => {
         setActiveDurationMs(lightMs);
@@ -1871,10 +1901,19 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         background: #191d25; color: #f2f3f7; font: 600 .75rem/1.25 system-ui, sans-serif;
         text-align: center;
       }
-      .zero-scene-number {
+      .zero-scene-heading {
         position: absolute; inset-block-start: clamp(.8rem, 2.5vw, 2rem); inset-inline-start: clamp(.95rem, 3vw, 2.6rem);
-        z-index: 2; color: #191b22; font: 400 clamp(1.5rem, 3.25vw, 2.8rem)/1 Georgia, serif;
-        font-variant-numeric: tabular-nums; pointer-events: none;
+        z-index: 2; display: flex; align-items: center; gap: .5rem; pointer-events: none; font-variant-numeric: tabular-nums;
+      }
+      .zero-scene-number {
+        color: #191b22; font: 400 clamp(1.5rem, 3.25vw, 2.8rem)/1 Georgia, serif; font-variant-numeric: tabular-nums;
+      }
+      .zero-stopwatch {
+        padding: .2em .48em; border-radius: .25rem; background: #191d25; color: #f2f3f7;
+        font: 600 clamp(.76rem, 1.15vw, 1.1rem)/1.25 system-ui, sans-serif; font-variant-numeric: tabular-nums;
+      }
+      @container scene-display (max-width: 40rem) {
+        .zero-stage:has(.zero-stopwatch) .stimulus-bar { max-width: calc(100% - 8rem); }
       }
       .zero-question {
         position: absolute; width: min(87%, 900px); margin: 0; text-align: center;
@@ -2203,7 +2242,12 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       {sceneNumber !== null && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
         notes={noteScene ? noteInput.sounding : undefined} loop={loopFrame} tuning={extended.a4}
         resting={breathing} interactiveObject={showObject} />}
-      {sceneNumber !== null && <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>}
+      {(sceneNumber !== null || showStopwatch) && <div className="zero-scene-heading">
+        {sceneNumber !== null && <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>}
+        {showStopwatch && <ScoreStopwatch clock={sceneNumber === null ? null : audioRef.current}
+          beginsAt={sceneNumber === 1 ? openingClock.beginsAt : cue?.beginsAt ?? 0}
+          offset={sceneNumber === 1 ? openingClock.offset : cueStarts[sceneIndex] ?? 0} total={totalSeconds} paused={paused} />}
+      </div>}
       {sceneNumber !== null && sceneNumber < 10 && <div className="zero-subtitle" role="status">{showSubtitles && sceneTitle && <span>{sceneTitle}</span>}</div>}
       </SceneMixer>
     </div></ProjectionSignalContext.Provider>
@@ -2375,6 +2419,11 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
           Activar subtítulos
           <input type="checkbox" role="switch" checked={showSubtitles}
             onChange={(event) => setShowSubtitles(event.currentTarget.checked)} />
+        </label>
+        <label className="zero-subtitle-toggle">
+          Mostrar cronómetro
+          <input type="checkbox" role="switch" checked={showStopwatch}
+            onChange={(event) => setShowStopwatch(event.currentTarget.checked)} />
         </label>
         <DjConsole output={manualOutput} inputs={midiInputs}/>
         <a className={styles.organonLink} href="/860-multiversos/organon" target="_blank" rel="noopener">Órganon · Mapa de controles ↗</a>

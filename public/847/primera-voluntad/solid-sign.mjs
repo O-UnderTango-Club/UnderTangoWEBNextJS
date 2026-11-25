@@ -67,25 +67,19 @@ for (let i = 0; i < 4; i++) {
   const j = (i + 1) % 4;
   quad(slash[0][i], slash[0][j], slash[1][j], slash[1][i], 1);
 }
-const ramps = [
-  [
-    [55, 48, 114],
-    [186, 214, 255],
-  ],
-  [
-    [31, 25, 81],
-    [130, 109, 248],
-  ],
-  [
-    [70, 65, 145],
-    [207, 255, 252],
-  ],
-].map(([low, high]) =>
-  Array.from(
-    { length: 48 },
-    (_, i) => 'rgb(' + low.map((v, k) => Math.round(v + ((high[k] - v) * i) / 47)).join(',') + ')'
-  )
-);
+let paletteHue = -100;
+let ramps;
+function updateMetal(now) {
+  const hue = Math.floor(((now * 0.018 + 202) % 360) / 6) * 6;
+  if (hue === paletteHue) return;
+  paletteHue = hue;
+  ramps = [0, 28, -19].map((offset, face) =>
+    Array.from({ length: 48 }, (_, i) => {
+      const light = (face === 1 ? 15 : 24) + i * (face === 1 ? 1.03 : 1.42);
+      return 'hsl(' + (hue + offset) + ',' + (face === 1 ? 75 : 83) + '%,' + light + '%)';
+    })
+  );
+}
 
 const spriteSize = 288,
   unit = 100;
@@ -108,6 +102,7 @@ export function drawSign(stage, m, level, now) {
   const roll = m.spin + m.floor.angle * 0.55;
   const change = Math.abs(roll - lastRoll) + Math.abs(m.yaw - lastYaw) + Math.abs(m.pitch - lastPitch);
   if (change > 0.12 || (now - lastPaint > 45 && change > 0.014) || now - lastPaint > 180) {
+    updateMetal(now);
     brush.clearRect(0, 0, spriteSize, spriteSize);
     foot = paintMesh(brush, m.yaw, m.pitch, roll, level);
     lastRoll = roll;

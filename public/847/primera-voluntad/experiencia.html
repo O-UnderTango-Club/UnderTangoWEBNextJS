@@ -53,95 +53,69 @@
       video {
         object-fit: cover;
       }
-      .cue {
+      .sr-only {
         position: absolute;
-        top: max(1.15rem, env(safe-area-inset-top));
-        left: max(1.2rem, env(safe-area-inset-left));
-        right: max(1.2rem, env(safe-area-inset-right));
-        width: max-content;
-        max-width: calc(
-          100% - max(1.2rem, env(safe-area-inset-left)) - max(1.2rem, env(safe-area-inset-right)) -
-            0.5rem
-        );
-        transform: translate(var(--dx, 0px), var(--dy, 0px));
-        pointer-events: none;
-      }
-      .plate {
-        position: relative;
-        isolation: isolate;
-        padding: 0.72rem 0.9rem 0.86rem;
-        display: grid;
-        align-items: center;
-        grid-template-columns: minmax(0, 1fr);
-        max-width: 37rem;
-        border-left: 2px solid #b8f6eb;
-      }
-      .plate::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        z-index: -1;
-        background: linear-gradient(
-          112deg,
-          rgba(11, 12, 28, 0.94),
-          rgba(21, 18, 46, 0.83) 78%,
-          rgba(21, 18, 46, 0.72)
-        );
-      }
-      .meta {
-        margin: 0 0 0.38rem;
-        color: #cbf9f0;
-        font:
-          650 clamp(0.68rem, 1.8vmin, 0.84rem) / 1.35 system-ui,
-          sans-serif;
-        letter-spacing: 0.055em;
-      }
-      .title {
-        margin: 0;
-        max-width: 17ch;
-        text-wrap: balance;
-        overflow-wrap: break-word;
-        font:
-          800 clamp(1.75rem, 6.4vmin, 3.6rem) / 0.99 Uberlin,
-          system-ui,
-          sans-serif;
-        letter-spacing: -0.025em;
-        color: #fff;
-      }
-      .cue[data-cue='3'] .title {
-        font-size: clamp(1.36rem, 4.7vmin, 2.75rem);
-        max-width: 24ch;
-        line-height: 1.04;
-      }
-      .art {
-        display: none;
-        position: relative;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
         overflow: hidden;
-        width: clamp(3.2rem, 12vmin, 6.5rem);
-        aspect-ratio: 0.82;
-        background: #11101b;
+        clip-path: inset(50%);
+        white-space: nowrap;
       }
-      .art img {
+      .stage {
+        --left: max(10px, env(safe-area-inset-left));
+        --right: max(10px, env(safe-area-inset-right));
+        --top: max(10px, env(safe-area-inset-top));
+        --bottom: max(10px, env(safe-area-inset-bottom));
+        padding: var(--top) var(--right) var(--bottom) var(--left);
+      }
+      #clip-tools {
         position: absolute;
-        width: 180%;
-        max-width: none;
-        height: auto;
-        left: -40%;
-        top: -50%;
+        left: var(--left);
+        bottom: var(--bottom);
+        display: flex;
+        gap: 0.35rem;
+        align-items: center;
       }
-      .cue[data-cue='1'] .plate,
-      .cue[data-cue='3'] .plate {
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 0.8rem;
+      #save,
+      #share,
+      #clip-state {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        margin: 0;
+        border-radius: 2rem;
+        background: #101222eb;
+        color: #f7f8fc;
+        border: 1px solid #a9b7c6;
+        font:
+          600 0.82rem/1.15 system-ui,
+          sans-serif;
+        text-decoration: none;
       }
-      .cue[data-cue='1'] .art,
-      .cue[data-cue='3'] .art {
-        display: block;
+      #save {
+        min-height: 44px;
+        padding: 0.4rem 0.75rem;
+      }
+      #share {
+        width: 44px;
+        min-height: 44px;
+        padding: 0;
+      }
+      #clip-state {
+        padding: 0.4rem 0.65rem;
+        border-color: #65717b;
+        font-size: 0.72rem;
+      }
+      #clip-tools svg {
+        width: 19px;
+        height: 19px;
       }
       .stage-tools {
         position: absolute;
-        right: max(1rem, env(safe-area-inset-right));
-        bottom: max(1rem, env(safe-area-inset-bottom));
+        right: var(--right);
+        bottom: var(--bottom);
         display: flex;
         gap: 0.48rem;
       }
@@ -216,18 +190,6 @@
         outline: 2px solid #f6ce81;
         outline-offset: 4px;
       }
-      @media (orientation: landscape) and (max-height: 32rem) {
-        .cue {
-          top: max(0.55rem, env(safe-area-inset-top));
-        }
-        .plate {
-          max-width: 63vw;
-          padding: 0.5rem 0.75rem;
-        }
-        .art {
-          width: 3.2rem;
-        }
-      }
       @media (max-width: 30rem) {
         .controls button {
           flex: 1 1 8rem;
@@ -241,14 +203,38 @@
         <video id="feed" class="visual" autoplay muted playsinline hidden></video>
         <canvas id="scene" class="visual" aria-hidden="true" hidden></canvas>
         <canvas id="surface" class="visual" aria-hidden="true"></canvas>
-        <div id="cue" class="cue" hidden aria-live="polite" aria-atomic="true">
-          <div class="plate">
-            <div class="art"><img src="/847/primera-voluntad.svg" alt="" /></div>
-            <div>
-              <p id="cue-meta" class="meta"></p>
-              <h2 id="cue-title" class="title"></h2>
-            </div>
-          </div>
+        <div id="cue" class="sr-only" hidden aria-live="polite" aria-atomic="true">
+          <span id="cue-meta"></span> <span id="cue-title"></span>
+        </div>
+        <div id="clip-tools" hidden>
+          <span id="clip-state">Clip local de 20 s</span>
+          <a id="save" hidden download>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4" />
+            </svg>
+            Guardar video
+          </a>
+          <button id="share" type="button" aria-label="Compartir video" title="Compartir video" hidden>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 15V3m-4 4 4-4 4 4M7 10H4v11h16V10h-3" />
+            </svg>
+          </button>
         </div>
         <div id="stage-tools" class="stage-tools" hidden>
           <button id="speaker" type="button" aria-label="Activar música y pasos" aria-pressed="false">
@@ -259,8 +245,8 @@
       </section>
       <section class="details" aria-label="Sobre la experiencia">
         <div id="finish" hidden>
-          <h2>El 2 de diciembre nos vemos en la Cabaña de los Muñecos</h2>
-          <p>Puerto Iguazú · Festival Multiversos</p>
+          <h2>El 2 de diciembre por la noche nos vemos en la Cabaña de los Muñecos</h2>
+          <p>El 12 de diciembre nos vemos en Silicon Misiones, en Posadas.</p>
         </div>
         <h1>Un Ø aparece</h1>
         <p id="status" class="status" role="status">Esperando permiso para usar la cámara…</p>
@@ -272,11 +258,13 @@
         </div>
         <p>
           Apuntá a las juntas del piso o a los lados de un pasillo. El Ø viaja siguiendo su perspectiva.
-          Mové, girá o acercá el teléfono para cambiar el recorrido.
+          Incliná el teléfono y dejá caer el cartel hacia un costado. El Ø puede golpearlo en el camino.
         </p>
         <p>
           La música de fondo es «trance psicomusical», de Ø UnderTango Club. Tocá la imagen para activar
-          el sonido. El video se procesa en tu dispositivo, sin micrófono, grabación ni envío.
+          el sonido. Los primeros 20 segundos se preparan como video en tu dispositivo. Podés guardarlo o
+          compartirlo desde la esquina inferior izquierda. Al cerrar se descarta el clip local. La cámara
+          funciona sin micrófono y la página no envía las imágenes.
         </p>
         <a href="/847/primera-voluntad">← Volver a la ficha</a>
       </section>

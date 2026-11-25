@@ -1,9 +1,21 @@
 import { luminance, visibleLines } from './line-detector.mjs';
 import { cameraMotion } from './camera-motion.mjs';
 import { readFloor, SignMotion } from './motion.mjs';
-import { visibleCrop, drawWake, drawField, addMark, carryMarks, drawDemo } from './scene.mjs';
+import {
+  visibleCrop,
+  drawWake,
+  drawField,
+  addMark,
+  carryMarks,
+  drawDemo,
+  drawImpacts,
+} from './scene.mjs';
 import { drawSign } from './solid-sign.mjs';
 import { soundscape } from './footsteps.mjs';
+
+import { RollingSign, ShowBoard, collide } from './stage-physics.mjs';
+import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs';
+import { SceneClip } from './clip.mjs';
 
 const get = (id) => document.getElementById(id);
 const stage = get('stage'),
@@ -19,7 +31,7 @@ const caption = get('cue'),
   tools = get('stage-tools'),
   status = get('status'),
   finish = get('finish');
-const ctx = surface.getContext('2d'),
+const ctx = surface.getContext('2d', { alpha: false }),
   ink = scene.getContext('2d');
 const sample = document.createElement('canvas'),
   sampler = sample.getContext('2d', { willReadFrequently: true });
@@ -29,12 +41,47 @@ const gentle = matchMedia('(prefers-reduced-motion: reduce)');
 const audio = soundscape(updateSound);
 const hint =
   'Buscando un borde. Probá con dos juntas del piso o con los costados de un pasillo bien iluminado.';
-const cues = [
-  [2600, 'Ø Primera voluntad', 'Este 2 de diciembre'],
-  [10000, 'Ø Primera voluntad · Pablo Cieslik', 'Show de arte generativo'],
-  [18200, 'Festival Multiversos · Puerto Iguazú', 'La Cabaña de los Muñecos'],
-  [27500, 'Show de arte generativo · Puerto Iguazú', finish.querySelector('h2').textContent],
-];
+const clip = new SceneClip(updateClip);
+const clipTools = get('clip-tools'),
+  save = get('save'),
+  share = get('share'),
+  clipState = get('clip-state');
+const art = new Image();
+art.src = '/847/primera-voluntad.svg';
+const view = { width: 1, height: 1, left: 10, top: 10, right: 10, bottom: 68 };
+let body = null,
+  board = new ShowBoard(),
+  layout,
+  sharing = false;
+const hits = [];
+function updateClip(current) {
+  clipTools.hidden = current.state === 'idle';
+  const ready = current.state === 'ready';
+  save.hidden = !ready;
+  share.hidden = !ready || !current.canShare();
+  clipState.hidden = ready;
+  if (ready) {
+    save.href = current.url;
+    save.download = current.file.name;
+  } else {
+    save.removeAttribute('href');
+    clipState.textContent =
+      current.state === 'unavailable' ? 'Video no disponible' : 'Clip local de 20 s';
+  }
+}
+share.addEventListener('click', async () => {
+  if (sharing || !clip.canShare()) return;
+  sharing = true;
+  try {
+    await navigator.share({ files: [clip.file], title: 'Ø Primera voluntad' });
+  } catch (error) {
+    if (error.name !== 'AbortError')
+      status.textContent = 'Podés descargar el archivo con Guardar video.';
+  } finally {
+    sharing = false;
+    if (document.hidden && mode) end('Experiencia cerrada al cambiar de pestaña.');
+  }
+});
 
 let generation = 0,
   mode = null,
@@ -56,8 +103,7 @@ let sceneStart = 0,
   lastStep = 0,
   side = 1,
   lean = 1,
-  cueIndex = -1,
-  nextDrift = 0;
+  cueIndex = -1;
 const marks = [];
 
 function updateSound() {
@@ -88,13 +134,25 @@ function resize() {
   const changedAspect = Math.abs(w / h / (width / height) - 1) > 0.3;
   width = w;
   height = h;
-  const ratio = Math.min(devicePixelRatio || 1, 1.75, Math.sqrt(1550000 / (w * h)));
+  const ratio = Math.min(devicePixelRatio || 1, 1.1, Math.sqrt(820000 / (w * h)));
   surface.width = Math.round(w * ratio);
   surface.height = Math.round(h * ratio);
   ctx?.setTransform(surface.width / w, 0, 0, surface.height / h, 0, 0);
   scene.width = w;
   scene.height = h;
+  const style = getComputedStyle(stage);
+  Object.assign(view, {
+    width: w,
+    height: h,
+    top: 2 + parseFloat(style.paddingTop),
+    left: 2 + parseFloat(style.paddingLeft),
+    right: 5 + parseFloat(style.paddingRight),
+    bottom: 58 + parseFloat(style.paddingBottom),
+  });
+  layout = layoutBoard(ctx, view);
+  board.fit(view, layout);
   if (motion && changedAspect) {
+    body = null;
     motion = null;
     phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
   } else motion?.resize(w, h);
@@ -107,7 +165,11 @@ function resize() {
 function release() {
   generation++;
   cancelAnimationFrame(frame);
-  mode = motion = previous = null;
+  mode = motion = previous = body = null;
+  clip.reset();
+  board = new ShowBoard();
+  if (layout) board.fit(view, layout);
+  hits.length = 0;
   if (stream) stream.getTracks().forEach((track) => track.stop());
   stream = null;
   feed.pause();
@@ -118,8 +180,6 @@ function release() {
   marks.length = 0;
   caption.hidden = tools.hidden = true;
   cueIndex = -1;
-  caption.style.removeProperty('--dx');
-  caption.style.removeProperty('--dy');
   audio.close();
 }
 function end(message, complete = false) {
@@ -127,34 +187,15 @@ function end(message, complete = false) {
   finish.hidden = !complete;
   phase('idle', message);
 }
-function showWords(now) {
-  const next = cueIndex + 1;
-  if (next < cues.length && now - sceneStart >= cues[next][0]) {
-    cueIndex = next;
-    get('cue-meta').textContent = cues[next][1];
-    get('cue-title').textContent = cues[next][2];
-    caption.dataset.cue = String(next);
-    caption.hidden = tools.hidden = false;
-    if (!gentle.matches)
-      caption.firstElementChild.animate?.(
-        [
-          { opacity: 0, transform: 'translateY(5px)' },
-          { opacity: 1, transform: 'translateY(0)' },
-        ],
-        { duration: 650, easing: 'ease-out' }
-      );
-    if (motion) addMark(marks, motion, now, true, -side);
-  }
-  if (motion && !caption.hidden && now >= nextDrift) {
-    nextDrift = now + 85;
-    const f = motion.floor;
-    const x = gentle.matches
-      ? 0
-      : Math.max(-5, Math.min(5, (f.vanish.x / width - 0.5) * 10 + motion.tilt * 5));
-    const y = gentle.matches ? 0 : Math.max(-4, Math.min(4, (f.vanish.y / height - 0.32) * 9));
-    caption.style.setProperty('--dx', x.toFixed(1) + 'px');
-    caption.style.setProperty('--dy', y.toFixed(1) + 'px');
-  }
+function showWords(elapsed) {
+  const next = cueAt(elapsed);
+  if (next === cueIndex || next < 0) return;
+  cueIndex = next;
+  const cue = announcements[next];
+  get('cue-meta').textContent = 'Show de arte generativo · ' + cue.city;
+  get('cue-title').textContent = cue.text;
+  caption.dataset.cue = String(next);
+  caption.hidden = tools.hidden = false;
 }
 function analyze(source, crop, now) {
   const scale = 192 / Math.max(width, height),
@@ -167,10 +208,11 @@ function analyze(source, crop, now) {
   }
   sampler.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
   const current = luminance(sampler.getImageData(0, 0, w, h));
-  if (motion && previous && now - lastRead < 550) {
+  if (previous && now - lastRead < 550) {
     const change = cameraMotion(previous, current);
     if (change) {
-      motion.carry(change);
+      board.carry(change);
+      motion?.carry(change);
       carryMarks(marks, change, width, height);
     }
   }
@@ -181,9 +223,13 @@ function analyze(source, crop, now) {
   const ground = readFloor(visibleLines(current), width, height, motion?.target.line);
   if (!ground) return;
   lastLineAt = now;
-  if (ground.kind === 'convergence') lastPairAt = now;
+  if (ground.kind === 'convergence') {
+    lastPairAt = now;
+    board.observe(ground.angle);
+  }
   if (!motion) {
     motion = new SignMotion(ground, width, height, gentle.matches);
+    body = new RollingSign(motion);
     phase(
       'ground',
       mode === 'demo' ? 'Escena de muestra, sin cámara.' : 'El Ø sigue el movimiento de tu encuadre.'
@@ -202,58 +248,89 @@ function refreshTexture(source, crop, stamp) {
   textureInk.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
   textureTime = stamp;
 }
-function renderMotion(source, crop, now, dt) {
-  const lost = now - lastLineAt;
-  if (lost > 1450) {
-    motion = null;
+function render(source, crop, now, dt) {
+  const elapsed = now - sceneStart,
+    lost = now - lastLineAt;
+  showWords(elapsed);
+  if (motion && lost > 1900) {
+    motion = body = null;
     marks.length = 0;
-    ctx.clearRect(0, 0, width, height);
     phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
-    return;
   }
   let turned = false;
   while (dt > 0) {
-    const step = Math.min(dt, 1 / 40);
-    if (motion.advance(step)) turned = true;
+    const step = Math.min(dt, 1 / 90);
+    if (cueIndex >= 0) board.advance(view, step, elapsed / 1000, gentle.matches);
+    if (motion) {
+      if (motion.advance(step)) turned = true;
+      body.advance(motion, step);
+      const hit = cueIndex >= 0 && lost < 900 ? collide(body, board, now) : null;
+      if (hit) {
+        hits.push(hit);
+        if (Math.abs(hit.ny) > 0.35) motion.direction = hit.ny > 0 ? -1 : 1;
+        motion.lateral += hit.nx * 0.24;
+        turned = true;
+      }
+    }
     dt -= step;
   }
-  const beat = audio.pulse();
-  if (lost < 850 && (turned || now - lastStep > 460 + 100 * motion.depth)) {
-    lastStep = now;
-    side *= -1;
-    addMark(marks, motion, now, true, side);
-    audio.step(motion.x / width, motion.y / height, turned, side);
+  ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
+  if (motion) {
+    const beat = audio.pulse();
+    if (lost < 900 && (turned || now - lastStep > 460 + 100 * motion.depth)) {
+      lastStep = now;
+      side *= -1;
+      addMark(marks, body, now, true, side);
+      audio.step(body.x / width, body.y / height, turned, side);
+    }
+    if (now - lastMark >= (gentle.matches ? 190 : 105)) {
+      lastMark = now;
+      addMark(marks, body, now, false, side);
+    }
+    refreshTexture(source, crop, nextRead);
+    drawWake(
+      ctx,
+      texture,
+      { x: 0, y: 0, w: texture.width, h: texture.height },
+      width,
+      height,
+      marks,
+      now,
+      gentle.matches
+    );
+    drawImpacts(
+      ctx,
+      texture,
+      { x: 0, y: 0, w: texture.width, h: texture.height },
+      view,
+      hits,
+      now,
+      gentle.matches
+    );
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (1900 - lost) / 900);
+    drawField(ctx, body, marks, now, beat);
+    drawSign(ctx, body, beat, now);
+    ctx.restore();
   }
-  if (now - lastMark >= (gentle.matches ? 190 : 115)) {
-    lastMark = now;
-    addMark(marks, motion, now, false, side);
+  if (cueIndex >= 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (elapsed - 850) / 250);
+    paintBoard(ctx, board, layout, cueIndex, art, now);
+    ctx.restore();
   }
-  ctx.clearRect(0, 0, width, height);
-  refreshTexture(source, crop, nextRead);
-  drawWake(
-    ctx,
-    texture,
-    { x: 0, y: 0, w: texture.width, h: texture.height },
-    width,
-    height,
-    marks,
-    now,
-    gentle.matches
-  );
-  drawField(ctx, motion, marks, now, beat);
-  ctx.save();
-  ctx.globalAlpha = Math.min(1, (1450 - lost) / 550);
-  drawSign(ctx, motion, beat, now);
-  ctx.restore();
+  if (clip.state === 'idle') clip.begin(surface, audio, now);
+  else if (clip.state === 'preparing') clip.paint(surface, now);
 }
 function animate(now) {
-  const dt = Math.min(0.2, Math.max(0, (now - frameAt) / 1000));
+  const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
   frameAt = now;
   const isDemo = mode === 'demo',
     source = isDemo ? scene : feed;
   const sw = isDemo ? scene.width : feed.videoWidth,
     sh = isDemo ? scene.height : feed.videoHeight;
   if (sw && sh && (isDemo || feed.readyState >= 2)) {
+    if (!sceneStart) sceneStart = lastMark = lastStep = now;
     const crop = visibleCrop(sw, sh, width, height);
     if (now >= nextRead) {
       nextRead = now + 63;
@@ -265,16 +342,16 @@ function animate(now) {
         return;
       }
     }
-    showWords(now);
-    if (motion) renderMotion(source, crop, now, dt);
+    render(source, crop, now, dt);
   }
   frame = requestAnimationFrame(animate);
 }
 function startFrames() {
-  frameAt = sceneStart = performance.now();
+  frameAt = performance.now();
+  sceneStart = 0;
   textureTime = -1;
   lastMark = lastStep = sceneStart;
-  nextRead = nextLines = nextDrift = 0;
+  nextRead = nextLines = 0;
   lastPairAt = -Infinity;
   side = 1;
   phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
@@ -343,15 +420,24 @@ get('dismiss').addEventListener('click', dismiss);
 sound.addEventListener('click', audio.toggle);
 speaker.addEventListener('click', audio.toggle);
 stage.addEventListener('click', (event) => {
-  if (mode && !event.target.closest('button')) audio.unlock();
+  if (mode && !event.target.closest('button,a')) audio.unlock();
 });
 addEventListener('pagehide', () => end('Experiencia cerrada. Podés volver a empezar.'));
 if (typeof ResizeObserver === 'function') new ResizeObserver(resize).observe(stage);
 else addEventListener('resize', resize);
+document.fonts
+  ?.load('800 20px Uberlin')
+  .then(() => {
+    if (ctx && layout) {
+      layout = layoutBoard(ctx, view);
+      board.fit(view, layout);
+    }
+  })
+  .catch(() => {});
 let opened = false;
 function visibility() {
   if (document.hidden) {
-    if (mode) end('Experiencia cerrada al cambiar de pestaña.');
+    if (mode && !sharing) end('Experiencia cerrada al cambiar de pestaña.');
   } else if (!opened) {
     opened = true;
     enter(location.hash === '#sin-camara' ? 'demo' : 'camera');

@@ -25,6 +25,8 @@ export function soundscape(onChange) {
     muted = false,
     playing = false,
     failed = false;
+  let master = null,
+    recording = null;
   let request = null,
     music = null,
     meter = null,
@@ -38,7 +40,8 @@ export function soundscape(onChange) {
       music.disconnect();
       music = null;
     }
-    meter = null;
+    if (recording) recording.stream.getTracks().forEach((track) => track.stop());
+    recording = master = meter = null;
     noise = null;
     level = 0;
     failed = false;
@@ -70,7 +73,7 @@ export function soundscape(onChange) {
       gain.gain.linearRampToValueAtTime(0.31, ctx.currentTime + 0.65);
       source.connect(meter);
       meter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(master);
       source.start();
       music = source;
     } catch {
@@ -83,10 +86,17 @@ export function soundscape(onChange) {
     }
   }
   function unlock() {
-    if (muted || !Audio) return;
+    if (!Audio) return;
     try {
       if (!context) {
         context = new Audio();
+        master = context.createGain();
+        master.gain.value = muted ? 0 : 1;
+        master.connect(context.destination);
+        if (context.createMediaStreamDestination) {
+          recording = context.createMediaStreamDestination();
+          master.connect(recording);
+        }
         context.onstatechange = () => {
           startMusic();
           onChange();
@@ -118,14 +128,16 @@ export function soundscape(onChange) {
     }
     if (context?.state === 'running' && !muted) {
       muted = true;
-      disconnect();
+      master.gain.setTargetAtTime(0, context.currentTime, 0.015);
+      onChange();
     } else {
       muted = false;
+      if (master) master.gain.setTargetAtTime(1, context.currentTime, 0.015);
       unlock();
     }
   }
   function pulse() {
-    if (!meter || context?.state !== 'running') return 0;
+    if (muted || !meter || context?.state !== 'running') return 0;
     meter.getByteTimeDomainData(samples);
     let power = 0;
     for (const s of samples) power += ((s - 128) / 128) ** 2;
@@ -138,9 +150,9 @@ export function soundscape(onChange) {
     const pan = context.createStereoPanner?.();
     if (pan) {
       pan.pan.value = Math.max(-0.85, Math.min(0.85, (x - 0.5) * 1.7));
-      pan.connect(context.destination);
+      pan.connect(master);
     }
-    const out = pan || context.destination;
+    const out = pan || master;
     const heel = context.createOscillator(),
       thud = context.createGain();
     heel.frequency.setValueAtTime((side > 0 ? 132 : 109) + 20 * (1 - y), t);
@@ -185,6 +197,26 @@ export function soundscape(onChange) {
     step,
     pulse,
     supported: Boolean(Audio),
+    recordingTrack: () => recording?.stream.getAudioTracks()[0],
+    tap(copy) {
+      if (!context?.createScriptProcessor || !master) return null;
+      // Used for the PCM track only when the browser lacks a native recorder.
+      const input = master,
+        meterTap = context.createScriptProcessor(2048, 1, 1);
+      const silent = context.createGain();
+      silent.gain.value = 0;
+      input.connect(meterTap);
+      meterTap.connect(silent);
+      silent.connect(context.destination);
+      meterTap.onaudioprocess = (event) =>
+        copy(event.inputBuffer.getChannelData(0), event.inputBuffer.sampleRate, performance.now());
+      return () => {
+        meterTap.onaudioprocess = null;
+        input.disconnect(meterTap);
+        meterTap.disconnect();
+        silent.disconnect();
+      };
+    },
     start() {
       playing = true;
       unlock();

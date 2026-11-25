@@ -7,6 +7,9 @@ import { visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
 
 import { cameraMotion, carryPoint } from '../public/847/primera-voluntad/camera-motion.mjs';
 
+import { RollingSign, ShowBoard, collide } from '../public/847/primera-voluntad/stage-physics.mjs';
+import { announcements, cueAt } from '../public/847/primera-voluntad/show-board.mjs';
+
 const width = 192,
   height = 138;
 
@@ -227,4 +230,64 @@ test('forward and return travel share a perspective projection and keep reversin
 test('sampling and local distortions share the same object-fit cover crop', () => {
   assert.deepEqual(visibleCrop(640, 480, 240, 480), { x: 200, y: 0, w: 240, h: 480 });
   assert.deepEqual(visibleCrop(480, 640, 480, 240), { x: 0, y: 200, w: 480, h: 240 });
+});
+
+test('a sudden camera displacement drives the visible sign over consecutive frames', () => {
+  const route = new SignMotion(floorFixture(), 400, 800),
+    sign = new RollingSign(route);
+  const start = sign.x;
+  route.x += 120;
+  for (let frame = 0; frame < 60; frame++) {
+    const before = sign.x;
+    sign.advance(route, 1 / 60);
+    assert.ok(sign.x > before && sign.x - before < 5.1);
+    if (frame === 0) assert.ok(sign.x - start < 2);
+  }
+  assert.ok(sign.x - start > 112);
+});
+
+test('a held camera roll lets the board settle down the corresponding side', () => {
+  const view = { width: 400, height: 800, left: 14, right: 14, top: 14, bottom: 68 };
+  const board = new ShowBoard();
+  board.fit(view, { width: 280, height: 120 });
+  for (let i = 0; i < 240; i++) board.advance(view, 1 / 60, i / 60, true);
+  const centered = { x: board.x, y: board.y };
+  for (const angle of [-0.3, 0.6]) {
+    board.carry({ a: Math.cos(angle), b: Math.sin(angle), dx: 0 });
+    for (let i = 0; i < 240; i++) board.advance(view, 1 / 60, i / 60, true);
+    assert.ok((board.x - centered.x) * (angle < 0 ? 1 : -1) > 30);
+    assert.ok(board.y > centered.y + 120);
+    const half =
+      (board.width * Math.abs(Math.cos(board.angle)) + board.height * Math.abs(Math.sin(board.angle))) /
+      2;
+    assert.ok(board.x - half >= view.left - 0.01 && board.x + half <= view.width - view.right + 0.01);
+  }
+});
+
+test('the visible rotated face rejects a miss and transfers momentum on contact', () => {
+  const board = Object.assign(new ShowBoard(), { x: 180, y: 275, width: 170, height: 76, angle: 0.21 });
+  const r = 21,
+    nx = -Math.sin(board.angle),
+    ny = Math.cos(board.angle);
+  const distance = board.height / 2 + r * 1.04;
+  const sign = {
+    x: board.x + nx * (distance + 2),
+    y: board.y + ny * (distance + 2) + r,
+    radius: r,
+    vx: -nx * 100,
+    vy: -ny * 100,
+  };
+  assert.equal(collide(sign, board, 1000), null);
+  sign.x -= nx * 4;
+  sign.y -= ny * 4;
+  const hit = collide(sign, board, 1020);
+  assert.ok(hit && Math.abs(hit.nx - nx) < 0.001 && Math.abs(hit.ny - ny) < 0.001);
+  assert.ok(sign.vx * nx + sign.vy * ny > 0 && board.vx * nx + board.vy * ny < 0);
+  assert.equal(collide(sign, board, 1030), null);
+});
+
+test('both cities appear within the clip and Posadas stays after the download becomes available', () => {
+  assert.equal(cueAt(0), -1);
+  assert.equal(announcements[cueAt(9999)].city, 'Puerto Iguazú');
+  for (const ms of [10000, 19999, 20000, 60000]) assert.equal(announcements[cueAt(ms)].city, 'Posadas');
 });

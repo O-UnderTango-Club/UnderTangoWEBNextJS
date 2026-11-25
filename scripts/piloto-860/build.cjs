@@ -15,8 +15,17 @@ if (durationFile && (!Array.isArray(officialTimes) || officialTimes.length !== 1
 if (controls.format !== "undertango-860/controles-v1" || !controls.settings) throw Error("Falta el mapa del Órganon.");
 const entries = fs.readdirSync(route).filter(name => /\.tsx?$/.test(name) && !["page.tsx","layout.tsx"].includes(name));
 entries.push("organon/page.tsx", "votar/page.tsx");
-const mime = {".wav":"audio/wav",".mp3":"audio/mpeg",".png":"image/png",".jpg":"image/jpeg"};
+const mime = {".wav":"audio/wav",".mp3":"audio/mpeg",".mp4":"video/mp4",".png":"image/png",".jpg":"image/jpeg"};
 const assets = new Map();
+function inlineAssets(source) {
+  return source.replaceAll(/(["'])\/multiversos\/([\w.-]+)\1/g, (_, quote, asset) => {
+    if (!assets.has(asset)) {
+      const bytes=fs.readFileSync(path.join(root,"public/multiversos",asset));
+      assets.set(asset,"data:"+mime[path.extname(asset)]+";base64,"+bytes.toString("base64"));
+    }
+    return "__assets["+JSON.stringify(asset)+"]";
+  });
+}
 
 const modules = entries.map(name => {
   let source = read(path.join(route,name));
@@ -31,13 +40,7 @@ const modules = entries.map(name => {
       .replace(/<img src=\{[^}]+votar\/qr[^>]+\/>/, '<span style={{display:"block",color:"#171925",padding:"1em"}}>Votar en esta PC ↗</span>');
   }
   if (name === "votar/page.tsx") source = source.replace('new URLSearchParams(location.search)', 'new URLSearchParams(location.hash.split("?")[1])');
-  source = source.replaceAll(/(["'])\/multiversos\/([\w.-]+)\1/g, (_, quote, asset) => {
-    if (!assets.has(asset)) {
-      const bytes=fs.readFileSync(path.join(root,"public/multiversos",asset));
-      assets.set(asset,"data:"+mime[path.extname(asset)]+";base64,"+bytes.toString("base64"));
-    }
-    return "__assets["+JSON.stringify(asset)+"]";
-  });
+  source = inlineAssets(source);
   // A JSX attribute needs an expression for an embedded resource.
   source = source.replaceAll(/src=__assets\["([^"]+)"\]/g,'src={__assets["$1"]}');
   if (name==="partitura.tsx") source=source.replace('href="/860-multiversos/organon"','href="#organon"');
@@ -53,6 +56,8 @@ const modules = entries.map(name => {
   if (result.diagnostics?.length) throw Error(ts.flattenDiagnosticMessageText(result.diagnostics[0].messageText,"\n")+" · "+name);
   return JSON.stringify(name.replace(/\.tsx?$/,""))+":(module,exports,require)=>{\n"+result.outputText+"\n}";
 });
+const videoCatalog = JSON.stringify(JSON.parse(read(path.join(route,"scene-videos.json"))));
+modules.push('"scene-videos.json":(module)=>{module.exports='+inlineAssets(videoCatalog)+';}');
 const styles = {};
 const css = ["page.module.css","organon/page.module.css","votar/votar.module.css"].map(file=>{
   const mapping={};
@@ -127,4 +132,4 @@ const domDir = path.dirname(require.resolve("react-dom/package.json"));
 const scripts = [read(path.join(reactDir,"umd/react.production.min.js")),read(path.join(domDir,"umd/react-dom.production.min.js")),runtime];
 const html='<!doctype html><html lang="es-AR" data-ensayo="860"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>860 Multiversos · Piloto de apertura</title><style>:root{--font-undertango-sans:system-ui;--font-undertango-editorial:Georgia}body{margin:0;background:#11131a}*,*::before,*::after{box-sizing:border-box}'+css+'</style></head><body><div id="app"></div>'+scripts.map(js=>'<script>'+js.replaceAll(/<\/script/gi,'<\\/script')+'</script>').join("")+'</body></html>';
 fs.writeFileSync(outputFile,html);
-console.log(path.resolve(outputFile)+" · "+assets.size+" recursos de imagen y audio");
+console.log(path.resolve(outputFile)+" · "+assets.size+" recursos audiovisuales");

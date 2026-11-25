@@ -1,4 +1,4 @@
-import {useEffect,useState,type CSSProperties} from "react";
+import {useEffect,useState,type CSSProperties,type ReactNode} from "react";
 import {INKS, isRound, PALETTES, remainingSeconds, TIMBRES} from "./coda-ballot";
 import {useHostedBallot} from "./coda-host";
 import {StimulusBar} from "./stimulus-bar";
@@ -33,7 +33,7 @@ const style = `
 @media(prefers-reduced-motion:reduce){.coda-wave{animation:none;opacity:.3;transform:translate(-50%,-50%) scale(.85)}}
 @container(max-width:430px){.coda-invite{inset:17% 5% 6%;gap:3%;grid-template-columns:1fr 1fr;}.coda-stage h2{font-size:clamp(1.4rem,7cqw,2.1rem)}.coda-qr{width:min(100%,48cqh);}}
 `;
-type Props={scene:number;clock:AudioContext;beginsAt:number;duration:number;output:GainNode|null;paused:boolean;routing:{current:PerformanceInput|null}};
+type Props={scene:number;clock:AudioContext;beginsAt:number;duration:number;output:GainNode|null;paused:boolean;routing:{current:PerformanceInput|null};filmLayer:ReactNode};
 export function CodaProjection(props:Props) {
   const {scene,paused}=props;
   const {session,state,colorSound,issue,clockOffset}=useHostedBallot(props);
@@ -55,6 +55,7 @@ export function CodaProjection(props:Props) {
   return <div className="coda-stage" data-scene={scene} data-color={selection.color} data-sound={selection.sound}
     style={{"--coda-color":INKS[selection.color],"--coda-light":.06+.68*((111-scene)/21)} as CSSProperties}>
     <style>{style}</style>
+    {props.filmLayer}
     <StimulusBar scene={scene} paused={paused} ballot={state && (!isRound(scene) || vote) ? {
       open:vote && state.open, total:state.total,
       choice:colorSound ? PALETTES[colorSound.color]+" · "+TIMBRES[colorSound.sound] : null,

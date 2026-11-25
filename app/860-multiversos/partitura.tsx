@@ -28,6 +28,7 @@ import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
+import { SceneVideo, sceneFilms } from "./scene-video";
 import { usesSceneKeyboard } from "./scene-instrument";
 import { DjConsole } from "./dj-console";
 import { DJ_CONTROL, herculesCommand, isInpulse200, type DjCommand } from "./dj-midi";
@@ -1221,6 +1222,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
   const [showStopwatch, setShowStopwatch] = useSavedSetting("showStopwatch", false);
+  const [filmControls, setFilmControls] = useState<HTMLDivElement | null>(null);
   const strikes = useRef<PointStrike[]>([]);
   const [voiceUnavailable, setVoiceUnavailable] = useState(false);
 
@@ -1656,6 +1658,10 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const numberedMode = activeScene === "harmonics" ? "line" : activeScene;
   const sceneIndex = numberedControls.findIndex(control => control.mode === numberedMode);
   const sceneNumber = sceneIndex >= 0 ? SHOW_SCORE[sceneIndex].number : null;
+  const film = sceneNumber === null ? undefined : sceneFilms.get(sceneNumber);
+  const filmLayer = film && cue && outputRef.current
+    ? <SceneVideo key={sceneNumber} film={film} cue={cue} paused={paused} output={outputRef.current} controls={filmControls} />
+    : null;
   const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack);
   const loopFrame = sceneNumber===14 ? chordLoop.frame : extended.three
     ? (extended.loops.find(loop=>loop.frame?.running)?.frame ?? extended.loops[0].frame) : extended.manual.frame;
@@ -1709,6 +1715,12 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         container: scene-display / size;
       }
       .scene-mixer { min-width:0; min-height:0; overflow:auto; overscroll-behavior:contain; background:#15151d; color:white; font: .76rem system-ui; }
+      .scene-film { position:absolute; inset:0; z-index:-1; width:100%; height:100%; pointer-events:none; }
+      .scene-film[hidden] { display:none; }
+      .live-set:has(> .scene-film:not([hidden])) > canvas[data-resonant-scene] { mix-blend-mode:screen; }
+      .scene-film-caption { margin:.65rem 0 .25rem; font-size:.82rem; }
+      .scene-film-controls { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem; margin:.35rem 0; }
+      .zero-controls .scene-film-controls button { min-height:32px; padding:.25rem .5rem; font-size:.78rem; }
       .scene-mixer-tools,.scene-mixer-row { display:flex; align-items:center; gap:.5rem; padding:.24rem .55rem; flex-wrap:wrap; }
       .scene-mixer-tools .scene-record {color:#ff696f;font-size:1.15rem;line-height:1;min-width:2.5rem;}
       .scene-mixer-tools details[open] {display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;}
@@ -2073,10 +2085,11 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       ${EXTENDED_STYLE}
     `}</style>
     <ProjectionSignalContext.Provider value={signals}><div className="zero-performance">
-      <SceneMixer stageBackground={extendedDark ? "#130f20" : light ? "#fff" : "#000"} extendedDark={extendedDark}
+      <SceneMixer filmLayer={liveSet ? filmLayer : null} stageBackground={extendedDark ? "#130f20" : light ? "#fff" : "#000"} extendedDark={extendedDark}
         canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={reset} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
         countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused}>
+      {!liveSet && !coda && filmLayer}
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} cue={cue} paused={paused} />}
       {(sceneNumber === 1 || stage === "two") && cue && <OpeningProjection scene={stage === "two" ? 2 : 1} cue={cue} seconds={activeDurationMs / 1000} strikes={strikes} />}
@@ -2092,7 +2105,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         beginsAt={cue?.beginsAt ?? 0} />}
       {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
       {(extendedScene === 60 || extendedScene === 61 || extendedScene === 62) && cue && <HardstyleTrack clock={cue.context} output={outputRef.current} paused={paused} />}
-      {coda && cue && <CodaProjection scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} paused={paused} routing={pianoRouting} />}
+      {coda && cue && <CodaProjection filmLayer={filmLayer} scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} paused={paused} routing={pianoRouting} />}
       {extendedScene && !liveSet && !coda && cue && (extendedScene === 42 || extendedScene === 62
         ? <TypeProjection scene={extendedScene} beginsAt={cue.beginsAt} clock={cue.context} paused={paused} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} />
         : extendedScene === 61
@@ -2129,6 +2142,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
           const isActive = mode === numberedMode;
           const score = SHOW_SCORE[index], seconds = durations[index];
           const excerpt = REPERTOIRE[score.number];
+          const sceneFilm = sceneFilms.get(score.number);
           const {min,max} = limits[index];
           return <div key={mode} className="zero-scene" role="region" data-scene={score.number} aria-labelledby={`${id}-title`}
             ref={isActive ? activeSceneRef : undefined} aria-current={isActive ? "step" : undefined}>
@@ -2144,6 +2158,10 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
                 }} onKeyDown={event => {if(event.key === "Enter")event.currentTarget.blur();}} /> s</label>
             </div>
             <small>{scoreTime(cueStarts[index])} · {score.title}</small>
+            {sceneFilm && <>
+              <p className="scene-film-caption">Fondo · {sceneFilm.clip.title}</p>
+              {isActive && <div ref={setFilmControls} />}
+            </>}
             {score.number === 70 && <p>Escenas 70–79 · trance psicomusical. El fragmento entra en el ensamble de la 79.</p>}
             {excerpt && <RepertoireCue scene={score.number} clip={excerpt} seconds={seconds}
               cue={isActive ? cue : null} output={isActive ? outputRef.current : null} />}

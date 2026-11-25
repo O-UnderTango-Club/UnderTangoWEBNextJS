@@ -1,12 +1,14 @@
+import { introMs, invitationMs } from './timing.mjs';
+
 export const announcements = [
   {
     city: 'Puerto Iguazú',
-    text: 'El 2 de diciembre por la noche nos vemos en la Cabaña de los Muñecos',
+    text: 'El 2 de diciembre nos vemos en la Cabaña de los Muñecos',
   },
   { city: 'Posadas', text: 'El 12 de diciembre nos vemos en Silicon Misiones, en Posadas' },
 ];
 export function cueAt(ms) {
-  return ms < 850 ? -1 : ms < 10000 ? 0 : 1;
+  return ms < introMs ? -1 : ms < introMs + invitationMs ? 0 : 1;
 }
 
 function wrap(ctx, text, width) {

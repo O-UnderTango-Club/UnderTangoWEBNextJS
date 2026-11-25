@@ -1,7 +1,7 @@
 import { WebClip } from './webm.mjs';
 import { PhotoClip } from './quicktime.mjs';
 
-export const clipLength = 20000;
+import { clipLength, clipName } from './timing.mjs';
 const avcFormats = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2'];
 const otherFormats = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4', ''];
 
@@ -48,7 +48,7 @@ export class SceneClip {
   }
   async begin(source, audio, now) {
     if (this.state !== 'idle') return;
-    this.started = performance.now();
+    this.started = now;
     this.setState('preparing');
     try {
       this.canvas = document.createElement('canvas');
@@ -56,7 +56,7 @@ export class SceneClip {
       this.size(source, 960);
       this.paint(source, now);
       const canvas = this.canvas,
-        native = window.MediaRecorder && canvas.captureStream;
+        native = window.MediaRecorder && canvas.captureStream && audio.recordingTrack();
       if (native && this.native(source, audio, avcFormats)) return;
       this.stopTracks();
       this.size(source, 840);
@@ -126,12 +126,15 @@ export class SceneClip {
           if (!chunks.length) return this.complete(null);
           const type = (active.mimeType || chunks[0].type).split(';')[0];
           const ext = type.includes('mp4') ? 'mp4' : 'webm';
-          this.complete(new File(chunks, 'primera-voluntad-20s.' + ext, { type }));
+          this.complete(new File(chunks, clipName(clipLength, ext), { type }));
         };
         active.start(1000);
-        this.timer = setTimeout(() => {
-          if (this.recorder === active && active.state !== 'inactive') active.stop();
-        }, clipLength);
+        this.timer = setTimeout(
+          () => {
+            if (this.recorder === active && active.state !== 'inactive') active.stop();
+          },
+          Math.max(0, clipLength - (performance.now() - this.started))
+        );
         this.setState('preparing');
         return true;
       } catch {

@@ -10,77 +10,167 @@ export function visibleCrop(sourceWidth, sourceHeight, width, height) {
 }
 
 export function addMark(marks, motion, now, step, side) {
-  const { radius } = motion;
-  const angle = Math.atan2(motion.vy, motion.vx);
-  const offset = step ? radius * 0.34 * side : 0;
+  const last = marks.at(-1);
+  if (last && now - last.born < 35) {
+    if (step) {
+      last.step = true;
+      last.side = side;
+    }
+    return;
+  }
+  const speed = Math.hypot(motion.vx, motion.vy);
+  let angle = speed > 3 ? Math.atan2(motion.vy, motion.vx) : (last?.angle ?? 0);
+  // Keep the two hems of the ribbon on their respective sides during a reversal.
+  if (last && Math.cos(angle - last.angle) < 0) angle += Math.PI;
+  const bend = last ? Math.sin(angle - last.angle) : 0;
   marks.push({
-    x: motion.x - Math.sin(angle) * offset,
-    y: motion.y + Math.cos(angle) * offset,
-    radius: radius * (step ? 2.1 : 1.7),
+    x: motion.x,
+    y: motion.y,
+    radius: motion.radius,
     angle,
-    side,
+    bend,
+    spin: motion.spin,
+    pressure: Math.min(1, speed / (3 * motion.radius) + motion.energy * 0.28),
     step,
+    side,
     born: now,
-    lifetime: (step ? 1650 : 920) * (motion.gentle ? 0.75 : 1),
   });
-  if (marks.length > 14) marks.shift();
+  if (marks.length > 28) marks.shift();
 }
 
-// Pull displaced strips from the currently visible camera crop, only under the
-// logo's trail. The video used by the detector always stays untouched.
-export function drawWake(ctx, source, crop, width, height, marks, now, gentle) {
-  while (marks.length && now - marks[0].born > marks[0].lifetime) marks.shift();
-  // Three fresh lenses bend pixels. Older marks keep their colored afterimage.
-  const bendFrom = Math.max(0, marks.length - 3);
-  for (const [i, m] of marks.entries()) {
-    const age = (now - m.born) / m.lifetime;
-    if (age >= 1) continue;
-    const fade = 1 - age,
-      r = m.radius * (1 + 0.22 * age);
-    const c = Math.cos(m.angle),
-      s = Math.sin(m.angle);
-    ctx.save();
+function smoothPath(ctx, points, join = false) {
+  const first = points[0];
+  if (join) ctx.lineTo(first.x, first.y);
+  else ctx.moveTo(first.x, first.y);
+  for (let i = 1; i < points.length - 1; i++) {
+    const a = points[i],
+      b = points[i + 1];
+    ctx.quadraticCurveTo(a.x, a.y, (a.x + b.x) / 2, (a.y + b.y) / 2);
+  }
+  const last = points.at(-1);
+  ctx.lineTo(last.x, last.y);
+}
+
+// The width and twist come from the sign's angular motion, speed and turns.
+// The ribbons sample the floor underneath, then fine strands cross their folds.
+export function drawWake(ctx, source, crop, width, height, marks, now, body) {
+  const gentle = body.gentle,
+    lifetime = gentle ? 1500 : 2100;
+  while (marks.length && now - marks[0].born > lifetime) marks.shift();
+  if (marks.length < 2) return;
+  const last = marks.at(-1);
+  const knots = [
+    ...marks,
+    { ...last, x: body.x, y: body.y, radius: body.radius, spin: body.spin, born: now, step: false },
+  ];
+  const spine = knots.map((m, i) => {
+    const age = (now - m.born) / lifetime;
+    const bloom = Math.sin(Math.PI * Math.min(1, age * 1.3));
+    const taper = Math.min(1, i / 2, (1 - age) * 5);
+    const span =
+      m.radius *
+      taper *
+      (0.22 + bloom * (gentle ? 0.64 : 1.15) + 0.48 * m.pressure + 0.45 * Math.abs(m.bend));
+    return {
+      x: m.x,
+      y: m.y,
+      nx: -Math.sin(m.angle) * span,
+      ny: Math.cos(m.angle) * span,
+      phase: m.spin * 1.65 + age * 3.8 + m.bend * 1.4,
+    };
+  });
+  const strand = (lane) =>
+    spine.map((k) => {
+      const wave =
+        lane * 0.29 + 0.8 * Math.sin(k.phase + lane * 1.95) + 0.14 * Math.sin(2.3 * k.phase + lane);
+      return { x: k.x + k.nx * wave, y: k.y + k.ny * wave };
+    });
+  const left = strand(-1),
+    right = strand(1);
+  const head = spine.at(-1),
+    tail = spine[0];
+  const hue = (now * 0.018 + 156 + last.bend * 30) % 360;
+  const pigment = ctx.createLinearGradient(tail.x, tail.y, head.x + 0.01, head.y);
+  pigment.addColorStop(0, `hsla(${hue + 92},86%,57%,.03)`);
+  pigment.addColorStop(0.36, `hsla(${hue + 55},92%,63%,.44)`);
+  pigment.addColorStop(0.72, `hsla(${hue},95%,67%,.56)`);
+  pigment.addColorStop(1, `hsla(${hue - 28},96%,81%,.3)`);
+
+  ctx.save();
+  ctx.beginPath();
+  smoothPath(ctx, left);
+  smoothPath(ctx, right.slice().reverse(), true);
+  ctx.closePath();
+  ctx.save();
+  ctx.clip();
+  const shift = last.radius * (gentle ? 0.16 : 0.49);
+  ctx.globalAlpha = gentle ? 0.42 : 0.67;
+  ctx.drawImage(
+    source,
+    crop.x,
+    crop.y,
+    crop.w,
+    crop.h,
+    -Math.sin(last.angle) * shift,
+    Math.cos(last.angle) * shift,
+    width,
+    height
+  );
+  ctx.restore();
+  ctx.fillStyle = pigment;
+  ctx.fill();
+  // A fine dark edge preserves the folds over bright tiles as well as in shadow.
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(27,16,62,.23)';
+  ctx.stroke();
+  ctx.lineCap = ctx.lineJoin = 'round';
+  ctx.globalCompositeOperation = 'screen';
+  const lanes = gentle ? [-1, 0, 1] : [-1, -0.84, -0.39, 0.05, 0.49, 0.86, 1];
+  for (const lane of lanes) {
+    const points = lane === -1 ? left : lane === 1 ? right : strand(lane);
     ctx.beginPath();
-    if (m.step) {
-      ctx.ellipse(m.x + 0.2 * r * c, m.y + 0.2 * r * s, 0.57 * r, 0.29 * r, m.angle, 0, tau);
-      ctx.moveTo(m.x - 0.55 * r * c + 0.23 * r, m.y - 0.55 * r * s);
-      ctx.ellipse(m.x - 0.55 * r * c, m.y - 0.55 * r * s, 0.23 * r, 0.23 * r, 0, 0, tau);
-    } else {
-      ctx.ellipse(m.x, m.y, r, 0.72 * r, m.angle, 0, tau);
-    }
-    ctx.clip();
-    const stretch = 1 + (gentle ? 0.12 : 0.43) * fade;
-    const left = m.x - r,
-      top = m.y - r;
-    const strip = r / 2;
-    ctx.globalAlpha = fade * (gentle ? 0.58 : 0.9);
-    for (let row = 0; i >= bendFrom && row < 4; row++) {
-      const bend =
-        Math.sin(((row + 0.5) * Math.PI) / 4) *
-        Math.sin(0.7 * row + 5 * age + m.side) *
-        r *
-        fade *
-        (gentle ? 0.12 : 0.48);
-      const sx = crop.x + ((m.x - r / stretch + bend) * crop.w) / width;
-      const sy = crop.y + ((m.y + (row * strip - r) / stretch) * crop.h) / height;
-      ctx.drawImage(
-        source,
-        sx,
-        sy,
-        (2 * r * crop.w) / (width * stretch),
-        ((strip + 1) * crop.h) / (height * stretch),
-        left,
-        top + row * strip,
-        2 * r,
-        strip + 1
+    smoothPath(ctx, points);
+    ctx.lineWidth = Math.abs(lane) === 1 ? 1.65 : 0.85;
+    ctx.strokeStyle = `hsla(${hue + 48 * lane},95%,${Math.abs(lane) === 1 ? 82 : 72}%,.66)`;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Footfalls unwind into curved barbs. Their opening angle follows each turn.
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.lineCap = 'round';
+  for (const m of marks) {
+    if (!m.step) continue;
+    const age = (now - m.born) / lifetime;
+    const bloom = Math.sin(age * Math.PI);
+    const r = m.radius * (0.35 + 1.6 * bloom) * (0.85 + 0.28 * m.pressure);
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(m.angle + m.bend * bloom * 0.5);
+    ctx.scale(r, r * m.side);
+    ctx.globalAlpha = (1 - age) ** 1.5 * (gentle ? 0.47 : 0.84);
+    const branches = gentle ? 3 : 6;
+    ctx.beginPath();
+    for (let j = 0; j < branches; j++) {
+      const s = j / branches,
+        curl = 0.52 + 0.34 * Math.sin(m.spin + s + age * 3);
+      ctx.moveTo(-s * 0.55, s * 0.16);
+      ctx.bezierCurveTo(
+        -0.35 - s * 0.8,
+        0.45 + s,
+        0.25 - s * 0.9,
+        1.02 + s * 0.55,
+        0.46 - s * 0.93,
+        curl + s * 0.77
       );
     }
-    ctx.globalAlpha = fade * (m.step ? 0.42 : 0.33);
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'hsl(' + ((m.born * 0.021 + (m.side > 0 ? 128 : 245)) % 360) + ' 96% 59%)';
-    ctx.fillRect(left, top, 2 * r, 2 * r);
+    ctx.lineWidth = 0.95 / Math.max(1, r);
+    ctx.strokeStyle = `hsl(${hue + 35 * m.side + age * 40},94%,79%)`;
+    ctx.stroke();
     ctx.restore();
   }
+  ctx.restore();
 }
 
 export function carryMarks(marks, flow, width, height) {
@@ -95,7 +185,7 @@ export function carryMarks(marks, flow, width, height) {
   }
 }
 
-export function drawField(ctx, m, marks, now, level) {
+export function drawField(ctx, m, now, level) {
   const r = m.radius,
     time = now / 1000;
   ctx.save();
@@ -111,25 +201,6 @@ export function drawField(ctx, m, marks, now, level) {
   ctx.restore();
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
-  for (const mark of marks) {
-    if (!mark.step) continue;
-    const age = (now - mark.born) / mark.lifetime;
-    if (age < 0 || age >= 1) continue;
-    ctx.globalAlpha = (1 - age) ** 2 * (m.gentle ? 0.22 : 0.58);
-    ctx.strokeStyle = mark.side > 0 ? '#94f6df' : '#a99aff';
-    ctx.lineWidth = Math.max(1, mark.radius * 0.045 * (1 - age));
-    ctx.beginPath();
-    ctx.ellipse(
-      mark.x,
-      mark.y,
-      mark.radius * (0.6 + 2.1 * age),
-      mark.radius * (0.13 + 0.49 * age),
-      m.floor.angle,
-      0,
-      tau
-    );
-    ctx.stroke();
-  }
   const energy = Math.min(1, 0.32 + level * 0.65 + m.energy);
   const hue = (now * 0.018 + 188) % 360;
   const halo = r * (3.2 + energy);
@@ -178,21 +249,35 @@ export function drawImpacts(ctx, source, crop, view, hits, now, gentle) {
     const hue = (hit.born * 0.026 + 185) % 360;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(hit.x, hit.y, r, 0, tau);
+    const incident = Math.atan2(hit.ny, hit.nx);
+    // The reflected front folds along the axis of the collision.
+    for (let i = 0; i <= 64; i++) {
+      const a = (i / 64) * tau;
+      const phase = a - incident;
+      const ripple =
+        1 + fade * (0.12 * Math.cos(3 * phase + age * 4) + 0.065 * Math.sin(7 * phase - age * 3));
+      const dist = r * ripple * (0.88 + 0.12 * Math.cos(phase));
+      const x = hit.x + dist * Math.cos(a),
+        y = hit.y + dist * Math.sin(a);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
     ctx.clip();
     const zoom = 1 + fade * (gentle ? 0.08 : 0.25);
     ctx.globalAlpha = fade * 0.75;
-    const sampleR = r / zoom;
+    const reach = r * 1.2,
+      sampleR = reach / zoom;
     ctx.drawImage(
       source,
       crop.x + ((hit.x - sampleR) * crop.w) / view.width,
       crop.y + ((hit.y - sampleR) * crop.h) / view.height,
       (sampleR * 2 * crop.w) / view.width,
       (sampleR * 2 * crop.h) / view.height,
-      hit.x - r,
-      hit.y - r,
-      r * 2,
-      r * 2
+      hit.x - reach,
+      hit.y - reach,
+      reach * 2,
+      reach * 2
     );
     const wave = ctx.createRadialGradient(hit.x, hit.y, 0, hit.x, hit.y, r);
     wave.addColorStop(0, 'transparent');
@@ -201,9 +286,9 @@ export function drawImpacts(ctx, source, crop, view, hits, now, gentle) {
     wave.addColorStop(1, 'hsla(' + hue + ',100%,77%,.32)');
     ctx.globalCompositeOperation = 'color';
     ctx.fillStyle = wave;
-    ctx.fillRect(hit.x - r, hit.y - r, r * 2, r * 2);
+    ctx.fillRect(hit.x - reach, hit.y - reach, reach * 2, reach * 2);
     ctx.globalCompositeOperation = 'screen';
-    ctx.lineWidth = Math.max(1.5, size * 0.014 * fade);
+    ctx.lineWidth = Math.max(1.2, size * 0.006 * fade);
     ctx.strokeStyle = 'hsl(' + hue + ',100%,81%)';
     ctx.stroke();
     ctx.restore();
@@ -216,8 +301,16 @@ export function drawImpacts(ctx, source, crop, view, hits, now, gentle) {
       const n = r * (0.63 + 0.39 * Math.sin(i * 1.7 + hit.power));
       ctx.beginPath();
       ctx.moveTo(hit.x + Math.cos(a) * n, hit.y + Math.sin(a) * n);
-      ctx.lineTo(hit.x + Math.cos(a) * (n + r * 0.18), hit.y + Math.sin(a) * (n + r * 0.18));
-      ctx.lineWidth = 1.4 + (i % 3);
+      const curl = 0.2 + 0.24 * Math.sin(age * 4 + i);
+      ctx.bezierCurveTo(
+        hit.x + Math.cos(a + curl) * (n + r * 0.19),
+        hit.y + Math.sin(a + curl) * (n + r * 0.19),
+        hit.x + Math.cos(a + curl * 1.5) * (n + r * 0.34),
+        hit.y + Math.sin(a + curl * 1.5) * (n + r * 0.34),
+        hit.x + Math.cos(a + curl * 1.7) * (n + r * 0.23),
+        hit.y + Math.sin(a + curl * 1.7) * (n + r * 0.23)
+      );
+      ctx.lineWidth = 0.75 + 0.38 * (i % 3);
       ctx.strokeStyle = 'hsl(' + (hue + i * 8) + ',100%,76%)';
       ctx.stroke();
     }

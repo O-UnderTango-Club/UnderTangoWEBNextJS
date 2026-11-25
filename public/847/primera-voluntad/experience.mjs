@@ -16,6 +16,7 @@ import { soundscape } from './footsteps.mjs';
 import { RollingSign, ShowBoard, collide } from './stage-physics.mjs';
 import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs';
 import { SceneClip } from './clip.mjs';
+import { introMs } from './timing.mjs';
 
 const get = (id) => document.getElementById(id);
 const stage = get('stage'),
@@ -45,7 +46,7 @@ const clip = new SceneClip(updateClip);
 const clipTools = get('clip-tools'),
   save = get('save'),
   share = get('share'),
-  clipState = get('clip-state');
+  clipError = get('clip-error');
 const art = new Image();
 art.src = '/847/primera-voluntad.svg';
 const view = { width: 1, height: 1, left: 10, top: 10, right: 10, bottom: 68 };
@@ -55,18 +56,15 @@ let body = null,
   sharing = false;
 const hits = [];
 function updateClip(current) {
-  clipTools.hidden = current.state === 'idle';
   const ready = current.state === 'ready';
-  save.hidden = !ready;
+  clipTools.hidden = save.hidden = !ready;
   share.hidden = !ready || !current.canShare();
-  clipState.hidden = ready;
+  clipError.hidden = current.state !== 'unavailable';
   if (ready) {
     save.href = current.url;
     save.download = current.file.name;
   } else {
     save.removeAttribute('href');
-    clipState.textContent =
-      current.state === 'unavailable' ? 'Video no disponible' : 'Clip local de 20 s';
   }
 }
 share.addEventListener('click', async () => {
@@ -283,7 +281,7 @@ function render(source, crop, now, dt) {
       addMark(marks, body, now, true, side);
       audio.step(body.x / width, body.y / height, turned, side);
     }
-    if (now - lastMark >= (gentle.matches ? 190 : 105)) {
+    if (now - lastMark >= (gentle.matches ? 160 : 83)) {
       lastMark = now;
       addMark(marks, body, now, false, side);
     }
@@ -296,7 +294,7 @@ function render(source, crop, now, dt) {
       height,
       marks,
       now,
-      gentle.matches
+      body
     );
     drawImpacts(
       ctx,
@@ -309,13 +307,13 @@ function render(source, crop, now, dt) {
     );
     ctx.save();
     ctx.globalAlpha = Math.min(1, (1900 - lost) / 900);
-    drawField(ctx, body, marks, now, beat);
+    drawField(ctx, body, now, beat);
     drawSign(ctx, body, beat, now);
     ctx.restore();
   }
   if (cueIndex >= 0) {
     ctx.save();
-    ctx.globalAlpha = Math.min(1, (elapsed - 850) / 250);
+    ctx.globalAlpha = Math.min(1, (elapsed - introMs) / 140);
     paintBoard(ctx, board, layout, cueIndex, art, now);
     ctx.restore();
   }
@@ -330,17 +328,21 @@ function animate(now) {
   const sw = isDemo ? scene.width : feed.videoWidth,
     sh = isDemo ? scene.height : feed.videoHeight;
   if (sw && sh && (isDemo || feed.readyState >= 2)) {
-    if (!sceneStart) sceneStart = lastMark = lastStep = now;
     const crop = visibleCrop(sw, sh, width, height);
     if (now >= nextRead) {
       nextRead = now + 63;
-      if (isDemo) drawDemo(ink, width, height, (now - sceneStart) / 1000, lean);
+      if (isDemo) drawDemo(ink, width, height, sceneStart ? (now - sceneStart) / 1000 : 0, lean);
       try {
         analyze(source, crop, now);
       } catch {
         end('No se pudo leer la imagen. Podés reintentar o elegir Ver sin cámara.');
         return;
       }
+    }
+    if (!sceneStart) {
+      now = performance.now();
+      sceneStart = lastMark = lastStep = now;
+      audio.start(now);
     }
     render(source, crop, now, dt);
   }
@@ -355,7 +357,6 @@ function startFrames() {
   lastPairAt = -Infinity;
   side = 1;
   phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
-  audio.start();
   frame = requestAnimationFrame(animate);
 }
 async function enter(selected) {
@@ -367,6 +368,7 @@ async function enter(selected) {
   }
   mode = selected;
   const current = generation;
+  audio.prepare();
   phase(
     'permission',
     selected === 'camera' ? 'Esperando permiso para usar la cámara…' : 'Escena de muestra, sin cámara.'
@@ -374,6 +376,7 @@ async function enter(selected) {
   resize();
   window.scrollTo(0, 0);
   if (selected === 'demo') {
+    audio.unlock();
     scene.hidden = false;
     lean = Math.random() < 0.5 ? -1 : 1;
     startFrames();

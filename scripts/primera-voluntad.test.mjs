@@ -4,6 +4,8 @@ import { longestLine, sameLine, visibleLines } from '../public/847/primera-volun
 
 import { readFloor, SignMotion } from '../public/847/primera-voluntad/motion.mjs';
 import { visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
+import { arrangeScore } from '../public/847/primera-voluntad/footsteps.mjs';
+import { clipLength, clipName } from '../public/847/primera-voluntad/timing.mjs';
 
 import { cameraMotion, carryPoint } from '../public/847/primera-voluntad/camera-motion.mjs';
 
@@ -287,7 +289,38 @@ test('the visible rotated face rejects a miss and transfers momentum on contact'
 });
 
 test('both cities appear within the clip and Posadas stays after the download becomes available', () => {
-  assert.equal(cueAt(0), -1);
-  assert.equal(announcements[cueAt(9999)].city, 'Puerto Iguazú');
-  for (const ms of [10000, 19999, 20000, 60000]) assert.equal(announcements[cueAt(ms)].city, 'Posadas');
+  for (const ms of [0, 999]) assert.equal(cueAt(ms), -1);
+  for (const ms of [1000, 7999]) {
+    assert.equal(
+      announcements[cueAt(ms)].text,
+      'El 2 de diciembre nos vemos en la Cabaña de los Muñecos'
+    );
+  }
+  for (const ms of [8000, 14999, 15000, 60000]) {
+    assert.equal(
+      announcements[cueAt(ms)].text,
+      'El 12 de diciembre nos vemos en Silicon Misiones, en Posadas'
+    );
+  }
+});
+
+test('the score spans both invitations, loops across the original end and resolves at 15 seconds', () => {
+  const ctx = {
+    createBuffer(channels, length, sampleRate) {
+      const data = Array.from({ length: channels }, () => new Float32Array(length));
+      return { numberOfChannels: channels, length, sampleRate, getChannelData: (i) => data[i] };
+    },
+  };
+  const source = ctx.createBuffer(2, 13240, 1000);
+  source.getChannelData(0).fill(0.32);
+  source.getChannelData(1).fill(-0.18);
+  const score = arrangeScore(ctx, source, clipLength);
+  assert.equal(score.length, 15000);
+  assert.equal(clipName(clipLength, 'webm'), 'primera-voluntad-15s.webm');
+  for (let ch = 0; ch < 2; ch++) {
+    const pcm = score.getChannelData(ch);
+    for (const i of [0, 14999]) assert.ok(Math.abs(pcm[i]) < 1e-6);
+    for (const i of [200, 7999, 13184, 13185, 14000, 14800])
+      assert.equal(pcm[i], source.getChannelData(ch)[0]);
+  }
 });

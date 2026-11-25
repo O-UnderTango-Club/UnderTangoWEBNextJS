@@ -1,141 +1,197 @@
-// The soundtrack is an existing excerpt from the club's show score. Mix it
-// with the synthesized footsteps in an output-only Web Audio graph.
-const trackUrl = '/multiversos/repertorio-trance.mp3';
+import { clipLength } from './timing.mjs';
 
-function seamlessLoop(ctx, clip) {
-  const blend = Math.min(Math.round(clip.sampleRate * 0.055), Math.floor(clip.length / 6));
-  const length = clip.length - blend;
-  const loop = ctx.createBuffer(clip.numberOfChannels, length, clip.sampleRate);
+// Prepare the same musical phrase for the speakers and for the saved film.
+// Decoding in an offline context also works before the listener taps for sound.
+const trackUrl = '/multiversos/repertorio-trance.mp3';
+const musicGain = 0.31;
+
+export function arrangeScore(ctx, clip, duration) {
+  const rate = clip.sampleRate;
+  const overlap = Math.min(Math.round(rate * 0.055), Math.floor(clip.length / 6));
+  const period = clip.length - overlap;
+  const length = Math.round((rate * duration) / 1000);
+  const score = ctx.createBuffer(clip.numberOfChannels, length, rate);
   for (let channel = 0; channel < clip.numberOfChannels; channel++) {
-    const src = clip.getChannelData(channel),
-      dest = loop.getChannelData(channel);
-    dest.set(src.subarray(blend));
-    for (let i = 0; i < blend; i++) {
-      const t = (i + 1) / blend;
-      dest[length - blend + i] = src[clip.length - blend + i] * (1 - t) + src[i] * t;
+    const src = clip.getChannelData(channel);
+    const dest = score.getChannelData(channel);
+    for (let i = 0; i < length; i++) {
+      const phase = i % period;
+      let sample = src[phase + overlap];
+      if (phase >= period - overlap) {
+        const j = phase - (period - overlap);
+        const mix = (j + 1) / overlap;
+        sample += (src[j] - sample) * mix;
+      }
+      dest[i] = sample * Math.min(1, i / (rate * 0.1), (length - 1 - i) / (rate * 0.18));
     }
   }
-  return loop;
+  return score;
+}
+
+function makeNoise(ctx) {
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.16), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let prior = 0;
+  for (let i = 0; i < data.length; i++) {
+    prior = (prior + 0.55 * (Math.random() * 2 - 1)) / 1.5;
+    data[i] = prior;
+  }
+  return buffer;
+}
+
+function playStep(context, output, noise, t, { x, y, strong, side }) {
+  const pan = context.createStereoPanner?.();
+  if (pan) {
+    pan.pan.value = Math.max(-0.85, Math.min(0.85, (x - 0.5) * 1.7));
+    pan.connect(output);
+  }
+  const out = pan || output;
+  const heel = context.createOscillator(),
+    thud = context.createGain();
+  heel.frequency.setValueAtTime((side > 0 ? 132 : 109) + 20 * (1 - y), t);
+  heel.frequency.exponentialRampToValueAtTime(43 + 12 * y, t + 0.12);
+  thud.gain.setValueAtTime(0.0001, t);
+  thud.gain.exponentialRampToValueAtTime(strong ? 0.27 : 0.16, t + 0.008);
+  thud.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+  heel.connect(thud);
+  thud.connect(out);
+  const scrape = context.createBufferSource(),
+    tone = context.createBiquadFilter(),
+    grit = context.createGain();
+  scrape.buffer = noise;
+  tone.type = 'bandpass';
+  tone.frequency.value = (side > 0 ? 1150 : 870) + 400 * (1 - y);
+  tone.Q.value = 0.72;
+  grit.gain.setValueAtTime(0.0001, t);
+  grit.gain.exponentialRampToValueAtTime(strong ? 0.35 : 0.23, t + 0.025);
+  grit.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+  scrape.connect(tone);
+  tone.connect(grit);
+  grit.connect(out);
+  heel.onended = () => {
+    heel.disconnect();
+    thud.disconnect();
+  };
+  scrape.onended = () => {
+    scrape.disconnect();
+    tone.disconnect();
+    grit.disconnect();
+    pan?.disconnect();
+  };
+  heel.start(t);
+  heel.stop(t + 0.16);
+  scrape.start(t + 0.012);
+  scrape.stop(t + 0.18);
+}
+
+function playScore(ctx, output, score, offset, analyser) {
+  const source = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  source.buffer = score;
+  gain.gain.value = musicGain;
+  if (analyser) {
+    source.connect(analyser);
+    analyser.connect(gain);
+  } else source.connect(gain);
+  gain.connect(output);
+  source.start(ctx.currentTime, offset);
+  return source;
 }
 
 export function soundscape(onChange) {
   const Audio = window.AudioContext || window.webkitAudioContext;
-  let context = null,
-    noise = null,
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  let context, mix, monitor, recording, music, meter, noise;
+  let score, pending, request;
+  let started = null,
     muted = false,
-    playing = false,
-    failed = false;
-  let master = null,
-    recording = null;
-  let request = null,
-    music = null,
-    meter = null,
+    failed = false,
     level = 0;
+  const steps = [];
   const samples = new Uint8Array(128);
-  function disconnect() {
-    if (request) request.abort();
-    request = null;
-    if (music) {
-      music.stop();
-      music.disconnect();
-      music = null;
-    }
-    if (recording) recording.stream.getTracks().forEach((track) => track.stop());
-    recording = master = meter = null;
-    noise = null;
-    level = 0;
-    failed = false;
-    const prev = context;
-    context = null;
-    if (prev) {
-      prev.onstatechange = null;
-      if (prev.state !== 'closed') prev.close().catch(() => {});
-    }
-    onChange();
+
+  function play() {
+    if (!context || context.state !== 'running' || !score || started === null || music) return;
+    // Joining late only unlocks the speakers; the clip has its own complete score.
+    const offset = Math.max(0, (performance.now() - started) / 1000);
+    if (offset >= score.duration) return;
+    meter = context.createAnalyser();
+    meter.fftSize = 256;
+    music = playScore(context, mix, score, offset, meter);
   }
-  async function startMusic() {
-    const ctx = context;
-    if (!ctx || !playing || muted || music || request || failed || ctx.state !== 'running') return;
-    const pending = new AbortController();
-    request = pending;
-    try {
-      const response = await fetch(trackUrl, { signal: pending.signal });
-      if (!response.ok) throw Error('Música no disponible');
-      const clip = await ctx.decodeAudioData(await response.arrayBuffer());
-      if (context !== ctx || pending.signal.aborted) return;
-      const source = ctx.createBufferSource(),
-        gain = ctx.createGain();
-      source.buffer = seamlessLoop(ctx, clip);
-      source.loop = true;
-      meter = ctx.createAnalyser();
-      meter.fftSize = 256;
-      gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.31, ctx.currentTime + 0.65);
-      source.connect(meter);
-      meter.connect(gain);
-      gain.connect(master);
-      source.start();
-      music = source;
-    } catch {
-      if (context === ctx && !pending.signal.aborted) failed = true;
-    } finally {
-      if (request === pending) {
-        request = null;
-        onChange();
+
+  function prepare() {
+    if (score) return Promise.resolve(score);
+    if (pending) return pending;
+    const controller = new AbortController();
+    request = controller;
+    pending = (async () => {
+      try {
+        const response = await fetch(trackUrl, { signal: controller.signal });
+        if (!response.ok || !Offline) throw Error('Música no disponible');
+        const decoder = new Offline(1, 1, 48000);
+        const decoded = await decoder.decodeAudioData(await response.arrayBuffer());
+        if (controller.signal.aborted) return null;
+        score = arrangeScore(decoder, decoded, clipLength);
+        failed = false;
+        play();
+        return score;
+      } catch {
+        if (!controller.signal.aborted) failed = true;
+        return null;
+      } finally {
+        if (request === controller) {
+          pending = request = null;
+          onChange();
+        }
       }
-    }
+    })();
+    return pending;
   }
+
   function unlock() {
     if (!Audio) return;
     try {
       if (!context) {
         context = new Audio();
-        master = context.createGain();
-        master.gain.value = muted ? 0 : 1;
-        master.connect(context.destination);
+        mix = context.createGain();
+        monitor = context.createGain();
+        monitor.gain.value = muted ? 0 : 1;
+        mix.connect(monitor);
+        monitor.connect(context.destination);
         if (context.createMediaStreamDestination) {
           recording = context.createMediaStreamDestination();
-          master.connect(recording);
+          mix.connect(recording);
         }
+        noise = makeNoise(context);
         context.onstatechange = () => {
-          startMusic();
+          play();
           onChange();
         };
-        noise = context.createBuffer(1, Math.ceil(context.sampleRate * 0.16), context.sampleRate);
-        const data = noise.getChannelData(0);
-        let prior = 0;
-        for (let i = 0; i < data.length; i++) {
-          prior = (prior + 0.55 * (Math.random() * 2 - 1)) / 1.5;
-          data[i] = prior;
-        }
       }
       if (context.state !== 'running')
         context
           .resume()
-          .then(startMusic)
+          .then(play)
           .catch(() => {});
-      else startMusic();
+      else play();
       onChange();
     } catch {
-      disconnect();
+      onChange();
     }
   }
+
   function toggle() {
     if (failed) {
-      failed = false;
+      prepare();
       unlock();
       return;
     }
-    if (context?.state === 'running' && !muted) {
-      muted = true;
-      master.gain.setTargetAtTime(0, context.currentTime, 0.015);
-      onChange();
-    } else {
-      muted = false;
-      if (master) master.gain.setTargetAtTime(1, context.currentTime, 0.015);
-      unlock();
-    }
+    muted = context?.state === 'running' && !muted;
+    if (monitor) monitor.gain.setTargetAtTime(muted ? 0 : 1, context.currentTime, 0.015);
+    unlock();
   }
+
   function pulse() {
     if (muted || !meter || context?.state !== 'running') return 0;
     meter.getByteTimeDomainData(samples);
@@ -144,116 +200,67 @@ export function soundscape(onChange) {
     level = level * 0.63 + 0.37 * Math.min(1, Math.sqrt(power / samples.length) * 2.4);
     return level;
   }
+
   function step(x, y, strong, side) {
-    if (!context || context.state !== 'running' || muted) return;
-    const t = context.currentTime;
-    const pan = context.createStereoPanner?.();
-    if (pan) {
-      pan.pan.value = Math.max(-0.85, Math.min(0.85, (x - 0.5) * 1.7));
-      pan.connect(master);
+    if (started === null) return;
+    const event = { time: Math.max(0, (performance.now() - started) / 1000), x, y, strong, side };
+    if (event.time < clipLength / 1000) steps.push(event);
+    if (context?.state === 'running') playStep(context, mix, noise, context.currentTime, event);
+  }
+
+  // Include the decay of footsteps just before each encoded section.
+  async function renderClip(rate, duration, from = 0) {
+    const preroll = Math.min(from, 200);
+    const offset = (from - preroll) / 1000;
+    const end = (from + duration) / 1000;
+    const events = steps.filter((event) => event.time >= offset && event.time < end);
+    const phrase = await prepare();
+    if (!phrase) throw Error('Música no disponible');
+    const ctx = new Offline(1, Math.round((rate * (preroll + duration)) / 1000), rate);
+    playScore(ctx, ctx.destination, phrase, offset);
+    const grain = noise || (noise = makeNoise(ctx));
+    for (const event of events) playStep(ctx, ctx.destination, grain, event.time - offset, event);
+    const buffer = await ctx.startRendering();
+    const samples = buffer.getChannelData(0).subarray(Math.round((rate * preroll) / 1000));
+    return Int16Array.from(samples, (value) => Math.round(32767 * Math.max(-1, Math.min(1, value))));
+  }
+
+  function close() {
+    started = null;
+    steps.length = 0;
+    request?.abort();
+    pending = request = null;
+    if (music) {
+      music.stop();
+      music.disconnect();
     }
-    const out = pan || master;
-    const heel = context.createOscillator(),
-      thud = context.createGain();
-    heel.frequency.setValueAtTime((side > 0 ? 132 : 109) + 20 * (1 - y), t);
-    heel.frequency.exponentialRampToValueAtTime(43 + 12 * y, t + 0.12);
-    thud.gain.setValueAtTime(0.0001, t);
-    thud.gain.exponentialRampToValueAtTime(strong ? 0.27 : 0.16, t + 0.008);
-    thud.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
-    heel.connect(thud);
-    thud.connect(out);
-    const scrape = context.createBufferSource(),
-      tone = context.createBiquadFilter(),
-      grit = context.createGain();
-    scrape.buffer = noise;
-    tone.type = 'bandpass';
-    tone.frequency.value = (side > 0 ? 1150 : 870) + 400 * (1 - y);
-    tone.Q.value = 0.72;
-    grit.gain.setValueAtTime(0.0001, t);
-    grit.gain.exponentialRampToValueAtTime(strong ? 0.35 : 0.23, t + 0.025);
-    grit.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
-    scrape.connect(tone);
-    tone.connect(grit);
-    grit.connect(out);
-    heel.onended = () => {
-      heel.disconnect();
-      thud.disconnect();
-    };
-    scrape.onended = () => {
-      scrape.disconnect();
-      tone.disconnect();
-      grit.disconnect();
-      pan?.disconnect();
-    };
-    heel.start(t);
-    heel.stop(t + 0.16);
-    scrape.start(t + 0.012);
-    scrape.stop(t + 0.18);
+    recording?.stream.getTracks().forEach((track) => track.stop());
+    if (context) {
+      context.onstatechange = null;
+      if (context.state !== 'closed') context.close().catch(() => {});
+    }
+    context = mix = monitor = recording = music = noise = meter = null;
+    level = 0;
+    failed = false;
+    onChange();
   }
 
   return {
+    prepare,
     unlock,
     toggle,
     step,
     pulse,
+    renderClip,
+    close,
     supported: Boolean(Audio),
-    recordingTrack: () => recording?.stream.getAudioTracks()[0],
-    tap(copy) {
-      if (!context?.createScriptProcessor || !master) return null;
-      // Only the internal mix is tapped when a clip is encoded frame by frame.
-      const input = master,
-        meterTap = context.createScriptProcessor(2048, 1, 1);
-      const silent = context.createGain();
-      silent.gain.value = 0;
-      input.connect(meterTap);
-      meterTap.connect(silent);
-      silent.connect(context.destination);
-      meterTap.onaudioprocess = (event) =>
-        copy(event.inputBuffer.getChannelData(0), event.inputBuffer.sampleRate, performance.now());
-      return () => {
-        meterTap.onaudioprocess = null;
-        input.disconnect(meterTap);
-        meterTap.disconnect();
-        silent.disconnect();
-      };
+    start(now) {
+      started = now;
+      play();
     },
-    start() {
-      playing = true;
-      unlock();
-    },
-    close() {
-      playing = false;
-      disconnect();
-    },
+    recordingTrack: () =>
+      music && context?.state === 'running' ? recording?.stream.getAudioTracks()[0] : null,
     audible: () => context?.state === 'running' && !muted,
     failed: () => failed,
   };
-}
-
-export class ClipSound {
-  constructor(audio, rate, start, duration) {
-    this.rate = rate;
-    this.start = start;
-    this.endSample = 0;
-    this.data = new Int16Array(Math.round((rate * duration) / 1000));
-    this.detach = audio.tap((samples, inputRate, stamp) => this.write(samples, inputRate, stamp));
-    if (!this.detach) this.data = null;
-  }
-  write(samples, inputRate, stamp) {
-    const ratio = inputRate / this.rate,
-      count = Math.floor(samples.length / ratio);
-    let start = Math.round(((stamp - this.start) * this.rate) / 1000) - count;
-    if (Math.abs(start - this.endSample) < this.rate * 0.075) start = this.endSample;
-    start = Math.max(0, start);
-    for (let i = 0; i < count && start + i < this.data.length; i++) {
-      this.data[start + i] = Math.round(
-        Math.max(-1, Math.min(1, samples[Math.floor(i * ratio)])) * 32767
-      );
-    }
-    this.endSample = start + count;
-  }
-  stop() {
-    this.detach?.();
-    this.detach = null;
-  }
 }

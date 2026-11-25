@@ -1,4 +1,4 @@
-import { ClipSound } from './footsteps.mjs';
+import { clipName } from './timing.mjs';
 
 // QuickTime Photo-JPEG + mono PCM for browsers without a usable MediaRecorder.
 // Every JPEG is independently seekable. Sample times come from the live animation.
@@ -123,7 +123,7 @@ export function quickTimeFile(frames, width, height, duration, pcm, rate) {
   );
   return new File(
     [ftyp, u32(offset - ftyp.length), ascii('mdat'), ...media, box('moov', movie, ...tracks)],
-    'primera-voluntad-20s.mov',
+    clipName(duration, 'mov'),
     { type: 'video/quicktime' }
   );
 }
@@ -135,7 +135,7 @@ export class PhotoClip {
     this.frames = [];
     this.rate = 24000;
     this.startTime = startTime;
-    this.sound = new ClipSound(audio, this.rate, startTime, duration);
+    this.sound = audio;
   }
   frame(now) {
     const at = this.frames.length ? Math.max(1, Math.round(now - this.startTime)) : 0;
@@ -155,20 +155,18 @@ export class PhotoClip {
       });
   }
   async finish() {
-    this.sound.stop();
-    await this.pending;
+    const [pcm] = await Promise.all([this.sound.renderClip(this.rate, this.duration), this.pending]);
     if (!this.frames?.length) throw Error('Sin cuadros para guardar');
     return quickTimeFile(
       this.frames,
       this.canvas.width,
       this.canvas.height,
       this.duration,
-      this.sound.data,
+      pcm,
       this.rate
     );
   }
   close() {
-    this.sound.stop();
     this.frames = this.canvas = null;
   }
 }

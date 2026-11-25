@@ -78,8 +78,7 @@
         align-items: center;
       }
       #save,
-      #share,
-      #clip-state {
+      #share {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -102,11 +101,6 @@
         width: 44px;
         min-height: 44px;
         padding: 0;
-      }
-      #clip-state {
-        padding: 0.4rem 0.65rem;
-        border-color: #65717b;
-        font-size: 0.72rem;
       }
       #clip-tools svg {
         width: 19px;
@@ -207,7 +201,6 @@
           <span id="cue-meta"></span> <span id="cue-title"></span>
         </div>
         <div id="clip-tools" hidden>
-          <span id="clip-state">Clip local de 20 s</span>
           <a id="save" hidden download>
             <svg
               viewBox="0 0 24 24"
@@ -245,11 +238,12 @@
       </section>
       <section class="details" aria-label="Sobre la experiencia">
         <div id="finish" hidden>
-          <h2>El 2 de diciembre por la noche nos vemos en la Cabaña de los Muñecos</h2>
+          <h2>El 2 de diciembre nos vemos en la Cabaña de los Muñecos</h2>
           <p>El 12 de diciembre nos vemos en Silicon Misiones, en Posadas.</p>
         </div>
         <h1>Un Ø aparece</h1>
         <p id="status" class="status" role="status">Esperando permiso para usar la cámara…</p>
+        <p id="clip-error" class="status" role="status" hidden>No se pudo preparar el video con sonido. Podés volver a empezar.</p>
         <div class="controls">
           <button type="button" id="camera">Usar la cámara</button
           ><button type="button" id="demo">Ver sin cámara</button>
@@ -262,7 +256,7 @@
         </p>
         <p>
           La música de fondo es «trance psicomusical», de Ø UnderTango Club. Tocá la imagen para activar
-          el sonido. Los primeros 20 segundos se preparan como video en tu dispositivo. Podés guardarlo o
+          los parlantes. El video incluye la música y los pasos. Los primeros 15 segundos se preparan como video en tu dispositivo. Podés guardarlo o
           compartirlo desde la esquina inferior izquierda. Al cerrar se descarta el clip local. La cámara
           funciona sin micrófono y la página no envía las imágenes.
         </p>

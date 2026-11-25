@@ -200,7 +200,7 @@ export function soundscape(onChange) {
     recordingTrack: () => recording?.stream.getAudioTracks()[0],
     tap(copy) {
       if (!context?.createScriptProcessor || !master) return null;
-      // Used for the PCM track only when the browser lacks a native recorder.
+      // Only the internal mix is tapped when a clip is encoded frame by frame.
       const input = master,
         meterTap = context.createScriptProcessor(2048, 1, 1);
       const silent = context.createGain();
@@ -228,4 +228,32 @@ export function soundscape(onChange) {
     audible: () => context?.state === 'running' && !muted,
     failed: () => failed,
   };
+}
+
+export class ClipSound {
+  constructor(audio, rate, start, duration) {
+    this.rate = rate;
+    this.start = start;
+    this.endSample = 0;
+    this.data = new Int16Array(Math.round((rate * duration) / 1000));
+    this.detach = audio.tap((samples, inputRate, stamp) => this.write(samples, inputRate, stamp));
+    if (!this.detach) this.data = null;
+  }
+  write(samples, inputRate, stamp) {
+    const ratio = inputRate / this.rate,
+      count = Math.floor(samples.length / ratio);
+    let start = Math.round(((stamp - this.start) * this.rate) / 1000) - count;
+    if (Math.abs(start - this.endSample) < this.rate * 0.075) start = this.endSample;
+    start = Math.max(0, start);
+    for (let i = 0; i < count && start + i < this.data.length; i++) {
+      this.data[start + i] = Math.round(
+        Math.max(-1, Math.min(1, samples[Math.floor(i * ratio)])) * 32767
+      );
+    }
+    this.endSample = start + count;
+  }
+  stop() {
+    this.detach?.();
+    this.detach = null;
+  }
 }

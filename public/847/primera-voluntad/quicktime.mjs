@@ -1,3 +1,5 @@
+import { ClipSound } from './footsteps.mjs';
+
 // QuickTime Photo-JPEG + mono PCM for browsers without a usable MediaRecorder.
 // Every JPEG is independently seekable. Sample times come from the live animation.
 const ascii = (text) => Uint8Array.from(text, (c) => c.charCodeAt(0));
@@ -132,25 +134,8 @@ export class PhotoClip {
     this.duration = duration;
     this.frames = [];
     this.rate = 24000;
-    this.pcm = new Int16Array((this.rate * duration) / 1000);
     this.startTime = startTime;
-    this.endSample = 0;
-    this.detach = audio.tap((samples, inputRate, stamp) => this.writeSound(samples, inputRate, stamp));
-    if (!this.detach) this.pcm = null;
-  }
-  writeSound(samples, inputRate, stamp) {
-    const ratio = inputRate / this.rate;
-    const count = Math.floor(samples.length / ratio);
-    let start = Math.round(((stamp - this.startTime) * this.rate) / 1000) - count;
-    // Preserve a late sound unlock, but absorb ordinary audio callback jitter.
-    if (Math.abs(start - this.endSample) < this.rate * 0.075) start = this.endSample;
-    start = Math.max(0, start);
-    for (let i = 0; i < count && start + i < this.pcm.length; i++) {
-      this.pcm[start + i] = Math.round(
-        Math.max(-1, Math.min(1, samples[Math.floor(i * ratio)])) * 32767
-      );
-    }
-    this.endSample = start + count;
+    this.sound = new ClipSound(audio, this.rate, startTime, duration);
   }
   frame(now) {
     const at = this.frames.length ? Math.max(1, Math.round(now - this.startTime)) : 0;
@@ -170,8 +155,7 @@ export class PhotoClip {
       });
   }
   async finish() {
-    this.detach?.();
-    this.detach = null;
+    this.sound.stop();
     await this.pending;
     if (!this.frames?.length) throw Error('Sin cuadros para guardar');
     return quickTimeFile(
@@ -179,12 +163,12 @@ export class PhotoClip {
       this.canvas.width,
       this.canvas.height,
       this.duration,
-      this.pcm,
+      this.sound.data,
       this.rate
     );
   }
   close() {
-    this.detach?.();
-    this.detach = this.frames = this.pcm = this.canvas = null;
+    this.sound.stop();
+    this.frames = this.canvas = null;
   }
 }

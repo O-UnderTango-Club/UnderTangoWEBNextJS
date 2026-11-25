@@ -104,7 +104,7 @@ function longestRun(edges, width, height, angle, rho, minimumLength) {
 export function longestLine(frame) {
   const { width, height } = frame;
   const edges = edgeMap(frame);
-  const minimumLength = Math.max(22, Math.max(width, height) * .24);
+  const minimumLength = Math.max(22, Math.min(width, height) * .28, Math.max(width, height) * .14);
   const radius = Math.ceil(Math.hypot(width, height));
   const rhoCount = 2 * radius + 1;
   const votes = new Uint16Array(angleCount * rhoCount);
@@ -151,8 +151,9 @@ export function sameLine(first, next, width, height) {
   const length = Math.hypot(dx, dy), nextLength = Math.hypot(ex, ey);
   const mx = (next.a.x + next.b.x - first.a.x - first.b.x) * width / 2;
   const my = (next.a.y + next.b.y - first.a.y - first.b.y) * height / 2;
-  return Math.abs(dx * ey - dy * ex) < .16 * length * nextLength &&
-    Math.min(length, nextLength) >= .70 * Math.max(length, nextLength) &&
-    Math.abs(dx * my - dy * mx) / length < .035 * Math.max(width, height) &&
-    Math.abs(dx * mx + dy * my) / length < .22 * length;
+  // Follow rotations about the same midpoint while rejecting disconnected parallel edges.
+  return Math.abs(dx * ex + dy * ey) > .52 * length * nextLength &&
+    Math.min(length, nextLength) >= .52 * Math.max(length, nextLength) &&
+    Math.abs(dx * my - dy * mx) / length < .13 * Math.max(width, height) &&
+    Math.abs(dx * mx + dy * my) / length < .35 * length;
 }

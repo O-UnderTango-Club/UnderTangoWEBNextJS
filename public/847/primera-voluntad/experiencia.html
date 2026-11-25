@@ -1,48 +1,58 @@
 <!doctype html>
 <html lang="es-AR">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<meta name="theme-color" content="#080c14"><title>Un Ø aparece · Primera voluntad</title>
-<style>
-:root{color-scheme:dark;--bg:#080c14;--ink:#f4f3ff;--mint:#b1f0d7;--muted:#c5c9dc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 95% 15%,#211843,transparent 63%),var(--bg);color:var(--ink);font:1rem/1.5 system-ui,sans-serif;min-height:100svh}main{width:min(100% - 2rem,56rem);margin:auto;padding:clamp(1rem,5vw,3.6rem) 0 2rem}h1,h2{font-family:Georgia,serif;line-height:1.05;margin:.25em 0}h1{font-size:clamp(2.5rem,8vw,5rem)}h2{font-size:clamp(1.9rem,6vw,3.6rem)}p{margin:.55em 0}a{color:var(--mint)}button{border:1px solid #76869a;color:var(--ink);background:#1b2032;min-height:46px;padding:.5rem 1rem;border-radius:.6rem;font:inherit;font-weight:650;cursor:pointer}button.primary{background:var(--mint);color:#0e2822;border-color:var(--mint)}button:disabled{opacity:.55;cursor:wait}a:focus-visible,button:focus-visible{outline:2px solid #ffdc85;outline-offset:4px}.eyebrow{letter-spacing:.15em;text-transform:uppercase;color:var(--mint);font-size:.75rem;font-weight:700}.muted{color:var(--muted);font-size:.88rem}.controls{display:flex;flex-wrap:wrap;gap:.55rem;margin:.8rem 0}.stage{position:relative;display:grid;width:100%;isolation:isolate;overflow:hidden;border:1px solid #536175;border-radius:1rem;background:#121829;margin-top:1.1rem}.stage video,.stage canvas,.tint{position:absolute;inset:0;width:100%;height:100%;display:block}.stage video{object-fit:cover}.stage canvas{pointer-events:none}.stage .tint{pointer-events:none;opacity:0;background:radial-gradient(ellipse at var(--x,50%) var(--y,57%),#99ffdf 3%,#675eff 31%,#d1398d00 76%);mix-blend-mode:screen;transition:opacity .75s ease}.stage.altered .tint{opacity:.6}.stage.altered video,.stage.altered #scene{filter:hue-rotate(73deg) saturate(1.8) contrast(1.12) brightness(.76)}.stage video,.stage #scene{transition:filter .7s ease}.finish{position:relative;grid-area:1 / 1;display:grid;align-content:center;padding:clamp(1rem,6vw,4rem);background:#0a0f1bed;pointer-events:none}.finish[hidden],.stage canvas[hidden],video[hidden]{display:none}.finish p{max-width:38ch}.controls [hidden]{display:none}footer{margin-top:1.2rem}.status{min-height:1.5em}.visibility-note{max-width:70ch}/* The grid grows with the invitation when the screen is short or text is enlarged. */
-.stage::before {
-  content: "";
-  grid-area: 1 / 1;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  max-height: 64svh;
-}
-@media (orientation:landscape) and (max-height:30rem) {
-  .finish { padding: .75rem 1.25rem; }
-}
-@media(max-width:35rem){.stage::before{aspect-ratio:4/5}.controls button{flex-grow:1}}@media(prefers-reduced-motion:reduce){.stage .tint,.stage video,.stage #scene{transition:none}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#090b10">
+  <title>Un Ø aparece · Primera voluntad</title>
+  <style>
+    :root { color-scheme: dark; font: 100%/1.5 system-ui, sans-serif; color: #f2f1e9; background: #090b10; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    [hidden] { display: none !important; }
+    .stage { position: relative; width: 100%; height: 100vh; height: 100dvh; overflow: hidden; background: #090b10; }
+    .stage[data-phase="idle"], .stage[data-phase="done"] { display: none; }
+    .stage > * { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+    video { object-fit: cover; }
+    .details { max-width: 44rem; margin: auto; padding: clamp(1.5rem, 6vw, 4rem) max(1.25rem, env(safe-area-inset-right)) max(3rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left)); }
+    h1, h2 { margin: 0 0 .6em; font: 500 clamp(2.2rem, 6vw, 3.8rem)/1.08 Georgia, serif; text-wrap: balance; }
+    #finish { margin-bottom: 2rem; }
+    #finish h2 { color: #bbf4dc; }
+    p { margin: .65rem 0; }
+    .status { color: #bbf4dc; }
+    .controls { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1.1rem 0; }
+    button { min-height: 46px; padding: .55rem .95rem; background: #152122; border: 1px solid #728781; border-radius: .5rem; color: inherit; font: inherit; cursor: pointer; }
+    a { display: inline-block; margin-top: 1.1rem; color: #b3e8d2; }
+    :focus-visible { outline: 2px solid #f6ce81; outline-offset: 4px; }
+    @media (max-width: 30rem) { .controls button { flex: 1 1 8rem; } }
+  </style>
 </head>
 <body>
-<main>
-<a href="/847/primera-voluntad">← Volver a la ficha</a>
-<p class="eyebrow">Multiversos 2026 · Ø UnderTango Club</p>
-<h1>Un Ø aparece</h1>
-<p>Primero fue ruido. Después, algo quiso sonar.</p>
-<p>El código busca el borde recto más largo que distingue. Su posición y su inclinación dibujan el recorrido del Ø.</p>
-<div class="controls">
-<button id="camera" class="primary" type="button">Usar la cámara</button>
-<button id="demo" type="button">Ver sin cámara</button>
-<button id="stop" type="button" hidden>Cerrar cámara</button>
-</div>
-<p class="muted visibility-note">La cámara es opcional. La imagen se procesa en tu dispositivo, sin audio, grabación ni envío.</p>
-<p id="status" role="status" class="status">Elegí cómo querés entrar.</p>
-<div id="stage" class="stage">
-<video id="feed" autoplay playsinline muted hidden></video>
-<canvas id="scene" aria-hidden="true" hidden></canvas>
-<div class="tint" aria-hidden="true"></div>
-<canvas id="surface" aria-label="El Ø y el borde que recorre en el encuadre."></canvas>
-<section id="finish" class="finish" hidden>
-<p class="eyebrow">Ø Primera voluntad</p><h2>El 2 de diciembre nos vemos en la Cabaña de los Muñecos</h2><p>Puerto Iguazú · Festival Multiversos</p>
-</section>
-</div>
-<footer class="muted">Miércoles 2 de diciembre de 2026 · La Cabaña de los Muñecos · Puerto Iguazú</footer>
-</main>
-<script type="module" src="./experience.mjs"></script>
+  <main>
+    <section id="stage" class="stage" data-phase="permission" aria-label="Escena de Un Ø aparece">
+      <video id="feed" autoplay muted playsinline hidden></video>
+      <canvas id="scene" aria-hidden="true" hidden></canvas>
+      <canvas id="surface" aria-hidden="true"></canvas>
+    </section>
+    <section class="details" aria-label="Sobre la experiencia">
+      <div id="finish" hidden>
+        <h2>El 2 de diciembre nos vemos en la Cabaña de los Muñecos</h2>
+        <p>Puerto Iguazú · Festival Multiversos</p>
+      </div>
+      <h1>Un Ø aparece</h1>
+      <p id="status" class="status" role="status">Esperando permiso para usar la cámara…</p>
+      <div class="controls">
+        <button type="button" id="camera">Usar la cámara</button>
+        <button type="button" id="demo">Ver sin cámara</button>
+        <button type="button" id="sound">Activar sonido</button>
+        <button type="button" id="stop">Cerrar experiencia</button>
+      </div>
+      <p>El código encuentra un borde en tu encuadre. Incliná el teléfono y el recorrido del Ø cambia con él.</p>
+      <p>Si querés oír los pasos, podés tocar la imagen. El sonido se genera en el teléfono. La cámara se procesa en tu dispositivo, sin micrófono, grabación ni envío.</p>
+      <a href="/847/primera-voluntad">← Volver a la ficha</a>
+    </section>
+  </main>
+  <script type="module" src="./experience.mjs"></script>
 </body>
 </html>

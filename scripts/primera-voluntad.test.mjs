@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { longestLine, sameLine } from '../public/847/primera-voluntad/line-detector.mjs';
 
+import { SignMotion } from '../public/847/primera-voluntad/motion.mjs';
+import { visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
+
 const width = 192, height = 138;
 
 function frame(segments = [], noise = 0) {
@@ -67,12 +70,61 @@ test('separated collinear fragments do not outvote a continuous vertical edge', 
   expectSegment(longestLine(frame([[12, 44, 78, 44], [95, 44, 171, 44], long])), long);
 });
 
-test('stability accepts slight jitter and rejects a different location, direction or span', () => {
+test('tracking accepts a tilted edge and swapped endpoints, and rejects unrelated edges', () => {
   const first = { a: {x:.1, y:.5}, b: {x:.9, y:.5} };
   assert.ok(sameLine(first, {a:{x:.89,y:.51}, b:{x:.11,y:.49}}, width, height));
+  assert.ok(sameLine(first, {a:{x:.1,y:.18}, b:{x:.9,y:.82}}, width, height));
   for (const next of [
     {a:{x:.1,y:.73}, b:{x:.9,y:.73}},
-    {a:{x:.1,y:.1}, b:{x:.9,y:.9}},
+    {a:{x:.48,y:.1}, b:{x:.52,y:.9}},
     {a:{x:.2,y:.5}, b:{x:.4,y:.5}},
   ]) assert.equal(sameLine(first, next, width, height), false);
+});
+
+test('the first accepted frame places the sign and reversed camera tilt reverses its roll', () => {
+  const downRight = { a: {x:.09,y:.45}, b: {x:.91,y:.54} };
+  const downLeft = { a: {x:.91,y:.42}, b: {x:.09,y:.57} };
+  const sign = new SignMotion(downRight, 390, 844);
+  assert.equal(sign.phase, 'roll');
+  assert.equal(sign.fraction, .5);
+  for (let i = 0; i < 12; i++) sign.advance(1/60);
+  assert.ok(sign.fraction > .5);
+  sign.observe(downLeft);
+  for (let i = 0; i < 20; i++) sign.advance(1/60);
+  const x = sign.x;
+  for (let i = 0; i < 9; i++) sign.advance(1/60);
+  assert.ok(sign.x < x - 8);
+  assert.ok(sign.guide.ty < 0);
+  assert.equal(sign.phase, 'roll');
+});
+
+test('the endpoint launches a tumbling sign, with bounded rebounds on both axes', () => {
+  const sign = new SignMotion({a:{x:.04,y:.45}, b:{x:.96,y:.63}}, 390, 844);
+  let hits = 0, launch = null, wallX = false, wallY = false;
+  for (let frame = 0; frame < 340; frame++) {
+    const phase = sign.phase, vx = sign.vx, vy = sign.vy;
+    const hit = sign.advance(1/60);
+    if (phase === 'roll' && sign.phase === 'flight') {
+      assert.ok(hit);
+      assert.equal(sign.fraction, 1);
+      assert.ok(sign.vx < 0 && sign.vy < 0);
+      launch = frame;
+    } else if (sign.phase === 'flight') {
+      assert.ok(sign.x >= sign.radius && sign.x <= 390 - sign.radius);
+      assert.ok(sign.y >= sign.radius && sign.y <= 844 - sign.radius);
+      if (hit) {
+        hits++;
+        wallX ||= vx * sign.vx < 0;
+        wallY ||= vy * sign.vy < 0;
+      }
+    }
+  }
+  assert.ok(launch > 0 && launch < 90);
+  assert.ok(hits >= 3 && wallX && wallY);
+  assert.ok(sign.tumble > 6);
+});
+
+test('sampling and local distortions share the same object-fit cover crop', () => {
+  assert.deepEqual(visibleCrop(640, 480, 240, 480), {x:200, y:0, w:240, h:480});
+  assert.deepEqual(visibleCrop(480, 640, 480, 240), {x:0, y:200, w:480, h:240});
 });

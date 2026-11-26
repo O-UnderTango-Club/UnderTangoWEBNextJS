@@ -7,7 +7,7 @@ import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
 import { sceneNoiseBuffers, scheduleContinuationAudio } from "./scene-audio";
 import { collideIntoPitch, collisionTiming, loadQuestion, NOISE_KEYS, OPENING_QUESTION, pointTiming, speakQuestion, universeStrikeWeight, whiteOverture, WAVE_SECONDS, type PointStrike, type StrikeLog } from "./opening-sound";
-import { CollisionReadout, OpeningProjection } from "./opening-projection";
+import { openingFraction, CollisionReadout, OpeningProjection } from "./opening-projection";
 import { CONTINUATION_SCENES, DEFAULT_PAIR, NOISE_COLORS, NOISE_IDS, type ContinuationScene, type NoiseColor, type NoisePair } from "./scene-cues";
 import { ContinuationProjection } from "./scene-visuals";
 import { FIRST_MIDI_NOTE, NOTE_SCENES, NOTE_SCENE_IDS, isNoteScene, type NoteScene, type PerformanceInput } from "./performance-notes";
@@ -1214,6 +1214,45 @@ async function resumeAudioOutput(context: AudioContext) {
   }
 }
 
+function OpeningFilm({cue, output, controls, strikes, inside, paused, finish}: {
+  cue: SceneZeroCue; output: GainNode; controls: HTMLDivElement | null; strikes: StrikeLog;
+  inside: boolean; paused: boolean; finish: () => void;
+}) {
+  const layer = useRef<HTMLDivElement>(null);
+  const envelope = useRef({fraction: 0, closing: false, elapsed: 0, filmTime: 0});
+  const clock = cue.context;
+  const filmCue = useMemo(() => ({context: clock, beginsAt: clock.currentTime - envelope.current.filmTime}), [clock]);
+  useLayoutEffect(() => {
+    const node = layer.current;
+    if (!node) return;
+    const state = envelope.current;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let last = performance.now(), frame = 0;
+    const draw = (now: number) => {
+      const dt = paused ? 0 : (now - last) / 1000;
+      last = now;
+      state.filmTime += dt;
+      if (!state.closing && inside) state.fraction = openingFraction(strikes.current, still);
+      if (!state.closing && (state.fraction >= 1 || !inside)) state.closing = true;
+      if (state.closing) {
+        state.elapsed += dt;
+        const t = Math.min(1, state.elapsed / 4);
+        const scale = 1 - t * t;
+        node.style.transform = "scale(" + scale + ")";
+        node.style.opacity = String(1 - t ** 4);
+        if (!inside) node.style.clipPath = "circle(" + (72 * state.fraction ** .78) + "% at center)";
+        if (t === 1 || state.fraction === 0) { finish(); return; }
+      }
+      frame = requestAnimationFrame(draw);
+    };
+    draw(last);
+    return () => cancelAnimationFrame(frame);
+  }, [inside, paused, strikes, finish]);
+  return <div ref={layer} style={{position:"absolute", inset:0, zIndex:-1, pointerEvents:"none"}}>
+    <SceneVideo film={sceneFilms.get(1)!} cue={filmCue} output={output} controls={controls} paused={paused} />
+  </div>;
+}
+
 function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
   masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
@@ -1648,45 +1687,45 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const numberedMode = activeScene === "harmonics" ? "line" : activeScene;
   const sceneIndex = numberedControls.findIndex(control => control.mode === numberedMode);
   const sceneNumber = sceneIndex >= 0 ? SHOW_SCORE[sceneIndex].number : null;
+  const queuePanelFollow = useRef<(interaction?: boolean) => void>(() => {});
   useLayoutEffect(() => {
     const list = settingsRef.current;
-    if (sceneNumber === null || !list) return;
-    const card = list.querySelector<HTMLElement>(`[data-scene="${sceneNumber}"]`);
-    if (!card) return;
-    const follow = (onlyIfHidden = false) => {
+    if (!list) return;
+    let timer: number | undefined;
+    const follow = () => {
+      timer = undefined;
+      if (list.matches(":active")) return;
+      const card = list.querySelector<HTMLElement>('[aria-current="step"]');
+      if (!card) return;
       const top = list.getBoundingClientRect().top + list.clientTop + 10;
-      const bottom = top + list.clientHeight - 20;
       const row = card.getBoundingClientRect();
-      if (onlyIfHidden && row.bottom > top && row.top < bottom) return;
-      if (row.top >= top - 1 && row.bottom <= bottom + 1) return;
-      if (Math.abs(row.top - top) > 1) list.scrollTop += row.top - top;
+      if (row.top < top - 1 || row.bottom > top + list.clientHeight - 20)
+        list.scrollTop += row.top - top;
     };
-    follow();
-    const observer = new ResizeObserver(() => follow());
-    observer.observe(list);
-    observer.observe(card);
-    let idle: number | undefined;
-    const afterBrowsing = () => {
-      window.clearTimeout(idle);
-      if (paused) return;
-      idle = window.setTimeout(() => {
-        if (list.matches(":active") || list.querySelector("input:focus, select:focus, textarea:focus")) return;
-        follow(true);
-      }, 3000);
+    const restart = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(follow, 10000);
     };
-    list.addEventListener("scroll", afterBrowsing, {passive: true});
-    list.addEventListener("focusout", afterBrowsing);
-    list.addEventListener("pointerup", afterBrowsing);
+    queuePanelFollow.current = interaction => { if (interaction || timer === undefined) restart(); };
+    const panel = list.parentElement ?? list;
+    const events = ["wheel", "scroll", "pointerdown", "pointermove", "pointerup", "keydown", "input", "focusin", "focusout"];
+    for (const event of events) panel.addEventListener(event, restart, {passive:true, capture:true});
     return () => {
-      observer.disconnect();
-      window.clearTimeout(idle);
-      list.removeEventListener("scroll", afterBrowsing);
-      list.removeEventListener("focusout", afterBrowsing);
-      list.removeEventListener("pointerup", afterBrowsing);
+      window.clearTimeout(timer);
+      queuePanelFollow.current = () => {};
+      for (const event of events) panel.removeEventListener(event, restart, true);
     };
-  }, [sceneNumber, paused]);
+  }, []);
+  useLayoutEffect(() => { if (sceneNumber !== null) queuePanelFollow.current(); }, [sceneNumber]);
+  const [openingRun, setOpeningRun] = useState<{cue: SceneZeroCue; output: GainNode; generation: number} | null>(null);
+  const openingGeneration = useRef(0);
+  const finishOpeningFilm = useCallback(() => setOpeningRun(null), []);
+  useLayoutEffect(() => {
+    if (sceneNumber === 1 && cue && outputRef.current) setOpeningRun({cue, output: outputRef.current, generation: ++openingGeneration.current});
+    else if (stage === "ready" || sceneNumber === 0) setOpeningRun(null);
+  }, [sceneNumber, cue, stage === "ready"]);
   const film = sceneNumber === null ? undefined : sceneFilms.get(sceneNumber);
-  const filmLayer = film && cue && outputRef.current
+  const filmLayer = sceneNumber !== 1 && film && cue && outputRef.current
     ? <SceneVideo key={sceneNumber} film={film} cue={cue} paused={paused} output={outputRef.current} controls={filmControls} />
     : null;
   const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack);
@@ -1709,6 +1748,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
     void start(mode, asPreview, startPaused);
   };
   const moveScene = (index: number) => {
+    queuePanelFollow.current(true);
     const scene = numberedControls[index];
     if (scene) playMode(scene.mode, previewMode !== null, paused);
   };
@@ -2123,6 +2163,8 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={reset} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
         countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused}>
+      {openingRun && <OpeningFilm key={openingRun.generation} cue={cue ?? openingRun.cue} output={outputRef.current ?? openingRun.output}
+        controls={filmControls} strikes={strikes} inside={sceneNumber === 1} paused={paused} finish={finishOpeningFilm} />}
       {!liveSet && !coda && filmLayer}
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} cue={cue} paused={paused} />}

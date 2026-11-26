@@ -109,11 +109,14 @@ function ScoreStopwatch({ clock, beginsAt, offset, total, paused }: {
   </span>;
 }
 
-function temporalTrailFrame(progress: number, roll: number) {
-  const halfSpan = FREQUENCY_TRAIL_TRAVEL * progress / 2;
-  const horizontalFit = (FREQUENCY_VIEW.width / 2 - 28) / (180 + halfSpan * Math.cos(roll));
-  const verticalFit = 170 / (170 + halfSpan * Math.sin(roll));
-  return { halfSpan, zoom: Math.min(1, horizontalFit, verticalFit) };
+function temporalTrailFrame(progress: number, roll: number, width: number) {
+  const travel = FREQUENCY_TRAIL_TRAVEL + .75 * Math.max(0, width - FREQUENCY_VIEW.width);
+  // Move the inherited figure to the left, then keep the first sample there as the take grows rightward.
+  const pivot = travel / 2 * smoothSceneLight(progress / .12);
+  const extent = Math.max(pivot, travel * progress - pivot);
+  const horizontalFit = (width / 2 - 28) / (180 + extent * Math.cos(roll));
+  const verticalFit = 170 / (170 + extent * Math.sin(roll));
+  return { travel, pivot, zoom: Math.min(1, horizontalFit, verticalFit) };
 }
 const FREQUENCY_FORMAT = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 
@@ -382,7 +385,7 @@ function createTemporalTrailRenderer(canvas: HTMLCanvasElement, sampleCount: num
   gl.enable(gl.DEPTH_TEST);
   gl.clearColor(0, 0, 0, 0);
   gl.useProgram(program);
-  gl.uniform1f(gl.getUniformLocation(program, "u_travel"), FREQUENCY_TRAIL_TRAVEL / FREQUENCY_VIEW.scale);
+  const travelLocation = gl.getUniformLocation(program, "u_travel");
   gl.uniform4f(gl.getUniformLocation(program, "u_camera"),
     Math.cos(FREQUENCY_STOP_YAW), Math.sin(FREQUENCY_STOP_YAW), Math.cos(FREQUENCY_VIEW.tilt), Math.sin(FREQUENCY_VIEW.tilt));
   const rotation = gl.getUniformLocation(program, "u_rotation");
@@ -394,18 +397,19 @@ function createTemporalTrailRenderer(canvas: HTMLCanvasElement, sampleCount: num
       gl.bindBuffer(gl.ARRAY_BUFFER, samples);
       gl.bufferSubData(gl.ARRAY_BUFFER, from * 16, instances.subarray(from * 4, to * 4));
     },
-    paint(count: number, progress: number, lift: number, spin: number) {
+    paint(count: number, progress: number, lift: number, spin: number, width: number) {
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.useProgram(program);
       gl.bindVertexArray(vao);
       const roll = lift * Math.PI / 2;
-      const { halfSpan, zoom } = temporalTrailFrame(progress, roll);
+      const frame = temporalTrailFrame(progress, roll, width);
       gl.uniform4f(rotation, Math.cos(roll), Math.sin(roll), Math.cos(spin), Math.sin(spin));
-      gl.uniform1f(pivot, halfSpan / FREQUENCY_VIEW.scale);
+      gl.uniform1f(travelLocation, frame.travel / FREQUENCY_VIEW.scale);
+      gl.uniform1f(pivot, frame.pivot / FREQUENCY_VIEW.scale);
       gl.uniform2f(projection,
-        FREQUENCY_VIEW.scale * zoom * 2 / FREQUENCY_VIEW.width,
-        FREQUENCY_VIEW.scale * zoom * 2 / FREQUENCY_VIEW.height);
+        FREQUENCY_VIEW.scale * frame.zoom * 2 / width,
+        FREQUENCY_VIEW.scale * frame.zoom * 2 / FREQUENCY_VIEW.height);
       gl.drawElementsInstanced(gl.TRIANGLES, triangles.length, gl.UNSIGNED_SHORT, 0, count);
     },
     dispose,
@@ -418,6 +422,7 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock, froze
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const progressRef = useRef(progress);
   const [unavailable, setUnavailable] = useState(false);
+  const [viewWidth, setViewWidth] = useState(FREQUENCY_VIEW.width);
   useEffect(() => { progressRef.current = progress; }, [progress]);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -436,10 +441,13 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock, froze
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0, nextStamp = 0, raisedAt: number | null = null;
     let last = -Infinity, previousProgress = -1, previousTime = -1, resized = true;
+    let width = FREQUENCY_VIEW.width;
     const resize = () => {
       const density = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.max(1, Math.round(canvas.clientWidth * density));
       canvas.height = Math.max(1, Math.round(canvas.clientHeight * density));
+      width = FREQUENCY_VIEW.height * canvas.width / canvas.height;
+      setViewWidth(width);
       resized = true;
     };
     resize();
@@ -474,7 +482,7 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock, froze
       const stationary = frozenAtEnd || reduceMotion.matches;
       const lift = current < 1 ? 0 : stationary ? 1 : smoothSceneLight(seconds / FREQUENCY_TRAIL_TURN_SECONDS);
       const spin = lift * 0.26 + (stationary ? 0 : Math.max(0, seconds - FREQUENCY_TRAIL_TURN_SECONDS) * 0.34);
-      renderer.paint(visibleCount, current, lift, spin);
+      renderer.paint(visibleCount, current, lift, spin, width);
     };
     frame = window.requestAnimationFrame(draw);
     return () => {
@@ -485,15 +493,15 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock, froze
   }, [clock, durationMs, frozenAtEnd, intervalMs]);
 
   const notes = tuningAt(progress).map((value) => FREQUENCY_FORMAT.format(value) + " Hz").join(" · ");
-  const { halfSpan, zoom } = temporalTrailFrame(progress, 0);
+  const { travel, pivot, zoom } = temporalTrailFrame(progress, 0, viewWidth);
   const elapsed = Math.floor(progress * durationMs / 1000);
-  const axisHalfWidth = halfSpan * zoom * 100 / FREQUENCY_VIEW.width;
-  return <div className="zero-frequency-space">
+  const axisWidth = travel * progress * zoom * 100 / viewWidth;
+  return <div className={unavailable ? "zero-frequency-space" : "zero-frequency-space zero-temporal-trail"}>
     {unavailable
       ? <><FrequencySpace opacity={1} yaw={FREQUENCY_STOP_YAW} /><p className="zero-trail-fallback" role="status">La estela rotatoria requiere WebGL 2.</p></>
       : <canvas ref={canvasRef} role="img" aria-label="Estela tridimensional de fotogramas opacos que se eleva y gira al completarse" />}
-    {!frozenAtEnd && progress < 1 && axisHalfWidth >= 3 && <div className="zero-trail-axis" aria-hidden="true"
-      style={{ left: `${50 - axisHalfWidth}%`, width: `${2 * axisHalfWidth}%` }}>
+    {!unavailable && !frozenAtEnd && progress < 1 && axisWidth >= 6 && <div className="zero-trail-axis" aria-hidden="true"
+      style={{ left: `${50 - pivot * zoom * 100 / viewWidth}%`, width: `${axisWidth}%` }}>
       <span>0 s</span><span>{elapsed} s</span>
     </div>}
     {!frozenAtEnd && <div className="zero-time-caption">
@@ -1256,7 +1264,6 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const previousDeadline = useRef<{cue: SceneZeroCue; seconds: number} | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
-  const activeSceneRef = useRef<HTMLDivElement | null>(null);
   const spiralAnalyser=useRef<AnalyserNode|null>(null);
   const roomAnalyser=useRef<AnalyserNode|null>(null);
   const countingTake = useRef(false);
@@ -1375,31 +1382,6 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   }, [cue, enterNumberedScene, extendedScene, nextAfterSeconds, nextTimedScene, paused, previewMode, reset]);
 
   useEffect(() => () => stop(), [stop]);
-
-  useEffect(() => {
-    const settings = settingsRef.current;
-    const current = activeSceneRef.current;
-    if (!activeScene || !settings || !current) return;
-
-    const revealScene = () => {
-      const bounds = settings.getBoundingClientRect();
-      const row = current.getBoundingClientRect();
-      const inset = 10;
-      const top = bounds.top + settings.clientTop + inset;
-      const bottom = top + settings.clientHeight - 2 * inset;
-      if (row.top >= top && row.bottom <= bottom) return;
-
-      const alignTop = row.top < top || row.height > bottom - top;
-      const offset = alignTop ? row.top - top : row.bottom - bottom;
-      if (Math.abs(offset) < 1) return;
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      settings.scrollTo({ top: settings.scrollTop + offset, behavior: reduceMotion ? "auto" : "smooth" });
-    };
-
-    const observer = new ResizeObserver(revealScene);
-    observer.observe(settings);
-    return () => observer.disconnect();
-  }, [activeScene]);
 
   useEffect(() => {
     const volume = masterVolume;
@@ -1666,6 +1648,43 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const numberedMode = activeScene === "harmonics" ? "line" : activeScene;
   const sceneIndex = numberedControls.findIndex(control => control.mode === numberedMode);
   const sceneNumber = sceneIndex >= 0 ? SHOW_SCORE[sceneIndex].number : null;
+  useLayoutEffect(() => {
+    const list = settingsRef.current;
+    if (sceneNumber === null || !list) return;
+    const card = list.querySelector<HTMLElement>(`[data-scene="${sceneNumber}"]`);
+    if (!card) return;
+    const follow = (onlyIfHidden = false) => {
+      const top = list.getBoundingClientRect().top + list.clientTop + 10;
+      const bottom = top + list.clientHeight - 20;
+      const row = card.getBoundingClientRect();
+      if (onlyIfHidden && row.bottom > top && row.top < bottom) return;
+      if (row.top >= top - 1 && row.bottom <= bottom + 1) return;
+      if (Math.abs(row.top - top) > 1) list.scrollTop += row.top - top;
+    };
+    follow();
+    const observer = new ResizeObserver(() => follow());
+    observer.observe(list);
+    observer.observe(card);
+    let idle: number | undefined;
+    const afterBrowsing = () => {
+      window.clearTimeout(idle);
+      if (paused) return;
+      idle = window.setTimeout(() => {
+        if (list.matches(":active") || list.querySelector("input:focus, select:focus, textarea:focus")) return;
+        follow(true);
+      }, 3000);
+    };
+    list.addEventListener("scroll", afterBrowsing, {passive: true});
+    list.addEventListener("focusout", afterBrowsing);
+    list.addEventListener("pointerup", afterBrowsing);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(idle);
+      list.removeEventListener("scroll", afterBrowsing);
+      list.removeEventListener("focusout", afterBrowsing);
+      list.removeEventListener("pointerup", afterBrowsing);
+    };
+  }, [sceneNumber, paused]);
   const film = sceneNumber === null ? undefined : sceneFilms.get(sceneNumber);
   const filmLayer = film && cue && outputRef.current
     ? <SceneVideo key={sceneNumber} film={film} cue={cue} paused={paused} output={outputRef.current} controls={filmControls} />
@@ -1818,6 +1837,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .zero-point { width: clamp(8px, 1.05vw, 16px); aspect-ratio: 1; border-radius: 50%; background: #000; }
       .zero-harmonic-frame { position: relative; width: min(94%, 800px, 116dvh, 144cqh); aspect-ratio: 16 / 9; pointer-events: none; }
       .zero-harmonic-diagram, .zero-frequency-space, .zero-frequency-space canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .zero-temporal-trail { width:96cqw; left:50%; right:auto; transform:translateX(-50%); }
       .zero-note-scene[data-note-scene=ten] .zero-resting-sphere {
         transform: translateX(17%) scale(.90);
         animation: zeroSphereEntrance .5s ease-out both;
@@ -2012,7 +2032,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .zero-master-label output { color: #dce6ff; font-variant-numeric: tabular-nums; }
       .zero-settings {
         display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.15rem;
-        min-height: 0; overflow: auto; overscroll-behavior: contain;
+        min-height: 0; overflow: auto; overscroll-behavior: contain; overflow-anchor: none;
         padding: 1rem var(--zero-controls-padding); scrollbar-color: #5d6476 #11131a;
       }
       .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
@@ -2160,7 +2180,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
           const sceneFilm = sceneFilms.get(score.number);
           const {min,max} = limits[index];
           return <div key={mode} className="zero-scene" role="region" data-scene={score.number} aria-labelledby={`${id}-title`}
-            ref={isActive ? activeSceneRef : undefined} aria-current={isActive ? "step" : undefined}>
+            aria-current={isActive ? "step" : undefined}>
             <div className="zero-title">
               <h2 id={`${id}-title`}>Escena {score.number}</h2>
               <label className="zero-scene-seconds"><input key={seconds} type="number" min={min} max={max}

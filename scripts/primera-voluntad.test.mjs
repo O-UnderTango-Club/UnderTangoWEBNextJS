@@ -16,7 +16,7 @@ import {
   screenGravity,
   tiltFromRest,
 } from '../public/847/primera-voluntad/stage-physics.mjs';
-import { canSeatPrize, landOnTray, settlePrize } from '../public/847/primera-voluntad/prize-goal.mjs';
+import { touchesTray, settlePrize } from '../public/847/primera-voluntad/prize-goal.mjs';
 import { announcements, cueAt } from '../public/847/primera-voluntad/show-board.mjs';
 
 import { metalAt } from '../public/847/primera-voluntad/solid-sign.mjs';
@@ -441,8 +441,8 @@ test('the visible rotated face rejects a miss and transfers momentum on contact'
 
 test('a level head-on strike is braced harder than a lateral shove', () => {
   function strike(sideways) {
-    const plate = Object.assign(new ShowBoard(), { x: 150, y: 210, width: 200, height: 78, vy: 150, vx: sideways });
-    const wheel = { x: 150, y: 289, radius: 20, vx: 0, vy: 0 };
+    const plate = Object.assign(new ShowBoard(), { x: 150, y: 210, width: 200, height: 78, vy: 150, vx: sideways, driveX: sideways });
+    const wheel = { x: 150, y: 289, radius: 20, vx: 0, vy: 0, sinceCounter: 0.36 };
     assert.ok(collide(wheel, plate, 1000));
     return plate.vy;
   }
@@ -451,7 +451,7 @@ test('a level head-on strike is braced harder than a lateral shove', () => {
   assert.ok(strike(128) > 65);
 });
 
-test('the defender lunges from the rail into a descending plate, then leaves a gap', () => {
+test('the defender lunges from the rail into a descending plate and returns when it withdraws', () => {
   const rail = { a: { x: 40, y: 430 }, b: { x: 360, y: 430 } };
   const route = { ...new SignMotion(floorFixture(), 400, 800), path: rail, x: 215, y: 430,
     radius: 28, lift: 0 };
@@ -473,25 +473,20 @@ test('the defender lunges from the rail into a descending plate, then leaves a g
   }
   assert.ok(hit && board.rebounding && board.vy < -145);
   assert.ok(height > 41 && left < route.x - 10);
-  board.vy = 75;
+  board.vy = -45;
   for (let n = 0; n < 70; n++) sign.advance(route, 1 / 90, board);
   assert.ok(sign.lift < 0.1 && Math.abs(sign.x - route.x) < 4);
 });
 
-test('both cities appear within the clip and Posadas stays after the download becomes available', () => {
+test('the city on the solid changes every six seconds, including after the clip', () => {
+  assert.equal(clipLength, 15000);
   for (const ms of [0, 999]) assert.equal(cueAt(ms), -1);
-  for (const ms of [1000, 7999]) {
-    assert.equal(
-      announcements[cueAt(ms)].text,
-      'El 2 de diciembre nos vemos en la Cabaña de los Muñecos'
-    );
-  }
-  for (const ms of [8000, 14999, 15000, 60000]) {
-    assert.equal(
-      announcements[cueAt(ms)].text,
-      'El 12 de diciembre nos vemos en Silicon Misiones, en Posadas'
-    );
-  }
+  for (const ms of [1000, 6999, 13000, 14999, 15000, 18999, 25000])
+    assert.deepEqual(announcements[cueAt(ms)], { city: 'Puerto Iguazú',
+      text: 'El 2 de diciembre nos vemos en la Cabaña de los Muñecos, en Puerto Iguazú' });
+  for (const ms of [7000, 12999, 19000, 24999, 60000])
+    assert.deepEqual(announcements[cueAt(ms)], { city: 'Posadas',
+      text: 'El 12 de diciembre nos vemos en Silicon Misiones, en Posadas' });
 });
 
 test('the export plays the first 15 continuous seconds and fades at the end', () => {
@@ -545,71 +540,94 @@ test('a stripe alone steers promptly in either axis, reversing in the next pictu
   }
 });
 
-test('a descent that misses the tray rebounds; steering to the tray gives a soft landing', () => {
+test('the first tray contact catches even a fast, tilted or off-centre plate without bouncing', () => {
   for (const [width, height] of [[320, 568], [390, 664], [760, 360]]) {
     const view = { ...portrait, width, height, bottom: 86 };
     const board = new ShowBoard();
     board.fit(view, { width: (width - 28) * (width < height ? 0.88 : 0.66), height: 100 });
-    const bottom = height - view.bottom;
-    const goal = { x: width / 2, width: board.width, lipHeight: 11, y: bottom - board.height / 2, bottom };
-    const start = board.y;
-    settle(board, 8, view);
-    assert.equal(board.y, start);
-    board.gravity = { x: 0, y: 1 };
-    let first;
-    for (let i = 0; i < 600 && !first; i++) {
-      board.advance(view, 1 / 60, false);
-      first = landOnTray(board, goal, view);
+    const goal = { x: width / 2, width: board.width, lipHeight: 11, bottom: height - view.bottom };
+    assert.equal(touchesTray(board, goal), false);
+    board.gravity = { x: -0.6, y: 1 };
+    let caught = false;
+    for (let n = 0; n < 600 && !caught; n++) {
+      board.advance(view, 1 / 90, false);
+      caught = touchesTray(board, goal);
     }
-    assert.equal(first, 'rebound');
-    assert.ok(board.y + board.height / 2 < bottom - goal.lipHeight);
-    board.advance(view, 1 / 60, false);
-    assert.ok(board.y < goal.y - 3 && !canSeatPrize(board, goal));
-    settle(board, 0.15, view);
-    assert.ok(board.y < goal.y - 20);
-    board.x = goal.x + 4;
-    board.gravity.y = 0.23;
-    let result;
-    for (let i = 0; i < 600 && !result; i++) {
-      board.advance(view, 1 / 60, false);
-      result = landOnTray(board, goal, view);
+    assert.ok(caught && !board.rebounding);
+    assert.ok(Math.abs(board.x - goal.x) > 8 && Math.abs(board.angle) > 0.045);
+    const entry = { angle: board.angle, offsetX: board.x - goal.x,
+      offsetY: board.y - (goal.bottom - board.height / 2), progress: 0 };
+    for (let n = 0; n < 22; n++) {
+      const y = board.y;
+      settlePrize(board, goal, entry, 1 / 90);
+      assert.ok(board.y >= y - 1e-6 && !board.rebounding);
     }
-    assert.equal(result, 'seated');
-    const entry = { angle: board.angle, offsetX: board.x - goal.x, progress: 0 };
-    assert.equal(settlePrize(board, goal, entry, 0.12), false);
-    assert.equal(settlePrize(board, goal, entry, 0.12), true);
-    assert.equal(board.y, goal.y);
+    assert.equal(entry.progress, 1);
     assert.equal(board.x, goal.x);
+    assert.equal(board.y + board.height / 2, goal.bottom);
   }
 });
 
-test('an off-balance plate and a hard central strike bounce; a controlled central landing seats', () => {
+test('the space beside the tray is playable and the first post can catch a plate sliding in', () => {
   const board = plate();
-  const bottom = portrait.height - portrait.bottom;
-  const goal = { x: 200, width: board.width, lipHeight: 11, y: bottom - board.height / 2, bottom };
-  for (const [x, angle, speed, expected] of [
-    [226, 0, 75, 'rebound'], [200, 0.22, 75, 'rebound'],
-    [200, 0, 210, 'rebound'], [193, 0, 32, 'rebound'], [198, 0.012, 74, 'seated'],
-  ]) {
-    Object.assign(board, { x, y: bottom, angle, landingSpeed: speed, vy: 0 });
-    board.confine(portrait);
-    assert.equal(landOnTray(board, goal, portrait), expected);
-  }
-  Object.assign(board, { y: goal.y - 55, landingSpeed: 0 });
-  assert.equal(landOnTray(board, goal, portrait), null);
+  const goal = { x: 200, width: board.width, lipHeight: 11, bottom: 700 };
+  board.y = goal.bottom - board.height / 2;
+  board.x = 405;
+  assert.equal(touchesTray(board, goal), false);
+  board.x = 399;
+  assert.equal(touchesTray(board, goal), true);
+  board.y -= 13;
+  assert.equal(touchesTray(board, goal), false);
 });
 
-test('a lower corner inside the opening passes the lip until the face actually touches a post or the base', () => {
+test('a tilted corner can enter the opening before the face actually touches a post or the base', () => {
   const board = plate();
   const goal = { x: board.x, width: board.width, bottom: portrait.height - portrait.bottom, lipHeight: 11 };
   board.x -= 12;
   board.angle = 0.11;
-  board.vy = 45;
   const lowerCorner = (Math.cos(board.angle) * board.height + Math.sin(board.angle) * board.width) / 2;
   board.y = goal.bottom - 5 - lowerCorner;
-  assert.equal(landOnTray(board, goal, portrait), null);
+  assert.equal(touchesTray(board, goal), false);
   board.y += 5;
-  assert.equal(landOnTray(board, goal, portrait), 'rebound');
+  assert.equal(touchesTray(board, goal), true);
+});
+
+test('waiting for the small wheel or making a large downward swipe cannot force a straight crossing', () => {
+  const w = 390, h = 708, dt = 1 / 90;
+  const view = { ...portrait, width: w, height: h, left: 12, right: 15, top: 12, bottom: 87 };
+  for (const optical of [false, true]) {
+    const rail = { a: { x: 0.08, y: 0.86 }, b: { x: 0.89, y: 0.34 } };
+    const route = new SignMotion(readFloor([rail], w, h), w, h);
+    const wheel = new RollingSign(route), board = new ShowBoard();
+    board.fit(view, { width: (w - 27) * 0.88, height: 128 });
+    const goal = { x: (w + view.left - view.right) / 2, bottom: h - view.bottom, width: board.width, lipHeight: 11 };
+    let hits = 0, largestBlock = 0;
+    function step(frame) {
+      board.advance(view, dt, false);
+      route.advance(dt);
+      wheel.advance(route, dt, board);
+      wheel.keepInPlay(view);
+      const hit = collide(wheel, board, frame * dt * 1000);
+      wheel.keepInPlay(view);
+      if (hit) { hits++; route.rebound(hit); largestBlock = Math.max(largestBlock, wheel.radius); }
+      board.confine(view);
+      return touchesTray(board, goal);
+    }
+    for (let n = 0; n < 250; n++) step(n);
+    assert.ok(wheel.radius < w * 0.071);
+    board.gravity = { x: 0, y: optical ? 0 : 1 };
+    for (let n = 250; n < 1100; n++) {
+      if (optical && n % 13 === 0) board.steer(0, 0.16);
+      assert.equal(step(n), false);
+    }
+    assert.ok(hits >= 2 && largestBlock > w * 0.115);
+    let landed = false;
+    for (let n = 1100; n < 4700 && !landed; n++) {
+      board.gravity = { x: Math.sign(Math.sin((n - 1100) * dt * 7)) * 0.98, y: 0.65 };
+      landed = step(n);
+    }
+    assert.ok(landed);
+  }
 });
 
 test('tilting from an upright start responds in both directions and follows screen rotation', () => {

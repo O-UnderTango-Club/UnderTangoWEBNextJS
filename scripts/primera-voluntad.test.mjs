@@ -446,8 +446,36 @@ test('a level head-on strike is braced harder than a lateral shove', () => {
     assert.ok(collide(wheel, plate, 1000));
     return plate.vy;
   }
-  assert.ok(strike(0) < -120);
-  assert.ok(strike(85) > 65);
+  assert.ok(strike(0) < -160);
+  assert.ok(strike(85) < -160); // a slight sideways drift is still a head-on descent
+  assert.ok(strike(128) > 65);
+});
+
+test('the defender lunges from the rail into a descending plate, then leaves a gap', () => {
+  const rail = { a: { x: 40, y: 430 }, b: { x: 360, y: 430 } };
+  const route = { ...new SignMotion(floorFixture(), 400, 800), path: rail, x: 215, y: 430,
+    radius: 28, lift: 0 };
+  const sign = new RollingSign(route);
+  const board = plate();
+  board.x = 168;
+  board.y = 307;
+  for (let n = 0; n < 90; n++) sign.advance(route, 1 / 90, board);
+  assert.equal(sign.lift, 0);
+  assert.equal(sign.x, route.x);
+  board.vy = 80;
+  let height = 0, left = sign.x, hit = null;
+  for (let n = 0; n < 70; n++) {
+    sign.advance(route, 1 / 90, board);
+    height = Math.max(height, sign.lift);
+    left = Math.min(left, sign.x);
+    assert.ok(sign.x > rail.a.x && sign.x < rail.b.x);
+    hit = hit || collide(sign, board, n * 1000 / 90);
+  }
+  assert.ok(hit && board.rebounding && board.vy < -145);
+  assert.ok(height > 41 && left < route.x - 10);
+  board.vy = 75;
+  for (let n = 0; n < 70; n++) sign.advance(route, 1 / 90, board);
+  assert.ok(sign.lift < 0.1 && Math.abs(sign.x - route.x) < 4);
 });
 
 test('both cities appear within the clip and Posadas stays after the download becomes available', () => {
@@ -521,15 +549,20 @@ test('a descent that misses the tray rebounds; steering to the tray gives a soft
   for (const [width, height] of [[320, 568], [390, 664], [760, 360]]) {
     const view = { ...portrait, width, height, bottom: 86 };
     const board = new ShowBoard();
-    board.fit(view, { width: (width - 28) * (width < height ? 0.84 : 0.61), height: 100 });
+    board.fit(view, { width: (width - 28) * (width < height ? 0.88 : 0.66), height: 100 });
     const bottom = height - view.bottom;
-    const goal = { x: width / 2, width: 52, y: bottom - board.height / 2, bottom };
+    const goal = { x: width / 2, width: board.width, lipHeight: 11, y: bottom - board.height / 2, bottom };
     const start = board.y;
     settle(board, 8, view);
     assert.equal(board.y, start);
     board.gravity = { x: 0, y: 1 };
-    for (let i = 0; i < 600 && !board.landingSpeed; i++) board.advance(view, 1 / 60, false);
-    assert.equal(landOnTray(board, goal, view), 'rebound');
+    let first;
+    for (let i = 0; i < 600 && !first; i++) {
+      board.advance(view, 1 / 60, false);
+      first = landOnTray(board, goal, view);
+    }
+    assert.equal(first, 'rebound');
+    assert.ok(board.y + board.height / 2 < bottom - goal.lipHeight);
     board.advance(view, 1 / 60, false);
     assert.ok(board.y < goal.y - 3 && !canSeatPrize(board, goal));
     settle(board, 0.15, view);
@@ -553,10 +586,10 @@ test('a descent that misses the tray rebounds; steering to the tray gives a soft
 test('an off-balance plate and a hard central strike bounce; a controlled central landing seats', () => {
   const board = plate();
   const bottom = portrait.height - portrait.bottom;
-  const goal = { x: 200, width: 58, y: bottom - board.height / 2, bottom };
+  const goal = { x: 200, width: board.width, lipHeight: 11, y: bottom - board.height / 2, bottom };
   for (const [x, angle, speed, expected] of [
     [226, 0, 75, 'rebound'], [200, 0.22, 75, 'rebound'],
-    [200, 0, 210, 'rebound'], [193, 0.012, 74, 'seated'],
+    [200, 0, 210, 'rebound'], [193, 0, 32, 'rebound'], [198, 0.012, 74, 'seated'],
   ]) {
     Object.assign(board, { x, y: bottom, angle, landingSpeed: speed, vy: 0 });
     board.confine(portrait);

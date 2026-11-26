@@ -1,30 +1,41 @@
-// A landing is supported when the centre of mass is over the flat part of
-// the tray and the lower edge reaches both ends of that short support.
-export function canSeatPrize(board, goal) {
+// Work with the two visible lower corners, including the plate's rotation.
+function bottomEdge(board) {
   const sin = Math.sin(board.angle), cos = Math.cos(board.angle);
-  if (cos < 0.97 || board.vy + board.panVy < -2) return false;
-  const footX = board.x - sin * board.height / 2;
-  const footY = board.y + cos * board.height / 2;
-  const halfSupport = goal.width * 0.37;
-  const centerGap = goal.bottom - (footY + (goal.x - footX) * sin / cos);
-  return Math.abs(board.x - goal.x) <= goal.width * 0.22 &&
-    Math.abs(centerGap) + Math.abs(halfSupport * sin / cos) <= 5 &&
-    Math.abs(board.vx + board.panVx) < 62;
+  const cx = board.x - sin * board.height / 2, cy = board.y + cos * board.height / 2;
+  const halfWidth = cos * board.width / 2, halfRise = Math.abs(sin) * board.width / 2;
+  return { left: cx - halfWidth, right: cx + halfWidth, high: cy - halfRise, low: cy + halfRise };
+}
+
+function aligned(edge, goal) {
+  // A few CSS pixels of clearance allow for sensor noise on a same-width tray.
+  const clearance = Math.min(8, Math.max(5, goal.width * 0.02));
+  return Math.abs(edge.left - (goal.x - goal.width / 2)) <= clearance &&
+    Math.abs(edge.right - (goal.x + goal.width / 2)) <= clearance;
+}
+
+export function canSeatPrize(board, goal, edge = bottomEdge(board)) {
+  return aligned(edge, goal) && Math.abs(goal.bottom - edge.low) <= 1 &&
+    Math.abs(goal.bottom - edge.high) <= 4 && board.vy + board.panVy >= -2 &&
+    Math.abs(board.vx + board.panVx) < 36;
 }
 
 export function landOnTray(board, goal, view) {
-  const approach = board.landingSpeed;
-  const lowest = board.y + (Math.abs(Math.sin(board.angle)) * board.width + Math.abs(Math.cos(board.angle)) * board.height) / 2;
-  if (goal.bottom - lowest > 3) return null;
-  const soft = Math.min(145, Math.max(86, view.height * 0.185));
-  if (Math.max(approach, board.vy + board.panVy) <= soft && canSeatPrize(board, goal)) return 'seated';
-  if (approach < 24) return null;
-  // A hard or unbalanced landing springs back up. Distance and speed depend on
-  // the actual approach; easing the phone before contact makes a clean landing.
+  const speed = Math.max(board.landingSpeed, board.vy + board.panVy);
+  if (speed < 0.1) return null;
+  const edge = bottomEdge(board);
+  const rimY = goal.bottom - goal.lipHeight;
+  if (edge.low < rimY) return null;
+  const fits = aligned(edge, goal);
+  const overlapsTray = edge.right >= goal.x - goal.width / 2 && edge.left <= goal.x + goal.width / 2;
+  const contactY = !fits && overlapsTray ? rimY : goal.bottom;
+  if (edge.low < contactY - 0.5) return null;
+  const soft = Math.min(98, Math.max(63, view.height * 0.13));
+  if (speed <= soft && canSeatPrize(board, goal, edge)) return 'seated';
+
   board.panY = board.panVy = 0;
   board.rebounding = true;
-  board.vy = -Math.min(370, Math.max(170, approach * 1.4));
-  board.y -= 3;
+  board.vy = -Math.min(360, Math.max(Math.min(188, view.height * 0.38), speed * 1.4));
+  board.y -= Math.max(0, edge.low - contactY) + 1.5;
   return 'rebound';
 }
 

@@ -9,6 +9,8 @@ export class RollingSign {
     this.vx = this.vy = this.free = 0;
     this.radius = route.radius;
     this.lift = route.lift || 0;
+    this.liftSpeed = this.counterReach = 0;
+    this.sinceCounter = Infinity;
     this.spin = route.spin;
     this.yaw = route.yaw;
     this.pitch = route.pitch;
@@ -17,14 +19,49 @@ export class RollingSign {
     this.energy = this.travel = 0;
   }
 
-  advance(route, dt) {
+  // Commit to a point on the measured rail as the lower face approaches.
+  // The leap has a fixed reach; a feint can draw it out before the next descent.
+  counter(route, board, dt) {
+    this.sinceCounter += dt;
+    const cycle = 0.58;
     const size = Math.min(route.width, route.height);
+    if (this.sinceCounter >= 1.75 && board) {
+      const gap = this.y - this.lift - 2 * this.radius - board.y - board.height / 2;
+      const fall = board.vy + board.panVy;
+      const lateral = board.vx + board.panVx;
+      if (fall > size * 0.045 && gap > -this.radius && gap < size * 0.33 &&
+          Math.abs(board.x - this.x) < board.width / 2 + size * 0.18) {
+        const { a, b } = route.path;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        const aheadX = board.x + lateral * 0.22 - route.x;
+        const aheadY = board.y + board.height / 2 + this.radius * 2 - route.y;
+        this.counterReach = clamp((aheadX * dx + aheadY * dy) / length, -size * 0.24, size * 0.24);
+        this.sinceCounter = 0;
+      }
+    }
+    return this.sinceCounter < cycle ? Math.sin(Math.PI * this.sinceCounter / cycle) ** 2 : 0;
+  }
+
+  advance(route, dt, board = null) {
+    const size = Math.min(route.width, route.height);
+    const arc = this.counter(route, board, dt);
+    let targetX = route.x, targetY = route.y;
+    if (arc > 0) {
+      const { a, b } = route.path;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const along = ((route.x - a.x) * dx + (route.y - a.y) * dy) / length;
+      const reach = clamp(this.counterReach * arc, -along, length - along);
+      targetX += reach * dx / length;
+      targetY += reach * dy / length;
+    }
     const spring = this.free > 0 ? 9 : 55;
     const drag = this.free > 0 ? 2.7 : 14;
     this.free = Math.max(0, this.free - dt);
     const limit = size * (this.gentle ? 0.46 : 0.65);
-    this.vx += ((route.x - this.x) * spring - drag * this.vx) * dt;
-    this.vy += ((route.y - this.y) * spring - drag * this.vy) * dt;
+    this.vx += ((targetX - this.x) * spring - drag * this.vx) * dt;
+    this.vy += ((targetY - this.y) * spring - drag * this.vy) * dt;
     const speed = Math.hypot(this.vx, this.vy);
     if (speed > limit) {
       this.vx *= limit / speed;
@@ -34,7 +71,10 @@ export class RollingSign {
     this.y += this.vy * dt;
     const blend = 1 - Math.exp(-dt * 6);
     this.radius += (Math.max(route.radius, size * 0.048) - this.radius) * blend;
-    this.lift += ((route.lift || 0) - this.lift) * (1 - Math.exp(-dt * 15));
+    const lift = (route.lift || 0) + arc * size * (this.gentle ? 0.07 : 0.155);
+    const rise = (lift - this.lift) * (1 - Math.exp(-dt * 15));
+    this.lift += rise;
+    this.liftSpeed = dt > 0 ? rise / dt : 0;
     this.spin += (route.spin - this.spin) * blend;
     this.yaw += (route.yaw - this.yaw) * blend;
     this.pitch += (route.pitch - this.pitch) * blend;
@@ -246,12 +286,14 @@ export function collide(sign, board, now) {
     contactY = px * s + py * c;
   const relative =
     (sign.vx - board.vx - board.panVx + board.spin * contactY) * wx +
-    (sign.vy - board.vy - board.panVy - board.spin * contactX) * wy;
+    (sign.vy - (sign.liftSpeed || 0) - board.vy - board.panVy - board.spin * contactX) * wy;
   // The body braces a head-on descent. Canting the plate or shoving it sideways
   // sends the wheel along its rail and gives the player a way around it.
   const underneath = wy > 0.45;
-  const sliding = Math.abs(board.vx + board.panVx) > 46 || Math.abs(board.angle) > 0.105;
-  const wheelShare = underneath ? (sliding ? 0.72 : 0.10) : 0.80;
+  const lateral = Math.abs(board.vx + board.panVx);
+  const descent = Math.max(0, board.vy + board.panVy);
+  const sliding = lateral > Math.max(54, Math.min(86, board.width * 0.22), descent * 0.68);
+  const wheelShare = underneath ? (sliding ? 0.76 : 0.045) : 0.80;
   sign.x += wx * depth * wheelShare;
   sign.y += wy * depth * (wy < 0 ? 1 : wheelShare);
   board.x -= wx * depth * (1 - wheelShare);
@@ -262,8 +304,9 @@ export function collide(sign, board, now) {
   sign.vy += wy * impulse * (wy < 0 ? 1 : wheelShare);
   board.vx -= wx * impulse * (1 - wheelShare);
   if (wy > 0) board.vy -= wy * impulse * (1 - wheelShare);
-  if (underneath && !sliding && relative < -85) {
-    board.vy = Math.min(board.vy, -Math.min(270, -relative * 0.92));
+  if (underneath && !sliding && relative < -52 && now - board.lastHit >= 340) {
+    board.panY = board.panVy = 0;
+    board.vy = Math.min(board.vy, -clamp(-relative * 1.24, 148, 330));
     board.rebounding = true;
   }
   board.spin -= clamp(

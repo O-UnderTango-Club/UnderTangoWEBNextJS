@@ -126,25 +126,28 @@
         bottom: calc(var(--bottom) + 76px);
         transform: translateX(-50%);
         pointer-events: none;
-        width: clamp(48px, 15vw, 72px);
-        height: 9px;
-        color: #f2d9a8;
-        filter: drop-shadow(0 1px 1px #211d25);
+        height: 12px;
+        color: rgba(184, 184, 184, 0.55);
       }
-      .tray-shape { display: block; width: 100%; height: 100%; overflow: visible; }
-      #prize-target .tray-arrow {
+      .tray-shape {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: solid currentColor;
+        border-width: 0 1px 1px;
+      }
+      .tray-arrow {
         position: absolute;
-        top: calc(100% + 4px);
+        bottom: calc(100% + 3px);
         left: 50%;
         transform: translateX(-50%);
-        width: 22px;
-        height: 22px;
-        color: #ffe5ac;
-        filter: drop-shadow(0 1px 1px #15121b) drop-shadow(0 0 2px #15121b);
+        width: 15px;
+        height: 15px;
+        color: rgba(163, 163, 163, 0.46);
       }
       .stage[data-phase='permission'] #prize-target { visibility: hidden; }
       .stage[data-prize='ready'] #prize-target { color: #acffdf; }
-      #prize-target[data-hit] .tray-shape { stroke: #fff8df; stroke-width: 2.8; }
+      #prize-target[data-hit] .tray-shape { border-color: rgba(221, 221, 221, 0.8); }
       .stage[data-prize='ready'] .tray-arrow { visibility: hidden; }
       #prize-slot {
         grid-area: 1 / 2;
@@ -282,11 +285,9 @@
         <canvas id="scene" class="visual" aria-hidden="true" hidden></canvas>
         <canvas id="surface" class="visual" aria-hidden="true"></canvas>
         <div id="prize-target" aria-hidden="true">
-          <svg class="tray-shape" viewBox="0 0 64 10" preserveAspectRatio="none" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 1.5 6.5 8.5h51L63 1.5"/>
-          </svg>
-          <svg class="tray-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 21V4m-6.5 6.5L12 4l6.5 6.5"/>
+          <span class="tray-shape"></span>
+          <svg class="tray-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 2v11m-4-4 4 4 4-4"/>
           </svg>
         </div>
         <div id="cue" class="sr-only" hidden aria-live="polite" aria-atomic="true">
@@ -362,7 +363,7 @@
         </div>
         <p>
           Apuntá a una junta del piso o al borde de una mesa. El Ø rueda por esa recta y puede saltar a otra que entre en el encuadre.
-          Incliná el teléfono para que baje el cartel. Si el Ø te frena, probá de costado. Aflojá la inclinación al apoyar el centro del cartel en la bandejita. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
+          Incliná el teléfono para que baje el cartel. El Ø sale a tu encuentro. Probá una finta de costado y aflojá la inclinación para que los dos extremos del cartel entren juntos en la bandeja. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
           Si aparece el botón de inclinación arriba a la derecha, podés tocarlo para usar el sensor.
         </p>
         <p>
@@ -373,6 +374,6 @@
         <a href="/847/primera-voluntad">← Volver a la ficha</a>
       </section>
     </main>
-    <script type="module" src="./experience.mjs?v=bandeja"></script>
+    <script type="module" src="./experience.mjs?v=duelo"></script>
   </body>
 </html>

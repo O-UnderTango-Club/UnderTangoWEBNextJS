@@ -13,10 +13,10 @@ import {
 import { drawSign } from './solid-sign.mjs';
 import { soundscape } from './footsteps.mjs?v=bandeja';
 
-import { RollingSign, ShowBoard, collide, tiltFromRest } from './stage-physics.mjs?v=bandeja';
-import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs?v=bandeja';
+import { RollingSign, ShowBoard, collide, tiltFromRest } from './stage-physics.mjs?v=duelo';
+import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs?v=duelo';
 import { SceneClip } from './clip.mjs';
-import { landOnTray, settlePrize } from './prize-goal.mjs?v=bandeja';
+import { landOnTray, settlePrize } from './prize-goal.mjs?v=duelo';
 import { showPrize } from './prize.mjs?v=meta-visible';
 import { introMs } from './timing.mjs';
 
@@ -65,13 +65,14 @@ let goal, seating = null, pointer = null, baseline = null, lastTrayHit = -Infini
 
 function positionPrize() {
   if (!layout || !stage.clientWidth) return;
+  target.style.width = board.width + 'px';
   target.style.left = (view.left + view.width - view.right) / 2 + 'px';
   const rect = target.getBoundingClientRect(), space = stage.getBoundingClientRect();
   goal = {
     x: rect.left - space.left + rect.width / 2,
     width: rect.width,
-    y: rect.bottom - space.top - 1.5 - board.height / 2,
-    bottom: rect.bottom - space.top - 1.5,
+    lipHeight: rect.height - 1,
+    bottom: rect.bottom - space.top - 1,
   };
   view.bottom = view.height - goal.bottom;
   board.confine(view);
@@ -357,7 +358,7 @@ function render(source, crop, now, dt) {
     if (cueIndex >= 0 && motion && !seating) board.advance(view, step, gentle.matches);
     if (motion) {
       if (lost < 500 && motion.advance(step)) turned = true;
-      body.advance(motion, step);
+      body.advance(motion, step, cueIndex >= 0 && !seating && lost < 500 ? board : null);
       body.keepInPlay(view);
       const hit = cueIndex >= 0 ? collide(body, board, now) : null;
       body.keepInPlay(view);
@@ -575,8 +576,10 @@ pad.addEventListener('pointermove', (event) => {
 });
 pad.addEventListener('lostpointercapture', () => { pointer = null; });
 pad.addEventListener('keydown', (event) => {
-  const nudge = Math.min(18, width * 0.04) / (width * 1.25);
-  const delta = { ArrowLeft: [-nudge, 0], ArrowRight: [nudge, 0], ArrowUp: [0, -0.055], ArrowDown: [0, 0.055] }[event.key];
+  const nearTray = goal && goal.bottom - board.y - board.height / 2 < 48;
+  const dx = (nearTray ? 3 : Math.min(18, width * 0.04)) / (width * 1.25);
+  const dy = nearTray ? 2 / (height * 1.95) : 0.055;
+  const delta = { ArrowLeft: [-dx, 0], ArrowRight: [dx, 0], ArrowUp: [0, -dy], ArrowDown: [0, dy] }[event.key];
   if (!delta || mode !== 'demo') return;
   event.preventDefault();
   board.steer(...delta);

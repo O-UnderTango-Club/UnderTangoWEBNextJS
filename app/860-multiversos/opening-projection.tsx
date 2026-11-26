@@ -49,19 +49,24 @@ function strike(ink: CanvasRenderingContext2D, size: number, age: number, streng
   ink.restore();
 }
 
-function uncoverUniverse(ink: CanvasRenderingContext2D, w: number, h: number, log: StrikeLog["current"], still: boolean) {
-  // This canvas is a white curtain. Transparent pixels reveal the scene's playing (or frozen) film.
-  ink.fillStyle = "#fff";
-  ink.fillRect(-w / 2, -h / 2, w, h);
-  if (!log.energy || !w || !h) return;
+export function openingFraction(log: StrikeLog["current"], still: boolean) {
   let arrived = log.energy;
   for (const hit of log.hits) {
     const age = Math.max(0, hit.clock.currentTime - hit.time);
     arrived -= universeStrikeWeight(hit.velocity) * (1 - ease(age / (still ? .14 : .95)));
   }
+  return clamp(arrived / fullStrengthStrikes);
+}
+
+function uncoverUniverse(ink: CanvasRenderingContext2D, w: number, h: number, log: StrikeLog["current"], still: boolean) {
+  // This canvas is a white curtain. Transparent pixels reveal the scene's playing (or frozen) film.
+  ink.fillStyle = "#fff";
+  ink.fillRect(-w / 2, -h / 2, w, h);
+  if (!log.energy || !w || !h) return;
+  const arrived = openingFraction(log, still);
   const edge = Math.hypot(w, h) / 2;
   const clearEdge = .86;
-  const radius = edge * clamp(arrived / fullStrengthStrikes) ** .78 / clearEdge;
+  const radius = edge * arrived ** .78 / clearEdge;
   if (radius > 0) {
     ink.save();
     ink.globalCompositeOperation = "destination-out";

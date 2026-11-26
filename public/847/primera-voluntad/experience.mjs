@@ -13,12 +13,12 @@ import {
 import { drawSign } from './solid-sign.mjs';
 import { soundscape } from './footsteps.mjs?v=bandeja';
 
-import { RollingSign, ShowBoard, collide, tiltFromRest } from './stage-physics.mjs?v=duelo';
-import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs?v=duelo';
+import { RollingSign, ShowBoard, collide, tiltFromRest } from './stage-physics.mjs?v=cruce';
+import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs?v=cruce';
 import { SceneClip } from './clip.mjs';
-import { landOnTray, settlePrize } from './prize-goal.mjs?v=duelo';
+import { touchesTray, settlePrize } from './prize-goal.mjs?v=cruce';
 import { showPrize } from './prize.mjs?v=meta-visible';
-import { introMs } from './timing.mjs';
+import { introMs } from './timing.mjs?v=cruce';
 
 const get = (id) => document.getElementById(id);
 const stage = get('stage'),
@@ -61,7 +61,7 @@ const hits = [];
 const pad = get('steer-pad'),
   target = get('prize-target'),
   gift = get('open-secret');
-let goal, seating = null, pointer = null, baseline = null, lastTrayHit = -Infinity;
+let goal, seating = null, pointer = null, baseline = null;
 
 function positionPrize() {
   if (!layout || !stage.clientWidth) return;
@@ -78,15 +78,12 @@ function positionPrize() {
   board.confine(view);
   if (seating) settlePrize(board, goal, seating, 0);
 }
-function checkLanding(now) {
-  if (!goal || seating) return;
-  const landing = landOnTray(board, goal, view);
-  if (landing === 'rebound') {
-    lastTrayHit = now;
-    target.dataset.hit = '';
-  }
-  if (landing !== 'seated') return;
-  seating = { offsetX: board.x - goal.x, angle: board.angle, progress: 0 };
+function checkLanding() {
+  if (!goal || !touchesTray(board, goal)) return;
+  seating = {
+    offsetX: board.x - goal.x, offsetY: board.y - (goal.bottom - board.height / 2),
+    angle: board.angle, progress: 0,
+  };
   pad.hidden = true;
 }
 function advanceSeating(step) {
@@ -259,8 +256,6 @@ function stopInput() {
 function release() {
   stopInput();
   seating = null;
-  lastTrayHit = -Infinity;
-  delete target.dataset.hit;
   delete stage.dataset.prize;
   gift.hidden = true;
   cancelAnimationFrame(frame);
@@ -291,7 +286,6 @@ function showWords(elapsed) {
   get('cue-title').textContent = cue.text;
   caption.dataset.cue = String(next);
   caption.hidden = tools.hidden = false;
-  positionPrize();
 }
 function analyze(source, crop, now) {
   const scale = 192 / Math.max(width, height),
@@ -351,20 +345,20 @@ function render(source, crop, now, dt) {
     lost = now - lastLineAt;
   showWords(elapsed);
   if (motion && lost > 900 && stage.dataset.phase === 'ground') phase('search', hint);
-  if (target.hasAttribute('data-hit') && now - lastTrayHit > 260) delete target.dataset.hit;
   let turned = false;
   while (dt > 0) {
     const step = Math.min(dt, 1 / 90);
-    if (cueIndex >= 0 && motion && !seating) board.advance(view, step, gentle.matches);
     if (motion) {
+      const playing = cueIndex >= 0 && !seating;
+      if (playing) board.advance(view, step, gentle.matches);
       if (lost < 500 && motion.advance(step)) turned = true;
-      body.advance(motion, step, cueIndex >= 0 && !seating && lost < 500 ? board : null);
+      body.advance(motion, step, playing ? board : null);
       body.keepInPlay(view);
-      const hit = cueIndex >= 0 ? collide(body, board, now) : null;
+      const hit = playing ? collide(body, board, now) : null;
       body.keepInPlay(view);
-      if (cueIndex >= 0 && !seating) {
+      if (playing) {
         board.confine(view);
-        checkLanding(now);
+        checkLanding();
       }
       if (hit) {
         hits.push(hit);
@@ -576,9 +570,8 @@ pad.addEventListener('pointermove', (event) => {
 });
 pad.addEventListener('lostpointercapture', () => { pointer = null; });
 pad.addEventListener('keydown', (event) => {
-  const nearTray = goal && goal.bottom - board.y - board.height / 2 < 48;
-  const dx = (nearTray ? 3 : Math.min(18, width * 0.04)) / (width * 1.25);
-  const dy = nearTray ? 2 / (height * 1.95) : 0.055;
+  const dx = Math.min(18, width * 0.04) / (width * 1.25);
+  const dy = 0.055;
   const delta = { ArrowLeft: [-dx, 0], ArrowRight: [dx, 0], ArrowUp: [0, -dy], ArrowDown: [0, dy] }[event.key];
   if (!delta || mode !== 'demo') return;
   event.preventDefault();

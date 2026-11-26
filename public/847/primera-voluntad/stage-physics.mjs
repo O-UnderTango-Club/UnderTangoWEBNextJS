@@ -9,7 +9,8 @@ export class RollingSign {
     this.vx = this.vy = this.free = 0;
     this.radius = route.radius;
     this.lift = route.lift || 0;
-    this.liftSpeed = this.counterReach = 0;
+    this.liftSpeed = this.counterAt = 0;
+    this.slipTime = this.escapeSide = 0;
     this.sinceCounter = Infinity;
     this.spin = route.spin;
     this.yaw = route.yaw;
@@ -19,47 +20,47 @@ export class RollingSign {
     this.energy = this.travel = 0;
   }
 
-  // Commit to a point on the measured rail as the lower face approaches.
-  // The leap has a fixed reach; a feint can draw it out before the next descent.
-  counter(route, board, dt) {
-    this.sinceCounter += dt;
-    const cycle = 0.58;
-    const size = Math.min(route.width, route.height);
-    if (this.sinceCounter >= 1.75 && board) {
-      const gap = this.y - this.lift - 2 * this.radius - board.y - board.height / 2;
-      const fall = board.vy + board.panVy;
-      const lateral = board.vx + board.panVx;
-      if (fall > size * 0.045 && gap > -this.radius && gap < size * 0.33 &&
-          Math.abs(board.x - this.x) < board.width / 2 + size * 0.18) {
-        const { a, b } = route.path;
-        const dx = b.x - a.x, dy = b.y - a.y;
-        const length = Math.max(1, Math.hypot(dx, dy));
-        const aheadX = board.x + lateral * 0.22 - route.x;
-        const aheadY = board.y + board.height / 2 + this.radius * 2 - route.y;
-        this.counterReach = clamp((aheadX * dx + aheadY * dy) / length, -size * 0.24, size * 0.24);
-        this.sinceCounter = 0;
-      }
-    }
-    return this.sinceCounter < cycle ? Math.sin(Math.PI * this.sinceCounter / cycle) ** 2 : 0;
-  }
-
+  // Follow the rail into the plate's path. Once the wheel leaps it is committed
+  // to that point; an oblique shove can send it rolling back along the other side.
   advance(route, dt, board = null) {
     const size = Math.min(route.width, route.height);
-    const arc = this.counter(route, board, dt);
-    let targetX = route.x, targetY = route.y;
-    if (arc > 0) {
-      const { a, b } = route.path;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const length = Math.max(1, Math.hypot(dx, dy));
-      const along = ((route.x - a.x) * dx + (route.y - a.y) * dy) / length;
-      const reach = clamp(this.counterReach * arc, -along, length - along);
-      targetX += reach * dx / length;
-      targetY += reach * dy / length;
+    this.sinceCounter += dt;
+    this.slipTime = Math.max(0, this.slipTime - dt);
+    const gap = board ? this.y - this.lift - 2 * this.radius - board.y - board.height / 2 : Infinity;
+    const descending = board && (board.gravity?.y > 0.02 || board.vy + board.panVy > 2);
+    const ahead = descending && board.y < this.y - this.lift &&
+      Math.abs(board.x - this.x) < board.width / 2 + size * 0.30;
+    const guard = ahead && !this.slipTime ? clamp((size * 0.55 - gap) / (size * 0.34), 0, 1) : 0;
+    let targetX = route.x, targetY = route.y, arc = 0;
+    if (guard || this.sinceCounter < 0.58 || (board && this.slipTime)) {
+      const { a, b } = route.path, dx = b.x - a.x, dy = b.y - a.y;
+      const length2 = dx * dx + dy * dy || 1;
+      const fraction = (x, y) => clamp(((x - a.x) * dx + (y - a.y) * dy) / length2, 0, 1);
+      const rail = fraction(route.x, route.y);
+      let t = rail;
+      if (board && this.slipTime) {
+        t = fraction(board.x + this.escapeSide * (board.width / 2 + 2 * this.radius),
+          board.y - board.height / 2 - this.radius);
+      } else if (guard) {
+        const aim = fraction(board.x + (board.vx + board.panVx) * 0.17,
+          board.y + board.height / 2 + 2 * this.radius);
+        t += (aim - rail) * guard * 0.94;
+        if (this.sinceCounter >= 1.38 && guard > 0.36 && gap > -this.radius) {
+          this.counterAt = aim;
+          this.sinceCounter = 0;
+        }
+      }
+      if (!this.slipTime && this.sinceCounter < 0.58) {
+        arc = Math.sin(Math.PI * this.sinceCounter / 0.58) ** 2;
+        t += (this.counterAt - t) * arc;
+      }
+      targetX += (t - rail) * dx;
+      targetY += (t - rail) * dy;
     }
-    const spring = this.free > 0 ? 9 : 55;
+    const spring = this.slipTime ? 88 : this.free > 0 ? 9 : 55 + 42 * guard;
     const drag = this.free > 0 ? 2.7 : 14;
     this.free = Math.max(0, this.free - dt);
-    const limit = size * (this.gentle ? 0.46 : 0.65);
+    const limit = size * ((this.gentle ? 0.46 : 0.65) + (this.slipTime ? 0.46 : 0.35 * guard));
     this.vx += ((targetX - this.x) * spring - drag * this.vx) * dt;
     this.vy += ((targetY - this.y) * spring - drag * this.vy) * dt;
     const speed = Math.hypot(this.vx, this.vy);
@@ -70,7 +71,10 @@ export class RollingSign {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     const blend = 1 - Math.exp(-dt * 6);
-    this.radius += (Math.max(route.radius, size * 0.048) - this.radius) * blend;
+    // The visible solid grows into the block, even at the far end of a rail.
+    // Collision and artwork use this same radius.
+    const radius = Math.max(route.radius, size * (0.062 + guard * 0.079));
+    this.radius += (radius - this.radius) * (1 - Math.exp(-dt * (7 + 8 * guard)));
     const lift = (route.lift || 0) + arc * size * (this.gentle ? 0.07 : 0.155);
     const rise = (lift - this.lift) * (1 - Math.exp(-dt * 15));
     this.lift += rise;
@@ -87,7 +91,7 @@ export class RollingSign {
 
   keepInPlay(view) {
     const min = Math.min(view.width, view.height);
-    this.radius = Math.max(this.radius, min * 0.048);
+    this.radius = Math.max(this.radius, min * 0.062);
     this.x = clamp(this.x, this.radius * 1.18, view.width - this.radius * 1.18);
     this.y = clamp(this.y, this.lift + this.radius * 2.2, view.height - view.bottom + this.radius * 0.55);
   }
@@ -133,7 +137,7 @@ export class ShowBoard {
   constructor() {
     this.x = this.y = this.vx = this.vy = 0;
     this.width = this.height = this.angle = this.spin = 0;
-    this.panX = this.panY = this.landingSpeed = 0;
+    this.panX = this.panY = this.driveX = 0;
     this.gravity = null;
     this.restY = Infinity;
     this.restAngle = 0;
@@ -168,7 +172,7 @@ export class ShowBoard {
   fit(view, layout) {
     this.restY = Infinity;
     if (!this.width) {
-      // Start off the centre of the tray so the descent also needs a lateral correction.
+      // Give the player room for a sideways approach to the first rail.
       this.x = view.left + layout.width / 2 + (view.width - view.left - view.right - layout.width) * 0.14;
       this.y = view.top + layout.height / 2 + 5;
     } else if (this.viewWidth !== view.width || this.viewHeight !== view.height) {
@@ -183,7 +187,7 @@ export class ShowBoard {
     this.confine(view);
   }
 
-  confine(view, checkLanding = false) {
+  confine(view) {
     // A wheel pushing or tilting a plate against the upper edge cannot make it
     // descend on a stationary phone. Allow rotation again as soon as there is room.
     const reachY = (this.width * Math.abs(Math.sin(this.angle)) + this.height * Math.abs(Math.cos(this.angle))) / 2;
@@ -198,8 +202,6 @@ export class ShowBoard {
     const x = clamp(this.x, view.left + rx, view.width - view.right - rx);
     const floorY = view.height - view.bottom - ry;
     const y = clamp(this.y, view.top + ry, Math.min(this.restY, floorY));
-    if (checkLanding && this.y > floorY && this.vy + this.panVy > 0)
-      this.landingSpeed = this.vy + this.panVy;
     if ((this.x - x) * this.vx > 0) this.vx = 0;
     if ((this.y - y) * this.vy > 0) this.vy = 0;
     this.x = x;
@@ -210,13 +212,16 @@ export class ShowBoard {
     const gx = this.gravity?.x || 0, gy = this.gravity?.y || 0;
     this.restY = gy > 0 || this.panY > 0.00002 ? Infinity : this.y;
     this.restAngle = this.angle;
-    this.landingSpeed = 0;
     if (!gy && this.vy > 0) this.vy = 0;
     const response = 7;
     const ease = 1 - Math.exp(-dt * response),
       panEase = 1 - Math.exp(-dt * 32);
-    const dx = this.panX * panEase,
-      dy = this.panY * panEase;
+    // Consume a large optical shift or drag over several steps. A single
+    // input event must not carry the plate through a small, distant wheel.
+    const travel = Math.min(view.width, view.height) * 2.15 * dt;
+    const maxX = travel / (view.width * 1.25), maxY = travel / (view.height * 1.95);
+    const dx = clamp(this.panX * panEase, -maxX, maxX),
+      dy = clamp(this.panY * panEase, -maxY, maxY);
     this.panX -= dx;
     this.panY -= dy;
     const pace = gentle ? 0.62 : 1;
@@ -225,11 +230,12 @@ export class ShowBoard {
     const changeX = (targetVx - this.vx) * ease, changeY = (targetVy - this.vy) * ease;
     this.panVx = dx * view.width * 1.25 / dt;
     this.panVy = dy * view.height * 1.95 / dt;
+    this.driveX += (targetVx + this.panVx - this.driveX) * (1 - Math.exp(-dt * 18));
     this.vx += changeX;
     this.x += (targetVx + this.panVx) * dt - changeX / response;
     if (this.rebounding && this.vy < 0 && targetVy > this.vy) {
       // A hard strike earns its upward arc even if the phone is still tipped
-      // down. Sideways steering stays live and the player can ease the next landing.
+      // down. Sideways steering stays live during the parry.
       const acceleration = Math.min(880, view.height * 0.72 + 245);
       const next = Math.min(0, targetVy, this.vy + acceleration * dt);
       this.panVy = Math.min(0, this.panVy);
@@ -243,7 +249,7 @@ export class ShowBoard {
     }
     this.spin += ((0.12 * gx - this.angle) * 16 - this.spin * 8) * dt;
     this.angle += this.spin * dt;
-    this.confine(view, true);
+    this.confine(view);
   }
 }
 
@@ -287,13 +293,18 @@ export function collide(sign, board, now) {
   const relative =
     (sign.vx - board.vx - board.panVx + board.spin * contactY) * wx +
     (sign.vy - (sign.liftSpeed || 0) - board.vy - board.panVy - board.spin * contactX) * wy;
-  // The body braces a head-on descent. Canting the plate or shoving it sideways
-  // sends the wheel along its rail and gives the player a way around it.
   const underneath = wy > 0.45;
-  const lateral = Math.abs(board.vx + board.panVx);
-  const descent = Math.max(0, board.vy + board.panVy);
-  const sliding = lateral > Math.max(54, Math.min(86, board.width * 0.22), descent * 0.68);
-  const wheelShare = underneath ? (sliding ? 0.76 : 0.045) : 0.80;
+  const lateral = board.vx + board.panVx, descent = Math.max(0, board.vy + board.panVy);
+  const cutting = board.driveX * lateral > 0 && Math.abs(board.driveX) > 52 &&
+    Math.abs(lateral) > Math.max(56, descent * 0.57);
+  const committed = sign.sinceCounter > 0.15 && sign.sinceCounter < 1.05;
+  if (underneath && relative < -6 && !sign.slipTime && cutting && (committed || Math.abs(u) > hw * 0.66)) {
+    sign.slipTime = 1.32;
+    sign.escapeSide = -Math.sign(lateral);
+    sign.vx += sign.escapeSide * Math.min(230, board.width * 0.76);
+  }
+  const yielding = sign.slipTime > 0;
+  const wheelShare = underneath ? (yielding ? 0.97 : 0.015) : 0.80;
   sign.x += wx * depth * wheelShare;
   sign.y += wy * depth * (wy < 0 ? 1 : wheelShare);
   board.x -= wx * depth * (1 - wheelShare);
@@ -304,9 +315,9 @@ export function collide(sign, board, now) {
   sign.vy += wy * impulse * (wy < 0 ? 1 : wheelShare);
   board.vx -= wx * impulse * (1 - wheelShare);
   if (wy > 0) board.vy -= wy * impulse * (1 - wheelShare);
-  if (underneath && !sliding && relative < -52 && now - board.lastHit >= 340) {
+  if (underneath && !yielding && relative < -34 && now - board.lastHit >= 340) {
     board.panY = board.panVy = 0;
-    board.vy = Math.min(board.vy, -clamp(-relative * 1.24, 148, 330));
+    board.vy = Math.min(board.vy, -clamp(-relative * 1.30, 158, 340));
     board.rebounding = true;
   }
   board.spin -= clamp(
@@ -316,7 +327,7 @@ export function collide(sign, board, now) {
   );
   if (relative > -9 || now - board.lastHit < 340) return null;
   board.lastHit = now;
-  sign.free = 0.25;
+  sign.free = yielding ? 0.40 : 0.10;
   return {
     x: board.x + contactX,
     y: board.y + contactY,

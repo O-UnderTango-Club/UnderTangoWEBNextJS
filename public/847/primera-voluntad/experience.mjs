@@ -13,11 +13,11 @@ import {
 import { drawSign } from './solid-sign.mjs';
 import { soundscape } from './footsteps.mjs';
 
-import { RollingSign, ShowBoard, collide, screenGravity } from './stage-physics.mjs';
+import { RollingSign, ShowBoard, collide, tiltFromRest } from './stage-physics.mjs?v=meta-visible';
 import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs';
 import { SceneClip } from './clip.mjs';
-import { prizeGoal, SecretDock } from './prize-goal.mjs';
-import { showPrize } from './prize.mjs';
+import { canSeatPrize, settlePrize } from './prize-goal.mjs?v=meta-visible';
+import { showPrize } from './prize.mjs?v=meta-visible';
 import { introMs } from './timing.mjs';
 
 const get = (id) => document.getElementById(id);
@@ -59,24 +59,36 @@ let body = null,
   sharing = false;
 const hits = [];
 const pad = get('steer-pad'),
-  slot = get('prize-slot'),
+  target = get('prize-target'),
   gift = get('open-secret');
-let dock = new SecretDock(), goal, pointer = null, baseline = null, tiltActive = false;
+let goal, seating = null, pointer = null, baseline = null;
 
 function positionPrize() {
-  if (!layout || !slot.clientWidth || !stage.clientWidth) return;
-  const rect = slot.getBoundingClientRect();
-  const left = rect.left - stage.getBoundingClientRect().left;
-  const next = prizeGoal(view, board, { left, right: left + rect.width });
-  if (!goal || goal.x !== next.x || goal.floor !== next.floor) dock.since = null;
-  goal = next;
-  slot.style.setProperty('--gift-x', goal.x - left + 'px');
+  if (!layout || !stage.clientWidth) return;
+  target.style.width = layout.width + 'px';
+  target.style.height = layout.height + 'px';
+  target.style.left = (view.left + view.width - view.right) / 2 + 'px';
+  const rect = target.getBoundingClientRect(), space = stage.getBoundingClientRect();
+  goal = {
+    x: rect.left - space.left + rect.width / 2,
+    y: rect.top - space.top + rect.height / 2,
+    bottom: rect.bottom - space.top,
+  };
+  view.bottom = view.height - goal.bottom;
+  board.confine(view);
+  if (seating) settlePrize(board, goal, seating, 0);
 }
-function showGift(state) {
-  if (slot.dataset.state === state) return;
-  slot.dataset.state = state;
-  gift.hidden = state !== 'ready';
-  if (!gift.hidden) status.textContent = 'Apareció un regalo entre los controles.';
+function beginSeating() {
+  if (!goal || seating || !canSeatPrize(board, goal)) return;
+  seating = { offsetX: board.x - goal.x, angle: board.angle, progress: 0 };
+  pad.hidden = true;
+}
+function advanceSeating(step) {
+  if (settlePrize(board, goal, seating, step) && gift.hidden) {
+    stage.dataset.prize = 'ready';
+    gift.hidden = false;
+    status.textContent = 'Encajó el cuadro. Tocá el regalo para abrirlo.';
+  }
 }
 function updateClip(current) {
   const ready = current.state === 'ready';
@@ -131,11 +143,9 @@ function applyTilt() {
   const degrees = Number.isFinite(window.orientation)
     ? window.orientation
     : (window.screen.orientation?.angle ?? 0);
-  const g = screenGravity(attitude.beta, attitude.gamma, degrees);
-  if (!baseline) baseline = g;
-  tiltActive = Math.hypot(g.x - baseline.x, g.y - baseline.y) > 0.09;
-  // Opening the page while holding a phone upright must leave the plate at the top.
-  board.gravity = tiltActive ? g : { x: 0, y: 0 };
+  baseline ??= attitude;
+  const gravity = tiltFromRest(baseline, attitude, degrees);
+  if (board.gravity || gravity.x || gravity.y) board.gravity = gravity;
 }
 function measureTilt({ beta, gamma }) {
   if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
@@ -230,7 +240,6 @@ function stopInput() {
   window.removeEventListener('orientationchange', applyTilt);
   tiltButton.hidden = true;
   attitude = baseline = pointer = null;
-  tiltActive = false;
   pad.hidden = true;
   if (stream) stream.getTracks().forEach((track) => track.stop());
   stream = null;
@@ -239,8 +248,9 @@ function stopInput() {
 }
 function release() {
   stopInput();
-  dock = new SecretDock();
-  showGift('hidden');
+  seating = null;
+  delete stage.dataset.prize;
+  gift.hidden = true;
   cancelAnimationFrame(frame);
   mode = motion = previous = body = null;
   clip.reset();
@@ -285,7 +295,7 @@ function analyze(source, crop, now) {
   if (previous && now - lastRead < 550) {
     const change = cameraMotion(previous, current);
     if (change) {
-      if (mode === 'camera') board.carry(change, now);
+      if (mode === 'camera' && !seating) board.carry(change);
       motion?.carry(change);
       carryMarks(marks, change, width, height);
     }
@@ -333,17 +343,22 @@ function render(source, crop, now, dt) {
   let turned = false;
   while (dt > 0) {
     const step = Math.min(dt, 1 / 90);
-    if (cueIndex >= 0) board.advance(view, step, gentle.matches);
+    if (cueIndex >= 0 && !seating) {
+      board.advance(view, step, gentle.matches);
+      beginSeating();
+    }
     if (motion) {
       if (lost < 500 && motion.advance(step)) turned = true;
       body.advance(motion, step);
       const hit = cueIndex >= 0 && lost < 900 ? collide(body, board, now) : null;
+      if (cueIndex >= 0) beginSeating();
       if (hit) {
         hits.push(hit);
         motion.rebound(hit);
         turned = true;
       }
     }
+    if (seating) advanceSeating(step);
     dt -= step;
   }
   ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
@@ -387,18 +402,12 @@ function render(source, crop, now, dt) {
     ctx.restore();
   }
   if (cueIndex >= 0) {
-    if (mode !== 'prize') {
-      if (goal) {
-        const steered = tiltActive || now - board.lastSteer < 1300;
-        showGift(dock.update(board, goal, now, Boolean(body) && lost < 900, steered));
-      }
-      if (mode === 'demo') {
-        pad.hidden = false;
-        pad.style.width = board.width + 'px';
-        pad.style.height = board.height + 'px';
-        pad.style.transform = 'translate(' + (board.x - board.width / 2) + 'px,' +
-          (board.y - board.height / 2) + 'px) rotate(' + board.angle + 'rad)';
-      }
+    if (mode === 'demo' && !seating) {
+      pad.hidden = false;
+      pad.style.width = board.width + 'px';
+      pad.style.height = board.height + 'px';
+      pad.style.transform = 'translate(' + (board.x - board.width / 2) + 'px,' +
+        (board.y - board.height / 2) + 'px) rotate(' + board.angle + 'rad)';
     }
     ctx.save();
     ctx.globalAlpha = Math.min(1, (elapsed - introMs) / 140);
@@ -411,7 +420,7 @@ function render(source, crop, now, dt) {
 // Keep a completed clip on the claim page. For an early win, finish its two
 // invitations on the last visible frame, releasing the physical camera immediately.
 function openSecret() {
-  if (!dock.ready || (mode !== 'camera' && mode !== 'demo')) return;
+  if (gift.hidden || (mode !== 'camera' && mode !== 'demo')) return;
   cancelAnimationFrame(frame);
   const still = document.createElement('canvas');
   if (clip.state === 'preparing') {
@@ -548,7 +557,7 @@ pad.addEventListener('pointerdown', (event) => {
 pad.addEventListener('pointermove', (event) => {
   if (pointer?.id !== event.pointerId) return;
   board.steer((event.clientX - pointer.x) / (width * 1.25),
-    (event.clientY - pointer.y) / (height * 1.95), performance.now());
+    (event.clientY - pointer.y) / (height * 1.95));
   pointer.x = event.clientX;
   pointer.y = event.clientY;
 });
@@ -558,7 +567,7 @@ pad.addEventListener('keydown', (event) => {
   const delta = { ArrowLeft: [-nudge, 0], ArrowRight: [nudge, 0], ArrowUp: [0, -0.055], ArrowDown: [0, 0.055] }[event.key];
   if (!delta || mode !== 'demo') return;
   event.preventDefault();
-  board.steer(...delta, performance.now());
+  board.steer(...delta);
 });
 addEventListener('popstate', () => {
   if (get('prize')) location.reload();
@@ -575,7 +584,6 @@ stage.addEventListener('click', (event) => {
 addEventListener('pagehide', () => end('Experiencia cerrada. Podés volver a empezar.'));
 if (typeof ResizeObserver === 'function') {
   new ResizeObserver(resize).observe(stage);
-  new ResizeObserver(positionPrize).observe(slot);
 } else addEventListener('resize', resize);
 document.fonts
   ?.load('800 20px Uberlin')

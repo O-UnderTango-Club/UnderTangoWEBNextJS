@@ -14,8 +14,9 @@ import {
   ShowBoard,
   collide,
   screenGravity,
+  tiltFromRest,
 } from '../public/847/primera-voluntad/stage-physics.mjs';
-import { prizeGoal, SecretDock } from '../public/847/primera-voluntad/prize-goal.mjs';
+import { canSeatPrize, settlePrize } from '../public/847/primera-voluntad/prize-goal.mjs';
 import { announcements, cueAt } from '../public/847/primera-voluntad/show-board.mjs';
 
 import { metalAt } from '../public/847/primera-voluntad/solid-sign.mjs';
@@ -484,50 +485,74 @@ test('a stripe alone steers promptly in either axis, reversing in the next pictu
   }
 });
 
-test('the unmarked target stays between the controls and within reach of the plate', () => {
-  for (const [width, height, left, right] of [[320, 568, 110, 204], [390, 664, 197, 274], [760, 360, 205, 635]]) {
-    const view = { ...portrait, width, height };
+test('the same-sized silhouette is reachable from rest at phone and landscape sizes', () => {
+  for (const [width, height] of [[320, 568], [390, 664], [760, 360]]) {
+    const view = { ...portrait, width, height, bottom: 86 };
     const board = new ShowBoard();
     board.fit(view, { width: (width - 28) * (width < height ? 0.78 : 0.57), height: 100 });
-    const goal = prizeGoal(view, board, { left, right });
-    assert.ok(goal.x - 22 >= left && goal.x + 22 <= right);
-    assert.ok(goal.x > width / 2 + goal.tolerance);
-    const start = board.y;
-    settle(board, 20, view);
-    assert.equal(board.y, start);
-    const dock = new SecretDock();
-    assert.equal(dock.update(board, goal, 0, true, false), 'hidden');
-    board.y = goal.floor - board.height / 2;
-    assert.equal(dock.update(board, goal, 2000, true, true), 'near');
-    board.x = goal.x;
+    const bottom = height - view.bottom;
+    const goal = { x: width / 2, y: bottom - board.height / 2, bottom };
+    settle(board, 4, view);
+    assert.equal(canSeatPrize(board, goal), false);
+    board.gravity = tiltFromRest({ beta: 77, gamma: 0 }, { beta: 89, gamma: 0 });
+    settle(board, 6, view);
+    assert.ok(canSeatPrize(board, goal));
+    board.x += 9;
+    board.angle = 0.018;
     board.confine(view);
-    assert.equal(dock.update(board, goal, 2500, true, false), 'near');
-    assert.equal(dock.update(board, goal, 2600, true, true), 'holding');
-    assert.equal(dock.update(board, goal, 3299, true, false), 'holding');
-    assert.equal(dock.update(board, goal, 3300, true, false), 'ready');
-    board.y = start;
-    assert.equal(dock.update(board, goal, 4000, false, false), 'ready');
+    assert.ok(canSeatPrize(board, goal));
   }
 });
 
-test('skimming across the slot, losing the line or colliding interrupts the secret', () => {
+test('a grazing corner cannot seat the plate; an aligned landing completes without a hold', () => {
   const board = plate();
-  const goal = prizeGoal(portrait, board, {left: 190, right: 287});
-  const dock = new SecretDock();
+  const bottom = portrait.height - portrait.bottom;
+  const goal = { x: 200, y: bottom - board.height / 2, bottom };
   board.x = goal.x;
-  board.y = goal.floor - board.height / 2;
-  board.panVx = 90;
-  assert.equal(dock.update(board, goal, 1000, true, true), 'near');
-  board.panVx = 0;
-  assert.equal(dock.update(board, goal, 1100, true, true), 'holding');
-  assert.equal(dock.update(board, goal, 1500, false, true), 'hidden');
-  assert.equal(dock.update(board, goal, 1600, true, true), 'holding');
-  board.lastContact = 1900;
-  assert.equal(dock.update(board, goal, 1920, true, true), 'near');
-  assert.equal(dock.update(board, goal, 2210, true, true), 'holding');
-  board.x += 30;
-  assert.equal(dock.update(board, goal, 2800, true, true), 'near');
-  assert.equal(dock.ready, false);
+  board.y = goal.y - 6;
+  assert.equal(canSeatPrize(board, goal), false);
+  board.y = goal.y;
+  board.x += 32;
+  assert.equal(canSeatPrize(board, goal), false);
+  board.x = goal.x;
+  board.angle = 0.38;
+  board.confine(portrait);
+  assert.equal(canSeatPrize(board, goal), false);
+  board.angle = 0.21;
+  board.x = goal.x + 11;
+  board.y = goal.bottom;
+  board.confine(portrait);
+  board.panVy = 220;
+  board.lastContact = 1000;
+  assert.ok(canSeatPrize(board, goal));
+  const entry = { angle: board.angle, offsetX: board.x - goal.x, progress: 0 };
+  assert.equal(settlePrize(board, goal, entry, 0.12), false);
+  assert.ok(board.angle > 0 && board.y < goal.y && board.x > goal.x);
+  assert.equal(settlePrize(board, goal, entry, 0.12), true);
+  assert.equal(board.angle, 0);
+  assert.equal(board.x, goal.x);
+  assert.equal(board.y, goal.y);
+});
+
+test('tilting from an upright start responds in both directions and follows screen rotation', () => {
+  const rest = { beta: 82, gamma: 0 };
+  const tilt = beta => tiltFromRest(rest, { beta, gamma: 0 });
+  assert.equal(Math.abs(tilt(82.6).y), 0);
+  assert.ok(tilt(92).y > 0.44 && tilt(72).y < -0.44);
+  const board = plate(), start = board.y;
+  board.gravity = tilt(92);
+  board.carry({ a: 1, b: 0, dx: 0, dy: 0.05 });
+  settle(board, 0.3);
+  assert.ok(board.y > start + 34);
+  const lower = board.y;
+  board.gravity = tilt(72);
+  settle(board, 0.45);
+  assert.ok(board.y < lower - 25);
+  for (const [angle, sign] of [[90, -1], [270, 1]]) {
+    const g = tiltFromRest({ beta: 0, gamma: 12 }, { beta: 0, gamma: 24 }, angle);
+    assert.ok(g.y * sign > 0.55 && Math.abs(g.x) < 0.005);
+  }
+  assert.ok(tiltFromRest({ beta: 0, gamma: 0 }, { beta: 180, gamma: 0 }).y < -0.4);
 });
 
 test('a new vertical edge entering a horizontally uniform scene cannot pull the plate sideways', () => {

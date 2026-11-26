@@ -63,14 +63,32 @@ export function screenGravity(beta, gamma, screenAngle = 0) {
   return { x, y: y + 0.18 * level * Math.cos(pitch) * Math.cos(roll) };
 }
 
+// Measure pitch and roll relative to the first pose. Projecting the new gravity
+// vector on that pose's tangent axes also works when starting nearly upright.
+export function tiltFromRest(rest, current, screenAngle = 0) {
+  const rad = Math.PI / 180;
+  const pitch = current.beta * rad, reference = rest.beta * rad;
+  const roll = (current.gamma - rest.gamma) * rad, angle = screenAngle * rad;
+  const forward = Math.cos(pitch) * Math.cos(roll);
+  const x = Math.cos(pitch) * Math.sin(roll);
+  const y = Math.sin(pitch) * Math.cos(reference) - forward * Math.sin(reference);
+  const facing = Math.sin(pitch) * Math.sin(reference) + forward * Math.cos(reference);
+  // A flat, overturned handset settles toward its new lower edge.
+  const inverted = Math.max(0, -facing) * 0.2 * Math.cos(pitch) * Math.cos(current.gamma * rad);
+  const gain = v => Math.sign(v) * clamp((Math.abs(v) - 0.024) * 3.2, 0, 1);
+  return {
+    x: gain(x * Math.cos(angle) + (y + inverted) * Math.sin(angle)),
+    y: gain((y + inverted) * Math.cos(angle) - x * Math.sin(angle)),
+  };
+}
+
 export class ShowBoard {
   constructor() {
     this.x = this.y = this.vx = this.vy = 0;
     this.width = this.height = this.angle = this.spin = 0;
-    this.roll = this.panX = this.panY = 0;
+    this.roll = this.cameraPitch = this.panX = this.panY = 0;
     this.gravity = null;
     this.panVx = this.panVy = 0;
-    this.lastSteer = -Infinity;
     this.lastContact = this.lastHit = -Infinity;
   }
 
@@ -78,16 +96,21 @@ export class ShowBoard {
     return now - this.lastContact > 260;
   }
 
-  carry(flow, now = 0) {
+  carry(flow) {
     const turn = Math.atan2(flow.b, flow.a);
     if (Math.abs(turn) > 0.0018) this.roll -= turn;
-    // Optical flow describes the scene. The handset moves in the opposite direction.
-    this.steer(-flow.dx, -flow.dy, now);
+    // The scene travels opposite to the handset. Without an orientation sensor,
+    // a sustained reframe also changes the slope, until the player tilts back.
+    if (!this.gravity && Math.abs(flow.dy) > 0.0018)
+      this.cameraPitch = clamp(this.cameraPitch - flow.dy, -0.35, 0.35);
+    // During a measured tilt the optical pan can point in the opposite direction.
+    // Let the downhill edge win on that axis, while keeping independent pans.
+    const pan = (delta, gravity) => Math.abs(gravity) > 0.12 && delta * gravity < 0 ? 0 : delta;
+    this.steer(pan(-flow.dx, this.gravity?.x || 0), pan(-flow.dy, this.gravity?.y || 0));
   }
 
-  steer(x, y, now) {
+  steer(x, y) {
     if (Math.abs(x) + Math.abs(y) < 0.0018) return;
-    this.lastSteer = now;
     // Drop the pending displacement on a reversal so the first new frame counts.
     if (x * this.panX < 0) this.panX = 0;
     if (y * this.panY < 0) this.panY = 0;
@@ -125,22 +148,27 @@ export class ShowBoard {
   }
 
   advance(view, dt, gentle) {
+    const pitch = Math.sign(this.cameraPitch) * Math.max(0, Math.abs(this.cameraPitch) - 0.035);
     const gx = this.gravity?.x ?? Math.sin(this.roll),
-      gy = this.gravity?.y ?? (Math.min(1, Math.abs(this.roll) * 2.4) * Math.cos(this.roll));
-    const size = Math.min(view.width, view.height);
-    const ease = 1 - Math.exp(-dt * 2.4),
+      gy = this.gravity?.y ?? clamp(pitch * 2.8 + Math.min(1, Math.abs(this.roll) * 2.4) * Math.cos(this.roll), -1, 1);
+    const response = 7;
+    const ease = 1 - Math.exp(-dt * response),
       panEase = 1 - Math.exp(-dt * 32);
     const dx = this.panX * panEase,
       dy = this.panY * panEase;
     this.panX -= dx;
     this.panY -= dy;
     const pace = gentle ? 0.62 : 1;
-    this.vx += (size * 0.39 * pace * gx - this.vx) * ease;
-    this.vy += (size * 0.27 * pace * gy - this.vy) * ease;
+    const targetVx = Math.min(340, view.width * 0.54) * pace * gx;
+    const targetVy = Math.min(480, view.height * 0.62) * pace * gy;
+    const changeX = (targetVx - this.vx) * ease, changeY = (targetVy - this.vy) * ease;
+    this.vx += changeX;
+    this.vy += changeY;
     this.panVx = dx * view.width * 1.25 / dt;
     this.panVy = dy * view.height * 1.95 / dt;
-    this.x += (this.vx + this.panVx) * dt;
-    this.y += (this.vy + this.panVy) * dt;
+    // Integrate the eased velocity over the step, including its first frame.
+    this.x += (targetVx + this.panVx) * dt - changeX / response;
+    this.y += (targetVy + this.panVy) * dt - changeY / response;
     this.spin += ((0.12 * gx - this.angle) * 16 - this.spin * 8) * dt;
     this.angle += this.spin * dt;
     this.confine(view);

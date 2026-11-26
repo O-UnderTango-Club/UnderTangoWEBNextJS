@@ -1,43 +1,24 @@
-const clamp = (value, low, high) => Math.max(low, Math.min(value, high));
-
-// Place the touch target inside the free toolbar space, within reach of the wide plate.
-export function prizeGoal(view, board, slot) {
-  const reachLeft = view.left + board.width / 2 + 2;
-  const reachRight = view.width - view.right - board.width / 2 - 2;
-  const preferred = view.width / 2 + Math.min(64, view.width * 0.068);
-  const x = clamp(clamp(preferred, reachLeft, reachRight), slot.left + 22, slot.right - 22);
-  return {
-    x,
-    floor: view.height - view.bottom,
-    tolerance: clamp(view.width * 0.03, 9, 17) + Math.max(0, x - reachRight, reachLeft - x),
-  };
+// Only the lower edge of the drawn silhouette acts as a support. A plate may
+// come in on one corner after a collision, provided its face is lined up.
+export function canSeatPrize(board, goal) {
+  const bottom = board.y +
+    (board.width * Math.abs(Math.sin(board.angle)) + board.height * Math.abs(Math.cos(board.angle))) / 2;
+  const centerMargin = Math.min(24, Math.max(15, board.width * 0.075));
+  return Math.abs(goal.bottom - bottom) <= 3 &&
+    Math.abs(board.x - goal.x) <= centerMargin &&
+    Math.abs(board.angle) <= 0.28 && Math.abs(board.y - goal.y) <= board.height * 0.32;
 }
 
-export class SecretDock {
-  constructor() {
-    this.since = null;
-    this.ready = false;
-  }
-
-  update(board, goal, now, hasLine, steered) {
-    if (this.ready) return 'ready';
-    const sin = Math.sin(board.angle), cos = Math.cos(board.angle);
-    const edgeX = board.x - sin * board.height / 2;
-    const lowest = board.y + (Math.abs(sin) * board.width + Math.abs(cos) * board.height) / 2;
-    const gap = goal.floor - lowest;
-    if (!hasLine || gap > 20) {
-      this.since = null;
-      return 'hidden';
-    }
-    const centered = Math.abs(edgeX - goal.x) <= goal.tolerance;
-    const settled = Math.abs(board.vx + board.panVx) < 55 && now - board.lastContact > 220;
-    if (gap > 7 || !centered || !settled || (this.since === null && !steered)) {
-      this.since = null;
-      return 'near';
-    }
-    this.since ??= now;
-    if (now - this.since < 700) return 'holding';
-    this.ready = true;
-    return 'ready';
-  }
+// Let the weight settle onto its base. The gift becomes available on the frame
+// where the entire plate actually matches the outline, even if the phone moves.
+export function settlePrize(board, goal, entry, dt) {
+  entry.progress = Math.min(1, entry.progress + dt / 0.24);
+  const remaining = (1 - entry.progress) ** 2;
+  board.angle = entry.angle * remaining;
+  board.x = goal.x + entry.offsetX * remaining;
+  board.y = goal.bottom -
+    (board.width * Math.abs(Math.sin(board.angle)) + board.height * Math.cos(board.angle)) / 2;
+  board.spin = board.vx = board.vy = 0;
+  board.panX = board.panY = board.panVx = board.panVy = 0;
+  return entry.progress === 1;
 }

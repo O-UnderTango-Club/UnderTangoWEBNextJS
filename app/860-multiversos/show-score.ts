@@ -85,6 +85,7 @@ function buildScore(): ShowCue[] {
 }
 
 export const SHOW_SCORE = buildScore();
+export const SHOW_SCENE_COUNT = SHOW_SCORE.filter(cue => cue.number > 0).length;
 export const SHOW_TOTAL_SECONDS = SHOW_SCORE[SHOW_SCORE.length - 1].end;
 export const SHOW_EXTENDED_SECONDS: Record<number, number> = Object.fromEntries(
   SHOW_SCORE.filter(cue => cue.number >= 15).map(cue => [cue.number, cue.seconds])

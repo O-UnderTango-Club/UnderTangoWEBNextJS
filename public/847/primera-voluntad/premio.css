@@ -39,6 +39,7 @@ body:has(#prize) {
     system-ui,
     sans-serif;
   letter-spacing: -0.035em;
+  text-wrap: balance;
 }
 #prize h1:focus {
   outline: 0;
@@ -46,6 +47,17 @@ body:has(#prize) {
 #prize p {
   margin: 0.7rem 0 1.35rem;
   max-width: 38ch;
+}
+#prize .secret-sign {
+  display: inline-grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  margin: 0 0 .4rem;
+  border: 1px solid #d1b275;
+  border-radius: 50%;
+  color: #ffe3a6;
+  font: 600 2.25rem/1 system-ui, sans-serif;
 }
 #prize label {
   display: block;

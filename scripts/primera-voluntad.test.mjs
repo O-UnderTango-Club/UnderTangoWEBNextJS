@@ -15,7 +15,7 @@ import {
   collide,
   screenGravity,
 } from '../public/847/primera-voluntad/stage-physics.mjs';
-import { prizeGoal, inPrizeGoal } from '../public/847/primera-voluntad/prize-goal.mjs';
+import { prizeGoal, SecretDock } from '../public/847/primera-voluntad/prize-goal.mjs';
 import { announcements, cueAt } from '../public/847/primera-voluntad/show-board.mjs';
 
 import { metalAt } from '../public/847/primera-voluntad/solid-sign.mjs';
@@ -484,19 +484,50 @@ test('a stripe alone steers promptly in either axis, reversing in the next pictu
   }
 });
 
-test('the plate stays at the top at rest and wins only inside the drawn goal', () => {
-  for (const view of [portrait, {width: 740, height: 360, left: 16, right: 16, top: 12, bottom: 68}]) {
+test('the unmarked target stays between the controls and within reach of the plate', () => {
+  for (const [width, height, left, right] of [[320, 568, 110, 204], [390, 664, 197, 274], [760, 360, 205, 635]]) {
+    const view = { ...portrait, width, height };
     const board = new ShowBoard();
-    board.fit(view, {width: 200, height: 100});
-    const goal = prizeGoal(view, board), start = board.y;
+    board.fit(view, { width: (width - 28) * (width < height ? 0.78 : 0.57), height: 100 });
+    const goal = prizeGoal(view, board, { left, right });
+    assert.ok(goal.x - 22 >= left && goal.x + 22 <= right);
+    assert.ok(goal.x > width / 2 + goal.tolerance);
+    const start = board.y;
     settle(board, 20, view);
     assert.equal(board.y, start);
-    assert.equal(inPrizeGoal(board, goal), false);
-    board.y = view.height - view.bottom - board.height / 2;
-    assert.ok(inPrizeGoal(board, goal));
+    const dock = new SecretDock();
+    assert.equal(dock.update(board, goal, 0, true, false), 'hidden');
+    board.y = goal.floor - board.height / 2;
+    assert.equal(dock.update(board, goal, 2000, true, true), 'near');
     board.x = goal.x;
-    assert.equal(inPrizeGoal(board, goal), false);
+    board.confine(view);
+    assert.equal(dock.update(board, goal, 2500, true, false), 'near');
+    assert.equal(dock.update(board, goal, 2600, true, true), 'holding');
+    assert.equal(dock.update(board, goal, 3299, true, false), 'holding');
+    assert.equal(dock.update(board, goal, 3300, true, false), 'ready');
+    board.y = start;
+    assert.equal(dock.update(board, goal, 4000, false, false), 'ready');
   }
+});
+
+test('skimming across the slot, losing the line or colliding interrupts the secret', () => {
+  const board = plate();
+  const goal = prizeGoal(portrait, board, {left: 190, right: 287});
+  const dock = new SecretDock();
+  board.x = goal.x;
+  board.y = goal.floor - board.height / 2;
+  board.panVx = 90;
+  assert.equal(dock.update(board, goal, 1000, true, true), 'near');
+  board.panVx = 0;
+  assert.equal(dock.update(board, goal, 1100, true, true), 'holding');
+  assert.equal(dock.update(board, goal, 1500, false, true), 'hidden');
+  assert.equal(dock.update(board, goal, 1600, true, true), 'holding');
+  board.lastContact = 1900;
+  assert.equal(dock.update(board, goal, 1920, true, true), 'near');
+  assert.equal(dock.update(board, goal, 2210, true, true), 'holding');
+  board.x += 30;
+  assert.equal(dock.update(board, goal, 2800, true, true), 'near');
+  assert.equal(dock.ready, false);
 });
 
 test('a new vertical edge entering a horizontally uniform scene cannot pull the plate sideways', () => {

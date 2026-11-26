@@ -28,19 +28,18 @@ export async function POST(request: NextRequest) {
     !data ||
     typeof data.partida !== 'string' ||
     !uuid.test(data.partida) ||
-    typeof data.nombre !== 'string' ||
+    (data.nombre !== undefined && typeof data.nombre !== 'string') ||
     typeof data.instagram !== 'string'
   )
     return reply({ error: 'Revisá los datos de la partida.' }, 400);
-  const nombre = data.nombre.trim();
+  const nombre = data.nombre?.trim() ?? '';
   const instagram = data.instagram.trim().replace(/^@/, '');
   if (
-    (!nombre && !instagram) ||
     nombre.length > 80 ||
     /[\u0000-\u001f\u007f]/.test(nombre) ||
-    (instagram && !/^[a-z\d._]{1,30}$/i.test(instagram))
+    !/^[a-z\d._]{1,30}$/i.test(instagram)
   )
-    return reply({ error: 'Escribí tu nombre o un usuario de Instagram válido.' }, 400);
+    return reply({ error: 'Escribí un usuario de Instagram válido para seguir.' }, 400);
 
   const api = process.env.ANALYTICS_SUPABASE_URL;
   const key = process.env.ANALYTICS_SUPABASE_SECRET_KEY;
@@ -59,7 +58,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         p_partida: data.partida,
         p_nombre: nombre || null,
-        p_instagram: instagram || null,
+        p_instagram: instagram,
       }),
     });
     if (!saved.ok) return reply(unavailable, 503);
@@ -74,13 +73,6 @@ export async function POST(request: NextRequest) {
     return reply(unavailable, 503);
   }
   const link = new URL('https://wa.me/' + whatsapp);
-  const who = [
-    nombre && 'Soy ' + nombre + '.',
-    instagram && 'Mi Instagram es @' + instagram + '.',
-  ].filter(Boolean);
-  link.searchParams.set(
-    'text',
-    ['Hola, gané el premio de Ø Primera voluntad.', ...who, 'Quiero reclamarlo.'].join(' ')
-  );
+  link.searchParams.set('text', 'Ø');
   return reply({ whatsapp: link.href });
 }

@@ -1,36 +1,43 @@
-// Positions are in the same CSS pixels as the rotated plate, above the video controls.
-export function prizeGoal(view, board) {
-  const width = Math.min(360, view.width - view.left - view.right - 8);
-  const bottom = view.height - view.bottom;
-  const depth = Math.min(48, Math.max(24, (bottom - view.top - board.height) * 0.23));
-  return { x: (view.width - width) / 2, y: bottom - depth, width, depth };
+const clamp = (value, low, high) => Math.max(low, Math.min(value, high));
+
+// Place the touch target inside the free toolbar space, within reach of the wide plate.
+export function prizeGoal(view, board, slot) {
+  const reachLeft = view.left + board.width / 2 + 2;
+  const reachRight = view.width - view.right - board.width / 2 - 2;
+  const preferred = view.width / 2 + Math.min(64, view.width * 0.068);
+  const x = clamp(clamp(preferred, reachLeft, reachRight), slot.left + 22, slot.right - 22);
+  return {
+    x,
+    floor: view.height - view.bottom,
+    tolerance: clamp(view.width * 0.03, 9, 17) + Math.max(0, x - reachRight, reachLeft - x),
+  };
 }
 
-export function inPrizeGoal(board, goal) {
-  // Use the midpoint of the physical lower edge. A tilted corner brushing the goal is insufficient.
-  const x = board.x - (Math.sin(board.angle) * board.height) / 2;
-  const y = board.y + (Math.cos(board.angle) * board.height) / 2;
-  const margin = Math.min(28, goal.width * 0.1);
-  return x >= goal.x + margin && x <= goal.x + goal.width - margin && y >= goal.y + goal.depth * 0.42;
-}
+export class SecretDock {
+  constructor() {
+    this.since = null;
+    this.ready = false;
+  }
 
-export function paintPrizeGoal(ctx, goal, active) {
-  const { x, y, width, depth } = goal;
-  ctx.save();
-  ctx.fillStyle = active ? 'rgba(26,79,69,.93)' : 'rgba(9,18,26,.86)';
-  ctx.fillRect(x, y, width, depth);
-  ctx.strokeStyle = active ? '#fff6ce' : '#99ecd3';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x + 1, y + 1);
-  ctx.lineTo(x + 1, y + depth - 1);
-  ctx.lineTo(x + width - 1, y + depth - 1);
-  ctx.lineTo(x + width - 1, y + 1);
-  ctx.stroke();
-  ctx.fillStyle = '#f5fff8';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = '650 ' + Math.min(16, Math.max(12, width / 23)) + 'px system-ui, sans-serif';
-  ctx.fillText('Bajá el cuadro acá para ganar tu premio', x + width / 2, y + depth / 2, width - 16);
-  ctx.restore();
+  update(board, goal, now, hasLine, steered) {
+    if (this.ready) return 'ready';
+    const sin = Math.sin(board.angle), cos = Math.cos(board.angle);
+    const edgeX = board.x - sin * board.height / 2;
+    const lowest = board.y + (Math.abs(sin) * board.width + Math.abs(cos) * board.height) / 2;
+    const gap = goal.floor - lowest;
+    if (!hasLine || gap > 20) {
+      this.since = null;
+      return 'hidden';
+    }
+    const centered = Math.abs(edgeX - goal.x) <= goal.tolerance;
+    const settled = Math.abs(board.vx + board.panVx) < 55 && now - board.lastContact > 220;
+    if (gap > 7 || !centered || !settled || (this.since === null && !steered)) {
+      this.since = null;
+      return 'near';
+    }
+    this.since ??= now;
+    if (now - this.since < 700) return 'holding';
+    this.ready = true;
+    return 'ready';
+  }
 }

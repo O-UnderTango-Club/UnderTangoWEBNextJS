@@ -71,10 +71,21 @@
         --bottom: max(10px, env(safe-area-inset-bottom));
         padding: var(--top) var(--right) var(--bottom) var(--left);
       }
-      #clip-tools {
+      #game-dock {
         position: absolute;
         left: var(--left);
+        right: var(--right);
         bottom: var(--bottom);
+        display: grid;
+        grid-template-columns: calc(8.2rem + 44px + 0.35rem) minmax(44px, 1fr) auto;
+        align-items: center;
+        gap: 6px;
+        pointer-events: none;
+      }
+      #clip-tools {
+        grid-area: 1 / 1;
+        justify-self: start;
+        pointer-events: auto;
         display: flex;
         gap: 0.35rem;
         align-items: center;
@@ -104,6 +115,46 @@
         min-height: 44px;
         padding: 0;
       }
+      #game-dock #save { width: 8.2rem; white-space: nowrap; }
+      @media (max-width: 379px) {
+        #game-dock { grid-template-columns: calc(88px + 0.35rem) minmax(44px, 1fr) auto; }
+        #game-dock #save { width: 44px; padding: 0; }
+        #game-dock .save-label { display: none; }
+      }
+      #prize-slot {
+        grid-area: 1 / 2;
+        position: relative;
+        height: 46px;
+      }
+      #prize-slot::before, #open-secret {
+        position: absolute;
+        left: var(--gift-x, 50%);
+        top: 50%;
+        transform: translate(-50%, -50%);
+      }
+      #prize-slot::before {
+        content: '';
+        width: 12px;
+        height: 2px;
+        background: #fff0bf;
+        box-shadow: 0 0 9px 2px #f6cf7b;
+        opacity: 0;
+        transition: opacity 160ms, width 350ms;
+      }
+      #prize-slot[data-state='near']::before { opacity: .74; }
+      #prize-slot[data-state='holding']::before { width: 26px; opacity: 1; }
+      #open-secret {
+        width: 44px; height: 44px; min-height: 44px; padding: 0;
+        display: grid; place-items: center;
+        border-radius: 50%; border: 1px solid #ffdea1;
+        background: #1e1b19f5; color: #ffe3a6;
+        box-shadow: 0 0 10px #f3cb8059;
+        pointer-events: auto;
+      }
+      #open-secret svg { width: 24px; height: 24px; }
+      @media (prefers-reduced-motion: reduce) {
+        #prize-slot::before { transition: none; }
+      }
       #clip-tools svg {
         width: 19px;
         height: 19px;
@@ -128,9 +179,9 @@
       }
       #steer-pad:active { cursor: grabbing; }
       .stage-tools {
-        position: absolute;
-        right: var(--right);
-        bottom: var(--bottom);
+        grid-area: 1 / 3;
+        justify-self: end;
+        pointer-events: auto;
         display: flex;
         gap: 0.48rem;
       }
@@ -222,46 +273,57 @@
           <span id="cue-meta"></span> <span id="cue-title"></span>
         </div>
         <button id="steer-pad" type="button" hidden aria-label="Mover el cuadro. Arrastrá o usá las flechas del teclado."></button>
-        <div id="clip-tools" hidden>
-          <a id="save" hidden download>
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.7"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4" />
-            </svg>
-            Guardar video
-          </a>
-          <button id="share" type="button" aria-label="Compartir video" title="Compartir video" hidden>
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.7"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 15V3m-4 4 4-4 4 4M7 10H4v11h16V10h-3" />
-            </svg>
-          </button>
-        </div>
         <button id="tilt" type="button" aria-label="Activar inclinación del teléfono" title="Activar inclinación del teléfono" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
             <rect x="7" y="3" width="10" height="17" rx="2" transform="rotate(22 12 12)"/>
             <path d="M3 7C4 4 6 2 9 1M21 17c-1 3-3 5-6 6"/>
           </svg>
         </button>
-        <div id="stage-tools" class="stage-tools" hidden>
-          <button id="speaker" type="button" aria-label="Activar música y pasos" aria-pressed="false">
-            ♪
-          </button>
-          <button id="dismiss" type="button" aria-label="Cerrar la experiencia">×</button>
+        <div id="game-dock">
+          <div id="clip-tools" hidden>
+            <a id="save" aria-label="Guardar video" title="Guardar video" hidden download>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4" />
+              </svg>
+              <span class="save-label">Guardar video</span>
+            </a>
+            <button id="share" type="button" aria-label="Compartir video" title="Compartir video" hidden>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 15V3m-4 4 4-4 4 4M7 10H4v11h16V10h-3" />
+              </svg>
+            </button>
+          </div>
+          <div id="prize-slot" data-state="hidden">
+            <button id="open-secret" type="button" aria-label="Abrir el premio secreto" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 8h18v4H3zM5 12v8h14v-8M12 8v12"/>
+                <path d="M12 8C8 8 5 7 6 4.7c1.3-2.8 5.4.8 6 3.3Zm0 0c4 0 7-1 6-3.3-1.3-2.8-5.4.8-6 3.3Z"/>
+              </svg>
+            </button>
+          </div>
+          <div id="stage-tools" class="stage-tools" hidden>
+            <button id="speaker" type="button" aria-label="Activar música y pasos" aria-pressed="false">
+              ♪
+            </button>
+            <button id="dismiss" type="button" aria-label="Cerrar la experiencia">×</button>
+          </div>
         </div>
       </section>
       <section class="details" aria-label="Sobre la experiencia">
@@ -280,7 +342,7 @@
         </div>
         <p>
           Apuntá a una junta del piso o al borde de una mesa. El Ø rueda por esa recta y puede saltar a otra que entre en el encuadre.
-          Mové el teléfono para llevar el cuadro hasta la meta de abajo. El Ø puede frenarlo en el camino. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
+          Mové el teléfono para guiar el cuadro. El Ø puede frenarlo en el camino. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
           Si aparece el botón de inclinación arriba a la derecha, podés tocarlo para usar el sensor.
         </p>
         <p>

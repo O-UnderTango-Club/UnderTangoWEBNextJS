@@ -16,7 +16,7 @@ import { soundscape } from './footsteps.mjs';
 import { RollingSign, ShowBoard, collide, screenGravity } from './stage-physics.mjs';
 import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs';
 import { SceneClip } from './clip.mjs';
-import { prizeGoal, inPrizeGoal, paintPrizeGoal } from './prize-goal.mjs';
+import { prizeGoal, SecretDock } from './prize-goal.mjs';
 import { showPrize } from './prize.mjs';
 import { introMs } from './timing.mjs';
 
@@ -58,8 +58,26 @@ let body = null,
   layout,
   sharing = false;
 const hits = [];
-const pad = get('steer-pad');
-let goal, inGoalSince = null, pointer = null, baseline = null, tiltActive = false;
+const pad = get('steer-pad'),
+  slot = get('prize-slot'),
+  gift = get('open-secret');
+let dock = new SecretDock(), goal, pointer = null, baseline = null, tiltActive = false;
+
+function positionPrize() {
+  if (!layout || !slot.clientWidth || !stage.clientWidth) return;
+  const rect = slot.getBoundingClientRect();
+  const left = rect.left - stage.getBoundingClientRect().left;
+  const next = prizeGoal(view, board, { left, right: left + rect.width });
+  if (!goal || goal.x !== next.x || goal.floor !== next.floor) dock.since = null;
+  goal = next;
+  slot.style.setProperty('--gift-x', goal.x - left + 'px');
+}
+function showGift(state) {
+  if (slot.dataset.state === state) return;
+  slot.dataset.state = state;
+  gift.hidden = state !== 'ready';
+  if (!gift.hidden) status.textContent = 'Apareció un regalo entre los controles.';
+}
 function updateClip(current) {
   const ready = current.state === 'ready';
   clipTools.hidden = save.hidden = !ready;
@@ -193,8 +211,7 @@ function resize() {
   });
   layout = layoutBoard(ctx, view);
   board.fit(view, layout);
-  goal = prizeGoal(view, board);
-  inGoalSince = null;
+  positionPrize();
   if (motion && changedAspect) {
     body = null;
     motion = null;
@@ -222,7 +239,8 @@ function stopInput() {
 }
 function release() {
   stopInput();
-  inGoalSince = null;
+  dock = new SecretDock();
+  showGift('hidden');
   cancelAnimationFrame(frame);
   mode = motion = previous = body = null;
   clip.reset();
@@ -251,6 +269,7 @@ function showWords(elapsed) {
   get('cue-title').textContent = cue.text;
   caption.dataset.cue = String(next);
   caption.hidden = tools.hidden = false;
+  positionPrize();
 }
 function analyze(source, crop, now) {
   const scale = 192 / Math.max(width, height),
@@ -368,11 +387,11 @@ function render(source, crop, now, dt) {
     ctx.restore();
   }
   if (cueIndex >= 0) {
-    const inside = inPrizeGoal(board, goal);
-    const steering = tiltActive || now - board.lastSteer < 1100;
     if (mode !== 'prize') {
-      inGoalSince = inside && body && lost < 900 && steering ? (inGoalSince ?? now) : null;
-      paintPrizeGoal(ctx, goal, inGoalSince !== null);
+      if (goal) {
+        const steered = tiltActive || now - board.lastSteer < 1300;
+        showGift(dock.update(board, goal, now, Boolean(body) && lost < 900, steered));
+      }
       if (mode === 'demo') {
         pad.hidden = false;
         pad.style.width = board.width + 'px';
@@ -391,11 +410,16 @@ function render(source, crop, now, dt) {
 }
 // Keep a completed clip on the claim page. For an early win, finish its two
 // invitations on the last visible frame, releasing the physical camera immediately.
-function win(source, crop) {
+function openSecret() {
+  if (!dock.ready || (mode !== 'camera' && mode !== 'demo')) return;
+  cancelAnimationFrame(frame);
   const still = document.createElement('canvas');
   if (clip.state === 'preparing') {
     still.width = surface.width;
     still.height = surface.height;
+    const live = mode === 'camera' && feed.videoWidth && feed.readyState >= 2;
+    const source = mode === 'demo' ? scene : live ? feed : surface;
+    const crop = visibleCrop(live ? feed.videoWidth : source.width, live ? feed.videoHeight : source.height, width, height);
     still.getContext('2d').drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, still.width, still.height);
   }
   const round = crypto.randomUUID();
@@ -444,10 +468,6 @@ function animate(now) {
       audio.start(now);
     }
     render(source, crop, now, dt);
-    if (inGoalSince !== null && now - inGoalSince >= 180) {
-      win(source, crop);
-      return;
-    }
   }
   frame = requestAnimationFrame(animate);
 }
@@ -518,6 +538,7 @@ async function enter(selected) {
 function dismiss() {
   end('Experiencia cerrada. Podés volver a empezar.', cueIndex >= 0);
 }
+gift.addEventListener('click', openSecret);
 pad.addEventListener('pointerdown', (event) => {
   if (mode !== 'demo' || pointer || event.button !== 0) return;
   pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
@@ -533,7 +554,8 @@ pad.addEventListener('pointermove', (event) => {
 });
 pad.addEventListener('lostpointercapture', () => { pointer = null; });
 pad.addEventListener('keydown', (event) => {
-  const delta = { ArrowLeft: [-0.06, 0], ArrowRight: [0.06, 0], ArrowUp: [0, -0.055], ArrowDown: [0, 0.055] }[event.key];
+  const nudge = Math.min(18, width * 0.04) / (width * 1.25);
+  const delta = { ArrowLeft: [-nudge, 0], ArrowRight: [nudge, 0], ArrowUp: [0, -0.055], ArrowDown: [0, 0.055] }[event.key];
   if (!delta || mode !== 'demo') return;
   event.preventDefault();
   board.steer(...delta, performance.now());
@@ -551,15 +573,17 @@ stage.addEventListener('click', (event) => {
   if (mode && !event.target.closest('button,a')) audio.unlock();
 });
 addEventListener('pagehide', () => end('Experiencia cerrada. Podés volver a empezar.'));
-if (typeof ResizeObserver === 'function') new ResizeObserver(resize).observe(stage);
-else addEventListener('resize', resize);
+if (typeof ResizeObserver === 'function') {
+  new ResizeObserver(resize).observe(stage);
+  new ResizeObserver(positionPrize).observe(slot);
+} else addEventListener('resize', resize);
 document.fonts
   ?.load('800 20px Uberlin')
   .then(() => {
     if (ctx && layout) {
       layout = layoutBoard(ctx, view);
       board.fit(view, layout);
-      goal = prizeGoal(view, board);
+      positionPrize();
     }
   })
   .catch(() => {});

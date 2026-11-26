@@ -106,6 +106,17 @@
         width: 19px;
         height: 19px;
       }
+      #tilt {
+        position: absolute;
+        right: var(--right);
+        top: var(--top);
+        width: 44px;
+        height: 44px;
+        padding: 8px;
+        border-radius: 50%;
+        background: #0e1321e8;
+      }
+      #tilt svg { width: 22px; height: 22px; vertical-align: middle; }
       .stage-tools {
         position: absolute;
         right: var(--right);
@@ -229,6 +240,12 @@
             </svg>
           </button>
         </div>
+        <button id="tilt" type="button" aria-label="Activar inclinación del teléfono" title="Activar inclinación del teléfono" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+            <rect x="7" y="3" width="10" height="17" rx="2" transform="rotate(22 12 12)"/>
+            <path d="M3 7C4 4 6 2 9 1M21 17c-1 3-3 5-6 6"/>
+          </svg>
+        </button>
         <div id="stage-tools" class="stage-tools" hidden>
           <button id="speaker" type="button" aria-label="Activar música y pasos" aria-pressed="false">
             ♪
@@ -251,12 +268,13 @@
           ><button type="button" id="stop">Cerrar experiencia</button>
         </div>
         <p>
-          Apuntá a las juntas del piso o a los lados de un pasillo. El Ø viaja siguiendo su perspectiva.
-          Incliná el teléfono y dejá caer el cartel hacia un costado. El Ø puede golpearlo en el camino.
+          Apuntá a una junta del piso o al borde de una mesa. El Ø rueda por esa recta y puede saltar a otra que entre en el encuadre.
+          Al mover el teléfono, el cartel acompaña tu mano. Al inclinarlo, cae hacia el lado más bajo.
+          Si aparece el botón de inclinación arriba a la derecha, podés tocarlo para usar el sensor.
         </p>
         <p>
           La música de fondo es «trance psicomusical», de Ø UnderTango Club. Tocá la imagen para activar
-          los parlantes. El video incluye la música y los pasos. Los primeros 15 segundos se preparan como video en tu dispositivo. Podés guardarlo o
+          los parlantes. La música sigue mientras la escena esté abierta. El video incluye la música y los pasos. Los primeros 15 segundos se preparan como video en tu dispositivo. Podés guardarlo o
           compartirlo desde la esquina inferior izquierda. Al cerrar se descarta el clip local. La cámara
           funciona sin micrófono y la página no envía las imágenes.
         </p>

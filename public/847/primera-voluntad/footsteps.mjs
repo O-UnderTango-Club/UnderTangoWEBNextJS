@@ -5,24 +5,37 @@ import { clipLength } from './timing.mjs';
 const trackUrl = '/multiversos/repertorio-trance.mp3';
 const musicGain = 0.31;
 
-export function arrangeScore(ctx, clip, duration) {
+export function musicLoop(ctx, clip) {
   const rate = clip.sampleRate;
   const overlap = Math.min(Math.round(rate * 0.055), Math.floor(clip.length / 6));
   const period = clip.length - overlap;
-  const length = Math.round((rate * duration) / 1000);
-  const score = ctx.createBuffer(clip.numberOfChannels, length, rate);
+  const loop = ctx.createBuffer(clip.numberOfChannels, period, rate);
   for (let channel = 0; channel < clip.numberOfChannels; channel++) {
     const src = clip.getChannelData(channel);
-    const dest = score.getChannelData(channel);
-    for (let i = 0; i < length; i++) {
-      const phase = i % period;
+    const dest = loop.getChannelData(channel);
+    for (let phase = 0; phase < period; phase++) {
       let sample = src[phase + overlap];
       if (phase >= period - overlap) {
         const j = phase - (period - overlap);
         const mix = (j + 1) / overlap;
         sample += (src[j] - sample) * mix;
       }
-      dest[i] = sample * Math.min(1, i / (rate * 0.1), (length - 1 - i) / (rate * 0.18));
+      dest[phase] = sample;
+    }
+  }
+  return loop;
+}
+
+// Only the film has an ending. The live player keeps the original crossfaded loop.
+export function arrangeScore(ctx, loop, duration) {
+  const rate = loop.sampleRate,
+    length = Math.round((rate * duration) / 1000);
+  const score = ctx.createBuffer(loop.numberOfChannels, length, rate);
+  for (let channel = 0; channel < loop.numberOfChannels; channel++) {
+    const src = loop.getChannelData(channel),
+      dest = score.getChannelData(channel);
+    for (let i = 0; i < length; i++) {
+      dest[i] = src[i % src.length] * Math.min(1, i / (rate * 0.1), (length - 1 - i) / (rate * 0.18));
     }
   }
   return score;
@@ -84,11 +97,16 @@ function playStep(context, output, noise, t, { x, y, strong, side }) {
   scrape.stop(t + 0.18);
 }
 
-function playScore(ctx, output, score, offset, analyser) {
+function playScore(ctx, output, score, offset, analyser, repeat = false) {
   const source = ctx.createBufferSource();
   const gain = ctx.createGain();
   source.buffer = score;
+  source.loop = repeat;
   gain.gain.value = musicGain;
+  if (repeat) {
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(musicGain, ctx.currentTime + 0.09);
+  }
   if (analyser) {
     source.connect(analyser);
     analyser.connect(gain);
@@ -102,7 +120,7 @@ export function soundscape(onChange) {
   const Audio = window.AudioContext || window.webkitAudioContext;
   const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   let context, mix, monitor, recording, music, meter, noise;
-  let score, pending, request;
+  let score, loop, pending, request;
   let started = null,
     muted = false,
     failed = false,
@@ -114,10 +132,9 @@ export function soundscape(onChange) {
     if (!context || context.state !== 'running' || !score || started === null || music) return;
     // Joining late only unlocks the speakers; the clip has its own complete score.
     const offset = Math.max(0, (performance.now() - started) / 1000);
-    if (offset >= score.duration) return;
     meter = context.createAnalyser();
     meter.fftSize = 256;
-    music = playScore(context, mix, score, offset, meter);
+    music = playScore(context, mix, loop, offset % loop.duration, meter, true);
   }
 
   function prepare() {
@@ -132,7 +149,8 @@ export function soundscape(onChange) {
         const decoder = new Offline(1, 1, 48000);
         const decoded = await decoder.decodeAudioData(await response.arrayBuffer());
         if (controller.signal.aborted) return null;
-        score = arrangeScore(decoder, decoded, clipLength);
+        loop = musicLoop(decoder, decoded);
+        score = arrangeScore(decoder, loop, clipLength);
         failed = false;
         play();
         return score;

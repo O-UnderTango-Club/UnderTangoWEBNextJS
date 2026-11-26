@@ -4,13 +4,20 @@ import { longestLine, sameLine, visibleLines } from '../public/847/primera-volun
 
 import { readFloor, SignMotion } from '../public/847/primera-voluntad/motion.mjs';
 import { visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
-import { arrangeScore } from '../public/847/primera-voluntad/footsteps.mjs';
+import { musicLoop, arrangeScore } from '../public/847/primera-voluntad/footsteps.mjs';
 import { clipLength, clipName } from '../public/847/primera-voluntad/timing.mjs';
 
 import { cameraMotion, carryPoint } from '../public/847/primera-voluntad/camera-motion.mjs';
 
-import { RollingSign, ShowBoard, collide } from '../public/847/primera-voluntad/stage-physics.mjs';
+import {
+  RollingSign,
+  ShowBoard,
+  collide,
+  screenGravity,
+} from '../public/847/primera-voluntad/stage-physics.mjs';
 import { announcements, cueAt } from '../public/847/primera-voluntad/show-board.mjs';
+
+import { metalAt } from '../public/847/primera-voluntad/solid-sign.mjs';
 
 const width = 192,
   height = 138;
@@ -158,6 +165,7 @@ function resample(frame, angle, scale, dx, dy) {
 }
 const floorFixture = () => ({
   kind: 'convergence',
+  paths: [{ a: { x: 240, y: 700 }, b: { x: 150, y: 220 } }],
   near: { x: 240, y: 700 },
   vanish: { x: 150, y: 220 },
   spread: 240,
@@ -248,22 +256,138 @@ test('a sudden camera displacement drives the visible sign over consecutive fram
   assert.ok(sign.x - start > 112);
 });
 
-test('a held camera roll lets the board settle down the corresponding side', () => {
-  const view = { width: 400, height: 800, left: 14, right: 14, top: 14, bottom: 68 };
+const portrait = { width: 400, height: 800, left: 14, right: 14, top: 14, bottom: 68 };
+function plate(view = portrait) {
   const board = new ShowBoard();
-  board.fit(view, { width: 280, height: 120 });
-  for (let i = 0; i < 240; i++) board.advance(view, 1 / 60, i / 60, true);
-  const centered = { x: board.x, y: board.y };
-  for (const angle of [-0.3, 0.6]) {
-    board.carry({ a: Math.cos(angle), b: Math.sin(angle), dx: 0 });
-    for (let i = 0; i < 240; i++) board.advance(view, 1 / 60, i / 60, true);
-    assert.ok((board.x - centered.x) * (angle < 0 ? 1 : -1) > 30);
-    assert.ok(board.y > centered.y + 120);
-    const half =
-      (board.width * Math.abs(Math.cos(board.angle)) + board.height * Math.abs(Math.sin(board.angle))) /
-      2;
-    assert.ok(board.x - half >= view.left - 0.01 && board.x + half <= view.width - view.right + 0.01);
+  board.fit(view, { width: 200, height: 100 });
+  board.y = view.height / 2;
+  return board;
+}
+function settle(board, seconds, view = portrait, hz = 60) {
+  for (let i = 0; i < Math.round(seconds * hz); i++) board.advance(view, 1 / hz, false);
+}
+
+test('the board follows phone pans in both directions and stays still on a steady neutral frame', () => {
+  const board = plate();
+  board.gravity = { x: 0, y: 0 };
+  const x = board.x;
+  board.carry({ a: 1, b: 0, dx: -0.09, dy: 0 });
+  settle(board, 1);
+  assert.ok(board.x > x + 21 && board.x < x + 25);
+  board.carry({ a: 1, b: 0, dx: 0.18, dy: 0 });
+  settle(board, 1);
+  assert.ok(board.x < x - 21);
+  settle(board, 2);
+  const rest = board.x;
+  settle(board, 2);
+  assert.ok(Math.abs(board.x - rest) < 0.02);
+});
+
+test('gravity follows the physical low edge in portrait, both landscape orientations and upside down', () => {
+  const down = screenGravity(90, 0, 0),
+    up = screenGravity(-90, 0, 0);
+  assert.ok(down.y > 0.99 && up.y < -0.99);
+  assert.ok(screenGravity(0, -80, 90).y > 0.98 && screenGravity(0, 80, 270).y > 0.98);
+  assert.ok(screenGravity(90, 0, 180).y < -0.99);
+  assert.ok(screenGravity(0, 0, 0).y > 0 && screenGravity(180, 0, 0).y < 0);
+  assert.equal(screenGravity(null, 0, 0), null);
+  for (const sign of [1, -1]) {
+    const board = plate();
+    board.gravity = screenGravity(38, sign * 42, 0);
+    settle(board, 1.25);
+    assert.ok((board.x - 200) * sign > 40 && board.y > 420);
+    board.gravity = up;
+    settle(board, 2);
+    assert.ok(board.y < 374);
   }
+  const slow = plate(),
+    fast = plate();
+  slow.gravity = fast.gravity = { x: 0.27, y: -0.42 };
+  settle(slow, 1.6, portrait, 30);
+  settle(fast, 1.6, portrait, 120);
+  assert.ok(Math.hypot(slow.x - fast.x, slow.y - fast.y) < 2);
+});
+
+test('optical roll works without a sensor and does not oscillate while held', () => {
+  const board = plate();
+  board.carry({ a: Math.cos(-0.45), b: Math.sin(-0.45), dx: 0, dy: 0 });
+  settle(board, 2);
+  assert.ok(board.x > 267 && board.y > 460);
+  board.carry({ a: Math.cos(0.9), b: Math.sin(0.9), dx: 0, dy: 0 });
+  settle(board, 4);
+  assert.ok(board.x < 143);
+});
+
+test('a horizontal or sloping edge carries the foot along the actual detected segment', () => {
+  for (const [a, b] of [
+    [
+      { x: 0.08, y: 0.66 },
+      { x: 0.88, y: 0.66 },
+    ],
+    [
+      { x: 0.82, y: 0.85 },
+      { x: 0.32, y: 0.24 },
+    ],
+  ]) {
+    const floor = readFloor([{ a, b }], 400, 800);
+    const route = new SignMotion(floor, 400, 800);
+    const wheel = new RollingSign(route);
+    const dx = (b.x - a.x) * 400,
+      dy = (b.y - a.y) * 800;
+    const start = wheel.x;
+    let travel = 0;
+    for (let i = 0; i < 660; i++) {
+      route.advance(1 / 90);
+      wheel.advance(route, 1 / 90);
+      const off = Math.abs((wheel.x - a.x * 400) * dy - (wheel.y - a.y * 800) * dx) / Math.hypot(dx, dy);
+      assert.ok(off < 0.2);
+      travel = Math.max(travel, Math.abs(wheel.x - start));
+    }
+    assert.ok(travel > 82);
+  }
+});
+
+test('a single flicker cannot replace a line; a confirmed neighbour gets a continuous hop', () => {
+  const first = { a: { x: 0.1, y: 0.7 }, b: { x: 0.85, y: 0.7 } };
+  const next = { a: { x: 0.72, y: 0.37 }, b: { x: 0.74, y: 0.8 } };
+  const floor = (lines) => readFloor(lines, 400, 800);
+  const route = new SignMotion(floor([first]), 400, 800);
+  const old = { x: route.x, y: route.y };
+  assert.equal(route.observe(floor([next]), 115), false);
+  assert.equal(route.observe(floor([first]), 250), true);
+  assert.equal(route.hop, null);
+  route.observe(floor([next]), 410);
+  assert.equal(route.observe(floor([next]), 615), true);
+  route.advance(0);
+  assert.ok(Math.hypot(route.x - old.x, route.y - old.y) < 0.01);
+  let lift = 0;
+  for (let i = 0; i < 150; i++) {
+    route.advance(1 / 90);
+    lift = Math.max(lift, route.lift);
+  }
+  assert.ok(lift > 5 && route.hop === null && route.lift === 0);
+  assert.ok(Math.abs(route.x - 292) < 5);
+});
+
+test('the wheel can change rails at a measured junction even when both edges remain visible', () => {
+  const h = { a: { x: 0.1, y: 0.6 }, b: { x: 0.87, y: 0.6 } };
+  const v = { a: { x: 0.84, y: 0.25 }, b: { x: 0.84, y: 0.77 } };
+  const floor = readFloor([h, v], 400, 800);
+  const route = new SignMotion(floor, 400, 800);
+  let switched = false;
+  for (let i = 0; i < 600; i++) {
+    if (i % 12 === 0) route.observe(floor, (i * 1000) / 90);
+    route.advance(1 / 90);
+    if (route.hop) switched = true;
+  }
+  assert.ok(switched);
+});
+
+test('the same color cycle includes ivory and graphite with fully neutral highlights', () => {
+  assert.equal(metalAt(3100).ivory, 1);
+  assert.equal(metalAt(9000).graphite, 1);
+  assert.equal(metalAt(6200).ivory + metalAt(6200).graphite, 0);
+  assert.equal(metalAt(17100).ivory, 1);
 });
 
 test('the visible rotated face rejects a miss and transfers momentum on contact', () => {
@@ -282,7 +406,11 @@ test('the visible rotated face rejects a miss and transfers momentum on contact'
   assert.equal(collide(sign, board, 1000), null);
   sign.x -= nx * 4;
   sign.y -= ny * 4;
+  assert.ok(board.allowsFootstep(1019));
   const hit = collide(sign, board, 1020);
+  assert.equal(board.allowsFootstep(1020), false);
+  assert.equal(board.allowsFootstep(1100), false);
+  assert.ok(board.allowsFootstep(1300));
   assert.ok(hit && Math.abs(hit.nx - nx) < 0.001 && Math.abs(hit.ny - ny) < 0.001);
   assert.ok(sign.vx * nx + sign.vy * ny > 0 && board.vx * nx + board.vy * ny < 0);
   assert.equal(collide(sign, board, 1030), null);
@@ -314,7 +442,9 @@ test('the score spans both invitations, loops across the original end and resolv
   const source = ctx.createBuffer(2, 13240, 1000);
   source.getChannelData(0).fill(0.32);
   source.getChannelData(1).fill(-0.18);
-  const score = arrangeScore(ctx, source, clipLength);
+  const loop = musicLoop(ctx, source);
+  const score = arrangeScore(ctx, loop, clipLength);
+  assert.ok(loop.length < source.length && loop.getChannelData(0).at(-1) === loop.getChannelData(0)[0]);
   assert.equal(score.length, 15000);
   assert.equal(clipName(clipLength, 'webm'), 'primera-voluntad-15s.webm');
   for (let ch = 0; ch < 2; ch++) {

@@ -13,7 +13,7 @@ import {
 import { drawSign } from './solid-sign.mjs';
 import { soundscape } from './footsteps.mjs';
 
-import { RollingSign, ShowBoard, collide } from './stage-physics.mjs';
+import { RollingSign, ShowBoard, collide, screenGravity } from './stage-physics.mjs';
 import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs';
 import { SceneClip } from './clip.mjs';
 import { introMs } from './timing.mjs';
@@ -27,7 +27,8 @@ const camera = get('camera'),
   demo = get('demo'),
   sound = get('sound'),
   stop = get('stop'),
-  speaker = get('speaker');
+  speaker = get('speaker'),
+  tiltButton = get('tilt');
 const caption = get('cue'),
   tools = get('stage-tools'),
   status = get('status'),
@@ -96,13 +97,48 @@ let width = 1,
   nextLines = 0;
 let sceneStart = 0,
   lastLineAt = 0,
-  lastPairAt = 0,
   lastMark = 0,
   lastStep = 0,
   side = 1,
-  lean = 1,
   cueIndex = -1;
 const marks = [];
+let attitude = null;
+function applyTilt() {
+  if (!attitude) return;
+  // Mobile WebKit can expose a desktop screen angle even while the handset viewport is portrait.
+  const degrees = Number.isFinite(window.orientation)
+    ? window.orientation
+    : (window.screen.orientation?.angle ?? 0);
+  board.gravity = screenGravity(attitude.beta, attitude.gamma, degrees);
+}
+function measureTilt({ beta, gamma }) {
+  if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
+  attitude = { beta, gamma };
+  applyTilt();
+  tiltButton.hidden = true;
+}
+function listenToTilt() {
+  if (!window.DeviceOrientationEvent) return;
+  window.addEventListener('deviceorientation', measureTilt);
+  window.screen.orientation?.addEventListener?.('change', applyTilt);
+  window.addEventListener('orientationchange', applyTilt);
+  tiltButton.disabled = false;
+  tiltButton.hidden = typeof window.DeviceOrientationEvent.requestPermission !== 'function';
+}
+tiltButton.addEventListener('click', async () => {
+  const session = generation;
+  tiltButton.disabled = true;
+  try {
+    const result = await window.DeviceOrientationEvent.requestPermission();
+    if (session === generation && result !== 'granted')
+      status.textContent = 'El cartel sigue el movimiento visible en la cámara.';
+  } catch {
+    if (session === generation)
+      status.textContent = 'El cartel sigue el movimiento visible en la cámara.';
+  } finally {
+    if (session === generation) tiltButton.hidden = true;
+  }
+});
 
 function updateSound() {
   const audible = audio.audible();
@@ -162,6 +198,11 @@ function resize() {
 
 function release() {
   generation++;
+  window.removeEventListener('deviceorientation', measureTilt);
+  window.screen.orientation?.removeEventListener?.('change', applyTilt);
+  window.removeEventListener('orientationchange', applyTilt);
+  tiltButton.hidden = true;
+  attitude = null;
   cancelAnimationFrame(frame);
   mode = motion = previous = body = null;
   clip.reset();
@@ -218,21 +259,20 @@ function analyze(source, crop, now) {
   lastRead = now;
   if (now < nextLines) return;
   nextLines = now + 135;
-  const ground = readFloor(visibleLines(current), width, height, motion?.target.line);
-  if (!ground) return;
-  lastLineAt = now;
-  if (ground.kind === 'convergence') {
-    lastPairAt = now;
-    board.observe(ground.angle);
+  const ground = readFloor(visibleLines(current), width, height);
+  if (!ground) {
+    if (motion) motion.pending = null;
+    return;
   }
   if (!motion) {
     motion = new SignMotion(ground, width, height, gentle.matches);
     body = new RollingSign(motion);
+    lastLineAt = now;
     phase(
       'ground',
       mode === 'demo' ? 'Escena de muestra, sin cámara.' : 'El Ø sigue el movimiento de tu encuadre.'
     );
-  } else if (ground.kind === 'convergence' || now - lastPairAt > 520) motion.observe(ground);
+  } else if (motion.observe(ground, now)) lastLineAt = now;
 }
 function refreshTexture(source, crop, stamp) {
   if (stamp === textureTime && texture.width) return;
@@ -258,15 +298,14 @@ function render(source, crop, now, dt) {
   let turned = false;
   while (dt > 0) {
     const step = Math.min(dt, 1 / 90);
-    if (cueIndex >= 0) board.advance(view, step, elapsed / 1000, gentle.matches);
+    if (cueIndex >= 0) board.advance(view, step, gentle.matches);
     if (motion) {
-      if (motion.advance(step)) turned = true;
+      if (lost < 500 && motion.advance(step)) turned = true;
       body.advance(motion, step);
       const hit = cueIndex >= 0 && lost < 900 ? collide(body, board, now) : null;
       if (hit) {
         hits.push(hit);
-        if (Math.abs(hit.ny) > 0.35) motion.direction = hit.ny > 0 ? -1 : 1;
-        motion.lateral += hit.nx * 0.24;
+        motion.rebound(hit);
         turned = true;
       }
     }
@@ -279,7 +318,8 @@ function render(source, crop, now, dt) {
       lastStep = now;
       side *= -1;
       addMark(marks, body, now, true, side);
-      audio.step(body.x / width, body.y / height, turned, side);
+      if (board.allowsFootstep(now) && body.lift < body.radius * 0.18)
+        audio.step(body.x / width, body.y / height, turned, side);
     }
     if (now - lastMark >= (gentle.matches ? 160 : 83)) {
       lastMark = now;
@@ -308,7 +348,7 @@ function render(source, crop, now, dt) {
     ctx.save();
     ctx.globalAlpha = Math.min(1, (1900 - lost) / 900);
     drawField(ctx, body, now, beat);
-    drawSign(ctx, body, beat, now);
+    drawSign(ctx, body, beat, now, elapsed);
     ctx.restore();
   }
   if (cueIndex >= 0) {
@@ -331,7 +371,7 @@ function animate(now) {
     const crop = visibleCrop(sw, sh, width, height);
     if (now >= nextRead) {
       nextRead = now + 63;
-      if (isDemo) drawDemo(ink, width, height, sceneStart ? (now - sceneStart) / 1000 : 0, lean);
+      if (isDemo) drawDemo(ink, width, height, sceneStart ? (now - sceneStart) / 1000 : 0, 1);
       try {
         analyze(source, crop, now);
       } catch {
@@ -354,7 +394,7 @@ function startFrames() {
   textureTime = -1;
   lastMark = lastStep = sceneStart;
   nextRead = nextLines = 0;
-  lastPairAt = -Infinity;
+  listenToTilt();
   side = 1;
   phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
   frame = requestAnimationFrame(animate);
@@ -378,7 +418,6 @@ async function enter(selected) {
   if (selected === 'demo') {
     audio.unlock();
     scene.hidden = false;
-    lean = Math.random() < 0.5 ? -1 : 1;
     startFrames();
     return;
   }

@@ -67,16 +67,32 @@ for (let i = 0; i < 4; i++) {
   const j = (i + 1) % 4;
   quad(slash[0][i], slash[0][j], slash[1][j], slash[1][i], 1);
 }
-let paletteHue = -100;
-let ramps;
-function updateMetal(now) {
-  const hue = Math.floor(((now * 0.018 + 202) % 360) / 6) * 6;
-  if (hue === paletteHue) return;
-  paletteHue = hue;
+// Hold each metal long enough to read in the clip, with soft transitions at both ends.
+function smooth(value) {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+}
+export function metalAt(ms) {
+  const phase = (((ms % 14000) + 14000) % 14000) / 1000;
+  const ivory = smooth((phase - 1.7) / 1.0) * (1 - smooth((phase - 4.0) / 1.1));
+  const graphite = smooth((phase - 7.4) / 1.15) * (1 - smooth((phase - 10) / 1.15));
+  return { hue: Math.floor(((ms * 0.018 + 202) % 360) / 4) * 4, ivory, graphite };
+}
+let paletteKey = '',
+  ramps;
+function updateMetal(elapsed) {
+  const { hue, ivory, graphite } = metalAt(elapsed);
+  const key = [hue, Math.round(ivory * 32), Math.round(graphite * 32)].join('/');
+  if (key === paletteKey) return;
+  paletteKey = key;
+  const color = 1 - ivory - graphite;
   ramps = [0, 28, -19].map((offset, face) =>
     Array.from({ length: 48 }, (_, i) => {
-      const light = (face === 1 ? 15 : 24) + i * (face === 1 ? 1.03 : 1.42);
-      return 'hsl(' + (hue + offset) + ',' + (face === 1 ? 75 : 83) + '%,' + light + '%)';
+      const t = i / 47;
+      const chromatic = (face === 1 ? 15 : 24) + i * (face === 1 ? 1.03 : 1.42);
+      const white = face === 1 ? 34 + 41 * t : 72 + 26 * t;
+      const black = face === 2 ? 16 + 53 * t : (face === 1 ? 3 : 5) + 25 * t ** 2;
+      return `hsl(${hue + offset},${color * (face === 1 ? 75 : 83)}%,${color * chromatic + ivory * white + graphite * black}%)`;
     })
   );
 }
@@ -93,7 +109,7 @@ let sprite,
 
 // Perspective size and position are composited at the video frame rate. Only
 // the small opaque mesh needs to be repainted when its lighting or pose changes.
-export function drawSign(stage, m, level, now) {
+export function drawSign(stage, m, level, now, elapsed) {
   if (!sprite) {
     sprite = document.createElement('canvas');
     sprite.width = sprite.height = spriteSize;
@@ -102,7 +118,7 @@ export function drawSign(stage, m, level, now) {
   const roll = m.spin + m.floor.angle * 0.55;
   const change = Math.abs(roll - lastRoll) + Math.abs(m.yaw - lastYaw) + Math.abs(m.pitch - lastPitch);
   if (change > 0.12 || (now - lastPaint > 45 && change > 0.014) || now - lastPaint > 180) {
-    updateMetal(now);
+    updateMetal(elapsed);
     brush.clearRect(0, 0, spriteSize, spriteSize);
     foot = paintMesh(brush, m.yaw, m.pitch, roll, level);
     lastRoll = roll;
@@ -112,7 +128,7 @@ export function drawSign(stage, m, level, now) {
   }
   const scale = m.radius / unit,
     side = spriteSize * scale;
-  stage.drawImage(sprite, m.x - side / 2, m.y - side / 2 - foot * scale, side, side);
+  stage.drawImage(sprite, m.x - side / 2, m.y - m.lift - side / 2 - foot * scale, side, side);
 }
 
 function paintMesh(ctx, yaw, pitch, roll, level) {

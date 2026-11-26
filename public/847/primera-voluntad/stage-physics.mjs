@@ -8,6 +8,7 @@ export class RollingSign {
     this.y = route.y;
     this.vx = this.vy = this.free = 0;
     this.radius = route.radius;
+    this.lift = route.lift || 0;
     this.spin = route.spin;
     this.yaw = route.yaw;
     this.pitch = route.pitch;
@@ -33,6 +34,7 @@ export class RollingSign {
     this.y += this.vy * dt;
     const blend = 1 - Math.exp(-dt * 6);
     this.radius += (route.radius - this.radius) * blend;
+    this.lift += ((route.lift || 0) - this.lift) * (1 - Math.exp(-dt * 15));
     this.spin += (route.spin - this.spin) * blend;
     this.yaw += (route.yaw - this.yaw) * blend;
     this.pitch += (route.pitch - this.pitch) * blend;
@@ -44,58 +46,89 @@ export class RollingSign {
   }
 }
 
+// Gravity projected onto the current screen, including landscape and inverted holds.
+export function screenGravity(beta, gamma, screenAngle = 0) {
+  if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return null;
+  const rad = Math.PI / 180,
+    pitch = beta * rad,
+    roll = gamma * rad,
+    angle = screenAngle * rad;
+  const gx = Math.cos(pitch) * Math.sin(roll),
+    gy = Math.sin(pitch);
+  const x = gx * Math.cos(angle) + gy * Math.sin(angle);
+  const y = -gx * Math.sin(angle) + gy * Math.cos(angle);
+  // On a level phone there is no downhill edge. Give the plate a small, slow
+  // settling motion which changes direction when the phone turns face-down.
+  const level = Math.max(0, 1 - Math.hypot(gx, gy) / 0.45);
+  return { x, y: y + 0.18 * level * Math.cos(pitch) * Math.cos(roll) };
+}
+
 export class ShowBoard {
   constructor() {
     this.x = this.y = this.vx = this.vy = 0;
-    this.width = this.height = this.roll = this.lean = this.drift = this.angle = 0;
-    this.spin = 0;
-    this.lastHit = -Infinity;
+    this.width = this.height = this.angle = this.spin = 0;
+    this.roll = this.panX = this.panY = 0;
+    this.gravity = null;
+    this.lastContact = this.lastHit = -Infinity;
+  }
+
+  allowsFootstep(now) {
+    return now - this.lastContact > 260;
   }
 
   carry(flow) {
     const turn = Math.atan2(flow.b, flow.a);
-    if (Math.abs(turn) > 0.0018) this.roll = clamp(this.roll - turn, -0.84, 0.84);
-    this.drift = clamp(this.drift + flow.dx * 1.6, -0.38, 0.38);
-  }
-
-  observe(angle) {
-    // The transverse seams also give a phone that started tilted a horizon.
-    this.roll += (clamp(-angle, -0.78, 0.78) - this.roll) * 0.035;
+    if (Math.abs(turn) > 0.0018) this.roll -= turn;
+    // Optical flow describes the scene. The handset moves in the opposite direction.
+    if (Math.abs(flow.dx) > 0.0013) this.panX = clamp(this.panX - flow.dx, -0.4, 0.4);
+    if (Math.abs(flow.dy) > 0.0013) this.panY = clamp(this.panY - flow.dy, -0.4, 0.4);
   }
 
   fit(view, layout) {
-    const first = !this.width;
+    if (!this.width) {
+      this.x = view.width / 2;
+      this.y = view.top + layout.height / 2 + 5;
+    } else if (this.viewWidth !== view.width || this.viewHeight !== view.height) {
+      this.x *= view.width / this.viewWidth;
+      this.y *= view.height / this.viewHeight;
+      this.panX = this.panY = 0;
+    }
+    this.viewWidth = view.width;
+    this.viewHeight = view.height;
     this.width = layout.width;
     this.height = layout.height;
-    if (first) {
-      this.x = view.width / 2;
-      this.y = view.top + this.height / 2 + 5;
-    }
     this.confine(view);
   }
 
   confine(view) {
     const c = Math.abs(Math.cos(this.angle)),
       s = Math.abs(Math.sin(this.angle));
-    const rx = (this.width * c + this.height * s) / 2;
-    const ry = (this.height * c + this.width * s) / 2;
-    this.x = clamp(this.x, view.left + rx, view.width - view.right - rx);
-    this.y = clamp(this.y, view.top + ry, view.height - view.bottom - ry);
+    const rx = (this.width * c + this.height * s) / 2,
+      ry = (this.height * c + this.width * s) / 2;
+    const x = clamp(this.x, view.left + rx, view.width - view.right - rx);
+    const y = clamp(this.y, view.top + ry, view.height - view.bottom - ry);
+    if ((this.x - x) * this.vx > 0) this.vx = 0;
+    if ((this.y - y) * this.vy > 0) this.vy = 0;
+    this.x = x;
+    this.y = y;
   }
 
-  advance(view, dt, time, gentle) {
-    this.lean += (clamp(this.roll * 3.5 + this.drift, -1, 1) - this.lean) * (1 - Math.exp(-3.1 * dt));
-    this.drift *= Math.exp(-1.15 * dt);
-    const { width: w, height: h } = view;
-    const room = (w - view.left - view.right - this.width) / 2;
-    const tx = (w + view.left - view.right) / 2 + this.lean * room;
-    const ty = h * (0.325 + 0.3 * Math.abs(this.lean) + (gentle ? 0 : 0.024 * Math.sin(time * 0.51)));
-    const k = gentle ? 3.0 : 5.1;
-    this.vx += ((tx - this.x) * k - 3.8 * this.vx) * dt;
-    this.vy += ((ty - this.y) * k - 3.9 * this.vy) * dt;
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
-    this.spin += ((0.115 * this.lean - this.angle) * 15 - this.spin * 6) * dt;
+  advance(view, dt, gentle) {
+    const gx = this.gravity?.x ?? Math.sin(this.roll),
+      gy = this.gravity?.y ?? Math.cos(this.roll);
+    const size = Math.min(view.width, view.height);
+    const ease = 1 - Math.exp(-dt * 2.4),
+      panEase = 1 - Math.exp(-dt * 6);
+    const dx = this.panX * panEase,
+      dy = this.panY * panEase;
+    this.panX -= dx;
+    this.panY -= dy;
+    const pace = gentle ? 0.62 : 1;
+    this.vx += (size * 0.29 * pace * gx - this.vx) * ease;
+    this.vy += (size * 0.14 * pace * gy - this.vy) * ease;
+    this.x += this.vx * dt + dx * view.width * 0.68;
+    this.y += this.vy * dt + dy * view.height * 0.45;
+    this.spin += ((0.12 * gx - this.angle) * 16 - this.spin * 8) * dt;
     this.angle += this.spin * dt;
     this.confine(view);
   }
@@ -107,7 +140,7 @@ export function collide(sign, board, now) {
     c = Math.cos(board.angle),
     s = Math.sin(board.angle);
   const dx = sign.x - board.x,
-    dy = sign.y - sign.radius - board.y;
+    dy = sign.y - (sign.lift || 0) - sign.radius - board.y;
   const u = dx * c + dy * s,
     v = dy * c - dx * s;
   const hw = board.width / 2,
@@ -118,6 +151,7 @@ export function collide(sign, board, now) {
     ny = v - py;
   const dist = Math.hypot(nx, ny);
   if (dist >= r) return null;
+  board.lastContact = now;
   let depth = r - dist;
   if (dist > 0.0001) {
     nx /= dist;

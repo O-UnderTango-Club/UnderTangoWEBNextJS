@@ -1,12 +1,31 @@
-// Only the lower edge of the drawn silhouette acts as a support. A plate may
-// come in on one corner after a collision, provided its face is lined up.
+// A landing is supported when the centre of mass is over the flat part of
+// the tray and the lower edge reaches both ends of that short support.
 export function canSeatPrize(board, goal) {
-  const bottom = board.y +
-    (board.width * Math.abs(Math.sin(board.angle)) + board.height * Math.abs(Math.cos(board.angle))) / 2;
-  const centerMargin = Math.min(24, Math.max(15, board.width * 0.075));
-  return Math.abs(goal.bottom - bottom) <= 3 &&
-    Math.abs(board.x - goal.x) <= centerMargin &&
-    Math.abs(board.angle) <= 0.28 && Math.abs(board.y - goal.y) <= board.height * 0.32;
+  const sin = Math.sin(board.angle), cos = Math.cos(board.angle);
+  if (cos < 0.97 || board.vy + board.panVy < -2) return false;
+  const footX = board.x - sin * board.height / 2;
+  const footY = board.y + cos * board.height / 2;
+  const halfSupport = goal.width * 0.37;
+  const centerGap = goal.bottom - (footY + (goal.x - footX) * sin / cos);
+  return Math.abs(board.x - goal.x) <= goal.width * 0.22 &&
+    Math.abs(centerGap) + Math.abs(halfSupport * sin / cos) <= 5 &&
+    Math.abs(board.vx + board.panVx) < 62;
+}
+
+export function landOnTray(board, goal, view) {
+  const approach = board.landingSpeed;
+  const lowest = board.y + (Math.abs(Math.sin(board.angle)) * board.width + Math.abs(Math.cos(board.angle)) * board.height) / 2;
+  if (goal.bottom - lowest > 3) return null;
+  const soft = Math.min(145, Math.max(86, view.height * 0.185));
+  if (Math.max(approach, board.vy + board.panVy) <= soft && canSeatPrize(board, goal)) return 'seated';
+  if (approach < 24) return null;
+  // A hard or unbalanced landing springs back up. Distance and speed depend on
+  // the actual approach; easing the phone before contact makes a clean landing.
+  board.panY = board.panVy = 0;
+  board.rebounding = true;
+  board.vy = -Math.min(370, Math.max(170, approach * 1.4));
+  board.y -= 3;
+  return 'rebound';
 }
 
 // Let the weight settle onto its base. The gift becomes available on the frame

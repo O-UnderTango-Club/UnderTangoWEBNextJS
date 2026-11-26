@@ -126,10 +126,13 @@
         bottom: calc(var(--bottom) + 76px);
         transform: translateX(-50%);
         pointer-events: none;
-        border: 2px solid #ffe5ac;
-        box-shadow: 0 0 0 1.5px #201b22, inset 0 0 0 1px #201b22;
+        width: clamp(48px, 15vw, 72px);
+        height: 9px;
+        color: #f2d9a8;
+        filter: drop-shadow(0 1px 1px #211d25);
       }
-      #prize-target svg {
+      .tray-shape { display: block; width: 100%; height: 100%; overflow: visible; }
+      #prize-target .tray-arrow {
         position: absolute;
         top: calc(100% + 4px);
         left: 50%;
@@ -140,8 +143,9 @@
         filter: drop-shadow(0 1px 1px #15121b) drop-shadow(0 0 2px #15121b);
       }
       .stage[data-phase='permission'] #prize-target { visibility: hidden; }
-      .stage[data-prize='ready'] #prize-target { border-color: #acffdf; }
-      .stage[data-prize='ready'] #prize-target svg { visibility: hidden; }
+      .stage[data-prize='ready'] #prize-target { color: #acffdf; }
+      #prize-target[data-hit] .tray-shape { stroke: #fff8df; stroke-width: 2.8; }
+      .stage[data-prize='ready'] .tray-arrow { visibility: hidden; }
       #prize-slot {
         grid-area: 1 / 2;
         display: grid;
@@ -278,7 +282,10 @@
         <canvas id="scene" class="visual" aria-hidden="true" hidden></canvas>
         <canvas id="surface" class="visual" aria-hidden="true"></canvas>
         <div id="prize-target" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="tray-shape" viewBox="0 0 64 10" preserveAspectRatio="none" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 1.5 6.5 8.5h51L63 1.5"/>
+          </svg>
+          <svg class="tray-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 21V4m-6.5 6.5L12 4l6.5 6.5"/>
           </svg>
         </div>
@@ -355,18 +362,17 @@
         </div>
         <p>
           Apuntá a una junta del piso o al borde de una mesa. El Ø rueda por esa recta y puede saltar a otra que entre en el encuadre.
-          Incliná el teléfono para guiar el cuadro hacia la silueta que señala la flecha. El Ø puede frenarlo en el camino. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
+          Incliná el teléfono para que baje el cartel. Si el Ø te frena, probá de costado. Aflojá la inclinación al apoyar el centro del cartel en la bandejita. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
           Si aparece el botón de inclinación arriba a la derecha, podés tocarlo para usar el sensor.
         </p>
         <p>
-          La música de fondo es «trance psicomusical», de Ø UnderTango Club. Tocá la imagen para activar
-          los parlantes. La música sigue mientras la escena esté abierta. El video incluye la música y los pasos. Los primeros 15 segundos se preparan como video en tu dispositivo. Podés guardarlo o
+          «trance psicomusical», de Ø UnderTango Club, suena completa. Si hace falta, tocá la imagen para escucharla. Podés silenciarla con el botón de sonido. El video incluye la música y los pasos. Los primeros 15 segundos se preparan como video en tu dispositivo. Podés guardarlo o
           compartirlo desde la esquina inferior izquierda. Al cerrar se descarta el clip local. La cámara
           funciona sin micrófono y la página no envía las imágenes.
         </p>
         <a href="/847/primera-voluntad">← Volver a la ficha</a>
       </section>
     </main>
-    <script type="module" src="./experience.mjs?v=meta-visible"></script>
+    <script type="module" src="./experience.mjs?v=bandeja"></script>
   </body>
 </html>

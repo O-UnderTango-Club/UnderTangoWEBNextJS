@@ -33,7 +33,7 @@ export class RollingSign {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     const blend = 1 - Math.exp(-dt * 6);
-    this.radius += (route.radius - this.radius) * blend;
+    this.radius += (Math.max(route.radius, size * 0.048) - this.radius) * blend;
     this.lift += ((route.lift || 0) - this.lift) * (1 - Math.exp(-dt * 15));
     this.spin += (route.spin - this.spin) * blend;
     this.yaw += (route.yaw - this.yaw) * blend;
@@ -43,6 +43,13 @@ export class RollingSign {
     this.travel = route.travel;
     this.x = clamp(this.x, this.radius * 1.18, route.width - this.radius * 1.18);
     this.y = clamp(this.y, this.radius * 2.3, route.height - this.radius * 0.08);
+  }
+
+  keepInPlay(view) {
+    const min = Math.min(view.width, view.height);
+    this.radius = Math.max(this.radius, min * 0.048);
+    this.x = clamp(this.x, this.radius * 1.18, view.width - this.radius * 1.18);
+    this.y = clamp(this.y, this.lift + this.radius * 2.2, view.height - view.bottom + this.radius * 0.55);
   }
 }
 
@@ -86,8 +93,11 @@ export class ShowBoard {
   constructor() {
     this.x = this.y = this.vx = this.vy = 0;
     this.width = this.height = this.angle = this.spin = 0;
-    this.roll = this.cameraPitch = this.panX = this.panY = 0;
+    this.panX = this.panY = this.landingSpeed = 0;
     this.gravity = null;
+    this.restY = Infinity;
+    this.restAngle = 0;
+    this.rebounding = false;
     this.panVx = this.panVy = 0;
     this.lastContact = this.lastHit = -Infinity;
   }
@@ -97,16 +107,14 @@ export class ShowBoard {
   }
 
   carry(flow) {
+    // Image travel is opposite to handset travel. Without a tilt sensor only
+    // motion between consecutive images steers the plate; a still image stops it.
+    const dx = Math.abs(flow.dx) > 0.0025 ? -flow.dx : 0;
+    const dy = Math.abs(flow.dy) > 0.0035 ? -flow.dy : 0;
     const turn = Math.atan2(flow.b, flow.a);
-    if (Math.abs(turn) > 0.0018) this.roll -= turn;
-    // The scene travels opposite to the handset. Without an orientation sensor,
-    // a sustained reframe also changes the slope, until the player tilts back.
-    if (!this.gravity && Math.abs(flow.dy) > 0.0018)
-      this.cameraPitch = clamp(this.cameraPitch - flow.dy, -0.35, 0.35);
-    // During a measured tilt the optical pan can point in the opposite direction.
-    // Let the downhill edge win on that axis, while keeping independent pans.
-    const pan = (delta, gravity) => Math.abs(gravity) > 0.12 && delta * gravity < 0 ? 0 : delta;
-    this.steer(pan(-flow.dx, this.gravity?.x || 0), pan(-flow.dy, this.gravity?.y || 0));
+    const roll = !this.gravity && Math.abs(turn) > 0.004 ? clamp(-turn * 0.65, -0.12, 0.12) : 0;
+    this.steer(this.gravity && Math.abs(this.gravity.x) > 0.08 ? 0 : dx + roll,
+      this.gravity ? 0 : dy * 0.68);
   }
 
   steer(x, y) {
@@ -119,8 +127,10 @@ export class ShowBoard {
   }
 
   fit(view, layout) {
+    this.restY = Infinity;
     if (!this.width) {
-      this.x = view.width / 2;
+      // Start off the centre of the tray so the descent also needs a lateral correction.
+      this.x = view.left + layout.width / 2 + (view.width - view.left - view.right - layout.width) * 0.14;
       this.y = view.top + layout.height / 2 + 5;
     } else if (this.viewWidth !== view.width || this.viewHeight !== view.height) {
       this.x *= view.width / this.viewWidth;
@@ -134,13 +144,23 @@ export class ShowBoard {
     this.confine(view);
   }
 
-  confine(view) {
+  confine(view, checkLanding = false) {
+    // A wheel pushing or tilting a plate against the upper edge cannot make it
+    // descend on a stationary phone. Allow rotation again as soon as there is room.
+    const reachY = (this.width * Math.abs(Math.sin(this.angle)) + this.height * Math.abs(Math.cos(this.angle))) / 2;
+    if (view.top + reachY > this.restY) {
+      this.angle = this.restAngle;
+      this.spin = 0;
+    }
     const c = Math.abs(Math.cos(this.angle)),
       s = Math.abs(Math.sin(this.angle));
     const rx = (this.width * c + this.height * s) / 2,
       ry = (this.height * c + this.width * s) / 2;
     const x = clamp(this.x, view.left + rx, view.width - view.right - rx);
-    const y = clamp(this.y, view.top + ry, view.height - view.bottom - ry);
+    const floorY = view.height - view.bottom - ry;
+    const y = clamp(this.y, view.top + ry, Math.min(this.restY, floorY));
+    if (checkLanding && this.y > floorY && this.vy + this.panVy > 0)
+      this.landingSpeed = this.vy + this.panVy;
     if ((this.x - x) * this.vx > 0) this.vx = 0;
     if ((this.y - y) * this.vy > 0) this.vy = 0;
     this.x = x;
@@ -148,9 +168,11 @@ export class ShowBoard {
   }
 
   advance(view, dt, gentle) {
-    const pitch = Math.sign(this.cameraPitch) * Math.max(0, Math.abs(this.cameraPitch) - 0.035);
-    const gx = this.gravity?.x ?? Math.sin(this.roll),
-      gy = this.gravity?.y ?? clamp(pitch * 2.8 + Math.min(1, Math.abs(this.roll) * 2.4) * Math.cos(this.roll), -1, 1);
+    const gx = this.gravity?.x || 0, gy = this.gravity?.y || 0;
+    this.restY = gy > 0 || this.panY > 0.00015 ? Infinity : this.y;
+    this.restAngle = this.angle;
+    this.landingSpeed = 0;
+    if (!gy && this.vy > 0) this.vy = 0;
     const response = 7;
     const ease = 1 - Math.exp(-dt * response),
       panEase = 1 - Math.exp(-dt * 32);
@@ -160,18 +182,29 @@ export class ShowBoard {
     this.panY -= dy;
     const pace = gentle ? 0.62 : 1;
     const targetVx = Math.min(340, view.width * 0.54) * pace * gx;
-    const targetVy = Math.min(480, view.height * 0.62) * pace * gy;
+    const targetVy = Math.min(320, view.height * 0.40) * pace * gy;
     const changeX = (targetVx - this.vx) * ease, changeY = (targetVy - this.vy) * ease;
-    this.vx += changeX;
-    this.vy += changeY;
     this.panVx = dx * view.width * 1.25 / dt;
     this.panVy = dy * view.height * 1.95 / dt;
-    // Integrate the eased velocity over the step, including its first frame.
+    this.vx += changeX;
     this.x += (targetVx + this.panVx) * dt - changeX / response;
-    this.y += (targetVy + this.panVy) * dt - changeY / response;
+    if (this.rebounding && this.vy < 0 && targetVy > this.vy) {
+      // A hard strike earns its upward arc even if the phone is still tipped
+      // down. Sideways steering stays live and the player can ease the next landing.
+      const acceleration = Math.min(880, view.height * 0.72 + 245);
+      const next = Math.min(0, targetVy, this.vy + acceleration * dt);
+      this.panVy = Math.min(0, this.panVy);
+      this.y += ((this.vy + next) / 2 + this.panVy) * dt;
+      this.vy = next;
+      if (next === 0) this.rebounding = false;
+    } else {
+      this.rebounding = false;
+      this.vy += changeY;
+      this.y += (targetVy + this.panVy) * dt - changeY / response;
+    }
     this.spin += ((0.12 * gx - this.angle) * 16 - this.spin * 8) * dt;
     this.angle += this.spin * dt;
-    this.confine(view);
+    this.confine(view, true);
   }
 }
 
@@ -215,18 +248,25 @@ export function collide(sign, board, now) {
   const relative =
     (sign.vx - board.vx - board.panVx + board.spin * contactY) * wx +
     (sign.vy - board.vy - board.panVy - board.spin * contactX) * wy;
-  // The wheel braces the plate from below. It can still give way and roll aside.
-  const wheelShare = wy > 0.5 ? 0.48 : 0.8;
+  // The body braces a head-on descent. Canting the plate or shoving it sideways
+  // sends the wheel along its rail and gives the player a way around it.
+  const underneath = wy > 0.45;
+  const sliding = Math.abs(board.vx + board.panVx) > 46 || Math.abs(board.angle) > 0.105;
+  const wheelShare = underneath ? (sliding ? 0.72 : 0.10) : 0.80;
   sign.x += wx * depth * wheelShare;
-  sign.y += wy * depth * wheelShare;
+  sign.y += wy * depth * (wy < 0 ? 1 : wheelShare);
   board.x -= wx * depth * (1 - wheelShare);
-  board.y -= wy * depth * (1 - wheelShare);
+  if (wy > 0) board.y -= wy * depth * (1 - wheelShare);
   if (relative >= 0) return null;
-  const impulse = Math.min(290, -1.62 * relative);
-  sign.vx += wx * impulse * 0.8;
-  sign.vy += wy * impulse * 0.8;
-  board.vx -= wx * impulse * 0.2;
-  board.vy -= wy * impulse * 0.2;
+  const impulse = Math.min(310, -1.65 * relative);
+  sign.vx += wx * impulse * wheelShare;
+  sign.vy += wy * impulse * (wy < 0 ? 1 : wheelShare);
+  board.vx -= wx * impulse * (1 - wheelShare);
+  if (wy > 0) board.vy -= wy * impulse * (1 - wheelShare);
+  if (underneath && !sliding && relative < -85) {
+    board.vy = Math.min(board.vy, -Math.min(270, -relative * 0.92));
+    board.rebounding = true;
+  }
   board.spin -= clamp(
     (((contactX * wy - contactY * wx) * impulse) / (board.width ** 2 + board.height ** 2)) * 2.4,
     -0.62,

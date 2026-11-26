@@ -14,7 +14,7 @@ import { FIRST_MIDI_NOTE, NOTE_SCENES, NOTE_SCENE_IDS, isNoteScene, type NoteSce
 import { PerformanceProjection, usePerformanceInput } from "./performance-view";
 import { usePausedSceneOutput } from "./paused-scene-output";
 import { useEarlyInstrument } from "./early-instrument";
-import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
+import { LiveChordTimeline } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isLiveSetScene, isTimbreScene, type ExtendedScene } from "./extended-scenes";
 import { SHOW_OPENING, SHOW_SCENE_COUNT, SHOW_SCORE, SHOW_TRANSITIONS, type CodaScene } from "./show-score";
 import { durationBounds, editShowDuration, resolveShowDurations } from "./show-durations";
@@ -1369,13 +1369,11 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const scoreClock = cue?.context ?? null;
   const audition = usePausedSceneOutput(paused ? scoreClock : null, masterVolume);
   const manualOutput = activeScene && cue ? (paused ? audition : outputRef.current) : null;
-  const chordLoop = useChordLoop(noteScene === "fourteen" ? cue : null, outputRef);
   const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, manualOutput, firstMidi);
-  const liveAttack = extended.attack, strikeChord = chordLoop.strike;
+  const liveAttack = extended.attack;
   const noteStrike = useCallback((frequency:number, time:number, velocity=.85) => {
     liveAttack.current={count:liveAttack.current.count+1,frequency,velocity};
-    if (noteScene==="fourteen" && !pausedRef.current) strikeChord(frequency,time);
-  },[liveAttack,noteScene,strikeChord]);
+  },[liveAttack]);
   const directionSeconds = extendedScene ? extendedSeconds[extendedScene] || (EXTENDED_DEFAULT_SECONDS[extendedScene] || 16) : 0;
   useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
   const earlyScene = typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
@@ -1772,8 +1770,6 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
     ? <SceneVideo key={sceneNumber} film={film} cue={cue} paused={paused} output={outputRef.current} controls={filmControls} />
     : null;
   const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack);
-  const loopFrame = sceneNumber===14 ? chordLoop.frame : extended.three
-    ? (extended.loops.find(loop=>loop.frame?.running)?.frame ?? extended.loops[0].frame) : extended.manual.frame;
   const sceneTitle = breathing ? "Plano 9" : numberedControls[sceneIndex]?.title;
   const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
   const coda = extendedScene !== null && extendedScene >= 90 ? extendedScene as CodaScene : null;
@@ -2221,9 +2217,9 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         inheritedTrail={(continuation === "cross" || continuation === "sphere") &&
           <TemporalFrequencyTrail progress={1} durationMs={timeSeconds * 1000} intervalMs={activeSamplingMs} clock={cue.context} frozenAtEnd />} />}
       {noteScene && <PerformanceProjection scene={noteScene} paused={paused} clock={cue?.context ?? null}
-        input={chordLoop.frame ? { ...noteInput, sounding: [...noteInput.sounding, ...chordLoop.frame.sounding] } : noteInput}
+        input={noteInput}
         beginsAt={cue?.beginsAt ?? 0} />}
-      {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
+      {noteScene === "fourteen" && <LiveChordTimeline histories={[noteInput.history]} live={noteInput.sounding} />}
       {!ready && <ScoreTrack file={"/multiversos/hardstyle.mp3"} title="Hardstyle" clock={cue?.context ?? null} output={outputRef.current}
         trigger={extendedScene === 39 || extendedScene === 60} fade={.08} />}
       {!ready && <ScoreTrack file={"/multiversos/electro.mp3"} title="Electro" clock={cue?.context ?? null} output={outputRef.current}
@@ -2241,7 +2237,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
       {sceneNumber !== null && sceneNumber > 0 && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
-        notes={noteScene ? noteInput.sounding : undefined} loop={loopFrame} tuning={extended.a4}
+        notes={noteScene ? noteInput.sounding : undefined} tuning={extended.a4}
         resting={breathing} interactiveObject={showObject} />}
       {(sceneNumber !== null || showStopwatch) && <div className="zero-scene-heading">
         {sceneNumber !== null && <div className="zero-scene-number" role="status" aria-label={`Escena ${sceneNumber}`}>{sceneNumber}</div>}
@@ -2342,7 +2338,6 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
               <input id="rest-duration" type="range" min={1} max={seconds-1} step={1} value={restSeconds}
                 aria-valuetext={restLabel} onChange={event => setRestFraction(event.currentTarget.valueAsNumber / seconds)} />
             </>}
-            {mode === "fourteen" && <ChordLoopControls loop={chordLoop} active={isActive} paused={paused} />}
             {typeof mode === "number" && mode < 90 && isActive && <ExtendedPerformanceControls performance={extended} scene={mode} paused={paused} />}
             {isActive && noteScene && noteScene !== "fourteen" && <div className="zero-scene-input">
               <p>{noteScene === "ten" ? "Usá cualquier tecla MIDI o 1–9 en la computadora. Después del tiempo elegido entra la escena 11."

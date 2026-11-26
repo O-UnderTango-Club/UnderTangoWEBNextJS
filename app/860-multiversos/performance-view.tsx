@@ -1,3 +1,4 @@
+import { appendVisualNotes, createVisualHistory } from "./chord-loop-view";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   createPerformanceNotes, FIRST_MIDI_NOTE, hasNoteCube, NOTE_FACE_FREQUENCIES, NOTE_SCENES, noteSceneFrequency,
@@ -11,12 +12,17 @@ export function usePerformanceInput({ scene, ownsInput, output, routing, splitNo
   firstMidi: number; splitNote: number; learnSplit: (note: number) => boolean; onStrike: NoteStrike;
 }) {
   const [sounding, setSounding] = useState<NoteFrequency[]>([]);
+  const history = useRef(createVisualHistory());
   const notesRef = useRef<PerformanceNotes | null>(null);
   const clickId = useRef(0);
 
   useEffect(() => {
     if (!ownsInput) return;
-    const player = scene && output ? createPerformanceNotes(output, setSounding, onStrike) : null;
+    history.current.length = 0;
+    const player = scene && output ? createPerformanceNotes(output, notes => {
+      if (scene === "fourteen") appendVisualNotes(history.current, notes);
+      setSounding(notes);
+    }, onStrike) : null;
     notesRef.current = player;
     const send = (key: string, index: number, velocity: number, splitIndex?: number, face: NoteFace = "front") => {
       if (!scene || !player) return;
@@ -82,7 +88,7 @@ export function usePerformanceInput({ scene, ownsInput, output, routing, splitNo
     };
   }, [output, learnSplit, onStrike, ownsInput, routing, scene, splitNote, firstMidi]);
 
-  return {
+  return { history: history.current,
     sounding,
     press: (id: string, frequency: NoteFrequency) => {
       if (output?.context.state === "running") notesRef.current?.press(id, frequency, 0.85);

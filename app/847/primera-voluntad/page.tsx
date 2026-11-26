@@ -22,8 +22,8 @@ export default function PrimeraVoluntad() {
             <p className={styles.date}><time dateTime="2026-12-02">Miércoles 2 de diciembre de 2026</time><br />La Cabaña de los Muñecos · Puerto Iguazú</p>
             <p>Pablo Cieslik · Ø UnderTango Club</p>
             <p>Mové el teléfono para guiar el cuadro entre las rectas del encuadre. En la muestra sin cámara podés arrastrarlo. A los 15 segundos podés guardar o compartir el video.</p>
-            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html">Vivir la experiencia «Un Ø aparece» con cámara →</a></p>
-            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html#sin-camara">Ver sin cámara →</a></p>
+            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=bandeja">Vivir la experiencia «Un Ø aparece» con cámara →</a></p>
+            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=bandeja#sin-camara">Ver sin cámara →</a></p>
             <a className={styles.button} href="https://www.instagram.com/multiversos.festival/">Consultar las novedades del festival →</a>
           </header>
           <Image className={styles.flyer} src={flyer} width={720} height={900} unoptimized priority alt="Afiche de Ø Primera voluntad, Pablo Cieslik y Ø UnderTango Club, 2 de diciembre en La Cabaña de los Muñecos." />

@@ -29,19 +29,15 @@ export const CUBE_TRACK_NAMES = ["Izquierda", "Centro", "Derecha"] as const;
 export const MATRIX_ORDER = [1, 2, 3, 7, 8, 0, 4, 5, 6] as const;
 export const FACE_NAMES = ["Frente", "Derecha", "Superior"] as const;
 const PITCHES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "Sol", "La♭", "La", "Si♭", "Si"];
-export const CUBE_FIRST_MIDI = 21;
+export const CUBE_FIRST_MIDI = 36;
 export const CUBE_SIZE = 27;
 export const DEFAULT_A4 = 444;
 
 export const temperedFrequency = (midi: number, a4: number) => a4 * 2 ** ((midi - 69) / 12);
 export const pitchName = (midi: number) => `${PITCHES[midi % 12]}${Math.floor(midi / 12) - 1}`;
 
-// Outside the 81 assigned keys, repeat the outer cube as on the performance keyboard.
-export function cubeIndexForMidi(midi: number) {
-  const offset = midi - CUBE_FIRST_MIDI;
-  const track = Math.max(0, Math.min(CUBE_TRACKS.length - 1, Math.floor(offset / CUBE_SIZE)));
-  const key = ((offset % CUBE_SIZE) + CUBE_SIZE) % CUBE_SIZE;
-  return track * CUBE_SIZE + key;
+export function cubeIndexForMidi(midi: number, first = CUBE_FIRST_MIDI) {
+  return midi - first;
 }
 
 export type CubeKey = { frequency: number; midi: number; label: string };

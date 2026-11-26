@@ -1,43 +1,43 @@
-const clamp = (value, low, high) => Math.max(low, Math.min(value, high));
-
-// Place the touch target inside the free toolbar space, within reach of the wide plate.
-export function prizeGoal(view, board, slot) {
-  const reachLeft = view.left + board.width / 2 + 2;
-  const reachRight = view.width - view.right - board.width / 2 - 2;
-  const preferred = view.width / 2 + Math.min(64, view.width * 0.068);
-  const x = clamp(clamp(preferred, reachLeft, reachRight), slot.left + 22, slot.right - 22);
-  return {
-    x,
-    floor: view.height - view.bottom,
-    tolerance: clamp(view.width * 0.03, 9, 17) + Math.max(0, x - reachRight, reachLeft - x),
-  };
+// A landing is supported when the centre of mass is over the flat part of
+// the tray and the lower edge reaches both ends of that short support.
+export function canSeatPrize(board, goal) {
+  const sin = Math.sin(board.angle), cos = Math.cos(board.angle);
+  if (cos < 0.97 || board.vy + board.panVy < -2) return false;
+  const footX = board.x - sin * board.height / 2;
+  const footY = board.y + cos * board.height / 2;
+  const halfSupport = goal.width * 0.37;
+  const centerGap = goal.bottom - (footY + (goal.x - footX) * sin / cos);
+  return Math.abs(board.x - goal.x) <= goal.width * 0.22 &&
+    Math.abs(centerGap) + Math.abs(halfSupport * sin / cos) <= 5 &&
+    Math.abs(board.vx + board.panVx) < 62;
 }
 
-export class SecretDock {
-  constructor() {
-    this.since = null;
-    this.ready = false;
-  }
+export function landOnTray(board, goal, view) {
+  const approach = board.landingSpeed;
+  const lowest = board.y + (Math.abs(Math.sin(board.angle)) * board.width + Math.abs(Math.cos(board.angle)) * board.height) / 2;
+  if (goal.bottom - lowest > 3) return null;
+  const soft = Math.min(145, Math.max(86, view.height * 0.185));
+  if (Math.max(approach, board.vy + board.panVy) <= soft && canSeatPrize(board, goal)) return 'seated';
+  if (approach < 24) return null;
+  // A hard or unbalanced landing springs back up. Distance and speed depend on
+  // the actual approach; easing the phone before contact makes a clean landing.
+  board.panY = board.panVy = 0;
+  board.rebounding = true;
+  board.vy = -Math.min(370, Math.max(170, approach * 1.4));
+  board.y -= 3;
+  return 'rebound';
+}
 
-  update(board, goal, now, hasLine, steered) {
-    if (this.ready) return 'ready';
-    const sin = Math.sin(board.angle), cos = Math.cos(board.angle);
-    const edgeX = board.x - sin * board.height / 2;
-    const lowest = board.y + (Math.abs(sin) * board.width + Math.abs(cos) * board.height) / 2;
-    const gap = goal.floor - lowest;
-    if (!hasLine || gap > 20) {
-      this.since = null;
-      return 'hidden';
-    }
-    const centered = Math.abs(edgeX - goal.x) <= goal.tolerance;
-    const settled = Math.abs(board.vx + board.panVx) < 55 && now - board.lastContact > 220;
-    if (gap > 7 || !centered || !settled || (this.since === null && !steered)) {
-      this.since = null;
-      return 'near';
-    }
-    this.since ??= now;
-    if (now - this.since < 700) return 'holding';
-    this.ready = true;
-    return 'ready';
-  }
+// Let the weight settle onto its base. The gift becomes available on the frame
+// where the entire plate actually matches the outline, even if the phone moves.
+export function settlePrize(board, goal, entry, dt) {
+  entry.progress = Math.min(1, entry.progress + dt / 0.24);
+  const remaining = (1 - entry.progress) ** 2;
+  board.angle = entry.angle * remaining;
+  board.x = goal.x + entry.offsetX * remaining;
+  board.y = goal.bottom -
+    (board.width * Math.abs(Math.sin(board.angle)) + board.height * Math.cos(board.angle)) / 2;
+  board.spin = board.vx = board.vy = 0;
+  board.panX = board.panY = board.panVx = board.panVy = 0;
+  return entry.progress === 1;
 }

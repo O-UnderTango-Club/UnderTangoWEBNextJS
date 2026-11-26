@@ -12,14 +12,13 @@ export function showPrize(round, clipTools) {
   document.title = '¿Descubriste el premio secreto? · Ø Primera voluntad';
   prize.innerHTML = `<section aria-labelledby="won-title">
     <h1 id="won-title" tabindex="-1">¿Descubriste el premio secreto?</h1>
-    <p>Si te animás a seguir por el hoyo del conejo, mandanos un solo signo por WhatsApp.</p>
+    <p>Si te animás a entrar en la madriguera del conejo, mandanos un solo signo por WhatsApp.</p>
     <p class="secret-sign" aria-label="Signo de conjunto vacío">Ø</p>
     <form novalidate>
-      <label for="winner-ig">Tu Instagram</label>
-      <div class="prize-input"><span aria-hidden="true">@</span><input id="winner-ig" name="instagram" maxlength="31" required aria-describedby="claim-note claim-status" autocapitalize="none" spellcheck="false" autocomplete="off" /></div>
-      <small id="claim-note">Al continuar, guardamos tu usuario de Instagram y abrimos el chat con Pablo.</small>
+      <label for="winner-ig">¿Nickname?</label>
+      <div class="prize-input"><span aria-hidden="true">@</span><input id="winner-ig" name="instagram" maxlength="31" required aria-describedby="claim-status" autocapitalize="none" spellcheck="false" autocomplete="off" /></div>
       <p id="claim-status" role="status" aria-live="polite"></p>
-      <button id="claim" type="submit">Seguir por WhatsApp</button>
+      <button id="claim" type="submit">Mandar mensaje</button>
     </form>
     <div class="prize-extras"><a href="/847/primera-voluntad">Volver a Primera voluntad</a></div>
   </section>`;

@@ -77,7 +77,7 @@
         right: var(--right);
         bottom: var(--bottom);
         display: grid;
-        grid-template-columns: calc(8.2rem + 44px + 0.35rem) minmax(44px, 1fr) auto;
+        grid-template-columns: calc(8.2rem + 44px + 0.35rem) minmax(44px, 1fr) calc(92px + .48rem);
         align-items: center;
         gap: 6px;
         pointer-events: none;
@@ -117,44 +117,55 @@
       }
       #game-dock #save { width: 8.2rem; padding-inline: .35rem; white-space: nowrap; }
       @media (max-width: 379px) {
-        #game-dock { grid-template-columns: calc(88px + 0.35rem) minmax(44px, 1fr) auto; }
+        #game-dock { grid-template-columns: calc(88px + 0.35rem) minmax(44px, 1fr) calc(92px + .48rem); }
         #game-dock #save { width: 44px; padding: 0; }
         #game-dock .save-label { display: none; }
       }
+      #prize-target {
+        position: absolute;
+        bottom: calc(var(--bottom) + 76px);
+        transform: translateX(-50%);
+        pointer-events: none;
+        width: clamp(48px, 15vw, 72px);
+        height: 9px;
+        color: #f2d9a8;
+        filter: drop-shadow(0 1px 1px #211d25);
+      }
+      .tray-shape { display: block; width: 100%; height: 100%; overflow: visible; }
+      #prize-target .tray-arrow {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: 22px;
+        height: 22px;
+        color: #ffe5ac;
+        filter: drop-shadow(0 1px 1px #15121b) drop-shadow(0 0 2px #15121b);
+      }
+      .stage[data-phase='permission'] #prize-target { visibility: hidden; }
+      .stage[data-prize='ready'] #prize-target { color: #acffdf; }
+      #prize-target[data-hit] .tray-shape { stroke: #fff8df; stroke-width: 2.8; }
+      .stage[data-prize='ready'] .tray-arrow { visibility: hidden; }
       #prize-slot {
         grid-area: 1 / 2;
-        position: relative;
+        display: grid;
+        place-items: center;
         height: 46px;
       }
-      #prize-slot::before, #open-secret {
-        position: absolute;
-        left: var(--gift-x, 50%);
-        top: 50%;
-        transform: translate(-50%, -50%);
-      }
-      #prize-slot::before {
-        content: '';
-        width: 12px;
-        height: 2px;
-        background: #fff0bf;
-        box-shadow: 0 0 9px 2px #f6cf7b;
-        opacity: 0;
-        transition: opacity 160ms, width 350ms;
-      }
-      #prize-slot[data-state='near']::before { opacity: .74; }
-      #prize-slot[data-state='holding']::before { width: 26px; opacity: 1; }
       #open-secret {
-        width: 44px; height: 44px; min-height: 44px; padding: 0;
-        display: grid; place-items: center;
-        border-radius: 50%; border: 1px solid #ffdea1;
-        background: #1e1b19f5; color: #ffe3a6;
-        box-shadow: 0 0 10px #f3cb8059;
+        display: grid;
+        place-items: center;
+        width: 46px;
+        height: 46px;
+        padding: 0;
+        border: 2px solid #fff1cd;
+        border-radius: 50%;
+        background: #ffe0a2;
+        color: #271e1c;
+        box-shadow: 0 0 0 2px #312328, 0 0 14px #ffdb8c96;
         pointer-events: auto;
       }
-      #open-secret svg { width: 24px; height: 24px; }
-      @media (prefers-reduced-motion: reduce) {
-        #prize-slot::before { transition: none; }
-      }
+      #open-secret svg { width: 25px; height: 25px; }
       #clip-tools svg {
         flex-shrink: 0;
         width: 19px;
@@ -270,6 +281,14 @@
         <video id="feed" class="visual" autoplay muted playsinline hidden></video>
         <canvas id="scene" class="visual" aria-hidden="true" hidden></canvas>
         <canvas id="surface" class="visual" aria-hidden="true"></canvas>
+        <div id="prize-target" aria-hidden="true">
+          <svg class="tray-shape" viewBox="0 0 64 10" preserveAspectRatio="none" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 1.5 6.5 8.5h51L63 1.5"/>
+          </svg>
+          <svg class="tray-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 21V4m-6.5 6.5L12 4l6.5 6.5"/>
+          </svg>
+        </div>
         <div id="cue" class="sr-only" hidden aria-live="polite" aria-atomic="true">
           <span id="cue-meta"></span> <span id="cue-title"></span>
         </div>
@@ -310,7 +329,7 @@
               </svg>
             </button>
           </div>
-          <div id="prize-slot" data-state="hidden">
+          <div id="prize-slot">
             <button id="open-secret" type="button" aria-label="Abrir el premio secreto" hidden>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -343,18 +362,17 @@
         </div>
         <p>
           Apuntá a una junta del piso o al borde de una mesa. El Ø rueda por esa recta y puede saltar a otra que entre en el encuadre.
-          Mové el teléfono para guiar el cuadro. El Ø puede frenarlo en el camino. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
+          Incliná el teléfono para que baje el cartel. Si el Ø te frena, probá de costado. Aflojá la inclinación al apoyar el centro del cartel en la bandejita. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
           Si aparece el botón de inclinación arriba a la derecha, podés tocarlo para usar el sensor.
         </p>
         <p>
-          La música de fondo es «trance psicomusical», de Ø UnderTango Club. Tocá la imagen para activar
-          los parlantes. La música sigue mientras la escena esté abierta. El video incluye la música y los pasos. Los primeros 15 segundos se preparan como video en tu dispositivo. Podés guardarlo o
+          «trance psicomusical», de Ø UnderTango Club, suena completa. Si hace falta, tocá la imagen para escucharla. Podés silenciarla con el botón de sonido. El video incluye la música y los pasos. Los primeros 15 segundos se preparan como video en tu dispositivo. Podés guardarlo o
           compartirlo desde la esquina inferior izquierda. Al cerrar se descarta el clip local. La cámara
           funciona sin micrófono y la página no envía las imágenes.
         </p>
         <a href="/847/primera-voluntad">← Volver a la ficha</a>
       </section>
     </main>
-    <script type="module" src="./experience.mjs"></script>
+    <script type="module" src="./experience.mjs?v=bandeja"></script>
   </body>
 </html>

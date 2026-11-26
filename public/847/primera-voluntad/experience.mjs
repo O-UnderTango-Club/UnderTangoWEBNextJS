@@ -11,13 +11,13 @@ import {
   drawImpacts,
 } from './scene.mjs';
 import { drawSign } from './solid-sign.mjs';
-import { soundscape } from './footsteps.mjs';
+import { soundscape } from './footsteps.mjs?v=bandeja';
 
-import { RollingSign, ShowBoard, collide, screenGravity } from './stage-physics.mjs';
-import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs';
+import { RollingSign, ShowBoard, collide, tiltFromRest } from './stage-physics.mjs?v=bandeja';
+import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs?v=bandeja';
 import { SceneClip } from './clip.mjs';
-import { prizeGoal, SecretDock } from './prize-goal.mjs';
-import { showPrize } from './prize.mjs';
+import { landOnTray, settlePrize } from './prize-goal.mjs?v=bandeja';
+import { showPrize } from './prize.mjs?v=meta-visible';
 import { introMs } from './timing.mjs';
 
 const get = (id) => document.getElementById(id);
@@ -59,24 +59,41 @@ let body = null,
   sharing = false;
 const hits = [];
 const pad = get('steer-pad'),
-  slot = get('prize-slot'),
+  target = get('prize-target'),
   gift = get('open-secret');
-let dock = new SecretDock(), goal, pointer = null, baseline = null, tiltActive = false;
+let goal, seating = null, pointer = null, baseline = null, lastTrayHit = -Infinity;
 
 function positionPrize() {
-  if (!layout || !slot.clientWidth || !stage.clientWidth) return;
-  const rect = slot.getBoundingClientRect();
-  const left = rect.left - stage.getBoundingClientRect().left;
-  const next = prizeGoal(view, board, { left, right: left + rect.width });
-  if (!goal || goal.x !== next.x || goal.floor !== next.floor) dock.since = null;
-  goal = next;
-  slot.style.setProperty('--gift-x', goal.x - left + 'px');
+  if (!layout || !stage.clientWidth) return;
+  target.style.left = (view.left + view.width - view.right) / 2 + 'px';
+  const rect = target.getBoundingClientRect(), space = stage.getBoundingClientRect();
+  goal = {
+    x: rect.left - space.left + rect.width / 2,
+    width: rect.width,
+    y: rect.bottom - space.top - 1.5 - board.height / 2,
+    bottom: rect.bottom - space.top - 1.5,
+  };
+  view.bottom = view.height - goal.bottom;
+  board.confine(view);
+  if (seating) settlePrize(board, goal, seating, 0);
 }
-function showGift(state) {
-  if (slot.dataset.state === state) return;
-  slot.dataset.state = state;
-  gift.hidden = state !== 'ready';
-  if (!gift.hidden) status.textContent = 'Apareció un regalo entre los controles.';
+function checkLanding(now) {
+  if (!goal || seating) return;
+  const landing = landOnTray(board, goal, view);
+  if (landing === 'rebound') {
+    lastTrayHit = now;
+    target.dataset.hit = '';
+  }
+  if (landing !== 'seated') return;
+  seating = { offsetX: board.x - goal.x, angle: board.angle, progress: 0 };
+  pad.hidden = true;
+}
+function advanceSeating(step) {
+  if (settlePrize(board, goal, seating, step) && gift.hidden) {
+    stage.dataset.prize = 'ready';
+    gift.hidden = false;
+    status.textContent = 'Encajó el cuadro. Tocá el regalo para abrirlo.';
+  }
 }
 function updateClip(current) {
   const ready = current.state === 'ready';
@@ -131,11 +148,12 @@ function applyTilt() {
   const degrees = Number.isFinite(window.orientation)
     ? window.orientation
     : (window.screen.orientation?.angle ?? 0);
-  const g = screenGravity(attitude.beta, attitude.gamma, degrees);
-  if (!baseline) baseline = g;
-  tiltActive = Math.hypot(g.x - baseline.x, g.y - baseline.y) > 0.09;
-  // Opening the page while holding a phone upright must leave the plate at the top.
-  board.gravity = tiltActive ? g : { x: 0, y: 0 };
+  if (!baseline) {
+    baseline = attitude;
+    board.panX = board.panY = 0;
+  }
+  const gravity = tiltFromRest(baseline, attitude, degrees);
+  board.gravity = gravity;
 }
 function measureTilt({ beta, gamma }) {
   if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
@@ -191,7 +209,7 @@ function resize() {
   const w = stage.clientWidth,
     h = stage.clientHeight;
   if (!w || !h || (w === width && h === height)) return;
-  const changedAspect = Math.abs(w / h / (width / height) - 1) > 0.3;
+  const priorWidth = width, priorHeight = height;
   width = w;
   height = h;
   const ratio = Math.min(devicePixelRatio || 1, 1.1, Math.sqrt(820000 / (w * h)));
@@ -212,11 +230,12 @@ function resize() {
   layout = layoutBoard(ctx, view);
   board.fit(view, layout);
   positionPrize();
-  if (motion && changedAspect) {
-    body = null;
-    motion = null;
-    phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
-  } else motion?.resize(w, h);
+  if (motion) {
+    motion.resize(w, h);
+    body.x *= w / priorWidth;
+    body.y *= h / priorHeight;
+    body.keepInPlay(view);
+  }
   previous = null;
   marks.length = 0;
   textureTime = -1;
@@ -230,7 +249,6 @@ function stopInput() {
   window.removeEventListener('orientationchange', applyTilt);
   tiltButton.hidden = true;
   attitude = baseline = pointer = null;
-  tiltActive = false;
   pad.hidden = true;
   if (stream) stream.getTracks().forEach((track) => track.stop());
   stream = null;
@@ -239,8 +257,11 @@ function stopInput() {
 }
 function release() {
   stopInput();
-  dock = new SecretDock();
-  showGift('hidden');
+  seating = null;
+  lastTrayHit = -Infinity;
+  delete target.dataset.hit;
+  delete stage.dataset.prize;
+  gift.hidden = true;
   cancelAnimationFrame(frame);
   mode = motion = previous = body = null;
   clip.reset();
@@ -285,7 +306,7 @@ function analyze(source, crop, now) {
   if (previous && now - lastRead < 550) {
     const change = cameraMotion(previous, current);
     if (change) {
-      if (mode === 'camera') board.carry(change, now);
+      if (mode === 'camera' && motion && !seating) board.carry(change);
       motion?.carry(change);
       carryMarks(marks, change, width, height);
     }
@@ -307,7 +328,10 @@ function analyze(source, crop, now) {
       'ground',
       mode === 'demo' ? 'Escena de muestra, sin cámara.' : 'El Ø sigue el movimiento de tu encuadre.'
     );
-  } else if (motion.observe(ground, now)) lastLineAt = now;
+  } else if (motion.observe(ground, now)) {
+    lastLineAt = now;
+    if (stage.dataset.phase === 'search') phase('ground', 'El Ø sigue el movimiento de tu encuadre.');
+  }
 }
 function refreshTexture(source, crop, stamp) {
   if (stamp === textureTime && texture.width) return;
@@ -325,30 +349,34 @@ function render(source, crop, now, dt) {
   const elapsed = now - sceneStart,
     lost = now - lastLineAt;
   showWords(elapsed);
-  if (motion && lost > 1900) {
-    motion = body = null;
-    marks.length = 0;
-    phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
-  }
+  if (motion && lost > 900 && stage.dataset.phase === 'ground') phase('search', hint);
+  if (target.hasAttribute('data-hit') && now - lastTrayHit > 260) delete target.dataset.hit;
   let turned = false;
   while (dt > 0) {
     const step = Math.min(dt, 1 / 90);
-    if (cueIndex >= 0) board.advance(view, step, gentle.matches);
+    if (cueIndex >= 0 && motion && !seating) board.advance(view, step, gentle.matches);
     if (motion) {
       if (lost < 500 && motion.advance(step)) turned = true;
       body.advance(motion, step);
-      const hit = cueIndex >= 0 && lost < 900 ? collide(body, board, now) : null;
+      body.keepInPlay(view);
+      const hit = cueIndex >= 0 ? collide(body, board, now) : null;
+      body.keepInPlay(view);
+      if (cueIndex >= 0 && !seating) {
+        board.confine(view);
+        checkLanding(now);
+      }
       if (hit) {
         hits.push(hit);
         motion.rebound(hit);
         turned = true;
       }
     }
+    if (seating) advanceSeating(step);
     dt -= step;
   }
   ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
+  const beat = motion ? audio.pulse() : 0;
   if (motion) {
-    const beat = audio.pulse();
     if (lost < 900 && (turned || now - lastStep > 460 + 100 * motion.depth)) {
       lastStep = now;
       side *= -1;
@@ -381,37 +409,32 @@ function render(source, crop, now, dt) {
       gentle.matches
     );
     ctx.save();
-    ctx.globalAlpha = Math.min(1, (1900 - lost) / 900);
+    ctx.globalAlpha = lost < 900 ? 1 : 0.65;
     drawField(ctx, body, now, beat);
-    drawSign(ctx, body, beat, now, elapsed);
     ctx.restore();
   }
   if (cueIndex >= 0) {
-    if (mode !== 'prize') {
-      if (goal) {
-        const steered = tiltActive || now - board.lastSteer < 1300;
-        showGift(dock.update(board, goal, now, Boolean(body) && lost < 900, steered));
-      }
-      if (mode === 'demo') {
-        pad.hidden = false;
-        pad.style.width = board.width + 'px';
-        pad.style.height = board.height + 'px';
-        pad.style.transform = 'translate(' + (board.x - board.width / 2) + 'px,' +
-          (board.y - board.height / 2) + 'px) rotate(' + board.angle + 'rad)';
-      }
+    if (mode === 'demo' && !seating) {
+      pad.hidden = false;
+      pad.style.width = board.width + 'px';
+      pad.style.height = board.height + 'px';
+      pad.style.transform = 'translate(' + (board.x - board.width / 2) + 'px,' +
+        (board.y - board.height / 2) + 'px) rotate(' + board.angle + 'rad)';
     }
     ctx.save();
     ctx.globalAlpha = Math.min(1, (elapsed - introMs) / 140);
     paintBoard(ctx, board, layout, cueIndex, art, now);
     ctx.restore();
   }
+  // Keep the solid defender visible in front when the plate meets it.
+  if (body) drawSign(ctx, body, beat, now, elapsed);
   if (clip.state === 'idle') clip.begin(surface, audio, now);
   else if (clip.state === 'preparing') clip.paint(surface, now);
 }
 // Keep a completed clip on the claim page. For an early win, finish its two
 // invitations on the last visible frame, releasing the physical camera immediately.
 function openSecret() {
-  if (!dock.ready || (mode !== 'camera' && mode !== 'demo')) return;
+  if (gift.hidden || (mode !== 'camera' && mode !== 'demo')) return;
   cancelAnimationFrame(frame);
   const still = document.createElement('canvas');
   if (clip.state === 'preparing') {
@@ -428,13 +451,11 @@ function openSecret() {
   stopInput();
   get('game').hidden = true;
   showPrize(round, clipTools);
+  get('prize').querySelector('.prize-extras').append(sound);
   const frozenCrop = { x: 0, y: 0, w: still.width, h: still.height };
   function finishClip(now) {
     if (mode !== 'prize') return;
-    if (clip.state !== 'preparing') {
-      audio.close();
-      return;
-    }
+    if (clip.state !== 'preparing') return;
     lastLineAt = now;
     const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
     frameAt = now;
@@ -548,7 +569,7 @@ pad.addEventListener('pointerdown', (event) => {
 pad.addEventListener('pointermove', (event) => {
   if (pointer?.id !== event.pointerId) return;
   board.steer((event.clientX - pointer.x) / (width * 1.25),
-    (event.clientY - pointer.y) / (height * 1.95), performance.now());
+    (event.clientY - pointer.y) / (height * 1.95));
   pointer.x = event.clientX;
   pointer.y = event.clientY;
 });
@@ -558,7 +579,7 @@ pad.addEventListener('keydown', (event) => {
   const delta = { ArrowLeft: [-nudge, 0], ArrowRight: [nudge, 0], ArrowUp: [0, -0.055], ArrowDown: [0, 0.055] }[event.key];
   if (!delta || mode !== 'demo') return;
   event.preventDefault();
-  board.steer(...delta, performance.now());
+  board.steer(...delta);
 });
 addEventListener('popstate', () => {
   if (get('prize')) location.reload();
@@ -575,7 +596,6 @@ stage.addEventListener('click', (event) => {
 addEventListener('pagehide', () => end('Experiencia cerrada. Podés volver a empezar.'));
 if (typeof ResizeObserver === 'function') {
   new ResizeObserver(resize).observe(stage);
-  new ResizeObserver(positionPrize).observe(slot);
 } else addEventListener('resize', resize);
 document.fonts
   ?.load('800 20px Uberlin')

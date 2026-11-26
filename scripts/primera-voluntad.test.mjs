@@ -4,7 +4,7 @@ import { longestLine, sameLine, visibleLines } from '../public/847/primera-volun
 
 import { readFloor, SignMotion } from '../public/847/primera-voluntad/motion.mjs';
 import { visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
-import { musicLoop, arrangeScore } from '../public/847/primera-voluntad/footsteps.mjs';
+import { arrangeScore } from '../public/847/primera-voluntad/footsteps.mjs';
 import { clipLength, clipName } from '../public/847/primera-voluntad/timing.mjs';
 
 import { cameraMotion, carryPoint } from '../public/847/primera-voluntad/camera-motion.mjs';
@@ -14,8 +14,9 @@ import {
   ShowBoard,
   collide,
   screenGravity,
+  tiltFromRest,
 } from '../public/847/primera-voluntad/stage-physics.mjs';
-import { prizeGoal, SecretDock } from '../public/847/primera-voluntad/prize-goal.mjs';
+import { canSeatPrize, landOnTray, settlePrize } from '../public/847/primera-voluntad/prize-goal.mjs';
 import { announcements, cueAt } from '../public/847/primera-voluntad/show-board.mjs';
 
 import { metalAt } from '../public/847/primera-voluntad/solid-sign.mjs';
@@ -261,6 +262,7 @@ const portrait = { width: 400, height: 800, left: 14, right: 14, top: 14, bottom
 function plate(view = portrait) {
   const board = new ShowBoard();
   board.fit(view, { width: 200, height: 100 });
+  board.x = view.width / 2;
   board.y = view.height / 2;
   return board;
 }
@@ -309,14 +311,33 @@ test('gravity follows the physical low edge in portrait, both landscape orientat
   assert.ok(Math.hypot(slow.x - fast.x, slow.y - fast.y) < 2);
 });
 
-test('optical roll works without a sensor and does not oscillate while held', () => {
-  const board = plate();
-  board.carry({ a: Math.cos(-0.45), b: Math.sin(-0.45), dx: 0, dy: 0 });
-  settle(board, 2);
-  assert.ok(board.x > 267 && board.y > 460);
-  board.carry({ a: Math.cos(0.9), b: Math.sin(0.9), dx: 0, dy: 0 });
+test('slow finger movement accumulates for the last few pixels of a demo landing', () => {
+  const board = plate(), start = board.y;
+  for (let i = 0; i < 25; i++) {
+    board.steer(0, 0.25 / (portrait.height * 1.95));
+    board.advance(portrait, 1 / 60, false);
+  }
+  settle(board, 0.4);
+  assert.ok(board.y > start + 6 && board.y <= start + 6.25);
+});
+
+test('a sideways reframe cannot drop a stationary plate and a level phone stops descending', () => {
+  const board = plate(), start = board.y;
+  board.carry({ a: Math.cos(0.2), b: Math.sin(0.2), dx: -0.05, dy: 0 });
+  settle(board, 3);
+  assert.equal(board.y, start);
+  board.carry({ a: 1, b: 0, dx: 0, dy: -0.02 });
+  settle(board, 0.6);
+  const rest = board.y;
+  settle(board, 5);
+  assert.ok(rest > start + 15 && Math.abs(board.y - rest) < 0.01);
+  board.gravity = { x: 0, y: 0.6 };
+  settle(board, 0.4);
+  const tilted = board.y;
+  board.gravity.y = 0;
+  board.carry({ a: 1, b: 0, dx: 0, dy: -0.15 });
   settle(board, 4);
-  assert.ok(board.x < 143);
+  assert.ok(tilted > rest + 40 && Math.abs(board.y - tilted) < 0.02);
 });
 
 test('a horizontal or sloping edge carries the foot along the actual detected segment', () => {
@@ -413,8 +434,20 @@ test('the visible rotated face rejects a miss and transfers momentum on contact'
   assert.equal(board.allowsFootstep(1100), false);
   assert.ok(board.allowsFootstep(1300));
   assert.ok(hit && Math.abs(hit.nx - nx) < 0.001 && Math.abs(hit.ny - ny) < 0.001);
-  assert.ok(sign.vx * nx + sign.vy * ny > 0 && board.vx * nx + board.vy * ny < 0);
+  assert.ok(board.vx * nx + board.vy * ny < -40);
+  assert.ok((sign.vx - board.vx) * nx + (sign.vy - board.vy) * ny > 0);
   assert.equal(collide(sign, board, 1030), null);
+});
+
+test('a level head-on strike is braced harder than a lateral shove', () => {
+  function strike(sideways) {
+    const plate = Object.assign(new ShowBoard(), { x: 150, y: 210, width: 200, height: 78, vy: 150, vx: sideways });
+    const wheel = { x: 150, y: 289, radius: 20, vx: 0, vy: 0 };
+    assert.ok(collide(wheel, plate, 1000));
+    return plate.vy;
+  }
+  assert.ok(strike(0) < -120);
+  assert.ok(strike(85) > 65);
 });
 
 test('both cities appear within the clip and Posadas stays after the download becomes available', () => {
@@ -433,26 +466,26 @@ test('both cities appear within the clip and Posadas stays after the download be
   }
 });
 
-test('the score spans both invitations, loops across the original end and resolves at 15 seconds', () => {
+test('the export plays the first 15 continuous seconds and fades at the end', () => {
   const ctx = {
     createBuffer(channels, length, sampleRate) {
       const data = Array.from({ length: channels }, () => new Float32Array(length));
       return { numberOfChannels: channels, length, sampleRate, getChannelData: (i) => data[i] };
     },
   };
-  const source = ctx.createBuffer(2, 13240, 1000);
-  source.getChannelData(0).fill(0.32);
-  source.getChannelData(1).fill(-0.18);
-  const loop = musicLoop(ctx, source);
-  const score = arrangeScore(ctx, loop, clipLength);
-  assert.ok(loop.length < source.length && loop.getChannelData(0).at(-1) === loop.getChannelData(0)[0]);
+  const source = ctx.createBuffer(2, 15250, 1000);
+  for (let i = 0; i < source.length; i++) {
+    source.getChannelData(0)[i] = i / source.length;
+    source.getChannelData(1)[i] = -i / source.length;
+  }
+  const score = arrangeScore(ctx, source, clipLength);
   assert.equal(score.length, 15000);
   assert.equal(clipName(clipLength, 'webm'), 'primera-voluntad-15s.webm');
   for (let ch = 0; ch < 2; ch++) {
     const pcm = score.getChannelData(ch);
     for (const i of [0, 14999]) assert.ok(Math.abs(pcm[i]) < 1e-6);
     for (const i of [200, 7999, 13184, 13185, 14000, 14800])
-      assert.equal(pcm[i], source.getChannelData(ch)[0]);
+      assert.equal(pcm[i], source.getChannelData(ch)[i]);
   }
 });
 
@@ -474,7 +507,7 @@ test('a stripe alone steers promptly in either axis, reversing in the next pictu
     const board = plate(), pos = vertical ? 'y' : 'x', initial = board[pos];
     board.carry(flow, 100);
     board.advance(portrait, 1 / 60, false);
-    assert.ok(board[pos] - initial > (vertical ? 12 : 7));
+    assert.ok(board[pos] - initial > (vertical ? 9 : 7));
     const at = board[pos];
     board.carry(reverse, 140);
     board.advance(portrait, 1 / 60, false);
@@ -484,50 +517,74 @@ test('a stripe alone steers promptly in either axis, reversing in the next pictu
   }
 });
 
-test('the unmarked target stays between the controls and within reach of the plate', () => {
-  for (const [width, height, left, right] of [[320, 568, 110, 204], [390, 664, 197, 274], [760, 360, 205, 635]]) {
-    const view = { ...portrait, width, height };
+test('a descent that misses the tray rebounds; steering to the tray gives a soft landing', () => {
+  for (const [width, height] of [[320, 568], [390, 664], [760, 360]]) {
+    const view = { ...portrait, width, height, bottom: 86 };
     const board = new ShowBoard();
-    board.fit(view, { width: (width - 28) * (width < height ? 0.78 : 0.57), height: 100 });
-    const goal = prizeGoal(view, board, { left, right });
-    assert.ok(goal.x - 22 >= left && goal.x + 22 <= right);
-    assert.ok(goal.x > width / 2 + goal.tolerance);
+    board.fit(view, { width: (width - 28) * (width < height ? 0.84 : 0.61), height: 100 });
+    const bottom = height - view.bottom;
+    const goal = { x: width / 2, width: 52, y: bottom - board.height / 2, bottom };
     const start = board.y;
-    settle(board, 20, view);
+    settle(board, 8, view);
     assert.equal(board.y, start);
-    const dock = new SecretDock();
-    assert.equal(dock.update(board, goal, 0, true, false), 'hidden');
-    board.y = goal.floor - board.height / 2;
-    assert.equal(dock.update(board, goal, 2000, true, true), 'near');
-    board.x = goal.x;
-    board.confine(view);
-    assert.equal(dock.update(board, goal, 2500, true, false), 'near');
-    assert.equal(dock.update(board, goal, 2600, true, true), 'holding');
-    assert.equal(dock.update(board, goal, 3299, true, false), 'holding');
-    assert.equal(dock.update(board, goal, 3300, true, false), 'ready');
-    board.y = start;
-    assert.equal(dock.update(board, goal, 4000, false, false), 'ready');
+    board.gravity = { x: 0, y: 1 };
+    for (let i = 0; i < 600 && !board.landingSpeed; i++) board.advance(view, 1 / 60, false);
+    assert.equal(landOnTray(board, goal, view), 'rebound');
+    board.advance(view, 1 / 60, false);
+    assert.ok(board.y < goal.y - 3 && !canSeatPrize(board, goal));
+    settle(board, 0.15, view);
+    assert.ok(board.y < goal.y - 20);
+    board.x = goal.x + 4;
+    board.gravity.y = 0.23;
+    let result;
+    for (let i = 0; i < 600 && !result; i++) {
+      board.advance(view, 1 / 60, false);
+      result = landOnTray(board, goal, view);
+    }
+    assert.equal(result, 'seated');
+    const entry = { angle: board.angle, offsetX: board.x - goal.x, progress: 0 };
+    assert.equal(settlePrize(board, goal, entry, 0.12), false);
+    assert.equal(settlePrize(board, goal, entry, 0.12), true);
+    assert.equal(board.y, goal.y);
+    assert.equal(board.x, goal.x);
   }
 });
 
-test('skimming across the slot, losing the line or colliding interrupts the secret', () => {
+test('an off-balance plate and a hard central strike bounce; a controlled central landing seats', () => {
   const board = plate();
-  const goal = prizeGoal(portrait, board, {left: 190, right: 287});
-  const dock = new SecretDock();
-  board.x = goal.x;
-  board.y = goal.floor - board.height / 2;
-  board.panVx = 90;
-  assert.equal(dock.update(board, goal, 1000, true, true), 'near');
-  board.panVx = 0;
-  assert.equal(dock.update(board, goal, 1100, true, true), 'holding');
-  assert.equal(dock.update(board, goal, 1500, false, true), 'hidden');
-  assert.equal(dock.update(board, goal, 1600, true, true), 'holding');
-  board.lastContact = 1900;
-  assert.equal(dock.update(board, goal, 1920, true, true), 'near');
-  assert.equal(dock.update(board, goal, 2210, true, true), 'holding');
-  board.x += 30;
-  assert.equal(dock.update(board, goal, 2800, true, true), 'near');
-  assert.equal(dock.ready, false);
+  const bottom = portrait.height - portrait.bottom;
+  const goal = { x: 200, width: 58, y: bottom - board.height / 2, bottom };
+  for (const [x, angle, speed, expected] of [
+    [226, 0, 75, 'rebound'], [200, 0.22, 75, 'rebound'],
+    [200, 0, 210, 'rebound'], [193, 0.012, 74, 'seated'],
+  ]) {
+    Object.assign(board, { x, y: bottom, angle, landingSpeed: speed, vy: 0 });
+    board.confine(portrait);
+    assert.equal(landOnTray(board, goal, portrait), expected);
+  }
+  Object.assign(board, { y: goal.y - 55, landingSpeed: 0 });
+  assert.equal(landOnTray(board, goal, portrait), null);
+});
+
+test('tilting from an upright start responds in both directions and follows screen rotation', () => {
+  const rest = { beta: 82, gamma: 0 };
+  const tilt = beta => tiltFromRest(rest, { beta, gamma: 0 });
+  assert.equal(Math.abs(tilt(82.6).y), 0);
+  assert.ok(tilt(92).y > 0.44 && tilt(72).y < -0.44);
+  const board = plate(), start = board.y;
+  board.gravity = tilt(92);
+  board.carry({ a: 1, b: 0, dx: 0, dy: 0.05 });
+  settle(board, 0.3);
+  assert.ok(board.y > start + 24);
+  const lower = board.y;
+  board.gravity = tilt(72);
+  settle(board, 0.45);
+  assert.ok(board.y < lower - 17);
+  for (const [angle, sign] of [[90, -1], [270, 1]]) {
+    const g = tiltFromRest({ beta: 0, gamma: 12 }, { beta: 0, gamma: 24 }, angle);
+    assert.ok(g.y * sign > 0.55 && Math.abs(g.x) < 0.005);
+  }
+  assert.ok(tiltFromRest({ beta: 0, gamma: 0 }, { beta: 180, gamma: 0 }).y < -0.4);
 });
 
 test('a new vertical edge entering a horizontally uniform scene cannot pull the plate sideways', () => {

@@ -1,41 +1,20 @@
 import { clipLength } from './timing.mjs';
 
-// Prepare the same musical phrase for the speakers and for the saved film.
-// Decoding in an offline context also works before the listener taps for sound.
-const trackUrl = '/multiversos/repertorio-trance.mp3';
+// Stream the full master for the speakers. Only its beginning is decoded in
+// memory for a portable video export on phones without a native audio recorder.
+const trackUrl = './trance-psicomusical.mp3';
+const clipMusicUrl = './musica-del-clip.mp3';
 const musicGain = 0.31;
 
-export function musicLoop(ctx, clip) {
-  const rate = clip.sampleRate;
-  const overlap = Math.min(Math.round(rate * 0.055), Math.floor(clip.length / 6));
-  const period = clip.length - overlap;
-  const loop = ctx.createBuffer(clip.numberOfChannels, period, rate);
-  for (let channel = 0; channel < clip.numberOfChannels; channel++) {
-    const src = clip.getChannelData(channel);
-    const dest = loop.getChannelData(channel);
-    for (let phase = 0; phase < period; phase++) {
-      let sample = src[phase + overlap];
-      if (phase >= period - overlap) {
-        const j = phase - (period - overlap);
-        const mix = (j + 1) / overlap;
-        sample += (src[j] - sample) * mix;
-      }
-      dest[phase] = sample;
-    }
-  }
-  return loop;
-}
-
-// Only the film has an ending. The live player keeps the original crossfaded loop.
-export function arrangeScore(ctx, loop, duration) {
-  const rate = loop.sampleRate,
+export function arrangeScore(ctx, music, duration) {
+  const rate = music.sampleRate,
     length = Math.round((rate * duration) / 1000);
-  const score = ctx.createBuffer(loop.numberOfChannels, length, rate);
-  for (let channel = 0; channel < loop.numberOfChannels; channel++) {
-    const src = loop.getChannelData(channel),
+  const score = ctx.createBuffer(music.numberOfChannels, length, rate);
+  for (let channel = 0; channel < music.numberOfChannels; channel++) {
+    const src = music.getChannelData(channel),
       dest = score.getChannelData(channel);
     for (let i = 0; i < length; i++) {
-      dest[i] = src[i % src.length] * Math.min(1, i / (rate * 0.1), (length - 1 - i) / (rate * 0.18));
+      dest[i] = (src[i] || 0) * Math.min(1, i / (rate * 0.1), (length - 1 - i) / (rate * 0.18));
     }
   }
   return score;
@@ -97,30 +76,21 @@ function playStep(context, output, noise, t, { x, y, strong, side }) {
   scrape.stop(t + 0.18);
 }
 
-function playScore(ctx, output, score, offset, analyser, repeat = false) {
+function playScore(ctx, output, score, offset) {
   const source = ctx.createBufferSource();
   const gain = ctx.createGain();
   source.buffer = score;
-  source.loop = repeat;
   gain.gain.value = musicGain;
-  if (repeat) {
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(musicGain, ctx.currentTime + 0.09);
-  }
-  if (analyser) {
-    source.connect(analyser);
-    analyser.connect(gain);
-  } else source.connect(gain);
+  source.connect(gain);
   gain.connect(output);
   source.start(ctx.currentTime, offset);
-  return source;
 }
 
 export function soundscape(onChange) {
   const Audio = window.AudioContext || window.webkitAudioContext;
   const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  let context, mix, monitor, recording, music, meter, noise;
-  let score, loop, pending, request;
+  let context, mix, monitor, recording, player, musicNode, meter, noise;
+  let score, pending, request, startingPlayer = false;
   let started = null,
     muted = false,
     failed = false,
@@ -129,12 +99,17 @@ export function soundscape(onChange) {
   const samples = new Uint8Array(128);
 
   function play() {
-    if (!context || context.state !== 'running' || !score || started === null || music) return;
-    // Joining late only unlocks the speakers; the clip has its own complete score.
-    const offset = Math.max(0, (performance.now() - started) / 1000);
-    meter = context.createAnalyser();
-    meter.fftSize = 256;
-    music = playScore(context, mix, loop, offset % loop.duration, meter, true);
+    if (!player || !player.paused || startingPlayer || started === null) return;
+    startingPlayer = true;
+    const current = player;
+    current.play().catch(error => {
+      if (current === player && error.name !== 'NotAllowedError' && error.name !== 'AbortError') failed = true;
+    }).finally(() => {
+      if (current === player) {
+        startingPlayer = false;
+        onChange();
+      }
+    });
   }
 
   function prepare() {
@@ -144,15 +119,12 @@ export function soundscape(onChange) {
     request = controller;
     pending = (async () => {
       try {
-        const response = await fetch(trackUrl, { signal: controller.signal });
+        const response = await fetch(clipMusicUrl, { signal: controller.signal });
         if (!response.ok || !Offline) throw Error('Música no disponible');
         const decoder = new Offline(1, 1, 48000);
         const decoded = await decoder.decodeAudioData(await response.arrayBuffer());
         if (controller.signal.aborted) return null;
-        loop = musicLoop(decoder, decoded);
-        score = arrangeScore(decoder, loop, clipLength);
-        failed = false;
-        play();
+        score = arrangeScore(decoder, decoded, clipLength);
         return score;
       } catch {
         if (!controller.signal.aborted) failed = true;
@@ -181,6 +153,21 @@ export function soundscape(onChange) {
           recording = context.createMediaStreamDestination();
           mix.connect(recording);
         }
+        player = document.createElement('audio');
+        player.preload = 'auto';
+        player.loop = true;
+        player.playsInline = true;
+        player.src = trackUrl;
+        musicNode = context.createMediaElementSource(player);
+        meter = context.createAnalyser();
+        meter.fftSize = 256;
+        const volume = context.createGain();
+        volume.gain.value = musicGain;
+        musicNode.connect(meter);
+        meter.connect(volume);
+        volume.connect(mix);
+        player.onplaying = () => { failed = false; onChange(); };
+        player.onerror = () => { failed = true; onChange(); };
         noise = makeNoise(context);
         context.onstatechange = () => {
           play();
@@ -192,7 +179,7 @@ export function soundscape(onChange) {
           .resume()
           .then(play)
           .catch(() => {});
-      else play();
+      play();
       onChange();
     } catch {
       onChange();
@@ -201,11 +188,13 @@ export function soundscape(onChange) {
 
   function toggle() {
     if (failed) {
+      failed = false;
+      player?.load();
       prepare();
       unlock();
       return;
     }
-    muted = context?.state === 'running' && !muted;
+    muted = Boolean(context?.state === 'running' && player && !player.paused && !muted);
     if (monitor) monitor.gain.setTargetAtTime(muted ? 0 : 1, context.currentTime, 0.015);
     unlock();
   }
@@ -248,16 +237,20 @@ export function soundscape(onChange) {
     steps.length = 0;
     request?.abort();
     pending = request = null;
-    if (music) {
-      music.stop();
-      music.disconnect();
+    if (player) {
+      player.onplaying = player.onerror = null;
+      player.pause();
+      player.removeAttribute('src');
+      player.load();
+      musicNode?.disconnect();
     }
+    startingPlayer = false;
     recording?.stream.getTracks().forEach((track) => track.stop());
     if (context) {
       context.onstatechange = null;
       if (context.state !== 'closed') context.close().catch(() => {});
     }
-    context = mix = monitor = recording = music = noise = meter = null;
+    context = mix = monitor = recording = player = musicNode = noise = meter = null;
     level = 0;
     failed = false;
     onChange();
@@ -277,8 +270,8 @@ export function soundscape(onChange) {
       play();
     },
     recordingTrack: () =>
-      music && context?.state === 'running' ? recording?.stream.getAudioTracks()[0] : null,
-    audible: () => context?.state === 'running' && !muted,
+      player && !player.paused && player.readyState >= 2 && context?.state === 'running' ? recording?.stream.getAudioTracks()[0] : null,
+    audible: () => Boolean(player && !player.paused && context?.state === 'running' && !muted),
     failed: () => failed,
   };
 }

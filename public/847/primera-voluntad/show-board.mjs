@@ -31,7 +31,7 @@ export function layoutBoard(ctx, view) {
   const w = view.width,
     h = view.height;
   const available = w - view.left - view.right;
-  const width = Math.min(463, available * (w < h ? 0.78 : 0.57));
+  const width = Math.min(492, available * (w < h ? 0.84 : 0.61));
   const pad = Math.min(15, Math.max(9, width * 0.044));
   const artSize = Math.min(51, Math.max(28, width * 0.14));
   const column = Math.max(25, width - pad * 3 - artSize);

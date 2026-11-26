@@ -26,7 +26,8 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const [amounts, setAmounts] = useSavedSetting<Partial<Record<TimbreScene, number>>>("amounts", {});
   const [live, setLive] = useState<TrackNotes>(EMPTY_TRACKS);
   const selectedRef = useRef(selected);
-  const layout = scene === 15 ? "numeric" : "tempered";
+  const numeric = scene !== null && scene <= 38;
+  const layout = numeric ? "numeric" : "tempered";
   const splitMidi = midiLayouts[layout];
   const splitRef = useRef(splitMidi);
   const instrument = useRef<OutputRef["current"]>(null);
@@ -41,7 +42,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const loopScene = timbre ? 20 : scene === 15 || scene === 18 ? scene : null;
   const loopCue = useMemo(() => clock && loopScene ? { context: clock, beginsAt: clock.currentTime } : null, [clock, loopScene]);
   const three = loopScene === 15 || loopScene === 18;
-  const keys = useMemo(() => getCubeKeys(loopScene !== 15, a4), [a4, loopScene]);
+  const keys = useMemo(() => getCubeKeys(!numeric, a4), [a4, numeric]);
   const strength = timbre ? amounts[timbre] ?? 72 : 72;
 
   useEffect(() => {
@@ -122,9 +123,9 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
     if (timbre) auditionRack.current?.select(timbre, strength);
   }, [auditionOutput, strength, timbre]);
 
-  const left = useChordLoop(three ? loopCue : null, instrument, { storageKey: "loop-left", synchronized: true, melodic: loopScene === 15, mix: 0.43 });
-  const center = useChordLoop(three ? loopCue : null, instrument, { storageKey: "loop-center", synchronized: true, melodic: loopScene === 15, click: false, mix: 0.43 });
-  const right = useChordLoop(three ? loopCue : null, instrument, { storageKey: "loop-right", synchronized: true, melodic: loopScene === 15, click: false, mix: 0.43 });
+  const left = useChordLoop(loopScene === 15 ? loopCue : null, instrument, { storageKey: "loop-left", synchronized: true, melodic: loopScene === 15, mix: 0.43 });
+  const center = useChordLoop(loopScene === 15 ? loopCue : null, instrument, { storageKey: "loop-center", synchronized: true, melodic: loopScene === 15, click: false, mix: 0.43 });
+  const right = useChordLoop(loopScene === 15 ? loopCue : null, instrument, { storageKey: "loop-right", synchronized: true, melodic: loopScene === 15, click: false, mix: 0.43 });
   const manual = useChordLoop(loopScene === 20 ? loopCue : null, instrument, { storageKey: "loop-manual", manual: true, bpm: 111, clickOutputRef: output });
   const melody = useRef([left, center, right]);
   melody.current = [left, center, right];
@@ -136,7 +137,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
     if (!bus) return;
     const players = CUBE_TRACKS.map((track) => createPerformanceNotes(bus, (notes) => {
       setLive((current) => current.map((existing, index) => index === track ? notes : existing) as TrackNotes);
-    }, auditionOutput ? undefined : three ? [captureLeft, captureCenter, captureRight][track] : captureManual, 0.15));
+    }, auditionOutput || loopScene === 18 ? undefined : three ? [captureLeft, captureCenter, captureRight][track] : captureManual, 0.15));
     const held = new Map<string, CubeTrack>();
     const release = (id: string) => {
       const track = held.get(id);
@@ -155,7 +156,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
         while(midiPitch<21)midiPitch+=12;
         while(midiPitch>108)midiPitch-=12;
       }
-      const frequency = midiPitch===undefined ? keys[track][Math.floor(index / 9)][index % 9].frequency : a4*2**((midiPitch-69)/12);
+      const frequency = numeric || midiPitch===undefined ? keys[track][Math.floor(index / 9)][index % 9].frequency : a4*2**((midiPitch-69)/12);
       attack.current = {count: attack.current.count + 1, frequency, velocity};
       if (!auditionOutput && loopScene === 15) melody.current[track].pressNote(id, frequency, velocity);
       players[track].press(id, frequency, velocity);
@@ -208,7 +209,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       window.removeEventListener("blur", releaseAll);
       document.removeEventListener("visibilitychange", hide);
     };
-  }, [captureCenter, captureLeft, captureManual, captureRight, keys, loopCue, loopScene, manualOutput, auditionOutput, routing, three, a4]);
+  }, [captureCenter, captureLeft, captureManual, captureRight, keys, loopCue, loopScene, manualOutput, auditionOutput, routing, three, a4, numeric]);
 
   return {
     attack, keys, three, timbre, selected, a4, setA4, splitMidi, live, strength, manual, loops: [left, center, right],
@@ -286,7 +287,7 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
 
 export function ExtendedPerformanceControls({ performance, paused, scene }: { performance: Performance; paused: boolean; scene: ExtendedScene }) {
   const { a4, setA4, selected, select, three, splitMidi, setSplit, timbre, strength, setStrength, loops, manual } = performance;
-  const tuning = scene !== 15 && scene !== 16 && scene !== 89 && <>
+  const tuning = scene >= 39 && scene !== 89 && <>
     <label htmlFor="extended-a4">La4 de referencia <output>{a4} Hz</output></label>
     <input id="extended-a4" type="range" min={400} max={480} step={1} value={a4} onChange={(event) => setA4(Number(event.currentTarget.value))} />
     <div className="zero-loop-presets">{[440, 444].map((value) => <button type="button" key={value} aria-pressed={a4 === value} onClick={() => setA4(value)}>{value} Hz</button>)}</div>
@@ -308,7 +309,7 @@ export function ExtendedPerformanceControls({ performance, paused, scene }: { pe
     </select>
     {scene === 15 ? <p>MIDI · Los tres cubos recorren una sola serie en pasos de 111 Hz. Graves a la izquierda, medios al centro y agudos a la derecha. Cada lupera conserva el ritmo y la duración de tus notas.</p> : <label className="extended-midi-split"><input type="checkbox" checked={splitMidi} onChange={(event) => setSplit(event.currentTarget.checked)} /> Repartir el piano MIDI entre los tres cubos</label>}
     <p className="extended-keys">1–9 frente · Mayús + 1–9 derecha · Z, X, C, V, B, N, M, coma y punto arriba. {scene !== 15 && "Con un cubo elegido, Do4 toca su primera nota."}</p>
-    {three ? <ChordLoopControls key={selected} loop={loops[selected]} active paused={paused} label={`Lupera ${CUBE_TRACK_NAMES[selected].toLowerCase()}`} /> : timbre && <>
+    {scene === 15 ? <ChordLoopControls key={selected} loop={loops[selected]} active paused={paused} label={`Lupera ${CUBE_TRACK_NAMES[selected].toLowerCase()}`} /> : timbre && <>
       <label htmlFor="extended-effect-mix">{TIMBRE_NAMES[timbre]} <output>{strength}%</output></label>
       <input id="extended-effect-mix" type="range" min={0} max={100} step={1} value={strength} onChange={(event) => setStrength(Number(event.currentTarget.value))} />
       <ChordLoopControls loop={manual} active paused={paused} label="Lupera" manual />

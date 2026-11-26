@@ -1,9 +1,14 @@
-export const NOTE_FREQUENCIES = [111, 222, 333, 444, 555, 666, 777, 888, 999] as const;
+import { harmonicFrequencyAt } from "./frequency-tuning";
+
+const faceFrequencies = (face: number) =>
+  Array.from({ length: 9 }, (_, index) => harmonicFrequencyAt(face * 9 + index));
+
 export const NOTE_FACE_FREQUENCIES = {
-  front: NOTE_FREQUENCIES,
-  right: [1111, 1222, 1333, 1444, 1555, 1666, 1777, 1888, 1999],
-  top: [2111, 2222, 2333, 2444, 2555, 2666, 2777, 2888, 2999],
+  front: faceFrequencies(0),
+  right: faceFrequencies(1),
+  top: faceFrequencies(2),
 } as const;
+export const NOTE_FREQUENCIES = NOTE_FACE_FREQUENCIES.front;
 export type NoteFace = keyof typeof NOTE_FACE_FREQUENCIES;
 export type NoteFrequency = number;
 

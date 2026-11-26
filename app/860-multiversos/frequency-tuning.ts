@@ -1,5 +1,9 @@
 export type FrequencyVector = [x: number, y: number, z: number];
 
+export function harmonicFrequencyAt(index: number) {
+  return 111 * (index + 1);
+}
+
 export const ORIGINAL_NOTES: FrequencyVector = [111, 222, 333];
 export const OCTAVE_NOTES: FrequencyVector = [220, 440, 880];
 

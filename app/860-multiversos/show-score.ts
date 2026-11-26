@@ -1,5 +1,4 @@
-// The first numbered scene contains the two preludes and the arrival at the line.
-// The engine already performs these three holds in addition to the slider times.
+// Original phase lengths are also used to recover older saved performances.
 export const SHOW_TRANSITIONS = { pointHold: 2.5, lineHold: 4, trailTurn: 3 } as const;
 export const SHOW_OPENING = { opening: 5, beacon: 12.5, line: 12, harmonics: 14, space: 9, time: 9, rest: 4 } as const;
 export const SHOW_CONTINUATION = { cross: 8, sphere: 10, noise: 12, return: 7, breath: 6 } as const;
@@ -21,8 +20,9 @@ export type CodaScene = typeof CODA_SCENES[number];
 // Durations are seconds of the performance clock. Each row is a scene boundary,
 // even when the tail of the previous instrument is still audible.
 const cues = [
-  [1, "Del vacío a la línea", SHOW_OPENING.opening + SHOW_OPENING.beacon + SHOW_TRANSITIONS.pointHold + SHOW_OPENING.line + SHOW_TRANSITIONS.lineHold],
-  [2, "Armónicos · 111, 222, 333 Hz", SHOW_OPENING.harmonics],
+  [0, "El conjunto vacío · Ruido blanco", 10],
+  [1, "La entidad mínima · Primer golpe", 15],
+  [2, "Dos puntos · Del golpe al armónico", 19],
   [3, "Espacio", SHOW_OPENING.space],
   [4, "Tiempo y giro", SHOW_OPENING.time + SHOW_TRANSITIONS.trailTurn],
   [5, "Cruce", SHOW_CONTINUATION.cross],

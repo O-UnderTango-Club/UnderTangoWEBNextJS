@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
   "start:https": "set NODE_ENV=production && node server/server.js",
+  "predev": "npm run materiales:860",
   "dev": "next dev",
+  "materiales:860": "node scripts/piloto-860/materiales.cjs",
+  "prebuild": "npm run materiales:860",
   "build": "next build",
   "start": "next start",
   "lint": "eslint"
@@ -30,6 +33,7 @@
     "copy-webpack-plugin": "^13.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.0.2",
+    "fflate": "0.8.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

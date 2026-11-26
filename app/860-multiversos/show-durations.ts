@@ -5,7 +5,9 @@ const longestShow = 40 * 60;
 const defaults = SHOW_SCORE.map(scene => scene.seconds);
 const minimums = SHOW_SCORE.map(scene => {
   switch (scene.number) {
-    case 1: return 12;
+    case 0: return 2;
+    case 1: return 7;
+    case 2: return 4;
     case 4: return 4;
     case 9: return 2;
     default: return 1;
@@ -18,8 +20,17 @@ function secondsTotal(durations: number[]) {
 
 export function resolveShowDurations(saved: unknown): number[] {
   if (!Array.isArray(saved)) return [...defaults];
+  // The old 111 rows began at 1. Keep the downbeat of scene 3 and all subsequent cues.
+  let values = saved;
+  if (saved.length === defaults.length - 1) {
+    const oldTime = (i: number, fallback: number) => Number.isFinite(saved[i]) && saved[i] > 0 ? saved[i] : fallback;
+    const total = Math.max(13, Math.round(oldTime(0, 36) + oldTime(1, 14)));
+    const extra = total - 13;
+    const zero = 2 + Math.round(extra * 10 / 37), one = 7 + Math.round(extra * 9 / 37);
+    values = [zero, one, total - zero - one, ...saved.slice(2)];
+  }
   const durations = defaults.map((fallback, index) => {
-    const value: unknown = saved[index];
+    const value: unknown = values[index];
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return fallback;
     return Math.max(minimums[index], Math.min(longestShow, Math.round(value)));
   });
@@ -48,7 +59,7 @@ function boundsForIndex(index: number, durations: number[]) {
 }
 
 function sceneIndex(scene: number) {
-  return Number.isInteger(scene) && scene >= 1 && scene <= defaults.length ? scene - 1 : -1;
+  return Number.isInteger(scene) && scene >= 0 && scene < defaults.length ? scene : -1;
 }
 
 export function durationBounds(scene: number, durations: number[]): { min: number; max: number } {

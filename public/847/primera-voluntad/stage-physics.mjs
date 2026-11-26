@@ -69,6 +69,8 @@ export class ShowBoard {
     this.width = this.height = this.angle = this.spin = 0;
     this.roll = this.panX = this.panY = 0;
     this.gravity = null;
+    this.panVx = this.panVy = 0;
+    this.lastSteer = -Infinity;
     this.lastContact = this.lastHit = -Infinity;
   }
 
@@ -76,12 +78,21 @@ export class ShowBoard {
     return now - this.lastContact > 260;
   }
 
-  carry(flow) {
+  carry(flow, now = 0) {
     const turn = Math.atan2(flow.b, flow.a);
     if (Math.abs(turn) > 0.0018) this.roll -= turn;
     // Optical flow describes the scene. The handset moves in the opposite direction.
-    if (Math.abs(flow.dx) > 0.0013) this.panX = clamp(this.panX - flow.dx, -0.4, 0.4);
-    if (Math.abs(flow.dy) > 0.0013) this.panY = clamp(this.panY - flow.dy, -0.4, 0.4);
+    this.steer(-flow.dx, -flow.dy, now);
+  }
+
+  steer(x, y, now) {
+    if (Math.abs(x) + Math.abs(y) < 0.0018) return;
+    this.lastSteer = now;
+    // Drop the pending displacement on a reversal so the first new frame counts.
+    if (x * this.panX < 0) this.panX = 0;
+    if (y * this.panY < 0) this.panY = 0;
+    this.panX = clamp(this.panX + x, -0.22, 0.22);
+    this.panY = clamp(this.panY + y, -0.22, 0.22);
   }
 
   fit(view, layout) {
@@ -115,19 +126,21 @@ export class ShowBoard {
 
   advance(view, dt, gentle) {
     const gx = this.gravity?.x ?? Math.sin(this.roll),
-      gy = this.gravity?.y ?? Math.cos(this.roll);
+      gy = this.gravity?.y ?? (Math.min(1, Math.abs(this.roll) * 2.4) * Math.cos(this.roll));
     const size = Math.min(view.width, view.height);
     const ease = 1 - Math.exp(-dt * 2.4),
-      panEase = 1 - Math.exp(-dt * 6);
+      panEase = 1 - Math.exp(-dt * 32);
     const dx = this.panX * panEase,
       dy = this.panY * panEase;
     this.panX -= dx;
     this.panY -= dy;
     const pace = gentle ? 0.62 : 1;
-    this.vx += (size * 0.29 * pace * gx - this.vx) * ease;
-    this.vy += (size * 0.14 * pace * gy - this.vy) * ease;
-    this.x += this.vx * dt + dx * view.width * 0.68;
-    this.y += this.vy * dt + dy * view.height * 0.45;
+    this.vx += (size * 0.39 * pace * gx - this.vx) * ease;
+    this.vy += (size * 0.27 * pace * gy - this.vy) * ease;
+    this.panVx = dx * view.width * 1.25 / dt;
+    this.panVy = dy * view.height * 1.95 / dt;
+    this.x += (this.vx + this.panVx) * dt;
+    this.y += (this.vy + this.panVy) * dt;
     this.spin += ((0.12 * gx - this.angle) * 16 - this.spin * 8) * dt;
     this.angle += this.spin * dt;
     this.confine(view);
@@ -172,12 +185,14 @@ export function collide(sign, board, now) {
   const contactX = px * c - py * s,
     contactY = px * s + py * c;
   const relative =
-    (sign.vx - board.vx + board.spin * contactY) * wx +
-    (sign.vy - board.vy - board.spin * contactX) * wy;
-  sign.x += wx * depth * 0.8;
-  sign.y += wy * depth * 0.8;
-  board.x -= wx * depth * 0.2;
-  board.y -= wy * depth * 0.2;
+    (sign.vx - board.vx - board.panVx + board.spin * contactY) * wx +
+    (sign.vy - board.vy - board.panVy - board.spin * contactX) * wy;
+  // The wheel braces the plate from below. It can still give way and roll aside.
+  const wheelShare = wy > 0.5 ? 0.48 : 0.8;
+  sign.x += wx * depth * wheelShare;
+  sign.y += wy * depth * wheelShare;
+  board.x -= wx * depth * (1 - wheelShare);
+  board.y -= wy * depth * (1 - wheelShare);
   if (relative >= 0) return null;
   const impulse = Math.min(290, -1.62 * relative);
   sign.vx += wx * impulse * 0.8;

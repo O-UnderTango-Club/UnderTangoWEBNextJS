@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="theme-color" content="#090b10" />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="stylesheet" href="./premio.css" />
     <title>Un Ø aparece · Primera voluntad</title>
     <style>
       @font-face {
@@ -117,6 +119,14 @@
         background: #0e1321e8;
       }
       #tilt svg { width: 22px; height: 22px; vertical-align: middle; }
+      #steer-pad {
+        position: absolute;
+        top: 0; left: 0;
+        padding: 0; border: 0; border-radius: 0;
+        background: transparent;
+        touch-action: none; cursor: grab;
+      }
+      #steer-pad:active { cursor: grabbing; }
       .stage-tools {
         position: absolute;
         right: var(--right);
@@ -203,7 +213,7 @@
     </style>
   </head>
   <body>
-    <main>
+    <main id="game">
       <section id="stage" class="stage" data-phase="permission" aria-label="Escena de Un Ø aparece">
         <video id="feed" class="visual" autoplay muted playsinline hidden></video>
         <canvas id="scene" class="visual" aria-hidden="true" hidden></canvas>
@@ -211,6 +221,7 @@
         <div id="cue" class="sr-only" hidden aria-live="polite" aria-atomic="true">
           <span id="cue-meta"></span> <span id="cue-title"></span>
         </div>
+        <button id="steer-pad" type="button" hidden aria-label="Mover el cuadro. Arrastrá o usá las flechas del teclado."></button>
         <div id="clip-tools" hidden>
           <a id="save" hidden download>
             <svg
@@ -269,7 +280,7 @@
         </div>
         <p>
           Apuntá a una junta del piso o al borde de una mesa. El Ø rueda por esa recta y puede saltar a otra que entre en el encuadre.
-          Al mover el teléfono, el cartel acompaña tu mano. Al inclinarlo, cae hacia el lado más bajo.
+          Mové el teléfono para llevar el cuadro hasta la meta de abajo. El Ø puede frenarlo en el camino. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
           Si aparece el botón de inclinación arriba a la derecha, podés tocarlo para usar el sensor.
         </p>
         <p>

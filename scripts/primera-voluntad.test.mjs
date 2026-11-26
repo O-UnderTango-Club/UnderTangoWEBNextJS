@@ -15,6 +15,7 @@ import {
   collide,
   screenGravity,
 } from '../public/847/primera-voluntad/stage-physics.mjs';
+import { prizeGoal, inPrizeGoal } from '../public/847/primera-voluntad/prize-goal.mjs';
 import { announcements, cueAt } from '../public/847/primera-voluntad/show-board.mjs';
 
 import { metalAt } from '../public/847/primera-voluntad/solid-sign.mjs';
@@ -273,7 +274,7 @@ test('the board follows phone pans in both directions and stays still on a stead
   const x = board.x;
   board.carry({ a: 1, b: 0, dx: -0.09, dy: 0 });
   settle(board, 1);
-  assert.ok(board.x > x + 21 && board.x < x + 25);
+  assert.ok(board.x > x + 43 && board.x < x + 47);
   board.carry({ a: 1, b: 0, dx: 0.18, dy: 0 });
   settle(board, 1);
   assert.ok(board.x < x - 21);
@@ -452,5 +453,48 @@ test('the score spans both invitations, loops across the original end and resolv
     for (const i of [0, 14999]) assert.ok(Math.abs(pcm[i]) < 1e-6);
     for (const i of [200, 7999, 13184, 13185, 14000, 14800])
       assert.equal(pcm[i], source.getChannelData(ch)[0]);
+  }
+});
+
+test('a stripe alone steers promptly in either axis, reversing in the next picture', () => {
+  function stripe(vertical, offset, lighting = 0) {
+    const width = 108, height = 192, gray = new Uint8Array(width * height);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const p = (vertical ? y : x) - offset;
+      gray[y * width + x] = (p > 36 && p < 46 ? 175 : p > 62 && p < 73 ? 112 : 30) + lighting;
+    }
+    return { width, height, gray };
+  }
+  for (const vertical of [true, false]) {
+    const start = stripe(vertical, 0), next = stripe(vertical, -5, 12);
+    const flow = cameraMotion(start, next), reverse = cameraMotion(next, start);
+    const axis = vertical ? 'dy' : 'dx';
+    assert.ok(Math.abs(flow[axis] * (vertical ? 192 : 108) + 5) < 0.1);
+    assert.ok(Math.abs(reverse[axis] + flow[axis]) < 0.001);
+    const board = plate(), pos = vertical ? 'y' : 'x', initial = board[pos];
+    board.carry(flow, 100);
+    board.advance(portrait, 1 / 60, false);
+    assert.ok(board[pos] - initial > (vertical ? 12 : 7));
+    const at = board[pos];
+    board.carry(reverse, 140);
+    board.advance(portrait, 1 / 60, false);
+    assert.ok(board[pos] < at);
+    const flash = cameraMotion(start, stripe(vertical, 0, 18));
+    assert.ok(!flash || (Math.abs(flash.dx) + Math.abs(flash.dy) < 0.001));
+  }
+});
+
+test('the plate stays at the top at rest and wins only inside the drawn goal', () => {
+  for (const view of [portrait, {width: 740, height: 360, left: 16, right: 16, top: 12, bottom: 68}]) {
+    const board = new ShowBoard();
+    board.fit(view, {width: 200, height: 100});
+    const goal = prizeGoal(view, board), start = board.y;
+    settle(board, 20, view);
+    assert.equal(board.y, start);
+    assert.equal(inPrizeGoal(board, goal), false);
+    board.y = view.height - view.bottom - board.height / 2;
+    assert.ok(inPrizeGoal(board, goal));
+    board.x = goal.x;
+    assert.equal(inPrizeGoal(board, goal), false);
   }
 });

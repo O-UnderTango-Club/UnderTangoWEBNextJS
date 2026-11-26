@@ -16,6 +16,8 @@ import { soundscape } from './footsteps.mjs';
 import { RollingSign, ShowBoard, collide, screenGravity } from './stage-physics.mjs';
 import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs';
 import { SceneClip } from './clip.mjs';
+import { prizeGoal, inPrizeGoal, paintPrizeGoal } from './prize-goal.mjs';
+import { showPrize } from './prize.mjs';
 import { introMs } from './timing.mjs';
 
 const get = (id) => document.getElementById(id);
@@ -56,6 +58,8 @@ let body = null,
   layout,
   sharing = false;
 const hits = [];
+const pad = get('steer-pad');
+let goal, inGoalSince = null, pointer = null, baseline = null, tiltActive = false;
 function updateClip(current) {
   const ready = current.state === 'ready';
   clipTools.hidden = save.hidden = !ready;
@@ -109,7 +113,11 @@ function applyTilt() {
   const degrees = Number.isFinite(window.orientation)
     ? window.orientation
     : (window.screen.orientation?.angle ?? 0);
-  board.gravity = screenGravity(attitude.beta, attitude.gamma, degrees);
+  const g = screenGravity(attitude.beta, attitude.gamma, degrees);
+  if (!baseline) baseline = g;
+  tiltActive = Math.hypot(g.x - baseline.x, g.y - baseline.y) > 0.09;
+  // Opening the page while holding a phone upright must leave the plate at the top.
+  board.gravity = tiltActive ? g : { x: 0, y: 0 };
 }
 function measureTilt({ beta, gamma }) {
   if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
@@ -185,6 +193,8 @@ function resize() {
   });
   layout = layoutBoard(ctx, view);
   board.fit(view, layout);
+  goal = prizeGoal(view, board);
+  inGoalSince = null;
   if (motion && changedAspect) {
     body = null;
     motion = null;
@@ -196,23 +206,29 @@ function resize() {
   nextRead = nextLines = 0;
 }
 
-function release() {
+function stopInput() {
   generation++;
   window.removeEventListener('deviceorientation', measureTilt);
   window.screen.orientation?.removeEventListener?.('change', applyTilt);
   window.removeEventListener('orientationchange', applyTilt);
   tiltButton.hidden = true;
-  attitude = null;
+  attitude = baseline = pointer = null;
+  tiltActive = false;
+  pad.hidden = true;
+  if (stream) stream.getTracks().forEach((track) => track.stop());
+  stream = null;
+  feed.pause();
+  feed.srcObject = null;
+}
+function release() {
+  stopInput();
+  inGoalSince = null;
   cancelAnimationFrame(frame);
   mode = motion = previous = body = null;
   clip.reset();
   board = new ShowBoard();
   if (layout) board.fit(view, layout);
   hits.length = 0;
-  if (stream) stream.getTracks().forEach((track) => track.stop());
-  stream = null;
-  feed.pause();
-  feed.srcObject = null;
   feed.hidden = scene.hidden = true;
   sample.width = sample.height = texture.width = texture.height = 0;
   ctx?.clearRect(0, 0, width, height);
@@ -250,7 +266,7 @@ function analyze(source, crop, now) {
   if (previous && now - lastRead < 550) {
     const change = cameraMotion(previous, current);
     if (change) {
-      board.carry(change);
+      if (mode === 'camera') board.carry(change, now);
       motion?.carry(change);
       carryMarks(marks, change, width, height);
     }
@@ -352,6 +368,19 @@ function render(source, crop, now, dt) {
     ctx.restore();
   }
   if (cueIndex >= 0) {
+    const inside = inPrizeGoal(board, goal);
+    const steering = tiltActive || now - board.lastSteer < 1100;
+    if (mode !== 'prize') {
+      inGoalSince = inside && body && lost < 900 && steering ? (inGoalSince ?? now) : null;
+      paintPrizeGoal(ctx, goal, inGoalSince !== null);
+      if (mode === 'demo') {
+        pad.hidden = false;
+        pad.style.width = board.width + 'px';
+        pad.style.height = board.height + 'px';
+        pad.style.transform = 'translate(' + (board.x - board.width / 2) + 'px,' +
+          (board.y - board.height / 2) + 'px) rotate(' + board.angle + 'rad)';
+      }
+    }
     ctx.save();
     ctx.globalAlpha = Math.min(1, (elapsed - introMs) / 140);
     paintBoard(ctx, board, layout, cueIndex, art, now);
@@ -359,6 +388,36 @@ function render(source, crop, now, dt) {
   }
   if (clip.state === 'idle') clip.begin(surface, audio, now);
   else if (clip.state === 'preparing') clip.paint(surface, now);
+}
+// Keep a completed clip on the claim page. For an early win, finish its two
+// invitations on the last visible frame, releasing the physical camera immediately.
+function win(source, crop) {
+  const still = document.createElement('canvas');
+  if (clip.state === 'preparing') {
+    still.width = surface.width;
+    still.height = surface.height;
+    still.getContext('2d').drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, still.width, still.height);
+  }
+  const round = crypto.randomUUID();
+  history.pushState(null, '', './premio.html#' + round);
+  mode = 'prize';
+  stopInput();
+  get('game').hidden = true;
+  showPrize(round, clipTools);
+  const frozenCrop = { x: 0, y: 0, w: still.width, h: still.height };
+  function finishClip(now) {
+    if (mode !== 'prize') return;
+    if (clip.state !== 'preparing') {
+      audio.close();
+      return;
+    }
+    lastLineAt = now;
+    const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
+    frameAt = now;
+    render(still, frozenCrop, now, dt);
+    frame = requestAnimationFrame(finishClip);
+  }
+  frame = requestAnimationFrame(finishClip);
 }
 function animate(now) {
   const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
@@ -370,7 +429,7 @@ function animate(now) {
   if (sw && sh && (isDemo || feed.readyState >= 2)) {
     const crop = visibleCrop(sw, sh, width, height);
     if (now >= nextRead) {
-      nextRead = now + 63;
+      nextRead = now + 40;
       if (isDemo) drawDemo(ink, width, height, sceneStart ? (now - sceneStart) / 1000 : 0, 1);
       try {
         analyze(source, crop, now);
@@ -385,6 +444,10 @@ function animate(now) {
       audio.start(now);
     }
     render(source, crop, now, dt);
+    if (inGoalSince !== null && now - inGoalSince >= 180) {
+      win(source, crop);
+      return;
+    }
   }
   frame = requestAnimationFrame(animate);
 }
@@ -455,6 +518,29 @@ async function enter(selected) {
 function dismiss() {
   end('Experiencia cerrada. Podés volver a empezar.', cueIndex >= 0);
 }
+pad.addEventListener('pointerdown', (event) => {
+  if (mode !== 'demo' || pointer || event.button !== 0) return;
+  pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  pad.setPointerCapture(event.pointerId);
+  audio.unlock();
+});
+pad.addEventListener('pointermove', (event) => {
+  if (pointer?.id !== event.pointerId) return;
+  board.steer((event.clientX - pointer.x) / (width * 1.25),
+    (event.clientY - pointer.y) / (height * 1.95), performance.now());
+  pointer.x = event.clientX;
+  pointer.y = event.clientY;
+});
+pad.addEventListener('lostpointercapture', () => { pointer = null; });
+pad.addEventListener('keydown', (event) => {
+  const delta = { ArrowLeft: [-0.06, 0], ArrowRight: [0.06, 0], ArrowUp: [0, -0.055], ArrowDown: [0, 0.055] }[event.key];
+  if (!delta || mode !== 'demo') return;
+  event.preventDefault();
+  board.steer(...delta, performance.now());
+});
+addEventListener('popstate', () => {
+  if (get('prize')) location.reload();
+});
 camera.addEventListener('click', () => enter('camera'));
 demo.addEventListener('click', () => enter('demo'));
 stop.addEventListener('click', dismiss);
@@ -473,6 +559,7 @@ document.fonts
     if (ctx && layout) {
       layout = layoutBoard(ctx, view);
       board.fit(view, layout);
+      goal = prizeGoal(view, board);
     }
   })
   .catch(() => {});

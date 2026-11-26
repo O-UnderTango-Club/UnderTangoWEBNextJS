@@ -150,12 +150,70 @@ function widePan(previous, current) {
   return { a: 1, b: 0, dx: bx / w, dy: by / h };
 }
 
+// A wall or a single stair can move vertically without offering a corner to
+// track. Compare signed brightness gradients across three strips on each axis.
+function stripMotion(before, after, vertical) {
+  const { width, height } = before;
+  const length = vertical ? height : width, breadth = vertical ? width : height;
+  const radius = Math.min(22, Math.floor(length * 0.18));
+  if (radius < 2 || breadth < 9) return null;
+  const votes = [];
+  for (let strip = 0; strip < 3; strip++) {
+    const old = new Float32Array(length), fresh = new Float32Array(length);
+    const first = Math.floor((strip + 0.08) * breadth / 3);
+    const last = Math.floor((strip + 0.92) * breadth / 3);
+    let columns = 0;
+    for (let cross = first; cross < last; cross += 3) {
+      columns++;
+      for (let pos = 1; pos < length - 1; pos++) {
+        const i = vertical ? pos * width + cross : cross * width + pos;
+        const step = vertical ? width : 1;
+        old[pos] += before.gray[i + step] - before.gray[i - step];
+        fresh[pos] += after.gray[i + step] - after.gray[i - step];
+      }
+    }
+    let energy = 0;
+    for (let i = radius + 1; i < length - radius - 1; i++) energy += old[i] ** 2;
+    if (energy < columns ** 2 * 55) continue;
+    const scores = [];
+    let best = -1, offset = 0;
+    for (let shift = -radius; shift <= radius; shift++) {
+      let dot = 0, norm = 0;
+      for (let i = radius + 1; i < length - radius - 1; i++) {
+        const g = fresh[i + shift];
+        dot += old[i] * g;
+        norm += g * g;
+      }
+      const score = norm ? dot / Math.sqrt(energy * norm) : 0;
+      scores.push(score);
+      if (score > best) { best = score; offset = shift; }
+    }
+    if (best < 0.78 || best - scores[radius] < 0.035) continue;
+    const ambiguous = scores.some((score, i) => Math.abs(i - radius - offset) > 2 && score > best - 0.055);
+    if (!ambiguous) votes.push(offset);
+  }
+  if (!votes.length) return null;
+  votes.sort((a, b) => a - b);
+  const median = votes[Math.floor(votes.length / 2)];
+  if (votes.filter(v => Math.abs(v - median) <= 2).length <= votes.length / 2) return null;
+  return median / length;
+}
+
+function translation(previous, current) {
+  const pan = widePan(previous, current);
+  if (pan) return pan;
+  const dy = stripMotion(previous, current, true);
+  const dx = stripMotion(previous, current, false);
+  if (dy !== null || dx !== null) return { a: 1, b: 0, dx: dx ?? 0, dy: dy ?? 0 };
+  return null;
+}
+
 // a,b represent scale*cos(roll), scale*sin(roll). Translation is relative to
 // the picture center, so a zoom does not masquerade as a pan.
 export function cameraMotion(previous, current) {
   if (!previous || previous.width !== current.width || previous.height !== current.height) return null;
   const pairs = patchMatches(previous, current);
-  if (pairs.length < 3) return widePan(previous, current);
+  if (pairs.length < 3) return translation(previous, current);
   const w = current.width,
     h = current.height;
   let inliers = [],
@@ -192,7 +250,7 @@ export function cameraMotion(previous, current) {
     }
     if (inliers.length === pairs.length && bestError === 0) break;
   }
-  if (inliers.length < Math.max(3, pairs.length * 0.48)) return widePan(previous, current);
+  if (inliers.length < Math.max(3, pairs.length * 0.48)) return translation(previous, current);
   let x = 0,
     y = 0,
     u = 0,
@@ -218,7 +276,7 @@ export function cameraMotion(previous, current) {
     dot += px * (p.u - u) + py * (p.v - v);
     cross += px * (p.v - v) - py * (p.u - u);
   }
-  if (!sum) return widePan(previous, current);
+  if (!sum) return translation(previous, current);
   const a = dot / sum,
     b = cross / sum;
   return {

@@ -125,7 +125,14 @@ export class SignMotion {
     this.width = width;
     this.height = height;
     this.gentle = gentle;
-    this.path = copyPath(floor.paths[0]);
+    // When several long edges compete, put the defender on the one closest to mid-screen.
+    const center = { x: width / 2, y: height * 0.54 };
+    const length = path => Math.hypot(path.b.x - path.a.x, path.b.y - path.a.y);
+    const longest = Math.max(...floor.paths.map(length));
+    const candidates = floor.paths.filter(path => length(path) >= longest * 0.8);
+    const distance = path => nearest(path, center.x, center.y).distance;
+    const first = candidates.reduce((best, path) => distance(path) < distance(best) ? path : best);
+    this.path = copyPath(first);
     this.target = copyPath(this.path);
     this.floor = {
       angle: floor.angle,
@@ -134,7 +141,9 @@ export class SignMotion {
       confidence: floor.kind === 'convergence' ? 1 : 0,
     };
     this.ground = { ...this.floor, near: { ...floor.near }, vanish: { ...floor.vanish } };
-    this.depth = 1.48;
+    // Start on the real rail at the point nearest the middle of the play area.
+    const t = clamp(nearest(this.path, width / 2, height * 0.54).t, 0.12, 0.88);
+    this.depth = 1 / (1 - t * depthRange);
     this.direction = 1;
     this.spin = 0.08;
     this.travel = this.tilt = this.energy = this.railTime = this.lift = 0;

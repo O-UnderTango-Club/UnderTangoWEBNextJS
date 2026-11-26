@@ -6,8 +6,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
 import { sceneNoiseBuffers, scheduleContinuationAudio } from "./scene-audio";
-import { collideIntoPitch, collisionTiming, loadQuestion, NOISE_KEYS, OPENING_QUESTION, pointTiming, speakQuestion, whiteOverture, WAVE_SECONDS, type PointStrike, type StrikeLog } from "./opening-sound";
-import { OpeningProjection } from "./opening-projection";
+import { collideIntoPitch, collisionTiming, loadQuestion, NOISE_KEYS, OPENING_QUESTION, pointTiming, speakQuestion, universeStrikeWeight, whiteOverture, WAVE_SECONDS, type PointStrike, type StrikeLog } from "./opening-sound";
+import { CollisionReadout, OpeningProjection } from "./opening-projection";
 import { CONTINUATION_SCENES, DEFAULT_PAIR, NOISE_COLORS, NOISE_IDS, type ContinuationScene, type NoiseColor, type NoisePair } from "./scene-cues";
 import { ContinuationProjection } from "./scene-visuals";
 import { FIRST_MIDI_NOTE, NOTE_SCENES, NOTE_SCENE_IDS, isNoteScene, type NoteScene, type PerformanceInput } from "./performance-notes";
@@ -16,7 +16,7 @@ import { usePausedSceneOutput } from "./paused-scene-output";
 import { useEarlyInstrument } from "./early-instrument";
 import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isLiveSetScene, isTimbreScene, type ExtendedScene } from "./extended-scenes";
-import { SHOW_OPENING, SHOW_SCORE, SHOW_TRANSITIONS, type CodaScene } from "./show-score";
+import { SHOW_OPENING, SHOW_SCENE_COUNT, SHOW_SCORE, SHOW_TRANSITIONS, type CodaScene } from "./show-score";
 import { durationBounds, editShowDuration, resolveShowDurations } from "./show-durations";
 import { previousSceneDurations } from "./previous-durations";
 import { CodaProjection } from "./coda-projection";
@@ -1161,6 +1161,7 @@ function playModuleGong(context: AudioContext, output: AudioNode, time: number, 
 
 type NumberedScene = NoteScene | ExtendedScene;
 type ModuleZeroScene = "opening" | "beacon" | "line" | "harmonics" | "space" | "time" | ContinuationScene | NumberedScene;
+type TunedVoice = { frequency: AudioParam; stop: (when: number) => void };
 
 const isContinuationScene = (stage: ModuleZeroScene): stage is ContinuationScene =>
   CONTINUATION_SCENES.some(({ mode }) => mode === stage);
@@ -1292,8 +1293,8 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const hitPoint = useCallback((hit: PointStrike) => {
     const previous = strikes.current;
     strikes.current = {
-      hits: [...previous.hits.filter(p => p.clock === hit.clock && hit.time - p.time < WAVE_SECONDS).slice(-11), hit],
-      energy: previous.energy + hit.velocity,
+      hits: [...previous.hits.filter(p => p.clock === hit.clock && hit.time - p.time < WAVE_SECONDS).slice(-31), hit],
+      energy: previous.energy + universeStrikeWeight(hit.velocity),
     };
     liveAttack.current = {count: liveAttack.current.count + 1, frequency: hit.frequency, velocity: hit.velocity};
   }, [liveAttack]);
@@ -1542,7 +1543,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         setActiveDurationMs(seconds * 1000);
         setStage(stage);
       };
-      const playTime = (bus: GainNode, time: number, voices: OscillatorNode[]) => {
+      const playTime = (bus: GainNode, time: number, voices: TunedVoice[]) => {
         voices.forEach((voice, index) => {
           voice.frequency.setValueAtTime(ORIGINAL_NOTES[index], time);
           voice.frequency.exponentialRampToValueAtTime(OCTAVE_NOTES[index], time + timeSeconds);
@@ -1561,11 +1562,11 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
           playContinuation("cross", continuationAt);
         }
       };
-      const playSpatial = (bus: GainNode, time: number, voices: OscillatorNode[]) => {
+      const playSpatial = (bus: GainNode, time: number, voices: TunedVoice[]) => {
         showAt("space", time, () => enterDiagram("spatial", time, spaceSeconds));
         playTime(bus, time + spaceSeconds, voices);
       };
-      const playHarmonics = (bus: GainNode, time: number, root: OscillatorNode, harmonicSeconds: number) => {
+      const playHarmonics = (bus: GainNode, time: number, root: TunedVoice, harmonicSeconds: number) => {
         playModuleGong(context, masterOutput, time, 330, 0.58);
         playModuleGong(context, masterOutput, time + harmonicSeconds * HARMONIC_CUE.secondGong, 444, 0.55);
         const second = addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
@@ -1633,13 +1634,15 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const preparing = stage === "preparing";
   const ready = stage === "ready";
   const waitingForAudio = (preparing || (paused && transportBusy)) && !pausedRef.current && audioRef.current?.state === "suspended";
-  const canPlayGeneral = waitingForAudio || (!preparing && !transportBusy && (ready || paused));
+  const canPlayGeneral = waitingForAudio || (!preparing && !transportBusy);
+  const playing = !ready && !preparing && !paused;
+  const playLabel = playing ? "Pausar con Play" : paused ? "Reanudar" : "Reproducir";
   function playGeneral() {
     if (!canPlayGeneral) return;
     if (waitingForAudio) void audioRef.current?.resume().catch(() => {});
     else if (ready) {
       if (!audioRef.current) void start();
-    } else void changePaused(false);
+    } else void changePaused(!paused);
   }
   const breathing = stage === "breath-hold";
   const canStart = ready || breathing || noteScene !== null || extendedScene !== null || (previewMode !== null && !preparing);
@@ -1796,6 +1799,11 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         .zero-stage:has(.zero-stopwatch) .stimulus-bar { max-width: calc(100% - 8rem); }
       }
       .opening-field { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+      .opening-rate {
+        position:absolute; z-index:1; inset-inline:0; bottom:clamp(.45rem,4cqh,2rem); margin:0;
+        color:#272936; text-align:center; font:600 clamp(.82rem,2.5cqh,1.25rem)/1.3 system-ui,sans-serif;
+        font-variant-numeric:tabular-nums; pointer-events:none;
+      }
       .opening-noises { display:flex; flex-wrap:wrap; gap:.3rem; margin:.4rem 0; }
       .opening-noises kbd { font:600 .72rem/1.4 system-ui; color:#cddafe; }
       .zero-controls .opening-noises button { min-height:32px; padding:.18rem .5rem; font-size:.73rem; touch-action:none; }
@@ -2099,6 +2107,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} cue={cue} paused={paused} />}
       {(sceneNumber === 1 || stage === "two") && cue && <OpeningProjection scene={stage === "two" ? 2 : 1} cue={cue} seconds={activeDurationMs / 1000} strikes={strikes} />}
+      {sceneNumber === 2 && cue && <CollisionReadout cue={cue} seconds={activeDurationMs / 1000} paused={paused} />}
       {question && <p className="zero-question" style={{ animationPlayState: paused ? "paused" : "running" }}>{OPENING_QUESTION}</p>}
       {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={diagramCue} durationMs={activeDurationMs - harmonicPhase * 1000}
         sampleIntervalMs={activeSamplingMs} />}
@@ -2137,7 +2146,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       <div className="zero-settings" ref={settingsRef}>
         <div className="zero-scene">
           <h2>Duración de la obra</h2>
-          <p><strong data-show-total={totalSeconds}>{scoreTime(totalSeconds)}</strong> · {SHOW_SCORE.length} escenas · margen de 20:00 a 40:00</p>
+          <p><strong data-show-total={totalSeconds}>{scoreTime(totalSeconds)}</strong> · {SHOW_SCENE_COUNT} escenas · margen de 20:00 a 40:00</p>
           <details><summary>Ajustes de duración</summary>
             {sceneNumber !== null && sceneNumber < 10 && <p>La apertura ya está en marcha. Los cambios de las escenas 0–9 entran al volver a reproducirlas.</p>}
             <button type="button" onClick={() => {setSavedSeconds(SHOW_SCORE.map(cue => cue.seconds)); setRestFraction(.4);}}>Restablecer 30:00</button>
@@ -2187,7 +2196,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
             </>}
             {mode === "beacon" && <p className="opening-cue">Desde la pregunta, tocá el piano o las teclas A–K. Cada golpe de bombo abre una onda y revela el universo. En pausa también podés tocar.</p>}
             {mode === "beacon" && voiceUnavailable && <small role="status">La voz no se pudo cargar. La pregunta sigue en pantalla.</small>}
-            {mode === "line" && <p className="opening-cue">Dos puntos delimitan el golpe. Podés acentuar el recorrido con el teclado hasta que aparezca la línea de 111 Hz.</p>}
+            {mode === "line" && <p className="opening-cue">Cada golpe deja un punto. Seguí el contador y escuchá cómo se juntan hasta formar la nota de 111 Hz. Podés acentuar el recorrido con el teclado.</p>}
             {mode === "time" && <>
               <div className="zero-sampling">
                 <label htmlFor="time-sampling">Intervalo de muestreo</label>
@@ -2264,9 +2273,9 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h2v14H5zM19 5v14L8 12z" /></svg>
           </button>
           <div className="zero-general-play">
-            <button type="button" aria-label={paused ? "Reanudar" : "Reproducir"} title={paused ? "Reanudar" : "Reproducir"}
+            <button type="button" aria-label={playLabel} title={playLabel}
               disabled={!canPlayGeneral} onClick={playGeneral}>
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z" /></svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d={playing ? "M5 4h4v16H5zm8 0h4v16h-4z" : "M7 4l14 8-14 8z"} /></svg>
             </button>
             <TransportMidiButton action="play" midi={transportMidi} />
           </div>

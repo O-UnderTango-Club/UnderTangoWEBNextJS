@@ -13,6 +13,10 @@ export const noiseKey = (note: number) => NOISE_KEYS[KEY_COLORS[note % 12]];
 export type PointStrike = { clock: BaseAudioContext; time: number; note: number; frequency: number; velocity: number };
 export type StrikeLog = { current: { hits: PointStrike[]; energy: number } };
 export const WAVE_SECONDS = 1.8;
+export const universeStrikeWeight = (velocity: number) => .45 + .55 * velocity;
+const FIRST_COLLISION_HZ = 2;
+export const FINAL_COLLISION_HZ = 111;
+const logRateRatio = Math.log(FINAL_COLLISION_HZ / FIRST_COLLISION_HZ);
 
 export function pointTiming(seconds: number) {
   const gong = Math.min(5.0, seconds * .62);
@@ -26,11 +30,14 @@ export function collisionTiming(seconds: number) {
   return { lead, ramp, harmonics };
 }
 
-// Integral of the same exponential frequency ramp scheduled on the audio thread.
-export function collisionBeat(elapsed: number, ramp: number) {
-  const t = Math.min(ramp, Math.max(0, elapsed));
-  const logRatio = Math.log(111 / 2);
-  return 2 * ramp * Math.expm1(logRatio * t / ramp) / logRatio + 111 * Math.max(0, elapsed - ramp);
+// Instantaneous rate and cumulative phase of the exponential ramp used by Web Audio.
+export function collisionPulse(elapsed: number, ramp: number) {
+  if (elapsed < 0) return { rate: 0, beats: 0 };
+  const rise = Math.expm1(logRateRatio * Math.min(1, elapsed / ramp));
+  return {
+    rate: elapsed >= ramp ? FINAL_COLLISION_HZ : FIRST_COLLISION_HZ * (1 + rise),
+    beats: FIRST_COLLISION_HZ * ramp * rise / logRateRatio + FINAL_COLLISION_HZ * Math.max(0, elapsed - ramp),
+  };
 }
 
 let questionBytes: Promise<ArrayBuffer> | undefined;
@@ -163,38 +170,47 @@ export function strikeMembrane(bus: GainNode, note: number, velocity: number, un
 }
 
 export function collideIntoPitch(output: GainNode, start: number, seconds: number) {
-  const ctx = output.context, { lead, ramp } = collisionTiming(seconds);
+  const ctx = output.context, { lead, ramp, harmonics } = collisionTiming(seconds);
   const first = start + lead, arrival = first + ramp;
-  // Two identical contacts per buffer cycle. Their early stereo reflections alternate sides.
-  const cycle = ctx.createBuffer(2, ctx.sampleRate | 0, ctx.sampleRate);
-  for (let hit = 0; hit < 2; hit++) {
-    const offset = Math.floor(hit * cycle.length / 2);
-    for (let i = 0; i < Math.floor(ctx.sampleRate * .11); i++) {
-      const t = i / ctx.sampleRate;
-      const attack = Math.min(1, t / .002);
-      const contact = attack * (.74 * Math.sin(2 * Math.PI * 96 * t) * Math.exp(-62 * t)
-        + (Math.random() * 2 - 1) * .19 * Math.exp(-156 * t));
-      for (let side = 0; side < 2; side++) cycle.getChannelData(side)[offset+i] = contact * (side === hit ? 1 : .68);
-    }
+  const settle = Math.min(1.2, (start + harmonics - arrival) * .9);
+  // The skin and the sustained tone share a read head, even when the operator
+  // changes the scene duration. One turn of either waveform is one collision.
+  const cycle = ctx.createBuffer(2, ctx.sampleRate, ctx.sampleRate);
+  const samples = cycle.getChannelData(0), fundamental = cycle.getChannelData(1);
+  for (let i = 0; i < cycle.length; i++) {
+    const phase = i / cycle.length;
+    fundamental[i] = Math.cos(2 * Math.PI * phase);
+    const t = phase / FIRST_COLLISION_HZ;
+    if (t >= .19) continue;
+    const attack = Math.min(1, t / .0015);
+    const skin = .42 * Math.sin(2 * Math.PI * 112 * t) * Math.exp(-42 * t);
+    const click = .19 * Math.sin(2 * Math.PI * 730 * t) * Math.exp(-160 * t);
+    samples[i] = attack * (.84 * Math.exp(-37 * t) + skin + click) * Math.min(1, (.19 - t) / .012);
   }
-  const train = ctx.createBufferSource(), level = ctx.createGain();
+  const train = ctx.createBufferSource(), layers = ctx.createChannelSplitter(2);
+  const bassCut = ctx.createBiquadFilter(), topCut = ctx.createBiquadFilter();
+  const level = ctx.createGain(), tone = ctx.createGain();
   train.buffer = cycle; train.loop = true;
-  train.playbackRate.setValueAtTime(1, first);
-  train.playbackRate.exponentialRampToValueAtTime(55.5, arrival);
-  level.gain.setValueAtTime(.38, first);
-  level.gain.setValueAtTime(.38, first + ramp * .55);
-  level.gain.exponentialRampToValueAtTime(.001, arrival);
-  train.connect(level).connect(output);
-  train.onended = () => { train.disconnect(); level.disconnect(); };
-  train.start(first); train.stop(arrival + .02);
-  const root = ctx.createOscillator(), tone = ctx.createGain();
-  root.frequency.setValueAtTime(2, first);
-  root.frequency.exponentialRampToValueAtTime(111, arrival);
+  const frequency = train.playbackRate;
+  frequency.setValueAtTime(FIRST_COLLISION_HZ, first);
+  frequency.exponentialRampToValueAtTime(FINAL_COLLISION_HZ, arrival);
+  bassCut.type = "highpass"; bassCut.frequency.value = 28; bassCut.Q.value = .707;
+  topCut.type = "lowpass"; topCut.frequency.value = 1600; topCut.Q.value = .707;
+  level.gain.setValueAtTime(.78, first);
+  level.gain.setValueAtTime(.78, arrival + settle * .25);
+  level.gain.linearRampToValueAtTime(0, arrival + settle);
   tone.gain.setValueAtTime(0, first);
-  tone.gain.setValueAtTime(0, first + ramp * .51);
-  tone.gain.linearRampToValueAtTime(.12, arrival);
-  root.connect(tone).connect(output);
-  root.onended = () => { root.disconnect(); tone.disconnect(); };
-  root.start(first);
-  return root;
+  tone.gain.setValueAtTime(0, first + ramp * .80);
+  tone.gain.linearRampToValueAtTime(.055, arrival);
+  tone.gain.linearRampToValueAtTime(.12, arrival + settle);
+  train.connect(layers);
+  layers.connect(bassCut, 0);
+  bassCut.connect(topCut).connect(level).connect(output);
+  layers.connect(tone, 1);
+  tone.connect(output);
+  train.onended = () => {
+    train.disconnect(); layers.disconnect(); bassCut.disconnect(); topCut.disconnect(); level.disconnect(); tone.disconnect();
+  };
+  train.start(first);
+  return { frequency, stop: (when: number) => train.stop(when) };
 }

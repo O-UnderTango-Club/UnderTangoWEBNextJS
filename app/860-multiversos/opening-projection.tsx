@@ -1,10 +1,12 @@
 import { useLayoutEffect, useRef } from "react";
-import { collisionBeat, collisionTiming, pointTiming, WAVE_SECONDS, type StrikeLog } from "./opening-sound";
+import { collisionPulse, collisionTiming, FINAL_COLLISION_HZ, pointTiming, universeStrikeWeight, WAVE_SECONDS, type StrikeLog } from "./opening-sound";
 
 type Cue = { context: AudioContext; beginsAt: number };
 const clamp = (n: number) => Math.min(1, Math.max(0, n));
 const ease = (n: number) => { const x = clamp(n); return x * x * (3 - 2 * x); };
 const tau = 2 * Math.PI;
+const fullStrengthStrikes = 32;
+const rateFormat = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
 
 function dot(ink: CanvasRenderingContext2D, x: number, y: number, radius: number) {
   ink.beginPath(); ink.arc(x, y, radius, 0, tau); ink.fill();
@@ -55,15 +57,16 @@ function uncoverUniverse(ink: CanvasRenderingContext2D, w: number, h: number, lo
   let arrived = log.energy;
   for (const hit of log.hits) {
     const age = Math.max(0, hit.clock.currentTime - hit.time);
-    arrived -= hit.velocity * (1 - ease(age / (still ? .14 : .95)));
+    arrived -= universeStrikeWeight(hit.velocity) * (1 - ease(age / (still ? .14 : .95)));
   }
   const edge = Math.hypot(w, h) / 2;
-  const radius = edge * 1.28 * (1 - Math.exp(-.48 * Math.max(0, arrived)));
+  const clearEdge = .86;
+  const radius = edge * clamp(arrived / fullStrengthStrikes) ** .78 / clearEdge;
   if (radius > 0) {
     ink.save();
     ink.globalCompositeOperation = "destination-out";
     const aperture = ink.createRadialGradient(0, 0, 0, 0, 0, radius);
-    aperture.addColorStop(0, "#000"); aperture.addColorStop(.72, "#000"); aperture.addColorStop(1, "transparent");
+    aperture.addColorStop(0, "#000"); aperture.addColorStop(clearEdge, "#000"); aperture.addColorStop(1, "transparent");
     ink.fillStyle = aperture; ink.fillRect(-radius, -radius, 2 * radius, 2 * radius);
     ink.restore();
   }
@@ -90,9 +93,9 @@ function uncoverUniverse(ink: CanvasRenderingContext2D, w: number, h: number, lo
 }
 
 function collisions(ink: CanvasRenderingContext2D, w: number, h: number, elapsed: number, seconds: number, still: boolean) {
-  const {lead, ramp, harmonics} = collisionTiming(seconds);
+  const {lead, ramp} = collisionTiming(seconds);
   const t = clamp((elapsed - lead) / ramp), turn = ease((t - .68) / .32);
-  const beats = collisionBeat(elapsed - lead, ramp), index = Math.floor(beats), phase = beats - index;
+  const {beats} = collisionPulse(elapsed - lead, ramp), index = Math.floor(beats), phase = beats - index;
   const span = Math.min(w * .31, h * .47, 330) * (1 - turn) + Math.min(w * .15, h * .19, 105) * turn;
   const r = Math.max(2, Math.min(w, h) * .009);
   ink.save(); ink.rotate(-Math.PI / 2 * turn);
@@ -110,8 +113,10 @@ function collisions(ink: CanvasRenderingContext2D, w: number, h: number, elapsed
       if (i === 0) ink.moveTo(-span, y); else ink.lineTo((2 * x - 1) * span, y);
     }
     ink.stroke();
-    for (let n = Math.max(0, index - 7); n <= index && turn < 1; n++) {
-      ink.globalAlpha = (1 - turn) * (.16 + .56 * (1 - (index - n) / 8)) * (1 - .5 * density);
+    // Keep several contacts from each video frame as the audio rate overtakes the display.
+    const trail = Math.min(64, index + 1);
+    for (let n = index - trail + 1; n <= index && turn < 1; n++) {
+      ink.globalAlpha = (1 - turn) * (.26 + .58 * (1 - (index - n) / trail));
       dot(ink, contact(n), 0, Math.max(1.2, r * .48));
     }
     if (!still && density < .98) {
@@ -121,11 +126,28 @@ function collisions(ink: CanvasRenderingContext2D, w: number, h: number, elapsed
     }
   }
   ink.restore();
-  if (elapsed >= lead + ramp) {
-    ink.fillStyle = "#18191c"; ink.globalAlpha = ease((elapsed - lead - ramp) / (harmonics - lead - ramp));
-    ink.font = Math.max(14, Math.min(28, h * .038)) + "px Georgia, serif";
-    ink.textAlign = "center"; ink.fillText("111 Hz", 0, span + 28); ink.globalAlpha = 1;
-  }
+}
+
+export function CollisionReadout({cue, seconds, paused}: { cue: Cue; seconds: number; paused: boolean }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const out = ref.current;
+    if (!out) return;
+    const {lead, ramp} = collisionTiming(seconds);
+    let frame = 0;
+    const draw = () => {
+      const {rate} = collisionPulse(cue.context.currentTime - cue.beginsAt - lead, ramp);
+      const shown = rate < 10 ? Math.floor(rate * 10) / 10 : Math.floor(rate);
+      const label = rate === FINAL_COLLISION_HZ
+        ? `${FINAL_COLLISION_HZ} golpes por segundo = ${FINAL_COLLISION_HZ} Hz`
+        : `${rateFormat.format(shown)} golpes por segundo`;
+      if (out.textContent !== label) out.textContent = label;
+      if (!paused && rate < FINAL_COLLISION_HZ) frame = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => cancelAnimationFrame(frame);
+  }, [cue, seconds, paused]);
+  return <p className="opening-rate" ref={ref} aria-live="off">0 golpes por segundo</p>;
 }
 
 export function OpeningProjection({scene, cue, seconds, strikes}: { scene: 1 | 2; cue: Cue; seconds: number; strikes: StrikeLog }) {

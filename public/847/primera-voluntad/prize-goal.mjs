@@ -2,21 +2,22 @@
 function bottomEdge(board) {
   const sin = Math.sin(board.angle), cos = Math.cos(board.angle);
   const cx = board.x - sin * board.height / 2, cy = board.y + cos * board.height / 2;
-  const halfWidth = cos * board.width / 2, halfRise = Math.abs(sin) * board.width / 2;
-  return { left: cx - halfWidth, right: cx + halfWidth, high: cy - halfRise, low: cy + halfRise };
+  const halfWidth = cos * board.width / 2, halfRise = sin * board.width / 2;
+  return { left: cx - halfWidth, right: cx + halfWidth, leftY: cy - halfRise, rightY: cy + halfRise };
 }
 
-function aligned(edge, goal) {
+function clearance(width) {
   // A few CSS pixels of clearance allow for sensor noise on a same-width tray.
-  const clearance = Math.min(8, Math.max(5, goal.width * 0.02));
-  return Math.abs(edge.left - (goal.x - goal.width / 2)) <= clearance &&
-    Math.abs(edge.right - (goal.x + goal.width / 2)) <= clearance;
+  return Math.min(8, Math.max(5, width * 0.02));
 }
 
 export function canSeatPrize(board, goal, edge = bottomEdge(board)) {
-  return aligned(edge, goal) && Math.abs(goal.bottom - edge.low) <= 1 &&
-    Math.abs(goal.bottom - edge.high) <= 4 && board.vy + board.panVy >= -2 &&
-    Math.abs(board.vx + board.panVx) < 36;
+  const room = clearance(goal.width);
+  return Math.abs(edge.left - (goal.x - goal.width / 2)) <= room &&
+    Math.abs(edge.right - (goal.x + goal.width / 2)) <= room &&
+    Math.abs(goal.bottom - edge.leftY) <= 4 && Math.abs(goal.bottom - edge.rightY) <= 4 &&
+    Math.abs(goal.bottom - Math.max(edge.leftY, edge.rightY)) <= 1 &&
+    board.vy + board.panVy >= -2 && Math.abs(board.vx + board.panVx) < 36;
 }
 
 export function landOnTray(board, goal, view) {
@@ -24,18 +25,26 @@ export function landOnTray(board, goal, view) {
   if (speed < 0.1) return null;
   const edge = bottomEdge(board);
   const rimY = goal.bottom - goal.lipHeight;
-  if (edge.low < rimY) return null;
-  const fits = aligned(edge, goal);
-  const overlapsTray = edge.right >= goal.x - goal.width / 2 && edge.left <= goal.x + goal.width / 2;
-  const contactY = !fits && overlapsTray ? rimY : goal.bottom;
-  if (edge.low < contactY - 0.5) return null;
+  const low = Math.max(edge.leftY, edge.rightY);
+  if (low < rimY - 0.5) return null;
+  let overlap = low - goal.bottom;
+  const left = goal.x - goal.width / 2, right = goal.x + goal.width / 2;
+  const room = clearance(goal.width);
+  // A tilted corner inside the opening can pass a post. Only the part of
+  // the lower face directly over that post can hit its top.
+  const slope = (edge.rightY - edge.leftY) / (edge.right - edge.left);
+  if (edge.left < left - room && left <= edge.right)
+    overlap = Math.max(overlap, edge.leftY + (left - edge.left) * slope - rimY);
+  if (edge.right > right + room && right >= edge.left)
+    overlap = Math.max(overlap, edge.rightY - (edge.right - right) * slope - rimY);
+  if (overlap < -0.5) return null;
   const soft = Math.min(98, Math.max(63, view.height * 0.13));
   if (speed <= soft && canSeatPrize(board, goal, edge)) return 'seated';
 
   board.panY = board.panVy = 0;
   board.rebounding = true;
   board.vy = -Math.min(360, Math.max(Math.min(188, view.height * 0.38), speed * 1.4));
-  board.y -= Math.max(0, edge.low - contactY) + 1.5;
+  board.y -= Math.max(0, overlap) + 1.5;
   return 'rebound';
 }
 

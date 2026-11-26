@@ -599,6 +599,19 @@ test('an off-balance plate and a hard central strike bounce; a controlled centra
   assert.equal(landOnTray(board, goal, portrait), null);
 });
 
+test('a lower corner inside the opening passes the lip until the face actually touches a post or the base', () => {
+  const board = plate();
+  const goal = { x: board.x, width: board.width, bottom: portrait.height - portrait.bottom, lipHeight: 11 };
+  board.x -= 12;
+  board.angle = 0.11;
+  board.vy = 45;
+  const lowerCorner = (Math.cos(board.angle) * board.height + Math.sin(board.angle) * board.width) / 2;
+  board.y = goal.bottom - 5 - lowerCorner;
+  assert.equal(landOnTray(board, goal, portrait), null);
+  board.y += 5;
+  assert.equal(landOnTray(board, goal, portrait), 'rebound');
+});
+
 test('tilting from an upright start responds in both directions and follows screen rotation', () => {
   const rest = { beta: 82, gamma: 0 };
   const tilt = beta => tiltFromRest(rest, { beta, gamma: 0 });

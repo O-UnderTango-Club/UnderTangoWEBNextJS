@@ -4,3 +4,4 @@ node_modules
 !.env.example
 .vercel/
 *.tsbuildinfo
+/public/860-multiversos/860-Multiversos.zip

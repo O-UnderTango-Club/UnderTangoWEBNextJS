@@ -39,7 +39,8 @@ function phaseInCycle(time:number, cycle:number) {
   return phase<1e-9 || cycle-phase<1e-9 ? 0 : phase;
 }
 
-export function SceneMixer({children, stageBackground, extendedDark, canPlayNote,connectMidi,transportMidi,playGeneral,pauseScene,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+export function SceneMixer({children, filmLayer, stageBackground, extendedDark, canPlayNote,connectMidi,transportMidi,playGeneral,pauseScene,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+  filmLayer: ReactNode;
   children: ReactNode; stageBackground: string; extendedDark: boolean;
   voiceScene: VoiceScene | null; cue: {context: AudioContext; beginsAt: number} | null; seconds: number;
   roomAnalyser: {current:AnalyserNode|null};
@@ -657,7 +658,7 @@ export function SceneMixer({children, stageBackground, extendedDark, canPlayNote
   <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" data-extended-dark={extendedDark || undefined}
     style={{background:stageBackground}}>
     {children}
-    {liveSet && analyser && <LiveSetProjection scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
+    {liveSet && analyser && <LiveSetProjection filmLayer={filmLayer} scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
       analyser={showRoomInput ? roomMeter : analyser} paused={paused} meter={meter} bars={bars} bpm={bpm}
       position={activeCount===null ? position : activeCount-1} recording={state==="recording" && !waiting} waiting={waiting} countIn={activeCount}
       slot={currentTake?.slot ?? null} takeStatus={takeStatus}

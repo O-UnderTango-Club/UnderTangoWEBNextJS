@@ -1,0 +1,69 @@
+[
+  {
+    "title": "La respiración antes de hablar",
+    "source": "veo30generatepreview_El__es_como_la_respiracin_antes_de_hablar_0.mp4",
+    "sha256": "27690f2834fb4a564f0d4e79f8ecaade5c65fc3ffad2ced9e94878e7e75296ad",
+    "src": "/multiversos/fondo-orbita.mp4",
+    "width": 1920,
+    "height": 1080,
+    "seconds": 8,
+    "audio": "AAC mono, 44,1 kHz",
+    "image": "Un punto azul emerge de la oscuridad. El halo se abre y deja ver una espiral de nubes luminosas.",
+    "uses": [
+      {
+        "scene": 44,
+        "loop": false,
+        "opacity": 0.82,
+        "fit": "cover",
+        "reason": "El remolino azul se abre detrás de la órbita de cristales. Los cristales conservan su respuesta al instrumento."
+      }
+    ]
+  },
+  {
+    "title": "Cosmic Unity Emergence",
+    "source": "20250805_1246_Cosmic Unity Emergence_simple_compose_01k1xejw6yep9vj9eyjdkg06hz.mp4",
+    "sha256": "a8cdcb25a28f890170ae8bf3f8ee7f1cd47e088a0b8c2e5f342d5db3da5a9178",
+    "src": "/multiversos/fondo-convergencia.mp4",
+    "width": 720,
+    "height": 1080,
+    "seconds": 5,
+    "audio": null,
+    "image": "Filamentos celestes, rosas y amarillos se reúnen en un núcleo blanco sobre fondo oscuro. Composición vertical.",
+    "uses": [
+      {
+        "scene": 1,
+        "loop": true,
+        "opacity": 1,
+        "fit": "cover",
+        "reason": "El video corre detrás del campo blanco. Cada golpe de bombo abre una onda desde el primer punto y deja ver más filamentos."
+      },
+      {
+        "scene": 49,
+        "loop": false,
+        "opacity": 0.75,
+        "fit": "contain",
+        "reason": "El núcleo reúne las líneas de la proyección. El encuadre conserva la figura vertical entera."
+      }
+    ]
+  },
+  {
+    "title": "Tarot Argentino · La carta gira",
+    "source": "Tarot Argentino - La carta gira.mp4",
+    "sha256": "7d51d78fa388a09d244455a7fe0555dfe4aad4fae785a5980a92b018f63b14fb",
+    "src": "/multiversos/fondo-tarot.mp4",
+    "width": 1280,
+    "height": 698,
+    "seconds": 8,
+    "audio": null,
+    "image": "Una carta suspendida gira sobre un mazo. Aparecen símbolos del tarot entre nubes violetas y verdes.",
+    "uses": [
+      {
+        "scene": 91,
+        "loop": true,
+        "opacity": 0.66,
+        "fit": "contain",
+        "reason": "El giro acompaña la invitación al público a elegir. La consigna y el acceso a la votación quedan en primer plano."
+      }
+    ]
+  }
+]

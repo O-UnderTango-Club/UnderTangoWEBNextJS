@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { AudienceProjection } from "./audience-projection";
 import { useTempo } from "./tempo";
 import { ResonantVisuals } from "./resonant-visuals";
@@ -8,6 +8,7 @@ import { LAYERS } from "./layer-take";
 
 type MeterRef = {current: AnalyserNode | null};
 type LiveSetProps = {
+  filmLayer: ReactNode;
   scene: number;
   title: string;
   analyser: MeterRef;
@@ -182,6 +183,7 @@ export function LiveSetProjection(props: LiveSetProps) {
   const pulse = position%meter+1, bar = Math.floor(position/meter)+1;
   return <div className="live-set" data-scene={scene} data-family={family} data-resonant={resonant || undefined} role="group" aria-label={title}>
     <style>{style}</style>
+    {props.filmLayer}
     {scene===68 ? <AudienceProjection analyser={analyser} paused={paused} treatment="ascii" />
       : resonant ? <ResonantVisuals scene={scene} signals={signals} paused={paused} />
       : <SoundDrawing scene={scene} analyser={analyser} paused={paused} bpm={bpm} />}

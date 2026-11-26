@@ -3,7 +3,7 @@ import { TOP_KEYS } from "./control-map";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SpiralProjection } from "./spiral";
 import { ChordLoopControls, ChordLoopTimeline, useChordLoop } from "./chord-loop-view";
-import { CUBE_FIRST_MIDI, CUBE_SIZE, CUBE_TRACK_NAMES, CUBE_TRACKS, DEFAULT_A4, FACE_NAMES, getCubeKeys, isTimbreScene, MATRIX_ORDER, TIMBRE_NAMES,
+import { cubeIndexForMidi, CUBE_SIZE, CUBE_TRACK_NAMES, CUBE_TRACKS, DEFAULT_A4, FACE_NAMES, getCubeKeys, isTimbreScene, MATRIX_ORDER, TIMBRE_NAMES,
   type CubeTrack, type ExtendedScene, type TimbreScene } from "./extended-scenes";
 import { createPerformanceNotes, type NoteFrequency, type PerformanceInput } from "./performance-notes";
 import { createTimbreRack } from "./timbre-rack";
@@ -165,20 +165,14 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       midiNote: (id, channel, note, velocity) => {
         const identity = `${midiPrefix(id)}${channel}:${note}`;
         if (velocity <= 0) { release(identity); return; }
-        if (loopScene === 15) {
-          const offset = note - CUBE_FIRST_MIDI;
-          const track = CUBE_TRACKS[Math.max(0, Math.min(2, Math.floor(offset / CUBE_SIZE)))];
-          strike(identity, track, ((offset % CUBE_SIZE) + CUBE_SIZE) % CUBE_SIZE, velocity);
-          return;
-        }
-        if (!splitRef.current) {
+        if (loopScene !== 15 && !splitRef.current) {
           const offset=note-60, track=selectedRef.current;
           strike(identity,track,((offset%CUBE_SIZE)+CUBE_SIZE)%CUBE_SIZE,velocity,keys[track][0][0].midi+offset);
           return;
         }
-        const index = note - CUBE_FIRST_MIDI;
-        const track = CUBE_TRACKS[Math.max(0,Math.min(2,Math.floor(index/CUBE_SIZE)))];
-        strike(identity,track,((index%CUBE_SIZE)+CUBE_SIZE)%CUBE_SIZE,velocity,note);
+        const index = cubeIndexForMidi(note);
+        const track = CUBE_TRACKS[Math.floor(index / CUBE_SIZE)];
+        strike(identity, track, index % CUBE_SIZE, velocity, loopScene === 15 ? undefined : note);
       },
       releaseMidi(id, channel) {
         const prefix = midiPrefix(id) + (channel === undefined ? "" : `${channel}:`);
@@ -301,7 +295,7 @@ export function ExtendedPerformanceControls({ performance, paused, scene }: { pe
     if(scene===89)return null;
     return <div className="extended-settings">
       {tuning}
-      <p>{scene===16 ? "El teclado recorre armónicos de 111 Hz en varias octavas." : "Piano MIDI · A–K en la computadora, con las teclas negras en la fila superior."}</p>
+      <p>{scene===16 ? "El teclado retoma la serie de los tres cubos. Desde La0, cada una de las 81 teclas sube 111 Hz." : "Piano MIDI · A–K en la computadora, con las teclas negras en la fila superior."}</p>
       {scene===88 && <p>CC64 · Pedal de resonancia del piano.</p>}
       {scene===79 && <p>Graves hasta Fa2 para el bombo, de Fa♯2 a Si3 para el bajo y desde Do4 para el arpegio.</p>}
     </div>;
@@ -312,7 +306,7 @@ export function ExtendedPerformanceControls({ performance, paused, scene }: { pe
     <select id="extended-track-choice" value={selected} onChange={(event) => select(Number(event.currentTarget.value) as CubeTrack)}>
       {CUBE_TRACKS.map((track) => <option value={track} key={track}>{CUBE_TRACK_NAMES[track]}</option>)}
     </select>
-    {scene === 15 ? <p>MIDI · Graves al cubo izquierdo, medios al centro y agudos al derecho. Cada lupera conserva el ritmo y la duración de tus notas.</p> : <label className="extended-midi-split"><input type="checkbox" checked={splitMidi} onChange={(event) => setSplit(event.currentTarget.checked)} /> Repartir el piano MIDI entre los tres cubos</label>}
+    {scene === 15 ? <p>MIDI · Los tres cubos recorren una sola serie en pasos de 111 Hz. Graves a la izquierda, medios al centro y agudos a la derecha. Cada lupera conserva el ritmo y la duración de tus notas.</p> : <label className="extended-midi-split"><input type="checkbox" checked={splitMidi} onChange={(event) => setSplit(event.currentTarget.checked)} /> Repartir el piano MIDI entre los tres cubos</label>}
     <p className="extended-keys">1–9 frente · Mayús + 1–9 derecha · Z, X, C, V, B, N, M, coma y punto arriba. {scene !== 15 && "Con un cubo elegido, Do4 toca su primera nota."}</p>
     {three ? <ChordLoopControls key={selected} loop={loops[selected]} active paused={paused} label={`Lupera ${CUBE_TRACK_NAMES[selected].toLowerCase()}`} /> : timbre && <>
       <label htmlFor="extended-effect-mix">{TIMBRE_NAMES[timbre]} <output>{strength}%</output></label>

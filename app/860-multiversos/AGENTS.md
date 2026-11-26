@@ -27,3 +27,13 @@ El teclado, MIDI y el botón de sonido tocan el instrumento de la escena indicad
 **Pausa general** tiene su asignación MIDI junto a Pausar. Play general reanuda la partitura. Al aprender un control, la nueva función reemplaza la que tenía ese mismo dispositivo, canal y señal. Verificá el cambio en el Órganon y comprobá ambos destinos.
 
 El archivo se actualiza cuando cambian las asignaciones. Su historial conserva hasta 64 revisiones recientes por perfil. Los cambios de teclas incorporadas se registran al abrir la nueva versión de la partitura. Al modificar esos controles, actualizá la referencia en `control-map.ts` en el mismo cambio y verificá exportación, reapertura y recuperación.
+
+## Videos del piloto local
+
+Cuando Pablo pida revisar material nuevo en `G:\00 - Inicio\860`, ejecutá `node scripts/piloto-860/revisar-clips.cjs` desde la raíz del piloto. Compara el contenido de los originales por SHA-256, incluso si se renombraron. Revisá la imagen y la pista de audio de cada incorporación y elegí la escena por su relación con lo que se proyecta y se toca.
+
+Las asignaciones están en `scene-videos.json`. Cada uso indica escena, encuadre, opacidad y si el clip se repite. Guardá la copia de reproducción en `public/multiversos`, reconstruí el HTML del piloto y probá el fondo con la animación, la pausa, el máster y el cambio de escena. Luego ejecutá `node scripts/piloto-860/revisar-clips.cjs "G:\00 - Inicio\860" --escribir` para actualizar `Registro de clips de 860.txt` junto a los originales.
+
+## Material de montaje
+
+La guía pública está en `public/860-multiversos/materiales.html`. `npm run materiales:860` genera el ZIP desde la partitura y sus referencias audiovisuales. El armado público se ejecuta con `--publico` en cada build. Para comprobar una entrega, extraé el ZIP en otro perfil y tocá la escena 1 sin conexión. Las asignaciones personales se transportan con la exportación privada del Órganon.

@@ -1,4 +1,6 @@
 /** The performance instruments feed the same scene bus as the score and sample recorder. */
+import { cubeIndexForMidi } from "./extended-scenes";
+import { harmonicFrequencyAt } from "./frequency-tuning";
 import { SHOW_INTERLUDES } from "./show-score";
 export const SCENE_INSTRUMENT_NAMES = {
   ...SHOW_INTERLUDES,
@@ -237,7 +239,7 @@ export function createSceneInstrument(scene: InstrumentScene, output: GainNode, 
   const keys=new Map<string,Held>();
   let timer:number|undefined;
   function frequency(note:number,color:Color) {
-    if(scene===16)return 111*(1+note%9)*2**Math.max(-2,Math.min(2,Math.floor((note-48)/24)));
+    if (scene === 16) return harmonicFrequencyAt(cubeIndexForMidi(note));
     let midi=note;
     if(color==="bass" || color==="doubleBass" || color==="kick" || (color==="acid" && scene!==74 && scene!==79)) {
       while(midi>51)midi-=12;

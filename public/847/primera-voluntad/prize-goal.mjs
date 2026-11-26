@@ -1,16 +1,23 @@
-// Intersect the lower face with the visible base and the two short posts.
+// A touch on the base or either post catches the plate, including edge-on.
 export function touchesTray(board, goal) {
   const sin = Math.sin(board.angle), cos = Math.cos(board.angle);
-  const footX = board.x - sin * board.height / 2, footY = board.y + cos * board.height / 2;
-  const half = cos * board.width / 2;
-  const left = goal.x - goal.width / 2, right = goal.x + goal.width / 2;
-  const from = Math.max(footX - half, left), to = Math.min(footX + half, right);
-  if (from > to) return false;
-  const slope = sin / cos;
-  const y1 = footY + (from - footX) * slope, y2 = footY + (to - footX) * slope;
-  const rim = goal.bottom - goal.lipHeight - 0.5;
-  return Math.max(y1, y2) >= goal.bottom - 0.5 ||
-    (from === left && y1 >= rim) || (to === right && y2 >= rim);
+  const hw = board.width / 2 + 0.5, hh = board.height / 2 + 0.5;
+  const rim = goal.bottom - goal.lipHeight;
+  if (board.y + hw * Math.abs(sin) + hh * Math.abs(cos) < rim) return false;
+
+  // Project a tray segment onto the two plate axes and the segment normal.
+  // Its centre and half-vector are expressed in the plate's local coordinates.
+  function intersects(x, y, hx, hy) {
+    const dx = x - board.x, dy = y - board.y;
+    const u = dx * cos + dy * sin, v = dy * cos - dx * sin;
+    const a = hx * cos + hy * sin, b = hy * cos - hx * sin;
+    return Math.abs(u) <= hw + Math.abs(a) && Math.abs(v) <= hh + Math.abs(b) &&
+      Math.abs(u * b - v * a) <= hw * Math.abs(b) + hh * Math.abs(a);
+  }
+  const half = goal.width / 2, post = goal.lipHeight / 2;
+  return intersects(goal.x, goal.bottom, half, 0) ||
+    intersects(goal.x - half, rim + post, 0, post) ||
+    intersects(goal.x + half, rim + post, 0, post);
 }
 
 // Catch at the first contact and slide continuously from that pose to the seat.

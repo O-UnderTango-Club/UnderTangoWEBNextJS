@@ -592,6 +592,19 @@ test('a tilted corner can enter the opening before the face actually touches a p
   assert.equal(touchesTray(board, goal), true);
 });
 
+test('a plate on its side or upside down is caught by the first visible contact', () => {
+  const board = plate();
+  const goal = { x: board.x, width: board.width, bottom: 700, lipHeight: 11 };
+  for (const angle of [Math.PI / 2, -Math.PI / 2, Math.PI]) {
+    board.angle = angle;
+    const reach = (board.width * Math.abs(Math.sin(angle)) + board.height * Math.abs(Math.cos(angle))) / 2;
+    board.y = goal.bottom - goal.lipHeight - reach - 2;
+    assert.equal(touchesTray(board, goal), false);
+    board.y = goal.bottom - reach;
+    assert.equal(touchesTray(board, goal), true);
+  }
+});
+
 test('waiting for the small wheel or making a large downward swipe cannot force a straight crossing', () => {
   const w = 390, h = 708, dt = 1 / 90;
   const view = { ...portrait, width: w, height: h, left: 12, right: 15, top: 12, bottom: 87 };

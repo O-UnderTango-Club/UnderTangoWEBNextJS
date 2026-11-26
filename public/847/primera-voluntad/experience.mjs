@@ -1,361 +1,576 @@
-import { longestLine, sameLine } from './line-detector.mjs';
+import { luminance, visibleLines } from './line-detector.mjs';
+import { cameraMotion } from './camera-motion.mjs';
+import { readFloor, SignMotion } from './motion.mjs';
+import {
+  visibleCrop,
+  drawWake,
+  drawField,
+  addMark,
+  carryMarks,
+  drawDemo,
+  drawImpacts,
+} from './scene.mjs';
+import { drawSign } from './solid-sign.mjs';
+import { soundscape } from './footsteps.mjs';
 
-const DETECTION_DELAY = 3000;
-const SAMPLE_INTERVAL = 150;
-const END_PAUSE = 1500;
-const SAMPLE_SIZE = 192;
-const colors = ['#f5adff', '#80ffd7', '#8aa7ff'];
-const SEARCH_HINT = 'Buscando una recta. Probá con el borde bien iluminado de una mesa o de una puerta.';
-const get = id => document.getElementById(id);
-const stage = get('stage'), surface = get('surface'), feed = get('feed');
-const demoScene = get('scene'), finish = get('finish'), status = get('status');
-const camera = get('camera'), demo = get('demo'), stop = get('stop');
-const ctx = surface.getContext('2d');
-const sample = document.createElement('canvas');
-const sampler = sample.getContext('2d', { willReadFrequently: true });
-const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+import { RollingSign, ShowBoard, collide, screenGravity } from './stage-physics.mjs';
+import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs';
+import { SceneClip } from './clip.mjs';
+import { prizeGoal, inPrizeGoal, paintPrizeGoal } from './prize-goal.mjs';
+import { showPrize } from './prize.mjs';
+import { introMs } from './timing.mjs';
 
-let phase = 'idle', stream = null, generation = 0, timer = 0, frame = 0;
-let width = 1, height = 1, demoEdge = null;
-let candidate = null, detectedAt = 0, previousVideoTime = -1, previousSampleAt = 0;
-let route = null, progress = 0;
-
-// The original particle torus and diagonal, in model coordinates.
-const particles = [];
-function addParticle(x, y, z, band, side) {
-  particles.push([x, y, z, band, Math.sin(band * 3.2 + side), Math.cos(band * 5 + side)]);
-}
-for (let ring = 0; ring < 92; ring++) {
-  for (let side = 0; side < 9; side++) {
-    const a = ring * 2 * Math.PI / 92, b = side * 2 * Math.PI / 9;
-    addParticle((1 + .18 * Math.cos(b)) * Math.cos(a), (1 + .18 * Math.cos(b)) * Math.sin(a),
-      .18 * Math.sin(b), ring, side);
+const get = (id) => document.getElementById(id);
+const stage = get('stage'),
+  feed = get('feed'),
+  surface = get('surface'),
+  scene = get('scene');
+const camera = get('camera'),
+  demo = get('demo'),
+  sound = get('sound'),
+  stop = get('stop'),
+  speaker = get('speaker'),
+  tiltButton = get('tilt');
+const caption = get('cue'),
+  tools = get('stage-tools'),
+  status = get('status'),
+  finish = get('finish');
+const ctx = surface.getContext('2d', { alpha: false }),
+  ink = scene.getContext('2d');
+const sample = document.createElement('canvas'),
+  sampler = sample.getContext('2d', { willReadFrequently: true });
+const texture = document.createElement('canvas'),
+  textureInk = texture.getContext('2d');
+const gentle = matchMedia('(prefers-reduced-motion: reduce)');
+const audio = soundscape(updateSound);
+const hint =
+  'Buscando un borde. Probá con dos juntas del piso o con los costados de un pasillo bien iluminado.';
+const clip = new SceneClip(updateClip);
+const clipTools = get('clip-tools'),
+  save = get('save'),
+  share = get('share'),
+  clipError = get('clip-error');
+const art = new Image();
+art.src = '/847/primera-voluntad.svg';
+const view = { width: 1, height: 1, left: 10, top: 10, right: 10, bottom: 68 };
+let body = null,
+  board = new ShowBoard(),
+  layout,
+  sharing = false;
+const hits = [];
+const pad = get('steer-pad');
+let goal, inGoalSince = null, pointer = null, baseline = null, tiltActive = false;
+function updateClip(current) {
+  const ready = current.state === 'ready';
+  clipTools.hidden = save.hidden = !ready;
+  share.hidden = !ready || !current.canShare();
+  clipError.hidden = current.state !== 'unavailable';
+  if (ready) {
+    save.href = current.url;
+    save.download = current.file.name;
+  } else {
+    save.removeAttribute('href');
   }
 }
-for (let i = 0; i < 85; i++) {
-  for (let j = 0; j < 3; j++) {
-    const x = -1.07 + 2.14 * i / 84, y = -.04 + .04 * j;
-    addParticle(x * Math.cos(.75) - y * Math.sin(.75), x * Math.sin(.75) + y * Math.cos(.75),
-      .055 + .03 * j, i, j + 10);
+share.addEventListener('click', async () => {
+  if (sharing || !clip.canShare()) return;
+  sharing = true;
+  try {
+    await navigator.share({ files: [clip.file], title: 'Ø Primera voluntad' });
+  } catch (error) {
+    if (error.name !== 'AbortError')
+      status.textContent = 'Podés descargar el archivo con Guardar video.';
+  } finally {
+    sharing = false;
+    if (document.hidden && mode) end('Experiencia cerrada al cambiar de pestaña.');
   }
-}
+});
 
-function say(message) {
-  if (status.textContent !== message) status.textContent = message;
+let generation = 0,
+  mode = null,
+  stream = null,
+  motion = null,
+  frame = 0;
+let width = 1,
+  height = 1,
+  previous = null,
+  textureTime = -1,
+  frameAt = 0,
+  lastRead = 0,
+  nextRead = 0,
+  nextLines = 0;
+let sceneStart = 0,
+  lastLineAt = 0,
+  lastMark = 0,
+  lastStep = 0,
+  side = 1,
+  cueIndex = -1;
+const marks = [];
+let attitude = null;
+function applyTilt() {
+  if (!attitude) return;
+  // Mobile WebKit can expose a desktop screen angle even while the handset viewport is portrait.
+  const degrees = Number.isFinite(window.orientation)
+    ? window.orientation
+    : (window.screen.orientation?.angle ?? 0);
+  const g = screenGravity(attitude.beta, attitude.gamma, degrees);
+  if (!baseline) baseline = g;
+  tiltActive = Math.hypot(g.x - baseline.x, g.y - baseline.y) > 0.09;
+  // Opening the page while holding a phone upright must leave the plate at the top.
+  board.gravity = tiltActive ? g : { x: 0, y: 0 };
 }
-
-function cancelAnimation() {
-  clearTimeout(timer);
-  cancelAnimationFrame(frame);
+function measureTilt({ beta, gamma }) {
+  if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
+  attitude = { beta, gamma };
+  applyTilt();
+  tiltButton.hidden = true;
 }
-
-function releaseCamera() {
-  if (stream) {
-    for (const track of stream.getTracks()) track.stop();
-    stream = null;
+function listenToTilt() {
+  if (!window.DeviceOrientationEvent) return;
+  window.addEventListener('deviceorientation', measureTilt);
+  window.screen.orientation?.addEventListener?.('change', applyTilt);
+  window.addEventListener('orientationchange', applyTilt);
+  tiltButton.disabled = false;
+  tiltButton.hidden = typeof window.DeviceOrientationEvent.requestPermission !== 'function';
+}
+tiltButton.addEventListener('click', async () => {
+  const session = generation;
+  tiltButton.disabled = true;
+  try {
+    const result = await window.DeviceOrientationEvent.requestPermission();
+    if (session === generation && result !== 'granted')
+      status.textContent = 'El cartel sigue el movimiento visible en la cámara.';
+  } catch {
+    if (session === generation)
+      status.textContent = 'El cartel sigue el movimiento visible en la cámara.';
+  } finally {
+    if (session === generation) tiltButton.hidden = true;
   }
-  feed.pause();
-  feed.srcObject = null;
-  feed.hidden = true;
-  stop.hidden = true;
-  sample.width = sample.height = 0;
+});
+
+function updateSound() {
+  const audible = audio.audible();
+  const label = audio.failed()
+    ? 'Reintentar música'
+    : audible
+      ? 'Silenciar música y pasos'
+      : 'Activar música y pasos';
+  sound.hidden = speaker.hidden = !mode || !audio.supported;
+  sound.textContent = label;
+  speaker.setAttribute('aria-label', label);
+  speaker.setAttribute('aria-pressed', String(audible));
 }
-
-function drawIdle() {
-  ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = 'rgba(197, 201, 220, .48)';
-  for (let i = 0; i < 47; i++) ctx.fillRect(i * 79.13 % width, i * 29.79 % height, i % 9 === 0 ? 2 : 1, 1);
-}
-
-function reset(message = 'Elegí cómo querés entrar.') {
-  generation++;
-  cancelAnimation();
-  phase = 'idle';
-  releaseCamera();
-  candidate = route = demoEdge = null;
-  demoScene.hidden = true;
-  camera.disabled = false;
-  finish.hidden = true;
-  stage.classList.remove('altered');
-  if (ctx) drawIdle();
-  say(message);
-}
-
-function drawDemoScene() {
-  demoScene.width = width;
-  demoScene.height = height;
-  const ink = demoScene.getContext('2d');
-  const sky = ink.createLinearGradient(0, 0, width, height);
-  sky.addColorStop(0, '#151931');
-  sky.addColorStop(.65, '#35345a');
-  sky.addColorStop(1, '#51566b');
-  ink.fillStyle = sky;
-  ink.fillRect(0, 0, width, height);
-
-  const left = .08 * width, right = .92 * width;
-  const firstY = demoEdge[0] * height, lastY = demoEdge[1] * height;
-  ink.beginPath();
-  ink.moveTo(left, firstY);
-  ink.lineTo(right, lastY);
-  ink.lineTo(right, lastY + .045 * height);
-  ink.lineTo(left, firstY + .045 * height);
-  ink.closePath();
-  ink.fillStyle = '#84999b';
-  ink.fill();
-  ink.beginPath();
-  ink.moveTo(left, firstY);
-  ink.lineTo(right, lastY);
-  ink.strokeStyle = '#d3e4cf';
-  ink.lineWidth = 2;
-  ink.stroke();
+function phase(name, message) {
+  stage.dataset.phase = name;
+  status.textContent = message;
+  camera.hidden = mode === 'camera';
+  demo.textContent = mode === 'demo' ? 'Reiniciar muestra' : 'Ver sin cámara';
+  stop.hidden = !mode;
+  updateSound();
 }
 
 function resize() {
-  const nextWidth = Math.max(1, surface.clientWidth), nextHeight = Math.max(1, surface.clientHeight);
-  const aspectChanged = Math.abs((nextWidth / nextHeight) / (width / height) - 1) > .04;
-  width = nextWidth;
-  height = nextHeight;
-  const dpr = Math.min(devicePixelRatio || 1, 2);
-  surface.width = Math.round(width * dpr);
-  surface.height = Math.round(height * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (phase === 'idle') drawIdle();
-  if (demoEdge) drawDemoScene();
-  if (aspectChanged && (phase === 'search' || phase === 'roll' || phase === 'rest')) beginSearch();
-  else if (route && (phase === 'roll' || phase === 'rest')) {
-    route = makeRoute(route.line);
-    drawPosition(progress);
-  }
+  const w = stage.clientWidth,
+    h = stage.clientHeight;
+  if (!w || !h || (w === width && h === height)) return;
+  const changedAspect = Math.abs(w / h / (width / height) - 1) > 0.3;
+  width = w;
+  height = h;
+  const ratio = Math.min(devicePixelRatio || 1, 1.1, Math.sqrt(820000 / (w * h)));
+  surface.width = Math.round(w * ratio);
+  surface.height = Math.round(h * ratio);
+  ctx?.setTransform(surface.width / w, 0, 0, surface.height / h, 0, 0);
+  scene.width = w;
+  scene.height = h;
+  const style = getComputedStyle(stage);
+  Object.assign(view, {
+    width: w,
+    height: h,
+    top: 2 + parseFloat(style.paddingTop),
+    left: 2 + parseFloat(style.paddingLeft),
+    right: 5 + parseFloat(style.paddingRight),
+    bottom: 58 + parseFloat(style.paddingBottom),
+  });
+  layout = layoutBoard(ctx, view);
+  board.fit(view, layout);
+  goal = prizeGoal(view, board);
+  inGoalSince = null;
+  if (motion && changedAspect) {
+    body = null;
+    motion = null;
+    phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
+  } else motion?.resize(w, h);
+  previous = null;
+  marks.length = 0;
+  textureTime = -1;
+  nextRead = nextLines = 0;
 }
 
-// Sample exactly the centered object-fit: cover crop shown by the video element.
-function readVisibleFrame(source, sourceWidth, sourceHeight) {
-  const w = Math.max(1, Math.round(SAMPLE_SIZE * width / Math.max(width, height)));
-  const h = Math.max(1, Math.round(SAMPLE_SIZE * height / Math.max(width, height)));
+function stopInput() {
+  generation++;
+  window.removeEventListener('deviceorientation', measureTilt);
+  window.screen.orientation?.removeEventListener?.('change', applyTilt);
+  window.removeEventListener('orientationchange', applyTilt);
+  tiltButton.hidden = true;
+  attitude = baseline = pointer = null;
+  tiltActive = false;
+  pad.hidden = true;
+  if (stream) stream.getTracks().forEach((track) => track.stop());
+  stream = null;
+  feed.pause();
+  feed.srcObject = null;
+}
+function release() {
+  stopInput();
+  inGoalSince = null;
+  cancelAnimationFrame(frame);
+  mode = motion = previous = body = null;
+  clip.reset();
+  board = new ShowBoard();
+  if (layout) board.fit(view, layout);
+  hits.length = 0;
+  feed.hidden = scene.hidden = true;
+  sample.width = sample.height = texture.width = texture.height = 0;
+  ctx?.clearRect(0, 0, width, height);
+  marks.length = 0;
+  caption.hidden = tools.hidden = true;
+  cueIndex = -1;
+  audio.close();
+}
+function end(message, complete = false) {
+  release();
+  finish.hidden = !complete;
+  phase('idle', message);
+}
+function showWords(elapsed) {
+  const next = cueAt(elapsed);
+  if (next === cueIndex || next < 0) return;
+  cueIndex = next;
+  const cue = announcements[next];
+  get('cue-meta').textContent = 'Show de arte generativo · ' + cue.city;
+  get('cue-title').textContent = cue.text;
+  caption.dataset.cue = String(next);
+  caption.hidden = tools.hidden = false;
+}
+function analyze(source, crop, now) {
+  const scale = 192 / Math.max(width, height),
+    w = Math.max(1, Math.round(width * scale)),
+    h = Math.max(1, Math.round(height * scale));
   if (sample.width !== w || sample.height !== h) {
     sample.width = w;
     sample.height = h;
+    previous = null;
   }
-  const scale = Math.max(width / sourceWidth, height / sourceHeight);
-  const sw = width / scale, sh = height / scale;
-  sampler.drawImage(source, (sourceWidth - sw) / 2, (sourceHeight - sh) / 2, sw, sh, 0, 0, w, h);
-  return sampler.getImageData(0, 0, w, h);
+  sampler.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
+  const current = luminance(sampler.getImageData(0, 0, w, h));
+  if (previous && now - lastRead < 550) {
+    const change = cameraMotion(previous, current);
+    if (change) {
+      if (mode === 'camera') board.carry(change, now);
+      motion?.carry(change);
+      carryMarks(marks, change, width, height);
+    }
+  }
+  previous = current;
+  lastRead = now;
+  if (now < nextLines) return;
+  nextLines = now + 135;
+  const ground = readFloor(visibleLines(current), width, height);
+  if (!ground) {
+    if (motion) motion.pending = null;
+    return;
+  }
+  if (!motion) {
+    motion = new SignMotion(ground, width, height, gentle.matches);
+    body = new RollingSign(motion);
+    lastLineAt = now;
+    phase(
+      'ground',
+      mode === 'demo' ? 'Escena de muestra, sin cámara.' : 'El Ø sigue el movimiento de tu encuadre.'
+    );
+  } else if (motion.observe(ground, now)) lastLineAt = now;
 }
-
-function drawGuide(line) {
-  ctx.beginPath();
-  ctx.moveTo(line.a.x * width, line.a.y * height);
-  ctx.lineTo(line.b.x * width, line.b.y * height);
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = 'rgba(9, 18, 32, .48)';
-  ctx.stroke();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(183, 246, 218, .88)';
-  ctx.stroke();
+function refreshTexture(source, crop, stamp) {
+  if (stamp === textureTime && texture.width) return;
+  const scale = Math.min(1, 720 / Math.max(width, height));
+  const w = Math.max(1, Math.round(width * scale)),
+    h = Math.max(1, Math.round(height * scale));
+  if (texture.width !== w || texture.height !== h) {
+    texture.width = w;
+    texture.height = h;
+  }
+  textureInk.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
+  textureTime = stamp;
 }
-
-function searching() {
-  candidate = null;
-  ctx.clearRect(0, 0, width, height);
-  say(demoEdge ? 'Escena de muestra, sin cámara.' : SEARCH_HINT);
+function render(source, crop, now, dt) {
+  const elapsed = now - sceneStart,
+    lost = now - lastLineAt;
+  showWords(elapsed);
+  if (motion && lost > 1900) {
+    motion = body = null;
+    marks.length = 0;
+    phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
+  }
+  let turned = false;
+  while (dt > 0) {
+    const step = Math.min(dt, 1 / 90);
+    if (cueIndex >= 0) board.advance(view, step, gentle.matches);
+    if (motion) {
+      if (lost < 500 && motion.advance(step)) turned = true;
+      body.advance(motion, step);
+      const hit = cueIndex >= 0 && lost < 900 ? collide(body, board, now) : null;
+      if (hit) {
+        hits.push(hit);
+        motion.rebound(hit);
+        turned = true;
+      }
+    }
+    dt -= step;
+  }
+  ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
+  if (motion) {
+    const beat = audio.pulse();
+    if (lost < 900 && (turned || now - lastStep > 460 + 100 * motion.depth)) {
+      lastStep = now;
+      side *= -1;
+      addMark(marks, body, now, true, side);
+      if (board.allowsFootstep(now) && body.lift < body.radius * 0.18)
+        audio.step(body.x / width, body.y / height, turned, side);
+    }
+    if (now - lastMark >= (gentle.matches ? 160 : 83)) {
+      lastMark = now;
+      addMark(marks, body, now, false, side);
+    }
+    refreshTexture(source, crop, nextRead);
+    drawWake(
+      ctx,
+      texture,
+      { x: 0, y: 0, w: texture.width, h: texture.height },
+      width,
+      height,
+      marks,
+      now,
+      body
+    );
+    drawImpacts(
+      ctx,
+      texture,
+      { x: 0, y: 0, w: texture.width, h: texture.height },
+      view,
+      hits,
+      now,
+      gentle.matches
+    );
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (1900 - lost) / 900);
+    drawField(ctx, body, now, beat);
+    drawSign(ctx, body, beat, now, elapsed);
+    ctx.restore();
+  }
+  if (cueIndex >= 0) {
+    const inside = inPrizeGoal(board, goal);
+    const steering = tiltActive || now - board.lastSteer < 1100;
+    if (mode !== 'prize') {
+      inGoalSince = inside && body && lost < 900 && steering ? (inGoalSince ?? now) : null;
+      paintPrizeGoal(ctx, goal, inGoalSince !== null);
+      if (mode === 'demo') {
+        pad.hidden = false;
+        pad.style.width = board.width + 'px';
+        pad.style.height = board.height + 'px';
+        pad.style.transform = 'translate(' + (board.x - board.width / 2) + 'px,' +
+          (board.y - board.height / 2) + 'px) rotate(' + board.angle + 'rad)';
+      }
+    }
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (elapsed - introMs) / 140);
+    paintBoard(ctx, board, layout, cueIndex, art, now);
+    ctx.restore();
+  }
+  if (clip.state === 'idle') clip.begin(surface, audio, now);
+  else if (clip.state === 'preparing') clip.paint(surface, now);
 }
-
-function scan() {
-  if (phase !== 'search') return;
-  const now = performance.now();
-  const ready = demoEdge || (feed.readyState >= 2 && feed.videoWidth && feed.videoHeight && feed.currentTime !== previousVideoTime);
-  if (now - previousSampleAt > 650) searching();
-  if (ready) {
-    previousSampleAt = now;
-    previousVideoTime = feed.currentTime;
-    let line;
-    try {
-      const pixels = demoEdge ? readVisibleFrame(demoScene, width, height)
-        : readVisibleFrame(feed, feed.videoWidth, feed.videoHeight);
-      line = longestLine(pixels);
-    } catch {
-      reset('No se pudo leer la imagen. Podés intentar de nuevo o elegir Ver sin cámara.');
+// Keep a completed clip on the claim page. For an early win, finish its two
+// invitations on the last visible frame, releasing the physical camera immediately.
+function win(source, crop) {
+  const still = document.createElement('canvas');
+  if (clip.state === 'preparing') {
+    still.width = surface.width;
+    still.height = surface.height;
+    still.getContext('2d').drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, still.width, still.height);
+  }
+  const round = crypto.randomUUID();
+  history.pushState(null, '', './premio.html#' + round);
+  mode = 'prize';
+  stopInput();
+  get('game').hidden = true;
+  showPrize(round, clipTools);
+  const frozenCrop = { x: 0, y: 0, w: still.width, h: still.height };
+  function finishClip(now) {
+    if (mode !== 'prize') return;
+    if (clip.state !== 'preparing') {
+      audio.close();
       return;
     }
-    if (!line) {
-      searching();
-    } else {
-      if (!candidate || !sameLine(candidate, line, width, height)) {
-        candidate = line;
-        detectedAt = performance.now();
-      }
-      ctx.clearRect(0, 0, width, height);
-      drawGuide(line);
-      say(demoEdge ? 'Escena de muestra. El código encontró su borde.' : 'Encontré una recta. Sostené el encuadre tres segundos.');
-      if (now - detectedAt >= DETECTION_DELAY) {
-        startRoll(line);
+    lastLineAt = now;
+    const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
+    frameAt = now;
+    render(still, frozenCrop, now, dt);
+    frame = requestAnimationFrame(finishClip);
+  }
+  frame = requestAnimationFrame(finishClip);
+}
+function animate(now) {
+  const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
+  frameAt = now;
+  const isDemo = mode === 'demo',
+    source = isDemo ? scene : feed;
+  const sw = isDemo ? scene.width : feed.videoWidth,
+    sh = isDemo ? scene.height : feed.videoHeight;
+  if (sw && sh && (isDemo || feed.readyState >= 2)) {
+    const crop = visibleCrop(sw, sh, width, height);
+    if (now >= nextRead) {
+      nextRead = now + 40;
+      if (isDemo) drawDemo(ink, width, height, sceneStart ? (now - sceneStart) / 1000 : 0, 1);
+      try {
+        analyze(source, crop, now);
+      } catch {
+        end('No se pudo leer la imagen. Podés reintentar o elegir Ver sin cámara.');
         return;
       }
     }
-  }
-  timer = setTimeout(scan, SAMPLE_INTERVAL);
-}
-
-function beginSearch() {
-  cancelAnimation();
-  phase = 'search';
-  route = null;
-  previousVideoTime = -1;
-  previousSampleAt = performance.now();
-  stage.classList.remove('altered');
-  searching();
-  scan();
-}
-
-function makeRoute(line) {
-  const a = { x: line.a.x * width, y: line.a.y * height };
-  const b = { x: line.b.x * width, y: line.b.y * height };
-  const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
-  const middle = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  // Roll downhill. On a level edge, the framing selects the end nearer the center.
-  const end = Math.abs(dy) > .06 * length ? (a.y > b.y ? a : b)
-    : (Math.abs(a.x - width / 2) < Math.abs(b.x - width / 2) ? a : b);
-  let nx = dy / length, ny = -dx / length;
-  if (ny > 0 || (Math.abs(ny) < .15 && nx * (width / 2 - middle.x) < 0)) {
-    nx = -nx;
-    ny = -ny;
-  }
-  const radius = Math.min(.11 * Math.min(width, height), .16 * length);
-  // On an edge against the frame, keep the symbol on the visible side.
-  if (middle.x + nx * radius * 1.4 < 0 || middle.x + nx * radius * 1.4 > width ||
-      middle.y + ny * radius * 1.4 < 0 || middle.y + ny * radius * 1.4 > height) {
-    nx = -nx;
-    ny = -ny;
-  }
-  const vx = end.x - middle.x, vy = end.y - middle.y;
-  const distance = Math.hypot(vx, vy);
-  return {
-    line, middle, end, nx, ny, radius,
-    turn: Math.sign(vx * -ny + vy * nx) * distance / radius,
-    duration: Math.min(3200, Math.max(1600, 5200 * distance / Math.max(width, height))),
-  };
-}
-
-function drawPosition(fraction) {
-  const { line, middle, end, nx, ny, radius } = route;
-  const x = middle.x + fraction * (end.x - middle.x), y = middle.y + fraction * (end.y - middle.y);
-  const turn = route.turn * fraction * (reducedMotion.matches ? .25 : 1);
-  const c = Math.cos(turn), s = Math.sin(turn);
-  const yaw = .35 + .18 * Math.sin(turn), cy = Math.cos(yaw), sy = Math.sin(yaw);
-  const cx = Math.cos(-.14), sx = Math.sin(-.14);
-  let minProjection = Infinity, footX = 0, footY = 0;
-  const scatter = reducedMotion.matches ? 0 : radius * .18 * Math.max(0, 1 - fraction / .12);
-  const dots = particles.map(([mx, my, mz, band, offsetX, offsetY]) => {
-    const ox = mx * cy + mz * sy, oz = -mx * sy + mz * cy;
-    const oy = -(my * cx - oz * sx), depth = my * sx + oz * cx;
-    const scale = radius * 4 / (4 - depth);
-    const px = (ox * c - oy * s) * scale + scatter * offsetX;
-    const py = (ox * s + oy * c) * scale + scatter * offsetY;
-    const size = Math.max(.75, radius * .023 * (1 + depth * .45));
-    // Pin the actual outermost projected particle to the contact point.
-    const projection = px * nx + py * ny - size;
-    if (projection < minProjection) {
-      minProjection = projection;
-      footX = px - nx * size;
-      footY = py - ny * size;
+    if (!sceneStart) {
+      now = performance.now();
+      sceneStart = lastMark = lastStep = now;
+      audio.start(now);
     }
-    return { px, py, depth, size, band };
-  });
-  ctx.clearRect(0, 0, width, height);
-  drawGuide(line);
-  stage.style.setProperty('--x', (100 * x / width) + '%');
-  stage.style.setProperty('--y', (100 * y / height) + '%');
-  dots.sort((p, q) => p.depth - q.depth);
-  for (const dot of dots) {
-    ctx.globalAlpha = Math.min(.98, .62 + dot.depth * .35);
-    ctx.fillStyle = colors[Math.floor(dot.band % 9 / 3)];
-    ctx.beginPath();
-    ctx.arc(x + dot.px - footX, y + dot.py - footY, dot.size, 0, 2 * Math.PI);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-}
-
-function startRoll(line) {
-  phase = 'roll';
-  route = makeRoute(line);
-  sample.width = sample.height = 0;
-  stage.classList.add('altered');
-  say('El Ø rueda sobre el borde.');
-  const start = performance.now();
-  function tick(now) {
-    const t = Math.min(1, (now - start) / route.duration);
-    progress = t * t * (3 - 2 * t);
-    drawPosition(progress);
-    if (t < 1) {
-      frame = requestAnimationFrame(tick);
+    render(source, crop, now, dt);
+    if (inGoalSince !== null && now - inGoalSince >= 180) {
+      win(source, crop);
       return;
     }
-    phase = 'rest';
-    say('El Ø descansa en el extremo.');
-    timer = setTimeout(() => {
-      phase = 'done';
-      releaseCamera();
-      camera.disabled = false;
-      finish.hidden = false;
-      say(finish.querySelector('h2').textContent);
-    }, END_PAUSE);
   }
-  tick(start);
+  frame = requestAnimationFrame(animate);
 }
-
-camera.addEventListener('click', async () => {
-  reset();
-  const request = generation;
-  phase = 'permission';
-  camera.disabled = true;
-  stop.hidden = false;
-  say('Esperando permiso para usar la cámara…');
+function startFrames() {
+  frameAt = performance.now();
+  sceneStart = 0;
+  textureTime = -1;
+  lastMark = lastStep = sceneStart;
+  nextRead = nextLines = 0;
+  listenToTilt();
+  side = 1;
+  phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
+  frame = requestAnimationFrame(animate);
+}
+async function enter(selected) {
+  release();
+  finish.hidden = true;
+  if (!ctx || !ink || !sampler || !textureInk) {
+    end('Este navegador no puede dibujar la experiencia.');
+    return;
+  }
+  mode = selected;
+  const current = generation;
+  audio.prepare();
+  phase(
+    'permission',
+    selected === 'camera' ? 'Esperando permiso para usar la cámara…' : 'Escena de muestra, sin cámara.'
+  );
+  resize();
+  window.scrollTo(0, 0);
+  if (selected === 'demo') {
+    audio.unlock();
+    scene.hidden = false;
+    startFrames();
+    return;
+  }
   try {
     if (!isSecureContext || !navigator.mediaDevices?.getUserMedia) throw Error('Cámara no disponible');
-    const next = await navigator.mediaDevices.getUserMedia({
+    const request = navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 960 }, height: { ideal: 720 } },
       audio: false,
     });
-    if (request !== generation) {
-      next.getTracks().forEach(track => track.stop());
+    audio.unlock();
+    const acquired = await request;
+    if (current !== generation) {
+      acquired.getTracks().forEach((track) => track.stop());
       return;
     }
-    stream = next;
-    for (const track of stream.getVideoTracks()) {
-      track.addEventListener('ended', () => {
-        if (request === generation) reset('La cámara se cerró. Podés volver a empezar o elegir Ver sin cámara.');
-      }, { once: true });
-    }
-    feed.srcObject = stream;
+    stream = acquired;
+    for (const track of stream.getVideoTracks())
+      track.addEventListener(
+        'ended',
+        () => {
+          if (current === generation) end('La cámara se cerró. Podés volver a empezar.');
+        },
+        { once: true }
+      );
+    feed.muted = true;
+    feed.srcObject = acquired;
     feed.hidden = false;
-    stage.scrollIntoView({ block: 'center' });
     await feed.play();
-    if (request === generation) beginSearch();
+    if (current === generation) startFrames();
   } catch {
-    if (request === generation) reset('No se pudo abrir la cámara. Podés ver la experiencia sin cámara.');
+    if (current === generation)
+      end('No se pudo abrir la cámara. Podés reintentar o elegir Ver sin cámara.');
   }
-});
-
-demo.addEventListener('click', () => {
-  reset();
-  const slope = (.12 + Math.random() * .18) * (Math.random() < .5 ? -1 : 1);
-  demoEdge = [.59 - slope / 2, .59 + slope / 2];
-  demoScene.hidden = false;
-  drawDemoScene();
-  stage.scrollIntoView({ block: 'center' });
-  beginSearch();
-});
-stop.addEventListener('click', () => reset('Cámara cerrada. Podés volver a empezar.'));
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && (stream || phase === 'permission')) reset('Cámara cerrada al cambiar de pestaña.');
-});
-addEventListener('pagehide', () => reset());
-if (!ctx || !sampler) {
-  camera.disabled = demo.disabled = true;
-  say('Este navegador no puede dibujar la experiencia.');
-} else {
-  resize();
-  if (typeof ResizeObserver === 'function') new ResizeObserver(resize).observe(stage);
-  else addEventListener('resize', resize);
 }
+function dismiss() {
+  end('Experiencia cerrada. Podés volver a empezar.', cueIndex >= 0);
+}
+pad.addEventListener('pointerdown', (event) => {
+  if (mode !== 'demo' || pointer || event.button !== 0) return;
+  pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  pad.setPointerCapture(event.pointerId);
+  audio.unlock();
+});
+pad.addEventListener('pointermove', (event) => {
+  if (pointer?.id !== event.pointerId) return;
+  board.steer((event.clientX - pointer.x) / (width * 1.25),
+    (event.clientY - pointer.y) / (height * 1.95), performance.now());
+  pointer.x = event.clientX;
+  pointer.y = event.clientY;
+});
+pad.addEventListener('lostpointercapture', () => { pointer = null; });
+pad.addEventListener('keydown', (event) => {
+  const delta = { ArrowLeft: [-0.06, 0], ArrowRight: [0.06, 0], ArrowUp: [0, -0.055], ArrowDown: [0, 0.055] }[event.key];
+  if (!delta || mode !== 'demo') return;
+  event.preventDefault();
+  board.steer(...delta, performance.now());
+});
+addEventListener('popstate', () => {
+  if (get('prize')) location.reload();
+});
+camera.addEventListener('click', () => enter('camera'));
+demo.addEventListener('click', () => enter('demo'));
+stop.addEventListener('click', dismiss);
+get('dismiss').addEventListener('click', dismiss);
+sound.addEventListener('click', audio.toggle);
+speaker.addEventListener('click', audio.toggle);
+stage.addEventListener('click', (event) => {
+  if (mode && !event.target.closest('button,a')) audio.unlock();
+});
+addEventListener('pagehide', () => end('Experiencia cerrada. Podés volver a empezar.'));
+if (typeof ResizeObserver === 'function') new ResizeObserver(resize).observe(stage);
+else addEventListener('resize', resize);
+document.fonts
+  ?.load('800 20px Uberlin')
+  .then(() => {
+    if (ctx && layout) {
+      layout = layoutBoard(ctx, view);
+      board.fit(view, layout);
+      goal = prizeGoal(view, board);
+    }
+  })
+  .catch(() => {});
+let opened = false;
+function visibility() {
+  if (document.hidden) {
+    if (mode && !sharing) end('Experiencia cerrada al cambiar de pestaña.');
+  } else if (!opened) {
+    opened = true;
+    enter(location.hash === '#sin-camara' ? 'demo' : 'camera');
+  }
+}
+document.addEventListener('visibilitychange', visibility);
+visibility();

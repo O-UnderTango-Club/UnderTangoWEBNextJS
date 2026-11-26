@@ -1765,7 +1765,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const finishOpeningFilm = useCallback(() => setOpeningRun(null), []);
   useLayoutEffect(() => {
     if (sceneNumber === 1 && cue && outputRef.current) setOpeningRun({cue, output: outputRef.current, generation: ++openingGeneration.current});
-    else if (stage === "ready" || sceneNumber === 0) setOpeningRun(null);
+    else if (stage === "ready") setOpeningRun(null);
   }, [sceneNumber, cue, stage === "ready"]);
   const film = sceneNumber === null ? undefined : sceneFilms.get(sceneNumber);
   const filmLayer = sceneNumber !== 1 && film && cue && outputRef.current
@@ -2224,9 +2224,9 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         input={chordLoop.frame ? { ...noteInput, sounding: [...noteInput.sounding, ...chordLoop.frame.sounding] } : noteInput}
         beginsAt={cue?.beginsAt ?? 0} />}
       {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
-      {cue && <ScoreTrack file={"/multiversos/hardstyle.mp3"} title="Hardstyle" clock={cue.context} output={outputRef.current}
+      {!ready && <ScoreTrack file={"/multiversos/hardstyle.mp3"} title="Hardstyle" clock={cue?.context ?? null} output={outputRef.current}
         trigger={extendedScene === 39 || extendedScene === 60} fade={.08} />}
-      {cue && <ScoreTrack file={"/multiversos/electro.mp3"} title="Electro" clock={cue.context} output={outputRef.current}
+      {!ready && <ScoreTrack file={"/multiversos/electro.mp3"} title="Electro" clock={cue?.context ?? null} output={outputRef.current}
         trigger={extendedScene === 67} fade={4} />}
       {(sceneNumber === 14 || sceneNumber === 18) && <NoteComet key={sceneNumber} attack={liveAttack} />}
       {coda && cue && <CodaProjection filmLayer={filmLayer} scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} paused={paused} routing={pianoRouting} />}

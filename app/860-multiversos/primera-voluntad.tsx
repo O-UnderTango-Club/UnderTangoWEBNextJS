@@ -11,7 +11,7 @@ type Props = {
 };
 
 export function ScoreTrack({file, title, clock, output, trigger, fade}: {
-  file: string; title: string; clock: AudioContext; output: GainNode | null; trigger: boolean; fade: number;
+  file: string; title: string; clock: AudioContext | null; output: GainNode | null; trigger: boolean; fade: number;
 }) {
   const [started, setStarted] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -19,7 +19,8 @@ export function ScoreTrack({file, title, clock, output, trigger, fade}: {
   const position = useRef(0);
   useEffect(() => { if (trigger) setStarted(true); }, [trigger]);
   useEffect(() => {
-    if (!started || !output || output.context !== clock) return;
+    if (!started || !clock || !output || output.context !== clock) return;
+    const context = clock;
     const controller = new AbortController();
     let source: AudioBufferSourceNode | undefined;
     let at = 0;
@@ -29,12 +30,12 @@ export function ScoreTrack({file, title, clock, output, trigger, fade}: {
     async function play() {
       const response = await fetch(file, {signal: controller.signal});
       if (!response.ok) throw Error(title);
-      const buffer = await clock.decodeAudioData(await response.arrayBuffer());
+      const buffer = await context.decodeAudioData(await response.arrayBuffer());
       if (controller.signal.aborted || position.current >= buffer.duration) return;
-      source = clock.createBufferSource();
+      source = context.createBufferSource();
       source.buffer = buffer;
       source.connect(gain);
-      at = clock.currentTime;
+      at = context.currentTime;
       gain.gain.setValueAtTime(.48 * Math.min(1, position.current / fade), at);
       gain.gain.linearRampToValueAtTime(.48, at + Math.max(0, fade - position.current));
       source.start(at, position.current);

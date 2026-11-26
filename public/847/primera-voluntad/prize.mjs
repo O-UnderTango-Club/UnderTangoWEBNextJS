@@ -20,7 +20,7 @@ export function showPrize(round, clipTools) {
       <div class="prize-input"><span aria-hidden="true">@</span><input id="winner-ig" name="instagram" maxlength="31" autocapitalize="none" spellcheck="false" autocomplete="off" /></div>
       <small>Con uno de los dos alcanza. Al tocar el botón guardamos tu registro y abrimos el chat con Pablo.</small>
       <p id="claim-status" role="status" aria-live="polite"></p>
-      <button id="claim" type="submit">Reclamar por WhatsApp <span aria-hidden="true">↗</span></button>
+      <button id="claim" type="submit">Reclamar por WhatsApp</button>
     </form>
     <div class="prize-extras"><a href="/847/primera-voluntad">Volver a Primera voluntad</a></div>
   </section>`;

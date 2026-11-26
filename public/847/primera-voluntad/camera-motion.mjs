@@ -172,9 +172,12 @@ function stripMotion(before, after, vertical) {
         fresh[pos] += after.gray[i + step] - after.gray[i - step];
       }
     }
-    let energy = 0;
-    for (let i = radius + 1; i < length - radius - 1; i++) energy += old[i] ** 2;
-    if (energy < columns ** 2 * 55) continue;
+    let energy = 0, difference = 0;
+    for (let i = radius + 1; i < length - radius - 1; i++) {
+      energy += old[i] ** 2;
+      difference += (old[i] - fresh[i]) ** 2;
+    }
+    if (energy < columns ** 2 * 55 || difference < energy * 0.015) continue;
     const scores = [];
     let best = -1, offset = 0;
     for (let shift = -radius; shift <= radius; shift++) {
@@ -199,21 +202,11 @@ function stripMotion(before, after, vertical) {
   return median / length;
 }
 
-function translation(previous, current) {
-  const pan = widePan(previous, current);
-  if (pan) return pan;
-  const dy = stripMotion(previous, current, true);
-  const dx = stripMotion(previous, current, false);
-  if (dy !== null || dx !== null) return { a: 1, b: 0, dx: dx ?? 0, dy: dy ?? 0 };
-  return null;
-}
-
 // a,b represent scale*cos(roll), scale*sin(roll). Translation is relative to
 // the picture center, so a zoom does not masquerade as a pan.
-export function cameraMotion(previous, current) {
-  if (!previous || previous.width !== current.width || previous.height !== current.height) return null;
+function featureMotion(previous, current) {
   const pairs = patchMatches(previous, current);
-  if (pairs.length < 3) return translation(previous, current);
+  if (pairs.length < 3) return widePan(previous, current);
   const w = current.width,
     h = current.height;
   let inliers = [],
@@ -250,7 +243,7 @@ export function cameraMotion(previous, current) {
     }
     if (inliers.length === pairs.length && bestError === 0) break;
   }
-  if (inliers.length < Math.max(3, pairs.length * 0.48)) return translation(previous, current);
+  if (inliers.length < Math.max(3, pairs.length * 0.48)) return widePan(previous, current);
   let x = 0,
     y = 0,
     u = 0,
@@ -276,7 +269,7 @@ export function cameraMotion(previous, current) {
     dot += px * (p.u - u) + py * (p.v - v);
     cross += px * (p.v - v) - py * (p.u - u);
   }
-  if (!sum) return translation(previous, current);
+  if (!sum) return widePan(previous, current);
   const a = dot / sum,
     b = cross / sum;
   return {
@@ -284,6 +277,37 @@ export function cameraMotion(previous, current) {
     b,
     dx: (u - w / 2 - a * (x - w / 2) + b * (y - h / 2)) / w,
     dy: (v - h / 2 - b * (x - w / 2) - a * (y - h / 2)) / h,
+  };
+}
+
+// Adding a vertical edge to an otherwise horizontally uniform frame gives no
+// evidence of horizontal travel. Both pictures need contrast along that axis.
+function hasAxisDetail({ gray, width, height }, step) {
+  let support = 0;
+  for (let y = 2; y < height - 2; y += 2) {
+    for (let x = 2; x < width - 2; x += 2) {
+      const pos = y * width + x;
+      if (Math.abs(gray[pos + step] - gray[pos - step]) > 12 && ++support >= 8) return true;
+    }
+  }
+  return false;
+}
+
+export function cameraMotion(previous, current) {
+  if (!previous || previous.width !== current.width || previous.height !== current.height) return null;
+  const flow = featureMotion(previous, current);
+  // A rotating or zooming frame needs the complete transform. During translation
+  // a crisp band independently resolves its own axis, even if corner matches drift.
+  if (flow && (Math.abs(flow.b) > 0.016 || Math.abs(flow.a - 1) > 0.018)) return flow;
+  const dy = stripMotion(previous, current, true);
+  const dx = stripMotion(previous, current, false);
+  if (!flow && dy === null && dx === null) return null;
+  const supported = (pan, step) =>
+    pan && hasAxisDetail(previous, step) && hasAxisDetail(current, step) ? pan : 0;
+  return {
+    a: flow?.a ?? 1, b: flow?.b ?? 0,
+    dx: supported(dx ?? flow?.dx ?? 0, 1),
+    dy: supported(dy ?? flow?.dy ?? 0, current.width),
   };
 }
 

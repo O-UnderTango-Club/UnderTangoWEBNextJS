@@ -498,3 +498,12 @@ test('the plate stays at the top at rest and wins only inside the drawn goal', (
     assert.equal(inPrizeGoal(board, goal), false);
   }
 });
+
+test('a new vertical edge entering a horizontally uniform scene cannot pull the plate sideways', () => {
+  const width = 113, height = 192;
+  const row = (y) => y > 58 && y < 71 ? 161 : y > 103 && y < 108 ? 218 : 48;
+  const gray = Uint8Array.from({ length: width * height }, (_, i) => row(Math.floor(i / width)));
+  const after = gray.map((v, i) => i % width > 29 && i % width < 36 ? 179 : v);
+  const flow = cameraMotion({ width, height, gray }, { width, height, gray: after });
+  assert.ok(!flow || Math.abs(flow.dx) < 0.001);
+});

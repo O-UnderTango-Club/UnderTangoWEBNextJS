@@ -311,6 +311,16 @@ test('gravity follows the physical low edge in portrait, both landscape orientat
   assert.ok(Math.hypot(slow.x - fast.x, slow.y - fast.y) < 2);
 });
 
+test('slow finger movement accumulates for the last few pixels of a demo landing', () => {
+  const board = plate(), start = board.y;
+  for (let i = 0; i < 25; i++) {
+    board.steer(0, 0.25 / (portrait.height * 1.95));
+    board.advance(portrait, 1 / 60, false);
+  }
+  settle(board, 0.4);
+  assert.ok(board.y > start + 6 && board.y <= start + 6.25);
+});
+
 test('a sideways reframe cannot drop a stationary plate and a level phone stops descending', () => {
   const board = plate(), start = board.y;
   board.carry({ a: Math.cos(0.2), b: Math.sin(0.2), dx: -0.05, dy: 0 });

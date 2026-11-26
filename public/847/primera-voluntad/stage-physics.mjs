@@ -118,7 +118,6 @@ export class ShowBoard {
   }
 
   steer(x, y) {
-    if (Math.abs(x) + Math.abs(y) < 0.0018) return;
     // Drop the pending displacement on a reversal so the first new frame counts.
     if (x * this.panX < 0) this.panX = 0;
     if (y * this.panY < 0) this.panY = 0;
@@ -169,7 +168,7 @@ export class ShowBoard {
 
   advance(view, dt, gentle) {
     const gx = this.gravity?.x || 0, gy = this.gravity?.y || 0;
-    this.restY = gy > 0 || this.panY > 0.00015 ? Infinity : this.y;
+    this.restY = gy > 0 || this.panY > 0.00002 ? Infinity : this.y;
     this.restAngle = this.angle;
     this.landingSpeed = 0;
     if (!gy && this.vy > 0) this.vy = 0;

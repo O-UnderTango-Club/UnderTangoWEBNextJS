@@ -156,8 +156,8 @@ export function ExtendedArt({ scene, clock, beginsAt, seconds, paused, a4 }: {
     </figure>
     <div className="extended-tuning-bridge">
       <div><h2>Multiversos</h2><p>111 · 222 · 333 Hz</p></div>
-      <div className="extended-a4"><span>Cuarto parcial</span><strong>444 Hz</strong></div>
-      <div><h2>Serie armónica</h2><p>444 · 555 · 666 Hz</p></div>
+      <div className="extended-a4"><span>La4</span><strong>{a4} Hz</strong></div>
+      <div><h2>Temperamento igual</h2><p>12 semitonos por octava</p></div>
     </div>
   </div>;
 }
@@ -194,9 +194,9 @@ export function useExtendedArtAudio(scene: ExtendedScene | null, clock: AudioCon
       tone(222, 0.32, 0.97, 0.035);
     } else {
       [111, 222, 333].forEach((frequency, index) => tone(frequency, 0.05 + index * 0.082, 0.39, 0.062));
-      tone(444, 0.34, 0.94, 0.096);
-      tone(555, 0.54, 0.94, 0.052);
-      tone(666, 0.64, 0.94, 0.052);
+      tone(a4, 0.34, 0.94, 0.096);
+      tone(temperedFrequency(73, a4), 0.54, 0.94, 0.052);
+      tone(temperedFrequency(76, a4), 0.64, 0.94, 0.052);
     }
     return () => {
       bus.disconnect();

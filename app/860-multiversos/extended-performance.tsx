@@ -25,7 +25,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const [amounts, setAmounts] = useSavedSetting<Partial<Record<TimbreScene, number>>>("amounts", {});
   const [live, setLive] = useState<TrackNotes>(EMPTY_TRACKS);
   const selectedRef = useRef(selected);
-  const numeric = scene !== null && scene <= 38;
+  const numeric = scene !== null && scene <= 16;
   const instrument = useRef<OutputRef["current"]>(null);
   const rack = useRef<ReturnType<typeof createTimbreRack> | null>(null);
   const auditionRack = useRef<ReturnType<typeof createTimbreRack> | null>(null);
@@ -38,7 +38,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const loopScene = timbre ? 20 : scene === 15 || scene === 18 ? scene : null;
   const loopCue = useMemo(() => clock && loopScene ? { context: clock, beginsAt: clock.currentTime } : null, [clock, loopScene]);
   const three = loopScene === 15 || loopScene === 18;
-  const keys = useMemo(() => getCubeKeys(!numeric, a4), [a4, numeric, firstMidi]);
+  const keys = useMemo(() => getCubeKeys(!numeric, a4, firstMidi), [a4, numeric, firstMidi]);
   const strength = timbre ? amounts[timbre] ?? 72 : 72;
 
   useEffect(() => {
@@ -59,8 +59,8 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
         if(velocity<=0 && pedals.has(channelKey))sustained.add(key);
         else {
           sustained.delete(key);
-          const pitch = scene >= 16 && scene <= 38 ? CUBE_FIRST_MIDI + note - firstMidi : note;
-          if (velocity <= 0 || scene > 38 || pitch >= CUBE_FIRST_MIDI) play(key,pitch,velocity);
+          const pitch = scene >= 16 && scene <= 16 ? CUBE_FIRST_MIDI + note - firstMidi : note;
+          if (velocity <= 0 || scene > 16 || pitch >= CUBE_FIRST_MIDI) play(key,pitch,velocity);
         }
       },
       sustainMidi:scene!==88 ? undefined : (device,channel,down)=>{
@@ -269,7 +269,7 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
 
 export function ExtendedPerformanceControls({ performance, paused, scene }: { performance: Performance; paused: boolean; scene: ExtendedScene }) {
   const { a4, setA4, selected, select, three, firstMidi, timbre, strength, setStrength } = performance;
-  const tuning = scene >= 39 && scene !== 89 && <>
+  const tuning = scene >= 17 && scene !== 89 && <>
     <label htmlFor="extended-a4">La4 de referencia <output>{a4} Hz</output></label>
     <input id="extended-a4" type="range" min={400} max={480} step={1} value={a4} onChange={(event) => setA4(Number(event.currentTarget.value))} />
     <div className="zero-loop-presets">{[440, 444].map((value) => <button type="button" key={value} aria-pressed={a4 === value} onClick={() => setA4(value)}>{value} Hz</button>)}</div>

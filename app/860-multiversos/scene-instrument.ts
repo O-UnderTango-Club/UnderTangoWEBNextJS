@@ -4,7 +4,7 @@ import { harmonicFrequencyAt } from "./frequency-tuning";
 import { SHOW_INTERLUDES } from "./show-score";
 export const SCENE_INSTRUMENT_NAMES = {
   ...SHOW_INTERLUDES,
-  16: "Armónicos de 111 Hz", 17: "Clavecín de 111 Hz", 19: "Timbre al tacto",
+  16: "Armónicos de 111 Hz", 17: "Clavecín temperado", 19: "Timbre al tacto",
   32: "Bajo de pulso", 33: "Pads abiertos", 34: "Batería electrónica", 35: "Arpegio",
   36: "Acordes cortos", 37: "Bajo ácido", 38: "Melodía de sierra", 39: "Ensamble por registros",
   63: "Dub", 64: "House", 65: "Garage", 66: "Breakbeat", 67: "Electro", 68: "Techno", 69: "Trance",
@@ -239,7 +239,7 @@ export function createSceneInstrument(scene: InstrumentScene, output: GainNode, 
   const keys=new Map<string,Held>();
   let timer:number|undefined;
   function frequency(note:number,color:Color) {
-    if (scene >= 16 && scene <= 38) return harmonicFrequencyAt(cubeIndexForMidi(note));
+    if (scene === 16) return harmonicFrequencyAt(cubeIndexForMidi(note));
     let midi=note;
     if(color==="bass" || color==="doubleBass" || color==="kick" || (color==="acid" && scene!==74 && scene!==79)) {
       while(midi>51)midi-=12;

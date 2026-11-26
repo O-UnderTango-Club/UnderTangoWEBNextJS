@@ -9,7 +9,7 @@ import { useTempo } from "./tempo";
 import { TransportMidiButton, type TransportMidi } from "./transport-midi";
 import { MIDI_REASSIGNMENT, reassignMidi, sameMidiSignal, type MidiReassignment } from "./midi-reassignment";
 import { LiveSetProjection } from "./live-set-projection";
-import { LAYERS, isLayer, countLayer, firstRepeat, type LayerPlan } from "./layer-take";
+import { LAYERS, hasScoredTake, takeSlot, takeName, nextTakeBeat, countLayer, firstRepeat, type LayerPlan } from "./layer-take";
 import { SCENE_INSTRUMENT_NAMES } from "./scene-instrument";
 import type { LiveSetScene } from "./extended-scenes";
 import type { PerformanceInput } from "./performance-notes";
@@ -39,7 +39,8 @@ function phaseInCycle(time:number, cycle:number) {
   return phase<1e-9 || cycle-phase<1e-9 ? 0 : phase;
 }
 
-export function SceneMixer({children, filmLayer, stageBackground, extendedDark, canPlayNote,connectMidi,transportMidi,playGeneral,pauseScene,stopScene,analyser,roomAnalyser,monitor, scene, routing, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+export function SceneMixer({children, filmLayer, stageBackground, extendedDark, canPlayNote,connectMidi,transportMidi,playGeneral,pauseScene,stopScene,analyser,roomAnalyser,monitor, scene, routing, takeScene, onTakeComplete, liveSet, codaScene, countingTake, input, master, paused, startScene, ready, voiceScene, cue, seconds}: {
+  takeScene: number|null; onTakeComplete: (cue:{context:AudioContext;beginsAt:number})=>void;
   filmLayer: ReactNode;
   children: ReactNode; stageBackground: string; extendedDark: boolean;
   voiceScene: VoiceScene | null; cue: {context: AudioContext; beginsAt: number} | null; seconds: number;
@@ -52,8 +53,10 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
 }) {
   const [clips, setClips] = useState<Clip[]>([]);
   const {bpm,setBpm,clock,setLocked}=useTempo();
-  const [meter,setMeter] = useSavedSetting("mixerMeter",4);
-  const [bars,setBars] = useSavedSetting("mixerBars",4);
+  const [savedMeter,setMeter] = useSavedSetting("mixerMeter",4);
+  const [savedBars,setBars] = useSavedSetting("mixerBars",4);
+  const automatic = hasScoredTake(takeScene);
+  const meter = automatic ? 4 : savedMeter, bars = automatic ? 4 : savedBars;
   const [room,setRoom] = useState(false);
   const [bankMap,setBankMap]=useSavedSetting<Record<string,Assignment>>("sampleBankMidi",{});
   const target=useRef<number|null>(null);
@@ -292,11 +295,11 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
       node.connect(gain).connect(ctx.destination);
       const gate=ctx.createGain();
       const sources:AudioNode[]=[];
-      const desktop=shared ? external.current : null;
+      const desktop=!plan && shared ? external.current : null;
       const surface=desktop?.getVideoTracks()[0]?.getSettings().displaySurface;
       if(!desktop || surface==="browser")sources.push(plan ? input : stereo.current ?? master);
       if(desktop)sources.push(ctx.createMediaStreamSource(desktop));
-      if(room && mic.current)sources.push(ctx.createMediaStreamSource(mic.current));
+      if(!plan && room && mic.current)sources.push(ctx.createMediaStreamSource(mic.current));
       for(const source of sources)source.connect(gate);
       const protectedTake=protectPeaks(gate,RECORDING_CEILING);
       protectedTake.connect(node);
@@ -316,7 +319,7 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
       const label=scene;
       function onLoop(channels:Float32Array[]){
         if(released || attempt!==generation.current)return;
-        if(plan){countingTake.current=false;setCountIn(null);}
+        if(plan){countingTake.current=false;setCountIn(null);if(cue)onTakeComplete(cue);}
         dispose();pending.current.delete(kind);
         const old=currentClips.current.find(c=>c.slot===slot);
         if(plan && !old && !channels.some(ch=>ch.some(value=>Math.abs(value)>.0002))){
@@ -605,25 +608,27 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
     setWaiting(false);setCountIn(null);setLayerState("Detenido");
     if(!pending.current.size)setState("idle");
   }
-  useEffect(()=>() => {endLayerTake();armed.current=null;layer.current=null;},[cue,liveSet]);
+  useEffect(()=>() => {endLayerTake();armed.current=null;layer.current=null;},[cue,takeScene]);
   useEffect(()=>{
-    if(!isLayer(liveSet) || !cue || !input || !master || paused || requesting || armed.current===cue)return;
-    const slot=liveSet-32;
+    if(!hasScoredTake(takeScene) || !cue || !input || !master || paused || requesting || armed.current===cue)return;
+    const slot=takeSlot(takeScene);
+    if(cycle>180){
+      setLayerState("Subí el tempo a 6 BPM o más para grabar cuatro compases.");
+      return;
+    }
     armed.current=cue;
     const origin=clock(cue.context);
     const now=Math.max(cue.beginsAt,cue.context.currentTime);
     // Start the count on the shared downbeat so successive layers have the same beat one.
     const elapsedBeats=(now-origin)/beat;
-    const countBeat=Math.ceil((elapsedBeats-.035)/meter)*meter;
-    const startBeat=countBeat+meter,base=origin+startBeat*beat;
-    if(cycle>180 || base+cycle>cue.beginsAt+seconds+.001){setLayerState("La toma supera la duración de la escena");return;}
+    const startBeat=nextTakeBeat(elapsedBeats),base=origin+startBeat*beat;
     // The scored layer owns its matrix take and its slot, even when the bank is full.
     for (const [mode,take] of pending.current) {
       if (mode!=="matrix" && take.slot!==slot) continue;
       take.cancel();
       pending.current.delete(mode);
     }
-    const plan={scene:liveSet,slot,startBeat,base,beat,meter,bars};
+    const plan={scene:takeScene,slot,startBeat,base,beat,meter,bars};
     layer.current=plan;chooseDestination(slot);setLayerState("Próximo compás");
     record({kind:"matrix",slot,batch:{version:selectionVersion.current,lastCompleted:-1},order:0},plan);
   });
@@ -643,9 +648,9 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
   const voiceStatus = {off:"Activá el micrófono", listening:"Escuchando", recording:"Grabando la voz",
     playing:voiceScene === 31 ? "Frase en loop · eco estéreo" : "Vocal en loop · coro grave",
     stopped:"Toma detenida", empty:"Toma sin señal", late:"Fin de la escena", error:"No se pudo grabar"};
-  const currentTake=layer.current?.scene===liveSet && armed.current===cue ? layer.current : null;
+  const currentTake=layer.current?.scene===takeScene && armed.current===cue ? layer.current : null;
   const activeCount=currentTake && countingTake.current ? countIn : null;
-  const recordedLayer=currentTake && clips.find(c=>c.slot===currentTake.slot && c.layer===liveSet);
+  const recordedLayer=currentTake && clips.find(c=>c.slot===currentTake.slot && c.layer===takeScene);
   let takeStatus=armed.current===cue ? layerState : "";
   if(currentTake && countingTake.current)takeStatus=activeCount!==null ? "Cuenta de entrada" : waiting ? "Próximo compás" : "Grabando";
   else if(takeStatus==="En loop" && !recordedLayer)takeStatus="Sin sample";
@@ -658,6 +663,11 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
   <div className="zero-stage" role="group" aria-label="Proyección del módulo cero" data-extended-dark={extendedDark || undefined}
     style={{background:stageBackground}}>
     {children}
+    {automatic && cycle>180 && <output role="status">Subí el tempo a 6 BPM o más para grabar cuatro compases.</output>}
+    {automatic && !liveSet && currentTake && <output data-take-status={takeStatus} style={{position:"absolute",top:"9%",right:"3%",zIndex:6,pointerEvents:"none",background:"#211c36",color:"#fff",padding:".4em .7em",borderRadius:6,textAlign:"center"}}>
+      {activeCount!==null && <strong style={{display:"block",fontSize:"clamp(36px,7vw,96px)"}}>{activeCount}</strong>}
+      S{currentTake.slot+1} · {takeStatus}
+    </output>}
     {liveSet && analyser && <LiveSetProjection filmLayer={filmLayer} scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
       analyser={showRoomInput ? roomMeter : analyser} paused={paused} meter={meter} bars={bars} bpm={bpm}
       position={activeCount===null ? position : activeCount-1} recording={state==="recording" && !waiting} waiting={waiting} countIn={activeCount}
@@ -708,8 +718,8 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
       <label title="Sumar el micrófono predeterminado"><input type="checkbox" checked={room} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("room",e.target.checked)}/> Sala</label>
       <details><summary>{bpm} BPM · {bars} × {meter}</summary>
       <label>BPM <input aria-label="BPM de grabación" type="number" min="1" max="240" key={bpm} defaultValue={bpm} disabled={state!=="idle"} onBlur={e=>{const n=Math.min(240,Math.max(1,Math.round(Number(e.target.value)||111)));setBpm(n);e.target.value=String(n);}} /></label>
-      <label>Pulsos <select aria-label="Pulsos" disabled={state!=="idle"} value={meter} onChange={e=>setMeter(Number(e.target.value))}>{[2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
-      <label>Compases <select aria-label="Compases" disabled={state!=="idle"} value={bars} onChange={e=>setBars(Number(e.target.value))}>{[1,2,3,4,5,6,7,8,12,16].map(n=><option key={n}>{n}</option>)}</select></label>
+      <label>Pulsos <select aria-label="Pulsos" disabled={automatic || state!=="idle"} value={meter} onChange={e=>setMeter(Number(e.target.value))}>{[2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
+      <label>Compases <select aria-label="Compases" disabled={automatic || state!=="idle"} value={bars} onChange={e=>setBars(Number(e.target.value))}>{[1,2,3,4,5,6,7,8,12,16].map(n=><option key={n}>{n}</option>)}</select></label>
       <label><input type="checkbox" checked={shared} disabled={requesting||state!=="idle"} onChange={e=>void chooseSource("computer",e.target.checked)}/> Compartir audio de la computadora</label>
       <small>Para todo lo que suena en la computadora, elegí Pantalla completa y activá Compartir audio del sistema.</small>
       </details>
@@ -730,12 +740,12 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
         onKeyUp={stopTone}>Tocar · P</button>
       {message && <small role="status">{message}</small>}
     </div>
-    <div className="sample-bank" data-layers={isLayer(liveSet)||undefined} aria-label="Banco de nueve samples">
+    <div className="sample-bank" data-layers={hasScoredTake(takeScene)||undefined} aria-label="Banco de nueve samples">
     {Array.from({length:BANK_SIZE},(_,slot)=>{
       const clip=clips.find(c=>c.slot===slot);
-      const isTake=isLayer(liveSet) && currentTake?.slot===slot;
-      const recordedName=clip?.layer ? LAYERS[clip.layer-32].name : clip?.scene;
-      const padName=isLayer(liveSet) ? (isTake ? LAYERS[liveSet-32].name : recordedName ?? LAYERS[slot]?.name ?? "Libre") : "";
+      const isTake=hasScoredTake(takeScene) && currentTake?.slot===slot;
+      const recordedName=clip?.layer ? takeName(clip.layer) : clip?.scene;
+      const padName=hasScoredTake(takeScene) ? (isTake ? takeName(takeScene) : recordedName ?? LAYERS[slot]?.name ?? "Libre") : "";
       const padStatus=isTake ? (activeCount!==null ? "Entrada "+activeCount+" / "+meter : takeStatus) : "";
       if(!clip)return <button className="sample-empty" aria-label={`Espacio ${slot+1} libre`} aria-pressed={selected===slot}
         data-selected={selected===slot} data-take={isTake || undefined} onClick={()=>chooseDestination(slot)} key={slot}>S{slot+1}{padName && <span className="pad-title">{padName}</span>}{padStatus && <small>{padStatus}</small>}</button>;

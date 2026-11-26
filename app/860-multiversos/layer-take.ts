@@ -1,3 +1,5 @@
+import { TIMBRE_NAMES, type TimbreScene } from "./extended-scenes";
+
 export const LAYERS = [
   {name:"Bajo de pulso",gesture:"pulso",color:"#91dbc2",pitch:110,wave:"sine"},
   {name:"Pads abiertos",gesture:"halo",color:"#b4b1ff",pitch:220,wave:"sine"},
@@ -9,10 +11,17 @@ export const LAYERS = [
   {name:"Ensamble por registros",gesture:"ensamble",color:"#7adddf",pitch:247,wave:"triangle"},
 ] as const;
 export function isLayer(scene:number|null): scene is number {return scene!==null && scene>=32 && scene<=39;}
+export function hasScoredTake(scene:number|null): scene is number { return scene!==null && scene>=19 && scene<=39; }
+export function takeSlot(scene:number) { return scene>=32 ? scene-32 : (scene-19)%9; }
+export function takeName(scene:number) { return scene>=32 ? LAYERS[scene-32].name : TIMBRE_NAMES[scene as TimbreScene] ?? "El timbre"; }
+export function nextTakeBeat(elapsed:number) {
+  // The complete count starts at beat 12 and the take at beat 16 (zero-based).
+  return 16 * Math.max(1, Math.ceil((elapsed + 4) / 16));
+}
 export type LayerPlan = {scene:number;slot:number;startBeat:number;base:number;beat:number;meter:number;bars:number};
 
 export function countLayer(ctx:AudioContext, speakers:AudioNode, plan:LayerPlan) {
-  const layer=LAYERS[plan.scene-32], notes:OscillatorNode[]=[];
+  const layer=LAYERS[takeSlot(plan.scene)%LAYERS.length], notes:OscillatorNode[]=[];
   for(let i=0;i<plan.meter;i++){
     const when=plan.base-(plan.meter-i)*plan.beat;
     const at=Math.max(ctx.currentTime,when), end=when+Math.min(plan.beat*.34,.15);

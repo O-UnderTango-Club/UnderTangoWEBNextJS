@@ -31,7 +31,7 @@ export const FACE_NAMES = ["Frente", "Derecha", "Superior"] as const;
 const PITCHES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "Sol", "La♭", "La", "Si♭", "Si"];
 export const CUBE_FIRST_MIDI = 36;
 export const CUBE_SIZE = 27;
-export const DEFAULT_A4 = 444;
+export const DEFAULT_A4 = 440;
 
 export const temperedFrequency = (midi: number, a4: number) => a4 * 2 ** ((midi - 69) / 12);
 export const pitchName = (midi: number) => `${PITCHES[midi % 12]}${Math.floor(midi / 12) - 1}`;
@@ -41,11 +41,11 @@ export function cubeIndexForMidi(midi: number, first = CUBE_FIRST_MIDI) {
 }
 
 export type CubeKey = { frequency: number; midi: number; label: string };
-export function getCubeKeys(tempered: boolean, a4: number) {
+export function getCubeKeys(tempered: boolean, a4: number, first = CUBE_FIRST_MIDI) {
   return CUBE_TRACKS.map((track) => FACE_NAMES.map((_, face) =>
     Array.from({ length: 9 }, (_, index): CubeKey => {
       const offset = track * CUBE_SIZE + face * 9 + index;
-      const midi = CUBE_FIRST_MIDI + offset;
+      const midi = first + offset;
       const frequency = tempered ? temperedFrequency(midi, a4) : harmonicFrequencyAt(offset);
       return { frequency, midi, label: tempered ? pitchName(midi) : String(frequency) };
     })));

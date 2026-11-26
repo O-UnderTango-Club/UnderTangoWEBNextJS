@@ -26,7 +26,8 @@ import { AudienceProjection } from "./audience-projection";
 import { ScoreTrack, PrimeraVoluntad } from "./primera-voluntad";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
-import { TempoProvider } from "./tempo";
+import { hasScoredTake } from "./layer-take";
+import { useTempo, TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
 import { SceneVideo, sceneFilms } from "./scene-video";
 import { usesSceneKeyboard } from "./scene-instrument";
@@ -1317,7 +1318,11 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const [voiceUnavailable, setVoiceUnavailable] = useState(false);
 
   const [savedSeconds, setSavedSeconds] = useSavedSetting<number[]>("sceneSeconds112", () => previousSceneDurations() ?? SHOW_SCORE.map(cue => cue.seconds));
-  const durations = useMemo(() => resolveShowDurations(savedSeconds), [savedSeconds]);
+  const {bpm: scoreBpm} = useTempo();
+  const takeSeconds = 16 * 60 / scoreBpm;
+  const durations = useMemo(() => resolveShowDurations(savedSeconds).map((seconds,scene) =>
+    hasScoredTake(scene) ? Math.round(2*takeSeconds) : seconds), [savedSeconds,takeSeconds]);
+  const [finishedTake,setFinishedTake] = useState<SceneZeroCue|null>(null);
   const limits = useMemo(() => durations.map((_,i) => durationBounds(i,durations)), [durations]);
   const [previousTimes] = useState(previousSceneDurations);
   const [restFraction, setRestFraction] = useSavedSetting("restFraction111", 0.4);
@@ -1445,6 +1450,10 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
 
   useEffect(() => {
     if ((!nextTimedScene && extendedScene !== 111) || nextAfterSeconds === 0 || !cue || paused) return;
+    if (hasScoredTake(extendedScene)) {
+      if(finishedTake === cue && nextTimedScene) enterNumberedScene(nextTimedScene,cue.context,previewMode!==null);
+      return;
+    }
     const deadline = cue.beginsAt + nextAfterSeconds;
     const edited = previousDeadline.current?.cue === cue && previousDeadline.current.seconds !== nextAfterSeconds;
     const nextBeginsAt = edited ? Math.max(deadline, cue.context.currentTime) : deadline;
@@ -1459,7 +1468,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
     };
     advance();
     return () => window.clearTimeout(timer);
-  }, [cue, enterNumberedScene, extendedScene, nextAfterSeconds, nextTimedScene, paused, previewMode, reset]);
+  }, [cue, finishedTake, enterNumberedScene, extendedScene, nextAfterSeconds, nextTimedScene, paused, previewMode, reset]);
 
   useEffect(() => () => stop(), [stop]);
 
@@ -2201,7 +2210,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       <SceneMixer filmLayer={liveSet ? filmLayer : null} stageBackground={extendedDark ? "#130f20" : light ? "#fff" : "#000"} extendedDark={extendedDark}
         canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={reset} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
-        countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused}>
+        takeScene={extendedScene} onTakeComplete={setFinishedTake} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused}>
       {openingRun && <OpeningFilm key={openingRun.generation} cue={cue ?? openingRun.cue} output={outputRef.current ?? openingRun.output}
         controls={filmControls} strikes={strikes} inside={sceneNumber === 1} paused={paused} finish={finishOpeningFilm} />}
       {!liveSet && !coda && filmLayer}
@@ -2268,14 +2277,14 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
             aria-current={isActive ? "step" : undefined}>
             <div className="zero-title">
               <h2 id={`${id}-title`}>Escena {score.number}</h2>
-              <label className="zero-scene-seconds"><input key={seconds} type="number" min={min} max={max}
+              {hasScoredTake(score.number) ? <span>4 compases · {takeSeconds.toLocaleString("es-AR",{maximumFractionDigits:2})} s de toma</span> : <label className="zero-scene-seconds"><input key={seconds} type="number" min={min} max={max}
                 aria-label={`Segundos de la escena ${score.number}`} defaultValue={seconds}
                 onBlur={event => {const field = event.currentTarget;
                   if (Number.isFinite(field.valueAsNumber)) {
                     const value = Math.min(max,Math.max(min,Math.round(field.valueAsNumber)));
                     field.value = String(value); editSeconds(score.number,value);
                   } else field.value = String(seconds);
-                }} onKeyDown={event => {if(event.key === "Enter")event.currentTarget.blur();}} /> s</label>
+                }} onKeyDown={event => {if(event.key === "Enter")event.currentTarget.blur();}} /> s</label>}
             </div>
             <small>{scoreTime(cueStarts[index])} · {score.title}</small>
             {sceneFilm && <>
@@ -2286,9 +2295,9 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
             {excerpt && <RepertoireCue scene={score.number} clip={excerpt} seconds={seconds}
               cue={isActive ? cue : null} output={isActive ? outputRef.current : null} />}
             {(mode === 31 || mode === 89) && <p><strong>Loop de voz.</strong> {VOICE_CUES[mode]}</p>}
-            <input id={id} type="range" min={min} max={max} step={1} value={seconds}
+            {!hasScoredTake(score.number) && <input id={id} type="range" min={min} max={max} step={1} value={seconds}
               aria-label={`Ajustar duración de la escena ${score.number}`} aria-valuetext={`${seconds} segundos`}
-              onChange={event => editSeconds(score.number,event.currentTarget.valueAsNumber)} />
+              onChange={event => editSeconds(score.number,event.currentTarget.valueAsNumber)} />}
             {mode === "opening" && <>
               <p className="opening-cue">Sostené una nota para sumar su ruido al blanco de la apertura.</p>
               <div className="opening-noises" role="group" aria-label="Cuatro colores de ruido">{NOISE_KEYS.map(({key, midi, label, note}) =>

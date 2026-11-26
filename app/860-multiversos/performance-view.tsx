@@ -1,14 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  createPerformanceNotes, FIRST_MIDI_NOTE, hasNoteCube, MIDI_START_BY_FACE, NOTE_FACE_FREQUENCIES, NOTE_SCENES, noteSceneFrequency,
+  createPerformanceNotes, FIRST_MIDI_NOTE, hasNoteCube, NOTE_FACE_FREQUENCIES, NOTE_SCENES, noteSceneFrequency,
   type NoteFace, type NoteFrequency, type NoteScene, type NoteStrike, type PerformanceInput, type PerformanceNotes,
 } from "./performance-notes";
 import { RestingSphere } from "./scene-visuals";
 
-export function usePerformanceInput({ scene, ownsInput, output, routing, splitNote, learnSplit, onStrike }: {
+export function usePerformanceInput({ scene, ownsInput, output, routing, splitNote, learnSplit, onStrike, firstMidi }: {
   scene: NoteScene | null; ownsInput: boolean; output: GainNode | null;
   routing: { current: PerformanceInput | null };
-  splitNote: number; learnSplit: (note: number) => boolean; onStrike: NoteStrike;
+  firstMidi: number; splitNote: number; learnSplit: (note: number) => boolean; onStrike: NoteStrike;
 }) {
   const [sounding, setSounding] = useState<NoteFrequency[]>([]);
   const notesRef = useRef<PerformanceNotes | null>(null);
@@ -32,15 +32,15 @@ export function usePerformanceInput({ scene, ownsInput, output, routing, splitNo
     const destination: PerformanceInput = {
       midiNote: (id, channel, note, velocity) => {
         if (scene === "eleven" && velocity > 0 && output?.context.state === "running" && learnSplit(note)) return;
-        let face: NoteFace = "front";
-        if (hasNoteCube(scene)) {
-          if (note >= MIDI_START_BY_FACE.top) face = "top";
-          else if (note >= MIDI_START_BY_FACE.right) face = "right";
+        const key = `${midiPrefix(id)}${channel}:${note}`;
+        if (scene === "ten" || scene === "eleven") {
+          send(key, note - FIRST_MIDI_NOTE, velocity, splitNote - FIRST_MIDI_NOTE);
+          return;
         }
-        const offset = note - MIDI_START_BY_FACE[face];
-        // Preserve each face's original nine keys and repeat its scale in unused registers.
-        const index = scene === "eleven" ? offset : ((offset % 9) + 9) % 9;
-        send(`${midiPrefix(id)}${channel}:${note}`, index, velocity, splitNote - FIRST_MIDI_NOTE, face);
+        const offset = note - firstMidi;
+        if (offset < 0 || offset >= (hasNoteCube(scene) ? 27 : 9)) return;
+        const face = (["front", "right", "top"] as const)[Math.floor(offset / 9)];
+        send(key, offset % 9, velocity, undefined, face);
       },
       releaseMidi: (id, channel) => player?.releaseFrom(midiPrefix(id) + (channel === undefined ? "" : `${channel}:`)),
       computerNote: (key, note, pressed) => {
@@ -80,7 +80,7 @@ export function usePerformanceInput({ scene, ownsInput, output, routing, splitNo
       if (notesRef.current === player) notesRef.current = null;
       releaseAll();
     };
-  }, [output, learnSplit, onStrike, ownsInput, routing, scene, splitNote]);
+  }, [output, learnSplit, onStrike, ownsInput, routing, scene, splitNote, firstMidi]);
 
   return {
     sounding,

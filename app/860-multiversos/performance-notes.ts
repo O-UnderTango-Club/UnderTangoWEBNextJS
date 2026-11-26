@@ -24,7 +24,6 @@ export const NOTE_SCENES = {
 export type NoteScene = keyof typeof NOTE_SCENES;
 export const NOTE_SCENE_IDS = Object.keys(NOTE_SCENES) as NoteScene[];
 export const FIRST_MIDI_NOTE = 60;
-export const MIDI_START_BY_FACE = { front: FIRST_MIDI_NOTE, right: FIRST_MIDI_NOTE + 12, top: FIRST_MIDI_NOTE + 24 } as const;
 
 export function isNoteScene(mode: string): mode is NoteScene {
   return Object.prototype.hasOwnProperty.call(NOTE_SCENES, mode);

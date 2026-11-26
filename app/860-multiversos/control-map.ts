@@ -45,11 +45,12 @@ type Settings = {
   mixerClearButton: string;
   mixerTransportAliases: Partial<Record<TransportAction, string>>;
   midiLayouts: {numeric: boolean; tempered: boolean};
+  cubeFirstMidi: number;
   splitNote: number;
 };
 const defaults: Settings = {
   sampleBankMidi: {}, ccMap: {}, generalPlayButton: "", generalPauseButton: "", generalStopButton: "", mixerRecordButton: "", mixerLiveButton: "", mixerPlayAllButton: "", mixerStopButton: "", mixerClearButton: "",
-  mixerTransportAliases: {}, midiLayouts: {numeric: false, tempered: true}, splitNote: 60,
+  mixerTransportAliases: {}, midiLayouts: {numeric: false, tempered: true}, cubeFirstMidi: 36, splitNote: 60,
 };
 type SettingName = keyof Settings;
 const settingNames = Object.keys(defaults) as SettingName[];
@@ -87,6 +88,7 @@ function validSetting(name: SettingName, value: unknown): boolean {
       return object(value) && Object.entries(value).every(([k, id]) => Object.hasOwn(TRANSPORT_NAMES, k) && validSignal(id, true));
     case "midiLayouts":
       return object(value) && typeof value.numeric === "boolean" && typeof value.tempered === "boolean";
+    case "cubeFirstMidi":
     case "splitNote": return integer(value, 0, 127);
     default: return validSignal(value, true);
   }
@@ -156,7 +158,7 @@ export function describeControls(s: Settings): Rows {
     if (buttons[action]) rows[TRANSPORT_NAMES[action]] = labelSignal(s.mixerTransportAliases[action] || buttons[action]);
   }
   rows["División del teclado MIDI"] = "Nota " + s.splitNote;
-  rows["Distribución MIDI"] = [s.midiLayouts.tempered && "Temperada", s.midiLayouts.numeric && "Numérica"].filter(Boolean).join(" + ") || "Desactivada";
+  rows["Distribución MIDI"] = "Teclas consecutivas desde MIDI " + s.cubeFirstMidi + " · nueve por cara";
   return rows;
 }
 function transportBindings(s: Settings): Record<TransportAction, string> {

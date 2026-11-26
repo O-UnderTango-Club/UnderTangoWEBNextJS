@@ -1295,8 +1295,8 @@ function OpeningFilm({cue, output, controls, strikes, inside, paused, finish}: {
   </div>;
 }
 
-function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
-  masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
+function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
+  firstMidi: number; calibration: boolean; toggleCalibration: () => void; masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
   connectMidi: (rescan?: boolean) => Promise<void>;
   midiConnection: MidiConnection;
@@ -1370,7 +1370,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const audition = usePausedSceneOutput(paused ? scoreClock : null, masterVolume);
   const manualOutput = activeScene && cue ? (paused ? audition : outputRef.current) : null;
   const chordLoop = useChordLoop(noteScene === "fourteen" ? cue : null, outputRef);
-  const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, manualOutput);
+  const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, manualOutput, firstMidi);
   const liveAttack = extended.attack, strikeChord = chordLoop.strike;
   const noteStrike = useCallback((frequency:number, time:number, velocity=.85) => {
     liveAttack.current={count:liveAttack.current.count+1,frequency,velocity};
@@ -1391,7 +1391,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   useLayoutEffect(() => { strikes.current.hits = []; }, [paused]);
   useEarlyInstrument(earlyScene, manualOutput, cue?.beginsAt ?? 0, activeDurationMs / 1000, playingNoisePair, scoreClock, pianoRouting, hitPoint);
   const noteInput = usePerformanceInput({
-    scene: noteScene, ownsInput: noteScene !== null || stage === "preparing", splitNote, learnSplit,
+    firstMidi, scene: noteScene, ownsInput: noteScene !== null || stage === "preparing", splitNote, learnSplit,
     output: manualOutput, routing: pianoRouting, onStrike: noteStrike,
   });
   const enterNumberedScene = useCallback((mode: NumberedScene, context: AudioContext, asPreview: boolean, beginsAt = context.currentTime) => {
@@ -2347,8 +2347,8 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
             {isActive && noteScene && noteScene !== "fourteen" && <div className="zero-scene-input">
               <p>{noteScene === "ten" ? "Usá cualquier tecla MIDI o 1–9 en la computadora. Después del tiempo elegido entra la escena 11."
                 : noteScene === "eleven" ? "En la computadora, 1–4 para la nota grave y 5–9 para la aguda."
-                  : noteScene === "thirteen" ? "La cara derecha se toca con Mayús y 1–9 o de Do5 a La♭5 por MIDI. Para la superior, tocá las celdas o usá de Do6 a La♭6."
-                    : "En la computadora, 1–9. En el piano, Do4 inicia la serie de 111 a 999 Hz y las nueve alturas se repiten por todo el teclado."}</p>
+                  : noteScene === "thirteen" ? "MIDI · Teclas 1–9 frente, 10–18 derecha, 19–27 arriba."
+                    : "Las primeras nueve teclas recorren 111 a 999 Hz. En la computadora, 1–9."}</p>
               {noteScene === "eleven" && midiInputs.length > 0 && <>
                 <p role="status">{learningSplit ? "Tocá la primera tecla de la zona aguda." : `Corte MIDI en ${splitLabel}. Desde ahí suenan 999 Hz.`}</p>
                 <button type="button" disabled={paused} onClick={() => {
@@ -2442,6 +2442,9 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
           <input type="checkbox" role="switch" checked={showStopwatch}
             onChange={(event) => setShowStopwatch(event.currentTarget.checked)} />
         </label>
+        <button type="button" aria-pressed={calibration} onClick={toggleCalibration}>
+          {calibration ? "Tocá la tecla más grave · Cancelar" : "Tecla más grave de los cubos · MIDI " + firstMidi}
+        </button>
         <DjConsole output={manualOutput} inputs={midiInputs}/>
         <a className={styles.organonLink} href="/860-multiversos/organon" target="_blank" rel="noopener">Órganon · Mapa de controles ↗</a>
         <a className={styles.materialLink} href="/860-multiversos/materiales.html" target="_blank" rel="noopener">Descargar material necesario para usar este dispositivo</a>
@@ -2455,6 +2458,8 @@ export default function Multiversos860Page() {
   const [midiInputs, setMidiInputs] = useState<MidiDevice[]>([]);
   const [midiConnection, setMidiConnection] = useState<MidiConnection>("checking");
   const [midiLearnFor, setMidiLearnFor] = useState<number | null>(null);
+  const [firstMidi, setFirstMidi] = useSavedSetting("cubeFirstMidi", 36);
+  const [calibration, setCalibration] = useState(false);
   const [masterVolume, setMasterVolume] = useSavedSetting("masterVolume", 100);
   const [faderSignal, setFaderSignal] = useState("");
   const [ccMap, setCcMap] = useSavedSetting<Record<number, CcBinding>>("ccMap", {});
@@ -2533,6 +2538,11 @@ export default function Multiversos860Page() {
         const first = data[1] || 0;
         const second = data[2] || 0;
         const kind = status & 0xf0;
+        if (calibration && kind === 0x90 && second > 0 && !isInpulse200(input.name)) {
+          setFirstMidi(first);
+          setCalibration(false);
+          return;
+        }
         const piano = pianoRouting.current;
         const channel = status & 0x0f;
         const controlType = kind === 0xe0 ? "bend" : kind === 0xb0 && first < 120 ? "cc" :
@@ -2680,7 +2690,7 @@ export default function Multiversos860Page() {
   return (
     <main className={styles.console}>
       <h1 className={styles.scoreTitle}>860 Multiversos</h1>
-      <TempoProvider><ModuleZero faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
+      <TempoProvider><ModuleZero firstMidi={firstMidi} calibration={calibration} toggleCalibration={() => setCalibration(value => !value)} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
       <div className={styles.horizon}>
         <span>LA FRONTERA ENTRE ESCUCHAR Y VER</span>
         <i />

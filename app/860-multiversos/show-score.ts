@@ -20,9 +20,9 @@ export type CodaScene = typeof CODA_SCENES[number];
 // Durations are seconds of the performance clock. Each row is a scene boundary,
 // even when the tail of the previous instrument is still audible.
 const cues = [
-  [0, "El conjunto vacío · Ruido blanco", 12],
-  [1, "La entidad mínima · Primer golpe", 16],
-  [2, "Dos puntos · Del golpe al armónico", 22],
+  [0, "El conjunto vacío · Ruido blanco", 10],
+  [1, "La entidad mínima · Primer golpe", 15],
+  [2, "Dos puntos · Del golpe al armónico", 19],
   [3, "Espacio", SHOW_OPENING.space],
   [4, "Tiempo y giro", SHOW_OPENING.time + SHOW_TRANSITIONS.trailTurn],
   [5, "Cruce", SHOW_CONTINUATION.cross],

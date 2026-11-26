@@ -98,7 +98,7 @@ export function DjConsole({output,inputs}: {output:AudioBus;inputs:MidiDevice[]}
   const [library,setLibrary]=useState<Track[]>(fragments);
   const [choice,setChoice]=useState(fragments[0]?.id ?? "");
   const selected=useRef(choice);
-  const [loaded,setLoaded]=useSavedSetting("djDeckFiles",{A:"",B:""});
+  const [loaded,setLoaded]=useSavedSetting("djDeckFiles",{A:fragments[0]?.id ?? "",B:fragments[1]?.id ?? ""});
   const [notice,setNotice]=useState("");
   const urls=useRef(new Map<string,string>()), mounted=useRef(false);
   const merge=useCallback((files:LibraryFile[])=>{

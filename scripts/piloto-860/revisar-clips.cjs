@@ -38,7 +38,7 @@ async function main() {
 
   const seen = new Set();
   const rows = [header, "", "Carpeta de originales", folder, "",
-    "Las posiciones se cuentan desde la entrada de cada escena. Los clips entran visibles y con su audio silenciado.", ""];
+    "Las posiciones se cuentan desde la entrada de cada escena. Los clips empiezan silenciados. En la escena 1 la imagen se descubre al tocar el bombo.", ""];
   for (const clip of catalog) {
     const locations = originals.get(clip.sha256) || [];
     rows.push(clip.title, "Original registrado · " + clip.source);

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { collisionBeat, collisionTiming, pointTiming, type StrikeLog } from "./opening-sound";
+import { useLayoutEffect, useRef } from "react";
+import { collisionBeat, collisionTiming, pointTiming, WAVE_SECONDS, type StrikeLog } from "./opening-sound";
 
 type Cue = { context: AudioContext; beginsAt: number };
 const clamp = (n: number) => Math.min(1, Math.max(0, n));
@@ -47,6 +47,48 @@ function strike(ink: CanvasRenderingContext2D, size: number, age: number, streng
   ink.restore();
 }
 
+function uncoverUniverse(ink: CanvasRenderingContext2D, w: number, h: number, log: StrikeLog["current"], still: boolean) {
+  // This canvas is a white curtain. Transparent pixels reveal the scene's playing (or frozen) film.
+  ink.fillStyle = "#fff";
+  ink.fillRect(-w / 2, -h / 2, w, h);
+  if (!log.energy || !w || !h) return;
+  let arrived = log.energy;
+  for (const hit of log.hits) {
+    const age = Math.max(0, hit.clock.currentTime - hit.time);
+    arrived -= hit.velocity * (1 - ease(age / (still ? .14 : .95)));
+  }
+  const edge = Math.hypot(w, h) / 2;
+  const radius = edge * 1.28 * (1 - Math.exp(-.48 * Math.max(0, arrived)));
+  if (radius > 0) {
+    ink.save();
+    ink.globalCompositeOperation = "destination-out";
+    const aperture = ink.createRadialGradient(0, 0, 0, 0, 0, radius);
+    aperture.addColorStop(0, "#000"); aperture.addColorStop(.72, "#000"); aperture.addColorStop(1, "transparent");
+    ink.fillStyle = aperture; ink.fillRect(-radius, -radius, 2 * radius, 2 * radius);
+    ink.restore();
+  }
+  for (const hit of log.hits) {
+    const t = clamp((hit.clock.currentTime - hit.time) / WAVE_SECONDS);
+    if (t >= 1) continue;
+    const strength = hit.velocity, tail = (1 - t) ** 1.7;
+    ink.save();
+    if (!still) {
+      const front = edge * (.42 + .67 * strength) * (1 - (1 - t) ** 2.5);
+      for (let echo = 0; echo < 3; echo++) {
+        const r = Math.max(1, front * (1 - echo * .038));
+        ink.globalAlpha = tail * (.72 - echo * .18) * (.38 + .62 * strength);
+        ink.strokeStyle = echo === 1 ? "#534272" : "#d6d9ff";
+        ink.lineWidth = Math.max(1, Math.min(w, h) * .003) / (1 + echo * .3);
+        ink.beginPath(); ink.arc(0, 0, r, 0, tau); ink.stroke();
+      }
+    }
+    const core = Math.max(3, Math.min(w, h) * (.008 + .014 * strength) * (1 - .6 * t));
+    ink.globalAlpha = tail; ink.fillStyle = "#242032"; dot(ink, 0, 0, core);
+    ink.fillStyle = "#f5eeff"; dot(ink, 0, 0, core * .58);
+    ink.restore();
+  }
+}
+
 function collisions(ink: CanvasRenderingContext2D, w: number, h: number, elapsed: number, seconds: number, still: boolean) {
   const {lead, ramp, harmonics} = collisionTiming(seconds);
   const t = clamp((elapsed - lead) / ramp), turn = ease((t - .68) / .32);
@@ -88,7 +130,7 @@ function collisions(ink: CanvasRenderingContext2D, w: number, h: number, elapsed
 
 export function OpeningProjection({scene, cue, seconds, strikes}: { scene: 1 | 2; cue: Cue; seconds: number; strikes: StrikeLog }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = ref.current, ink = canvas?.getContext("2d");
     if (!canvas || !ink) return;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -102,17 +144,20 @@ export function OpeningProjection({scene, cue, seconds, strikes}: { scene: 1 | 2
       const elapsed = Math.max(0, cue.context.currentTime - cue.beginsAt), size = Math.min(width, height);
       ink.setTransform(ratio, 0, 0, ratio, 0, 0); ink.clearRect(0, 0, width, height); ink.translate(width / 2, height / 2);
       if (scene === 1) {
+        uncoverUniverse(ink, width, height, strikes.current, motion.matches);
         const age = elapsed - timing.gong;
         if (age >= 0 && age < timing.fade) {
           ink.fillStyle = "#101116"; ink.globalAlpha = 1 - ease((age / timing.fade - .5) * 2);
           dot(ink, 0, 0, Math.max(4.5, size * .013)); ink.globalAlpha = 1;
         }
-      } else collisions(ink, width, height, elapsed, seconds, motion.matches);
-      for (const hit of strikes.current) {
-        ink.save();
-        if (scene === 2) ink.translate(Math.min(width * .28, height * .4) * ((hit.note % 13) / 6 - 1), 0);
-        strike(ink, size * (scene === 2 ? .55 : 1), hit.clock.currentTime - hit.time, hit.velocity, hit.note, motion.matches);
-        ink.restore();
+      } else {
+        collisions(ink, width, height, elapsed, seconds, motion.matches);
+        for (const hit of strikes.current.hits) {
+          ink.save();
+          ink.translate(Math.min(width * .28, height * .4) * ((hit.note % 13) / 6 - 1), 0);
+          strike(ink, size * .55, hit.clock.currentTime - hit.time, hit.velocity, hit.note, motion.matches);
+          ink.restore();
+        }
       }
       frame = requestAnimationFrame(draw);
     };
@@ -120,5 +165,5 @@ export function OpeningProjection({scene, cue, seconds, strikes}: { scene: 1 | 2
     return () => { observer.disconnect(); cancelAnimationFrame(frame); };
   }, [scene, cue, seconds, strikes]);
   return <canvas ref={ref} className="opening-field" role="img"
-    aria-label={scene === 1 ? "El primer punto y las ondas de cada golpe" : "Dos puntos y sus impactos hasta alcanzar 111 Hz"} />;
+    aria-label={scene === 1 ? "Cada golpe de bombo revela el universo en ondas desde el primer punto" : "Dos puntos y sus impactos hasta alcanzar 111 Hz"} />;
 }

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
 import { sceneNoiseBuffers, scheduleContinuationAudio } from "./scene-audio";
-import { collideIntoPitch, collisionTiming, loadQuestion, NOISE_KEYS, OPENING_QUESTION, pointTiming, speakQuestion, whiteOverture, type PointStrike } from "./opening-sound";
+import { collideIntoPitch, collisionTiming, loadQuestion, NOISE_KEYS, OPENING_QUESTION, pointTiming, speakQuestion, whiteOverture, WAVE_SECONDS, type PointStrike, type StrikeLog } from "./opening-sound";
 import { OpeningProjection } from "./opening-projection";
 import { CONTINUATION_SCENES, DEFAULT_PAIR, NOISE_COLORS, NOISE_IDS, type ContinuationScene, type NoiseColor, type NoisePair } from "./scene-cues";
 import { ContinuationProjection } from "./scene-visuals";
@@ -1223,7 +1223,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
   const [showStopwatch, setShowStopwatch] = useSavedSetting("showStopwatch", false);
   const [filmControls, setFilmControls] = useState<HTMLDivElement | null>(null);
-  const strikes = useRef<PointStrike[]>([]);
+  const strikes = useRef<StrikeLog["current"]>({hits: [], energy: 0});
   const [voiceUnavailable, setVoiceUnavailable] = useState(false);
 
   const [savedSeconds, setSavedSeconds] = useSavedSetting<number[]>("sceneSeconds112", () => previousSceneDurations() ?? SHOW_SCORE.map(cue => cue.seconds));
@@ -1290,10 +1290,15 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
   const earlyScene = typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
   const hitPoint = useCallback((hit: PointStrike) => {
-    strikes.current = [...strikes.current.filter(previous => previous.clock === hit.clock && hit.time - previous.time < 1.45).slice(-7), hit];
-    liveAttack.current = {count: liveAttack.current.count + 1, frequency: 54 * 2 ** ((hit.note % 19) / 20), velocity: hit.velocity};
+    const previous = strikes.current;
+    strikes.current = {
+      hits: [...previous.hits.filter(p => p.clock === hit.clock && hit.time - p.time < WAVE_SECONDS).slice(-11), hit],
+      energy: previous.energy + hit.velocity,
+    };
+    liveAttack.current = {count: liveAttack.current.count + 1, frequency: hit.frequency, velocity: hit.velocity};
   }, [liveAttack]);
-  useLayoutEffect(() => { strikes.current = []; }, [cue, paused]);
+  useLayoutEffect(() => { strikes.current = {hits: [], energy: 0}; }, [cue]);
+  useLayoutEffect(() => { strikes.current.hits = []; }, [paused]);
   useEarlyInstrument(earlyScene, manualOutput, cue?.beginsAt ?? 0, activeDurationMs / 1000, playingNoisePair, scoreClock, pianoRouting, hitPoint);
   const noteInput = usePerformanceInput({
     scene: noteScene, ownsInput: noteScene !== null || stage === "preparing", splitNote, learnSplit,
@@ -1797,8 +1802,9 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       .opening-cue { margin:.4rem 0 .6rem; font-size:.8rem; line-height:1.45; color:#d7dfef; }
       .zero-stage:has(.zero-object) .zero-scene-number { opacity:0; }
       .zero-question {
-        position: absolute; width: min(87%, 900px); margin: 0; text-align: center;
+        position: absolute; top: 19%; width: min(87%, 900px); margin: 0; text-align: center;
         color: #111; font: 400 clamp(1.5rem, 3.5vw, 3.6rem)/1.3 Georgia, serif;
+        text-shadow: 0 0 .12em #fff, 0 0 .28em #fff, 0 0 .5em #fff;
         animation: zeroSpaceFade .55s ease both;
       }
       .zero-point { width: clamp(8px, 1.05vw, 16px); aspect-ratio: 1; border-radius: 50%; background: #000; }
@@ -2179,7 +2185,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
                   onKeyUp={event => {if (event.key === " " || event.key === "Enter") {event.preventDefault(); pianoRouting.current?.computerNote("color-" + key, midi, false);}}}
                   onBlur={() => pianoRouting.current?.computerNote("color-" + key, midi, false)}><kbd>{key}</kbd> · {label}</button>)}</div>
             </>}
-            {mode === "beacon" && <p className="opening-cue">Cuando desaparezca el primer punto, tocá el piano o las teclas A–K. Cada ataque dibuja su propia onda. Podés pausar ahí para improvisar.</p>}
+            {mode === "beacon" && <p className="opening-cue">Desde la pregunta, tocá el piano o las teclas A–K. Cada golpe de bombo abre una onda y revela el universo. En pausa también podés tocar.</p>}
             {mode === "beacon" && voiceUnavailable && <small role="status">La voz no se pudo cargar. La pregunta sigue en pantalla.</small>}
             {mode === "line" && <p className="opening-cue">Dos puntos delimitan el golpe. Podés acentuar el recorrido con el teclado hasta que aparezca la línea de 111 Hz.</p>}
             {mode === "time" && <>
@@ -2316,6 +2322,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         </label>
         <DjConsole output={manualOutput} inputs={midiInputs}/>
         <a className={styles.organonLink} href="/860-multiversos/organon" target="_blank" rel="noopener">Órganon · Mapa de controles ↗</a>
+        <a className={styles.materialLink} href="/860-multiversos/materiales.html" target="_blank" rel="noopener">Descargar material necesario para usar este dispositivo</a>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
     </aside>

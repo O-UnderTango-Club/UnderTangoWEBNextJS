@@ -2,17 +2,19 @@ const fs = require("node:fs");
 const path = require("node:path");
 const ts = require("typescript");
 
-const [controlFile, outputFile, durationFile] = process.argv.slice(2);
-if (!controlFile || !outputFile) throw Error("Uso: node scripts/piloto-860/build.cjs Controles-860.json ensayo.html [duraciones-oficiales.json]");
+const [controlFile, outputFile, durationFile, mediaListFile] = process.argv.slice(2);
+if (!controlFile || !outputFile) throw Error("Uso: node scripts/piloto-860/build.cjs Controles-860.json|--publico ensayo.html [duraciones.json] [lista-de-medios.json]");
+const portable = controlFile === "--publico";
+const storageName = portable ? "860-portatil" : "860-piloto-apertura";
 const root = path.resolve(__dirname, "../..");
 const route = path.join(root, "app/860-multiversos");
 const read = file => fs.readFileSync(file, "utf8");
-const controls = JSON.parse(read(controlFile));
+const controls = portable ? null : JSON.parse(read(controlFile));
 const officialTimes = durationFile ? JSON.parse(read(durationFile)) : null;
 if (durationFile && (!Array.isArray(officialTimes) || officialTimes.length !== 111 || !officialTimes.every(n => Number.isFinite(n) && n > 0))) {
   throw Error("Se necesitan las duraciones de las 111 escenas oficiales.");
 }
-if (controls.format !== "undertango-860/controles-v1" || !controls.settings) throw Error("Falta el mapa del Órganon.");
+if (!portable && (controls.format !== "undertango-860/controles-v1" || !controls.settings)) throw Error("Falta el mapa del Órganon.");
 const entries = fs.readdirSync(route).filter(name => /\.tsx?$/.test(name) && !["page.tsx","layout.tsx"].includes(name));
 entries.push("organon/page.tsx", "votar/page.tsx");
 const mime = {".wav":"audio/wav",".mp3":"audio/mpeg",".mp4":"video/mp4",".png":"image/png",".jpg":"image/jpeg"};
@@ -43,12 +45,13 @@ const modules = entries.map(name => {
   source = inlineAssets(source);
   // A JSX attribute needs an expression for an embedded resource.
   source = source.replaceAll(/src=__assets\["([^"]+)"\]/g,'src={__assets["$1"]}');
-  if (name==="partitura.tsx") source=source.replace('href="/860-multiversos/organon"','href="#organon"');
+  if (name==="partitura.tsx") source=source.replace('href="/860-multiversos/organon"','href="#organon"')
+    .replace('href="/860-multiversos/materiales.html"', portable ? 'href="./Guia-de-montaje.html"' : 'href="https://www.undertangoclub.com/860-multiversos/materiales.html"');
   if (name==="organon/page.tsx") source=source.replace('href="/860-multiversos"', 'href={location.href.split("#")[0]}');
-  if (name==="control-map.ts") source=source.replaceAll("860-multiversos:","860-piloto-apertura:")
+  if (name==="control-map.ts") source=source.replaceAll("860-multiversos:",storageName+":")
     .replace("const directory = await navigator.storage.getDirectory();",
-      'const directory = await (await navigator.storage.getDirectory()).getDirectoryHandle("860-piloto-apertura", {create:true});');
-  if (name==="dj-library.ts") source=source.replace('"860-multiversos-dj"','"860-piloto-apertura-dj"');
+      'const directory = await (await navigator.storage.getDirectory()).getDirectoryHandle('+JSON.stringify(storageName)+', {create:true});');
+  if (name==="dj-library.ts") source=source.replace('"860-multiversos-dj"',JSON.stringify(storageName+"-dj"));
   if (name.endsWith(".tsx")) source='import React from "react";\n'+source;
   const result=ts.transpileModule(source,{fileName:name,reportDiagnostics:true,compilerOptions:{
     jsx:ts.JsxEmit.React,target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS,esModuleInterop:true
@@ -113,8 +116,10 @@ async function openScore(factories, styles, baseline, officialTimes) {
         }
         localStorage.setItem(map.JOURNAL_KEY,JSON.stringify(first));
       };
-      if(navigator.locks)await navigator.locks.request(map.JOURNAL_KEY,seed);
-      else await seed();
+      if (baseline) {
+        if(navigator.locks)await navigator.locks.request(map.JOURNAL_KEY,seed);
+        else await seed();
+      }
       await map.archiveControls();
       for(const [name,value] of [["mixerMatrixEnabled",false],["mixerLiveEnabled",true]]){
         const key=map.SETTINGS_PREFIX+name;
@@ -130,6 +135,8 @@ const runtime = preamble+"("+openScore.toString()+")({"+modules.join(",\n")+"},"
 const reactDir = path.dirname(require.resolve("react/package.json"));
 const domDir = path.dirname(require.resolve("react-dom/package.json"));
 const scripts = [read(path.join(reactDir,"umd/react.production.min.js")),read(path.join(domDir,"umd/react-dom.production.min.js")),runtime];
-const html='<!doctype html><html lang="es-AR" data-ensayo="860"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>860 Multiversos · Piloto de apertura</title><style>:root{--font-undertango-sans:system-ui;--font-undertango-editorial:Georgia}body{margin:0;background:#11131a}*,*::before,*::after{box-sizing:border-box}'+css+'</style></head><body><div id="app"></div>'+scripts.map(js=>'<script>'+js.replaceAll(/<\/script/gi,'<\\/script')+'</script>').join("")+'</body></html>';
+const title=portable ? "860 Multiversos · Partitura portátil" : "860 Multiversos · Piloto de apertura";
+const html='<!doctype html><html lang="es-AR" data-ensayo="860"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title><style>:root{--font-undertango-sans:system-ui;--font-undertango-editorial:Georgia}body{margin:0;background:#11131a}*,*::before,*::after{box-sizing:border-box}'+css+'</style></head><body><div id="app"></div>'+scripts.map(js=>'<script>'+js.replaceAll(/<\/script/gi,'<\\/script')+'</script>').join("")+'</body></html>';
 fs.writeFileSync(outputFile,html);
+if (mediaListFile) fs.writeFileSync(mediaListFile, JSON.stringify([...assets.keys()].sort()));
 console.log(path.resolve(outputFile)+" · "+assets.size+" recursos audiovisuales");

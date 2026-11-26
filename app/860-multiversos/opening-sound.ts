@@ -10,8 +10,9 @@ export const NOISE_KEYS = [
 const KEY_COLORS = [0, 0, 1, 1, 2, 3, 3, 0, 1, 2, 2, 3] as const;
 export const noiseKey = (note: number) => NOISE_KEYS[KEY_COLORS[note % 12]];
 
-export type PointStrike = { clock: BaseAudioContext; time: number; note: number; velocity: number };
-export type StrikeLog = { current: PointStrike[] };
+export type PointStrike = { clock: BaseAudioContext; time: number; note: number; frequency: number; velocity: number };
+export type StrikeLog = { current: { hits: PointStrike[]; energy: number } };
+export const WAVE_SECONDS = 1.8;
 
 export function pointTiming(seconds: number) {
   const gong = Math.min(5.0, seconds * .62);
@@ -79,9 +80,9 @@ export function whiteOverture(output: GainNode, start: number, seconds: number) 
 }
 
 // An early reflection on each side gives the struck skin a room without a long wash over the next attack.
-export function strikeMembrane(bus: GainNode, note: number, velocity: number) {
+export function strikeMembrane(bus: GainNode, note: number, velocity: number, universal = false) {
   const ctx = bus.context, now = ctx.currentTime;
-  const pitch = 54 * 2 ** ((note % 19) / 20);
+  const pitch = universal ? 55.5 : 54 * 2 ** ((note % 19) / 20);
   const depth = Math.max(.045, Math.min(1, velocity));
   const pan = ((note % 12) / 11 - .5) * .72;
   const shell = ctx.createGain();
@@ -98,18 +99,38 @@ export function strikeMembrane(bus: GainNode, note: number, velocity: number) {
     nodes.push(wall, amount, stereo);
   }
   const sources: AudioScheduledSourceNode[] = [];
+  // Keep the descending fundamental in the centre; only its skin and overtones reach the stereo walls.
+  let subLevel: GainNode | undefined;
+  if (universal) {
+    const sub = ctx.createOscillator();
+    subLevel = ctx.createGain();
+    sub.frequency.setValueAtTime(pitch * (3.2 + 2 * depth), now);
+    sub.frequency.exponentialRampToValueAtTime(111, now + .024);
+    sub.frequency.exponentialRampToValueAtTime(pitch, now + .115);
+    const gain = subLevel.gain;
+    gain.setValueAtTime(.0001, now);
+    gain.exponentialRampToValueAtTime(.58 * depth, now + .005);
+    gain.exponentialRampToValueAtTime(.29 * depth, now + .18);
+    gain.exponentialRampToValueAtTime(.0001, now + 1.32);
+    sub.connect(subLevel).connect(bus);
+    sub.start(now); sub.stop(now + 1.34);
+    nodes.push(subLevel); sources.push(sub);
+  }
   const white = ctx.createBufferSource(), band = ctx.createBiquadFilter(), skin = ctx.createGain();
   white.buffer = sceneNoiseBuffers(ctx)[0].buffer;
   band.type = "bandpass";
   band.frequency.value = 1000 + 3300 * depth;
   band.Q.value = .76;
   skin.gain.setValueAtTime(.001, now);
-  skin.gain.exponentialRampToValueAtTime(.6 * depth, now + .004);
+  skin.gain.exponentialRampToValueAtTime((universal ? .32 : .6) * depth, now + .004);
   skin.gain.exponentialRampToValueAtTime(.001, now + .10);
   white.connect(band).connect(skin).connect(shell);
   white.start(now, Math.random() * .4); white.stop(now + .12);
   nodes.push(band, skin); sources.push(white);
-  for (const [ratio, gain, decay] of [[1, .40, 1.02], [1.55, .105, .53], [2.39, .067, .31], [3.83, .035, .16]]) {
+  const modes = universal
+    ? [[2, .20, 1.12], [3, .11, .75], [4 + (note % 12) / 24, .055, .48], [7.02, .035, .32]]
+    : [[1, .40, 1.02], [1.55, .105, .53], [2.39, .067, .31], [3.83, .035, .16]];
+  for (const [ratio, gain, decay] of modes) {
     const mode = ctx.createOscillator(), envelope = ctx.createGain();
     const frequency = pitch * ratio;
     mode.frequency.setValueAtTime(frequency * (1.16 + .67 * depth), now);
@@ -131,7 +152,14 @@ export function strikeMembrane(bus: GainNode, note: number, velocity: number) {
     for (const node of nodes) node.disconnect();
   };
   for (const source of sources) source.onended = () => { if (--remaining === 0) close(); };
-  return { close, clock: ctx, time: now, note, velocity: depth };
+  const releaseSub = () => {
+    if (closed || !subLevel) return;
+    const gain = subLevel.gain, at = ctx.currentTime;
+    if (typeof gain.cancelAndHoldAtTime === "function") gain.cancelAndHoldAtTime(at);
+    else { const level = gain.value; gain.cancelScheduledValues(at); gain.setValueAtTime(level, at); }
+    gain.setTargetAtTime(.0001, at, .021);
+  };
+  return { close, releaseSub, clock: ctx, time: now, note, frequency: pitch, velocity: depth };
 }
 
 export function collideIntoPitch(output: GainNode, start: number, seconds: number) {

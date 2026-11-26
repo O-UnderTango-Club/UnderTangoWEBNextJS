@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { OCTAVE_NOTES, ORIGINAL_NOTES, interpolateTuning } from "./frequency-tuning";
 import type { PerformanceInput } from "./performance-notes";
 import { sceneNoiseBuffers } from "./scene-audio";
-import { noiseKey, pointTiming, strikeMembrane, type PointStrike } from "./opening-sound";
+import { noiseKey, strikeMembrane, type PointStrike } from "./opening-sound";
 import { CROSS_CUE, NEXT_NOTES, NOISE_IDS, SCENE_SYMBOLS, sceneProgress, type NoisePair } from "./scene-cues";
 
 type EarlyScene = "opening" | "beacon" | "line" | "harmonics" | "space" | "time" | "cross" | "sphere" | "noise" | "return" | "breath";
@@ -36,10 +36,9 @@ export function earlyInstrument(scene: EarlyScene, output: GainNode, beginsAt: n
     const now = ctx.currentTime;
     const strength = Math.max(0.05, Math.min(1, velocity));
     if (scene === "beacon" || scene === "line") {
-      const timing = pointTiming(seconds);
-      if (scene === "beacon" && score.currentTime - beginsAt < timing.gong + timing.fade) return;
+      if (scene === "beacon") tails[tails.length - 1]?.releaseSub();
       if (tails.length >= 12) tails.shift()!.close();
-      const hit = strikeMembrane(bus, note, strength);
+      const hit = strikeMembrane(bus, note, strength, scene === "beacon");
       tails.push(hit);
       onHit?.(hit);
       return;
@@ -139,7 +138,7 @@ export function earlyInstrument(scene: EarlyScene, output: GainNode, beginsAt: n
 
 export function useEarlyInstrument(scene: EarlyScene | null, output: GainNode | null, beginsAt: number, seconds: number,
   pair: NoisePair, score: AudioContext | null, routing: {current: PerformanceInput | null}, onHit?: (hit: PointStrike) => void) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!scene || !output || !score) return;
     const player = earlyInstrument(scene, output, beginsAt, seconds, pair, score, onHit);
     routing.current = player.input;

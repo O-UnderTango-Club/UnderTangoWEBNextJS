@@ -88,7 +88,7 @@ export function earlyInstrument(scene: EarlyScene, output: GainNode, beginsAt: n
       sources.push(osc);
       osc.start(now);
     }
-    const attack = scene === "breath" ? 0.065 : textural ? 0.016 : 0.009;
+    const attack = scene === "time" ? .16 : scene === "breath" ? 0.065 : textural ? 0.016 : 0.009;
     const peak = strength * (textural ? 0.65 : scene === "breath" ? 0.105 : 0.235);
     envelope.gain.setValueAtTime(0, now);
     envelope.gain.linearRampToValueAtTime(peak, now + attack);
@@ -96,7 +96,7 @@ export function earlyInstrument(scene: EarlyScene, output: GainNode, beginsAt: n
     sources[0].onended = () => { for (const node of [...sources, ...nodes]) node.disconnect(); };
     held.set(id, immediate => {
       const time = ctx.currentTime;
-      const releaseTime = immediate ? 0 : scene === "breath" ? 0.18 : 0.065;
+      const releaseTime = immediate ? 0 : scene === "time" ? .32 : scene === "breath" ? 0.18 : 0.065;
       if (ctx.state !== "closed") {
         if (typeof envelope.gain.cancelAndHoldAtTime === "function") envelope.gain.cancelAndHoldAtTime(time);
         else envelope.gain.cancelScheduledValues(time);

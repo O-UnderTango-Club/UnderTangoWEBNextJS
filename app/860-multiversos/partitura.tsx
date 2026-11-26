@@ -23,7 +23,7 @@ import { CodaProjection } from "./coda-projection";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
 import { TypeProjection } from "./type-projection";
 import { AudienceProjection } from "./audience-projection";
-import { HardstyleTrack, PrimeraVoluntad } from "./primera-voluntad";
+import { ScoreTrack, PrimeraVoluntad } from "./primera-voluntad";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { TempoProvider } from "./tempo";
@@ -502,7 +502,7 @@ function TemporalFrequencyTrail({ progress, durationMs, intervalMs, clock, froze
       : <canvas ref={canvasRef} role="img" aria-label="Estela tridimensional de fotogramas opacos que se eleva y gira al completarse" />}
     {!unavailable && !frozenAtEnd && progress < 1 && axisWidth >= 6 && <div className="zero-trail-axis" aria-hidden="true"
       style={{ left: `${50 - pivot * zoom * 100 / viewWidth}%`, width: `${axisWidth}%` }}>
-      <span>0 s</span><span>{elapsed} s</span>
+      <span>0 s · {ORIGINAL_NOTES.join(" · ")} Hz</span><span>{elapsed} s · {notes}</span>
     </div>}
     {!frozenAtEnd && <div className="zero-time-caption">
       <span>Cuarta dimensión: el tiempo</span>
@@ -1214,6 +1214,44 @@ async function resumeAudioOutput(context: AudioContext) {
   }
 }
 
+function NoteComet({attack}: {attack: {current: {count:number; frequency:number; velocity:number}}}) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const layer = canvas.current, pen = layer?.getContext("2d");
+    if (!layer || !pen) return;
+    let frame = 0, last = attack.current.count;
+    const tails: {born:number; y:number; hue:number; strength:number}[] = [];
+    function draw(now:number) {
+      if (!layer || !pen) return;
+      const w = layer.clientWidth, h = layer.clientHeight;
+      if (layer.width !== w || layer.height !== h) { layer.width = w; layer.height = h; }
+      pen.clearRect(0,0,w,h);
+      const hit = attack.current;
+      if (hit.count !== last) {
+        last = hit.count;
+        const pitch = Math.log2(Math.max(111, hit.frequency)/111);
+        tails.push({born:now,y:.78-.09*pitch,hue:(pitch*110)%360,strength:hit.velocity});
+      }
+      while (tails.length && now-tails[0].born > 1600) tails.shift();
+      for (const tail of tails) {
+        const age = (now-tail.born)/1600;
+        for (let i=31;i>=0;i--) {
+          const t = age-i*.006;
+          if (t<0) continue;
+          const power = (1-age)*(1-i/33);
+          const x = w*(.10+.82*t), y = h*(tail.y+.045*Math.sin(10*t+tail.hue));
+          pen.fillStyle = 'hsla('+ (tail.hue+i*3) +',95%,60%,'+power+')';
+          pen.beginPath(); pen.arc(x,y,1+power*(3+5*tail.strength),0,2*Math.PI); pen.fill();
+        }
+      }
+      frame = requestAnimationFrame(draw);
+    }
+    frame = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frame);
+  },[attack]);
+  return <canvas ref={canvas} aria-hidden="true" style={{position:"absolute",bottom:"8%",left:0,width:"100%",height:"25%",pointerEvents:"none",zIndex:4}} />;
+}
+
 function OpeningFilm({cue, output, controls, strikes, inside, paused, finish}: {
   cue: SceneZeroCue; output: GainNode; controls: HTMLDivElement | null; strikes: StrikeLog;
   inside: boolean; paused: boolean; finish: () => void;
@@ -1233,7 +1271,11 @@ function OpeningFilm({cue, output, controls, strikes, inside, paused, finish}: {
       last = now;
       state.filmTime += dt;
       if (!state.closing && inside) state.fraction = openingFraction(strikes.current, still);
-      if (!state.closing && (state.fraction >= 1 || !inside)) state.closing = true;
+      if (!inside && !state.closing) {
+        state.fraction = Math.min(1, state.fraction + dt / 8);
+        node.style.clipPath = "circle(" + (Math.SQRT1_2 * 100 * state.fraction ** .78) + "% at center)";
+      }
+      if (state.fraction >= 1) state.closing = true;
       if (state.closing) {
         state.elapsed += dt;
         const t = Math.min(1, state.elapsed / 4);
@@ -1292,6 +1334,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const [noisePair, setNoisePair] = useSavedSetting<NoisePair>("noisePair", DEFAULT_PAIR);
   const [playingNoisePair, setPlayingNoisePair] = useState<NoisePair>(DEFAULT_PAIR);
   const [timeSamplingMs, setTimeSamplingMs] = useSavedSetting("timeSamplingMs", SCENE_TIME_DEFAULT_SAMPLE_MS);
+  const [crossSamplingMs, setCrossSamplingMs] = useSavedSetting("crossSamplingMs", 250);
   const [activeSamplingMs, setActiveSamplingMs] = useState(SCENE_TIME_DEFAULT_SAMPLE_MS);
   const [previewMode, setPreviewMode] = useState<ModuleZeroScene | null>(null);
   const [paused, setPaused] = useState(false);
@@ -1722,7 +1765,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
   const finishOpeningFilm = useCallback(() => setOpeningRun(null), []);
   useLayoutEffect(() => {
     if (sceneNumber === 1 && cue && outputRef.current) setOpeningRun({cue, output: outputRef.current, generation: ++openingGeneration.current});
-    else if (stage === "ready" || sceneNumber === 0) setOpeningRun(null);
+    else if (stage === "ready") setOpeningRun(null);
   }, [sceneNumber, cue, stage === "ready"]);
   const film = sceneNumber === null ? undefined : sceneFilms.get(sceneNumber);
   const filmLayer = sceneNumber !== 1 && film && cue && outputRef.current
@@ -2173,7 +2216,7 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
       {question && <p className="zero-question" style={{ animationPlayState: paused ? "paused" : "running" }}>{OPENING_QUESTION}</p>}
       {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={diagramCue} durationMs={activeDurationMs - harmonicPhase * 1000}
         sampleIntervalMs={activeSamplingMs} />}
-      {continuation && cue && <ContinuationProjection scene={continuation} clock={cue.context} startsAt={cue.beginsAt}
+      {continuation && cue && <ContinuationProjection intervalMs={crossSamplingMs} scene={continuation} clock={cue.context} startsAt={cue.beginsAt}
         seconds={activeDurationMs / 1000} pair={playingNoisePair} hold={breathing}
         inheritedTrail={(continuation === "cross" || continuation === "sphere") &&
           <TemporalFrequencyTrail progress={1} durationMs={timeSeconds * 1000} intervalMs={activeSamplingMs} clock={cue.context} frozenAtEnd />} />}
@@ -2181,7 +2224,11 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
         input={chordLoop.frame ? { ...noteInput, sounding: [...noteInput.sounding, ...chordLoop.frame.sounding] } : noteInput}
         beginsAt={cue?.beginsAt ?? 0} />}
       {chordLoop.frame && cue && <ChordLoopTimeline clock={cue.context} frame={chordLoop.frame} paused={paused} live={noteInput.sounding} />}
-      {(extendedScene === 60 || extendedScene === 61 || extendedScene === 62) && cue && <HardstyleTrack clock={cue.context} output={outputRef.current} paused={paused} />}
+      {!ready && <ScoreTrack file={"/multiversos/hardstyle.mp3"} title="Hardstyle" clock={cue?.context ?? null} output={outputRef.current}
+        trigger={extendedScene === 39 || extendedScene === 60} fade={.08} />}
+      {!ready && <ScoreTrack file={"/multiversos/electro.mp3"} title="Electro" clock={cue?.context ?? null} output={outputRef.current}
+        trigger={extendedScene === 67} fade={4} />}
+      {(sceneNumber === 14 || sceneNumber === 18) && <NoteComet key={sceneNumber} attack={liveAttack} />}
       {coda && cue && <CodaProjection filmLayer={filmLayer} scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} paused={paused} routing={pianoRouting} />}
       {extendedScene && !liveSet && !coda && cue && (extendedScene === 42 || extendedScene === 62
         ? <TypeProjection scene={extendedScene} beginsAt={cue.beginsAt} clock={cue.context} paused={paused} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} />
@@ -2268,6 +2315,10 @@ function ModuleZero({ masterVolume, setMasterVolume, learnFader, learningFader, 
                 aria-valuetext={`${timeSamplingMs} milisegundos`} disabled={!canStart || previewMode === "time"}
                 onChange={(event) => setTimeSamplingMs(Number(event.currentTarget.value))} />
             </>}
+            {mode === "cross" && <label>Intervalo de la segunda línea · {crossSamplingMs} ms
+              <input type="range" min={50} max={1000} step={25} value={crossSamplingMs}
+                onChange={event => setCrossSamplingMs(event.currentTarget.valueAsNumber)} />
+            </label>}
             {mode === "noise" && <fieldset className="zero-noise-pair">
               <legend>Enlace para la prueba individual</legend>
               {(["from", "to"] as const).map((side) => <label key={side}>

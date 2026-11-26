@@ -10,41 +10,50 @@ type Props = {
   release: (id: string) => void;
 };
 
-export function HardstyleTrack({ clock, output, paused }: { clock: AudioContext; output: GainNode | null; paused: boolean }) {
-
+export function ScoreTrack({file, title, clock, output, trigger, fade}: {
+  file: string; title: string; clock: AudioContext | null; output: GainNode | null; trigger: boolean; fade: number;
+}) {
+  const [started, setStarted] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [retry, setRetry] = useState(false);
-
+  const [failed, setFailed] = useState(false);
+  const position = useRef(0);
+  useEffect(() => { if (trigger) setStarted(true); }, [trigger]);
   useEffect(() => {
-    if (!output) return;
+    if (!started || !clock || !output || output.context !== clock) return;
+    const context = clock;
     const controller = new AbortController();
     let source: AudioBufferSourceNode | undefined;
+    let at = 0;
     const gain = clock.createGain();
-    gain.gain.value = 0.48;
     gain.connect(output);
-    setRetry(false);
-    async function startTrack() {
-      const response = await fetch("/multiversos/hardstyle.mp3", { signal: controller.signal });
-      if (!response.ok) throw new Error("Hardstyle no está disponible");
-      const buffer = await clock.decodeAudioData(await response.arrayBuffer());
-      if (controller.signal.aborted) return;
-      source = clock.createBufferSource();
+    setFailed(false);
+    async function play() {
+      const response = await fetch(file, {signal: controller.signal});
+      if (!response.ok) throw Error(title);
+      const buffer = await context.decodeAudioData(await response.arrayBuffer());
+      if (controller.signal.aborted || position.current >= buffer.duration) return;
+      source = context.createBufferSource();
       source.buffer = buffer;
-      source.loop = true;
       source.connect(gain);
-      source.start();
+      at = context.currentTime;
+      gain.gain.setValueAtTime(.48 * Math.min(1, position.current / fade), at);
+      gain.gain.linearRampToValueAtTime(.48, at + Math.max(0, fade - position.current));
+      source.start(at, position.current);
+      source.onended = () => { position.current = buffer.duration; source?.disconnect(); source = undefined; };
     }
-    void startTrack().catch(() => { if (!controller.signal.aborted) setRetry(true); });
+    void play().catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => {
       controller.abort();
       if (source) {
+        position.current += Math.max(0, clock.currentTime - at);
+        source.onended = null;
         source.stop();
         source.disconnect();
       }
       gain.disconnect();
     };
-  }, [clock, output, attempt]);
-  return retry && !paused ? <button className="voluntad-retry" onClick={() => setAttempt(value => value + 1)}>Reproducir Hardstyle</button> : null;
+  }, [started, output, clock, file, title, fade, attempt]);
+  return failed ? <button onClick={() => setAttempt(n => n + 1)}>Reintentar {title}</button> : null;
 }
 
 export function PrimeraVoluntad({ clock, analyser, attack, paused, press, release }: Props) {

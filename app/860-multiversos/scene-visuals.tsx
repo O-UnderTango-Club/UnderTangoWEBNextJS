@@ -51,11 +51,11 @@ function frequencySymbol(ink: Ink, notes: FrequencyVector, center: Point, radius
   ink.restore();
 }
 
-function crossTrail(ink: Ink, progress: number, alpha: number) {
+function crossTrail(ink: Ink, progress: number, alpha: number, count = 24) {
   if (alpha <= 0) return;
   const travel = sceneProgress(progress, CROSS_CUE.morph, CROSS_CUE.formed);
   const visible = sceneProgress(progress, 0, CROSS_CUE.enter);
-  const count = 24;
+
   for (let index = 0; index <= Math.floor(travel * count); index++) {
     const position = index / count;
     frequencySymbol(ink, crossTuningAt(position), { x: lerp(CENTER_X - TRAIL_SPAN, CENTER_X + TRAIL_SPAN, position), y: CENTER_Y },
@@ -264,9 +264,9 @@ const DESCRIPTIONS: Record<ContinuationScene, string> = {
   breath: "El plano revela una esfera blanca que queda quieta",
 };
 
-export function ContinuationProjection({ scene, startsAt, seconds, clock, pair, inheritedTrail, hold = false }: {
+export function ContinuationProjection({ scene, startsAt, seconds, clock, pair, inheritedTrail, intervalMs, hold = false }: {
   scene: ContinuationScene; startsAt: number; seconds: number; clock: AudioContext; hold?: boolean;
-  pair: NoisePair; inheritedTrail: ReactNode;
+  pair: NoisePair; inheritedTrail: ReactNode; intervalMs: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const trailRef = useRef<HTMLDivElement>(null);
@@ -285,7 +285,16 @@ export function ContinuationProjection({ scene, startsAt, seconds, clock, pair, 
           trailRef.current.style.opacity = String(opacity);
         }
         switch (scene) {
-          case "cross": crossTrail(ink, progress, 1); break;
+          case "cross": {
+            const samples = Math.max(1, Math.round(seconds * (CROSS_CUE.formed - CROSS_CUE.morph) * 1000 / intervalMs));
+            crossTrail(ink, progress, 1, samples);
+            ink.fillStyle = "#353958";
+            ink.font = "9px sans-serif";
+            ink.textAlign = "center";
+            for (const end of [0, 1]) ink.fillText(crossTuningAt(end).map(Math.round).join(" · ") + " Hz",
+              CENTER_X + (2 * end - 1) * TRAIL_SPAN, CENTER_Y + 48);
+            break;
+          }
           case "sphere": soundGallery(ink, progress); break;
           case "noise": noiseField(ink, progress, pair); break;
           case "return": {
@@ -317,7 +326,7 @@ export function ContinuationProjection({ scene, startsAt, seconds, clock, pair, 
       window.cancelAnimationFrame(animation);
       observer.disconnect();
     };
-  }, [clock, hold, pair, scene, seconds, startsAt]);
+  }, [clock, hold, pair, scene, seconds, startsAt, intervalMs]);
 
   const label = hold ? "Esfera blanca en reposo" : scene === "noise"
     ? `${DESCRIPTIONS.noise}. Recorrido: ${[pair.from, ...noiseJourney(pair).map(leg => leg.to)].map(id => NOISE_COLORS[id].label).join(' → ')}` : DESCRIPTIONS[scene];

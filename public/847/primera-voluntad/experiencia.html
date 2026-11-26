@@ -115,7 +115,7 @@
         min-height: 44px;
         padding: 0;
       }
-      #game-dock #save { width: 8.2rem; white-space: nowrap; }
+      #game-dock #save { width: 8.2rem; padding-inline: .35rem; white-space: nowrap; }
       @media (max-width: 379px) {
         #game-dock { grid-template-columns: calc(88px + 0.35rem) minmax(44px, 1fr) auto; }
         #game-dock #save { width: 44px; padding: 0; }
@@ -156,6 +156,7 @@
         #prize-slot::before { transition: none; }
       }
       #clip-tools svg {
+        flex-shrink: 0;
         width: 19px;
         height: 19px;
       }

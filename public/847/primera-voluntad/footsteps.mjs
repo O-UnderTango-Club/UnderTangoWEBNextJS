@@ -212,12 +212,13 @@ export function soundscape(onChange) {
   }
 
   async function renderClip(rate, duration) {
+    const recordedSteps = steps.slice();
     const phrase = await prepare();
     if (!phrase) throw Error('Música no disponible');
     const ctx = new Offline(1, Math.round(rate * duration / 1000), rate);
     playScore(ctx, ctx.destination, phrase);
     const grain = noise || (noise = makeNoise(ctx));
-    for (const event of steps) playStep(ctx, ctx.destination, grain, event.time, event);
+    for (const event of recordedSteps) playStep(ctx, ctx.destination, grain, event.time, event);
     const buffer = await ctx.startRendering();
     const samples = buffer.getChannelData(0);
     return Int16Array.from(samples, (value) => Math.round(32767 * Math.max(-1, Math.min(1, value))));

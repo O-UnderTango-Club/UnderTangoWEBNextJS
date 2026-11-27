@@ -11,16 +11,16 @@ import {
   drawImpacts,
 } from './scene.mjs';
 import { drawSign } from './solid-sign.mjs?v=toma14';
-import { soundscape } from './footsteps.mjs?v=toma14';
+import { soundscape } from './footsteps.mjs?v=festejo';
 
-import { RollingSign, ShowBoard, collide, constrainContact, tiltFromRest } from './stage-physics.mjs?v=toma14';
+import { RollingSign, ShowBoard, collide, constrainContact, tiltFromRest } from './stage-physics.mjs?v=festejo';
 import { invitation, layoutBoard, paintBoard } from './show-board.mjs?v=ronda14';
 import { photoReview } from './photo-review.mjs?v=toma14';
 import { SceneClip } from './clip.mjs?v=toma14';
 import { touchesTray, settlePrize } from './prize-goal.mjs?v=cruce';
 import { showPrize } from './prize.mjs?v=toma14';
 import { readTake, rememberTake, savedId, markReturn, returningFromApp } from './saved-take.mjs?v=toma14';
-import { clipLength, roundPhase, secondsLeft } from './timing.mjs?v=ronda14';
+import { clipLength, roundPhase, secondsLeft } from './timing.mjs?v=festejo';
 
 const get = (id) => document.getElementById(id);
 const stage = get('stage'),
@@ -47,7 +47,10 @@ const gentle = matchMedia('(prefers-reduced-motion: reduce)');
 const audio = soundscape(updateSound);
 const hint =
   'Buscando un borde. Probá con dos juntas del piso o con los costados de un pasillo bien iluminado.';
-const clip = new SceneClip(updateClip, (file, offsets) => rememberTake(file, won, sourceMode, offsets));
+function newClip() {
+  return new SceneClip(updateClip, (file, offsets) => rememberTake(file, won, sourceMode, offsets));
+}
+let clip = newClip(), retryPending = false;
 const clipTools = get('clip-tools'),
   save = get('save'),
   share = get('share'),
@@ -90,34 +93,32 @@ function checkLanding() {
   if (!goal || !touchesTray(board, goal)) return;
   won = true;
   seating = {
-    offsetX: board.x - goal.x, offsetY: board.y - (goal.bottom - board.height / 2),
+    landedAt: elapsedMs, offsetX: board.x - goal.x, offsetY: board.y - (goal.bottom - board.height / 2),
     angle: board.angle, progress: 0,
   };
   pad.hidden = true;
 }
 function updateRound() {
   const seconds = sceneStart === null ? null : secondsLeft(0, elapsedMs);
-  const state = seconds === null ? 'waiting' : roundPhase(seconds, won, clip.state);
-  const timer = state === 'finishing' ? '…' : String(seconds ?? '');
-  if (countdown.textContent !== timer) countdown.textContent = timer;
-  if (state === stage.dataset.round) return;
-  stage.dataset.round = state;
+  const state = seconds === null ? 'waiting' : roundPhase(seconds, won);
   const finished = state === 'won' || state === 'lost';
   const ready = finished && clip.state === 'ready';
-  countdown.hidden = seconds === null || finished;
-  countdown.setAttribute('aria-label', state === 'finishing' ? 'Preparando tu video' : 'Segundos restantes');
-  if (state === 'finishing') status.textContent = 'Preparando tu video…';
   clipTools.hidden = save.hidden = share.hidden = !ready;
   watch.hidden = !ready || mode === 'review' || mode === 'prize';
+  if (seconds !== null && countdown.textContent !== String(seconds)) countdown.textContent = String(seconds);
+  if (state === stage.dataset.round) return;
+  stage.dataset.round = state;
+  countdown.hidden = seconds === null || finished;
   gift.hidden = state !== 'won';
   restart.hidden = state !== 'lost';
   if (state !== 'playing') pad.hidden = true;
-  if (state === 'caught') status.textContent = 'El cartel llegó a la bandeja.';
   if (state === 'won') status.textContent = 'Tocá el regalo para abrirlo.';
   if (state === 'lost') status.textContent = 'Se terminó el tiempo. Tocá la flecha para volver a jugar.';
 }
 
 function updateClip(current) {
+  if (retryPending && ['encoding', 'unavailable'].includes(current.state)) queueMicrotask(retry);
+  if (mode === 'prize' && ['encoding','ready','unavailable'].includes(current.state)) cancelAnimationFrame(frame);
   get('previous-take').hidden = !savedId() || current.state === 'ready';
   clipError.hidden = current.state !== 'unavailable';
   if (current.state === 'ready') {
@@ -290,6 +291,7 @@ function stopInput() {
   feed.srcObject = null;
 }
 function resetRound() {
+  retryPending = false;
   sceneStart = lastPictureAt = null;
   elapsedMs = 0;
   won = false;
@@ -400,7 +402,7 @@ function render(source, crop, now, dt) {
       const playing = withinTime && !seating;
       if (playing) board.advance(view, step, gentle.matches);
       else if (seating && seating.progress < 1) settlePrize(board, goal, seating, step);
-      if (lost < 500 && motion.advance(step)) turned = true;
+      if ((lost < 500 || mode === 'prize') && motion.advance(step)) turned = true;
       body.advance(motion, step, playing ? board : null);
       body.keepInPlay(view);
       const hit = collide(body, board, now, !playing);
@@ -463,16 +465,45 @@ function render(source, crop, now, dt) {
   }
   paintBoard(ctx, board, layout, art, now);
   if (body) drawSign(ctx, body, beat, now, elapsed);
+  if (seating) drawCelebration((elapsedMs - seating.landedAt) / 1000);
   if (clip.state === 'idle') clip.begin(surface, audio, sceneStart);
   else if (clip.state === 'preparing') clip.paint(surface, now);
+}
+function drawCelebration(t) {
+  if (t < 0 || t > 2.6) return;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, (2.6 - t) * 1.5);
+  const size = Math.min(width, height);
+  for (let i = 0; i < (gentle.matches ? 14 : 64); i++) {
+    const age = t - (i % 3) * 0.12;
+    if (age < 0) continue;
+    const angle = (i * 2.4) % Math.PI;
+    const speed = size * (0.48 + (i % 7) * 0.12) * (gentle.matches ? 0.45 : 1);
+    ctx.save();
+    ctx.translate(goal.x + Math.cos(angle) * speed * age,
+      goal.bottom - Math.sin(angle) * speed * age + size * 0.33 * age * age);
+    ctx.rotate(angle + age * (2 + i % 5));
+    ctx.fillStyle = ['#ffce68','#80ffee','#ff86c9','#eef8ff'][i % 4];
+    ctx.fillRect(-3, -1.5, 6 + i % 7, 3);
+    ctx.restore();
+  }
+  ctx.restore();
 }
 function openSecret(id, pushEntry = true) {
   if (gift.hidden || mode === 'prize') return;
   player.pause();
   cancelAnimationFrame(frame);
   if (pushEntry) history.pushState(null, '', './premio.html#' + id);
+  if (clip.state === 'preparing') {
+    const source = mode === 'camera' ? feed : scene;
+    if (mode === 'camera' && feed.videoWidth) {
+      const crop = visibleCrop(feed.videoWidth, feed.videoHeight, width, height);
+      ink.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
+    }
+  }
   mode = 'prize';
   stopInput();
+  if (clip.state === 'preparing') frame = requestAnimationFrame(animate);
   get('game').hidden = true;
   showPrize(id, clipTools);
   get('prize').querySelector('.prize-extras').append(sound);
@@ -482,6 +513,14 @@ function openSecret(id, pushEntry = true) {
   });
 }
 function animate(now) {
+  if (mode === 'prize' && !suspended && clip.state === 'preparing') {
+    const delta = lastPictureAt === null ? 0 : Math.min(200, Math.max(0, now - lastPictureAt));
+    elapsedMs = clip.limitAdvance(elapsedMs + delta);
+    lastPictureAt = now;
+    render(scene, visibleCrop(scene.width, scene.height, width, height), sceneStart + elapsedMs, Math.min(delta / 1000, 0.05));
+    frame = requestAnimationFrame(animate);
+    return;
+  }
   if (suspended || (mode !== 'camera' && mode !== 'demo')) return;
   const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
   frameAt = now;
@@ -612,14 +651,28 @@ function dismiss() {
   end('Experiencia cerrada. Podés volver a empezar.', sceneStart !== null);
 }
 gift.addEventListener('click', () => openSecret(crypto.randomUUID()));
-restart.addEventListener('click', () => {
+function retry() {
   if (stage.dataset.round !== 'lost') return;
+  if (clip.state === 'preparing') { retryPending = true; return; }
+  retryPending = false;
+  if (clip.state === 'encoding') {
+    const finishing = clip, source = sourceMode;
+    finishing.persist = (file, offsets) => rememberTake(file, false, source, offsets);
+    finishing.onChange = current => {
+      if (current.state === 'ready') {
+        URL.revokeObjectURL(current.url);
+        get('previous-take').hidden = clip.state === 'ready';
+      }
+    };
+    clip = newClip();
+  }
   if (mode === 'review') { enter(sourceMode || 'camera'); return; }
   resetRound();
   frameAt = performance.now();
   audio.unlock();
   phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
-});
+}
+restart.addEventListener('click', retry);
 pad.addEventListener('pointerdown', (event) => {
   if (mode !== 'demo' || pointer || event.button !== 0) return;
   pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
@@ -649,8 +702,15 @@ addEventListener('popstate', () => {
     get('prize').remove();
     get('game').hidden = false;
     document.title = 'Un Ø aparece · Primera voluntad';
-    mode = 'review';
-    showRecording();
+    if (clip.state === 'ready') {
+      mode = 'review';
+      showRecording();
+    } else {
+      cancelAnimationFrame(frame);
+      mode = sourceMode;
+      lastPictureAt = null;
+      startInput(mode);
+    }
   } else if (location.pathname.endsWith('/premio.html') && mode !== 'prize') {
     // Forward navigation reuses the prize document and its existing round ID.
     openSecret(location.hash.slice(1), false);
@@ -731,7 +791,7 @@ async function visibility() {
     enter(demoEntry ? 'demo' : 'camera');
   } else if (suspended) {
     markReturn(false);
-    if (mode === 'prize') { suspended = false; return; }
+    if (mode === 'prize') { suspended = false; if (clip.state === 'preparing') frame = requestAnimationFrame(animate); return; }
     if (clip.state === 'ready') { showRecording(); return; }
     if (clip.state === 'encoding') return;
     suspended = false;

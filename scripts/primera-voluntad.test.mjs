@@ -503,10 +503,10 @@ test('each round counts fourteen seconds from the detected line and closes at th
   assert.equal(secondsLeft(start + 22000, start + 22000), 14);
   for (const clip of ['preparing', 'ready', 'unavailable']) {
     assert.equal(roundPhase(1, false, clip), 'playing');
-    assert.equal(roundPhase(1, true, clip), 'caught');
+    assert.equal(roundPhase(1, true, clip), 'won');
   }
   for (const landed of [false, true]) {
-    assert.equal(roundPhase(0, landed, 'preparing'), 'finishing');
+    assert.equal(roundPhase(0, landed, 'preparing'), landed ? 'won' : 'lost');
     assert.equal(roundPhase(0, landed, 'ready'), landed ? 'won' : 'lost');
     assert.equal(roundPhase(0, landed, 'unavailable'), landed ? 'won' : 'lost');
   }

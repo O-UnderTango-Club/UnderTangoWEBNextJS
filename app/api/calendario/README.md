@@ -1,5 +1,5 @@
-# API de calendario
+# API de la agenda pública
 
-`GET /api/calendario?year=YYYY&month=M` lee el feed ICS público del calendario `UnderTango Club` (`undertangoclub@gmail.com`), expande recurrencias y devuelve sólo datos seguros para la agenda web: título, fecha/hora, ubicación y categoría.
+`GET /api/calendario?year=YYYY&month=M` devuelve las publicaciones del mes en `events` y utiliza `source: "public-calendar"`. La respuesta conserva los campos `live`, `calendar`, `year`, `month` y `updatedAt`. Si se omite el mes o el año, usa la fecha actual de Argentina.
 
-No se exponen descripciones de Google Calendar, donde puede existir información operativa interna.
+Los datos provienen de la cartelera editorial. Ver [protocolo de calendarios](../../../docs/calendarios.md).

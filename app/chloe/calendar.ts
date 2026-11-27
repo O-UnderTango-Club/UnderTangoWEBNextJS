@@ -1,3 +1,5 @@
+import { PUBLIC_CALENDAR_SOURCE } from "../../src/lib/public-calendar";
+
 type ClubEvent = { id: string; date: string; time: string; title: string; place: string };
 type ClubMonth = { events: ClubEvent[]; live: boolean; source: string; updatedAt: string };
 
@@ -15,7 +17,7 @@ export async function readClubCalendar(today: string, until: string) {
     const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8000), redirect: "error" });
     if (!response.ok) throw new Error("Calendario no disponible");
     const data: ClubMonth = await response.json();
-    if (data.live !== true || data.source !== "google-calendar" || !Array.isArray(data.events) ||
+    if (data.live !== true || data.source !== PUBLIC_CALENDAR_SOURCE || !Array.isArray(data.events) ||
         !Number.isFinite(Date.parse(data.updatedAt))) throw new Error("Consulta sin confirmar");
     return data;
   }));

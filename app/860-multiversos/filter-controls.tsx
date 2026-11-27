@@ -12,6 +12,13 @@ export function FilterControls({values,change}:{values:FilterValues;change:(id:M
           <span className="master-filter-face" data-active={value>0} style={{"--knob-angle":(-135+value*2.7)+"deg"} as CSSProperties}>
             <input type="range" aria-label={label} aria-valuetext={value+" %"} min={0} max={100} step={1} value={value}
               onChange={event=>change(id,event.currentTarget.valueAsNumber)}
+              onKeyDown={event=>{
+                const offsets:Record<string,number>={ArrowUp:1,ArrowRight:1,ArrowDown:-1,ArrowLeft:-1,PageUp:10,PageDown:-10,Home:-100,End:100};
+                const offset=offsets[event.key];
+                if(offset===undefined)return;
+                event.preventDefault();
+                change(id,Math.max(0,Math.min(100,value+offset)));
+              }}
               onPointerDown={event=>{
                 if(event.button!==0)return;
                 event.preventDefault();

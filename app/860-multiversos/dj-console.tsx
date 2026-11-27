@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { SETTINGS_PREFIX } from "./control-map";
 import { REPERTOIRE } from "./repertoire-cue";
 import { DJ_CONTROL, isInpulse200, type DeckSide, type DjCommand } from "./dj-midi";
 import { djFiles, type LibraryFile } from "./dj-library";
@@ -17,7 +18,17 @@ const repertoire = Object.entries(REPERTOIRE).flatMap(([id, clip], index) => cli
   entry: {trackId:"860-"+id, scene:Number(id) as ShowScene, offset:clip.entry, side:(index % 2 ? "B" : "A") as DeckSide},
 }] : []);
 const fragments = repertoire.map(({track}) => track);
-const defaultEntries = repertoire.map(({entry}) => entry);
+function initialEntries(): DjEntry[] {
+  return repertoire.map(({entry}) => {
+    // A fragment disabled on the old score stays disabled on first opening the DJ console.
+    try {
+      if (localStorage.getItem(SETTINGS_PREFIX + "repertoire-" + entry.scene) === "false") {
+        return {...entry, trackId:""};
+      }
+    } catch { /* Use the score defaults if storage is unavailable. */ }
+    return entry;
+  });
+}
 const time = (s:number) => Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
 
 function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch}: {
@@ -163,7 +174,7 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
   const [choice,setChoice]=useState(fragments[0]?.id ?? "");
   const selected=useRef(choice);
   const [loaded,setLoaded]=useSavedSetting("djDeckFiles",{A:fragments[0]?.id ?? "",B:fragments[1]?.id ?? ""});
-  const [entries,setEntries]=useSavedSetting("djScoreEntries",defaultEntries);
+  const [entries,setEntries]=useSavedSetting("djScoreEntries",initialEntries);
   const [cross,setCross]=useState(50);
   const [launches,setLaunches]=useState<Partial<Record<DeckSide,Launch>>>({});
   const pending=useRef(new Set<DeckSide>());

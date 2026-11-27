@@ -1,3 +1,5 @@
+import {filterForFader} from "./master-filters";
+
 export const CONTROL_FILE = "Controles-860.json";
 export const CONTROL_FORMAT = "undertango-860/controles-v1";
 export const SETTINGS_PREFIX = "860-multiversos:settings:v1:";
@@ -80,7 +82,7 @@ function validSetting(name: SettingName, value: unknown): boolean {
         validSignal(id) && object(item) && integer(item.slot, 0, 8) && short(item.action) && Object.hasOwn(BANK_ACTIONS, item.action) &&
         short(item.label) && (item.alias === undefined || validSignal(item.alias, true)));
     case "ccMap":
-      return object(value) && Object.entries(value).every(([slot, b]) => /^(-1|[0-8])$/.test(slot) && object(b) &&
+      return object(value) && Object.entries(value).every(([slot, b]) => (/^(-1|[0-8])$/.test(slot) || filterForFader(slot)) && object(b) &&
         short(b.inputId) && (b.inputName === undefined || short(b.inputName)) && integer(b.cc, -1, 127) &&
         (b.ccChannel === undefined || integer(b.ccChannel, 0, 15)) &&
         (b.bendChannel === undefined || integer(b.bendChannel, 0, 15)));
@@ -150,7 +152,8 @@ export function describeControls(s: Settings): Rows {
     rows["S" + (item.slot + 1) + " · " + BANK_ACTIONS[item.action]] = item.label;
   }
   for (const [slot, b] of Object.entries(s.ccMap)) {
-    rows[slot === "-1" ? "Máster" : "Síntesis histórica · " + synth[Number(slot)]] =
+    const filter=filterForFader(slot);
+    rows[slot === "-1" ? "Máster" : filter ? "Filtros · " + filter.label : "Síntesis histórica · " + synth[Number(slot)]] =
       (b.inputName || b.inputId) + " · " + (b.cc < 0 ? "Pitch Bend · canal " + (Number(b.bendChannel) + 1) : "CC " + b.cc + (b.ccChannel === undefined ? "" : " · canal " + (b.ccChannel + 1)));
   }
   const buttons = transportBindings(s);
@@ -176,12 +179,13 @@ function sharedFaders(settings: Settings): string[] {
     if (key.length === 5 && key[0] === "name") key.shift();
     if (key[2] !== "cc" && key[2] !== "bend") continue;
     for (const [slot, b] of Object.entries(settings.ccMap)) {
-      if (slot !== "-1") continue;
+      const filter=filterForFader(slot);
+      if (slot !== "-1" && !filter) continue;
       const device = a.alias ? signal(a.alias)[1] : undefined;
       const sameDevice = device && b.inputName ? device===b.inputName : key[0]===b.inputId;
       const sameSignal = key[2] === "cc" ? b.cc === key[3] && (b.ccChannel===undefined || b.ccChannel===key[1]) : b.cc < 0 && b.bendChannel === key[1];
       if (sameDevice && sameSignal) found.push("S" + (a.slot + 1) + " · " + BANK_ACTIONS[a.action] + " comparte " + a.label +
-        " con el máster. El banco cede ese control.");
+        (filter ? " con el filtro " + filter.label : " con el máster") + ". El banco cede ese control.");
     }
   }
   return found;

@@ -11,6 +11,9 @@ export const MASTER_FILTERS = [
 ] as const;
 
 export type MasterFilter = typeof MASTER_FILTERS[number]["id"];
+export type FilterFader = `filter-${MasterFilter}`;
+export const filterFader = (id:MasterFilter):FilterFader => `filter-${id}`;
+export const filterForFader = (key:string) => MASTER_FILTERS.find(({id}) => filterFader(id)===key);
 export type FilterValues = Partial<Record<MasterFilter,number>>;
 const amount=(value:number|undefined)=>Number.isFinite(value) ? Math.min(100,Math.max(0,value ?? 0))/100 : 0;
 

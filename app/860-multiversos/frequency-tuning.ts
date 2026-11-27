@@ -5,7 +5,7 @@ export function harmonicFrequencyAt(index: number) {
 }
 
 export const ORIGINAL_NOTES: FrequencyVector = [111, 222, 333];
-export const OCTAVE_NOTES: FrequencyVector = [220, 440, 880];
+export const OCTAVE_NOTES: FrequencyVector = [222, 444, 888];
 
 export function interpolateTuning(from: FrequencyVector, to: FrequencyVector, progress: number): FrequencyVector {
   return from.map((hz, index) => hz * (to[index] / hz) ** progress) as FrequencyVector;

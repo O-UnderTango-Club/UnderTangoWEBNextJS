@@ -39,8 +39,8 @@ export function noiseJourney(pair: NoisePair) {
 export const RETURN_CUE = { linked: 0.13, gather: 0.18, combined: 0.50, grouped: 0.80, white: 0.94 };
 export const BREATH_CUE = { pullback: 0.08, revealed: 0.79 };
 
-// Provisional endpoint for the preview, C in three octaves.
-export const NEXT_NOTES: FrequencyVector = [130.8128, 261.6256, 523.2511];
+// Three octaves of the pure fifth above 111 Hz.
+export const NEXT_NOTES: FrequencyVector = [166.5, 333, 666];
 export const crossTuningAt = (progress: number) => interpolateTuning(OCTAVE_NOTES, NEXT_NOTES, progress);
 
 // Every object in the gallery has a corresponding chord in the mix.

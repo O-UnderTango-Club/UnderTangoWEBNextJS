@@ -16,7 +16,7 @@ import { usePausedSceneOutput } from "./paused-scene-output";
 import { useEarlyInstrument } from "./early-instrument";
 import { LiveChordTimeline } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isLiveSetScene, isTimbreScene, type ExtendedScene } from "./extended-scenes";
-import { SHOW_OPENING, SHOW_SCENE_COUNT, SHOW_SCORE, SHOW_TRANSITIONS, type CodaScene } from "./show-score";
+import { SHOW_OPENING, SHOW_SCENE_COUNT, SHOW_SCORE, SHOW_TRANSITIONS, TEMPERAMENT_SCENE, type CodaScene } from "./show-score";
 import { durationBounds, editShowDuration, resolveShowDurations } from "./show-durations";
 import { previousSceneDurations } from "./previous-durations";
 import { CodaProjection } from "./coda-projection";
@@ -24,6 +24,7 @@ import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableE
 import { TypeProjection } from "./type-projection";
 import { AudienceProjection } from "./audience-projection";
 import { ScoreTrack, PrimeraVoluntad } from "./primera-voluntad";
+import { useScorePercussion } from "./score-percussion";
 import { hasReferenceVisual, ReferenceVisual } from "./reference-visuals";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { FilterControls } from "./filter-controls";
@@ -1381,6 +1382,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   },[liveAttack]);
   const directionSeconds = extendedScene ? extendedSeconds[extendedScene] || (EXTENDED_DEFAULT_SECONDS[extendedScene] || 16) : 0;
   useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
+  useScorePercussion(extendedScene,cue,directionSeconds,paused,loopMix.current);
   const openingActive = activeScene === "beacon" || activeScene === "line" || activeScene === "harmonics";
   const earlyScene = openingActive ? "beacon" : typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
   const hitPoint = useCallback((hit: PointStrike) => {
@@ -1847,6 +1849,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       }
       .scene-mixer { min-width:0; min-height:0; overflow:auto; overscroll-behavior:contain; background:#15151d; color:white; font: .76rem system-ui; }
       .scene-film { position:absolute; inset:0; z-index:-1; width:100%; height:100%; pointer-events:none; }
+      .extended-tuning[data-extended-scene="31"] {z-index:1;pointer-events:none;background:radial-gradient(ellipse,#26173ad9,#11101b66 69%);}
       .reference-visual {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
       .zero-stage > .reference-visual {z-index:-1;}
       .zero-stage > .reference-visual[data-reference-scene="62"] {z-index:1;}
@@ -2295,6 +2298,8 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         trigger={extendedScene === 39 || extendedScene === 60} fade={.08} />}
       {!ready && <ScoreTrack file={"/multiversos/electro.mp3"} title="Electro" clock={cue?.context ?? null} output={outputRef.current}
         trigger={extendedScene === 67} fade={4} />}
+      {extendedScene===TEMPERAMENT_SCENE && cue &&
+        <ExtendedArt scene={TEMPERAMENT_SCENE} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused}/>}
       {(sceneNumber === 14 || sceneNumber === 18) && <NoteComet key={sceneNumber} attack={liveAttack} />}
       {coda && cue && <CodaProjection filmLayer={filmLayer} scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} paused={paused} routing={pianoRouting} />}
       {extendedScene && !liveSet && !coda && cue && (extendedScene === 42 || extendedScene === 62

@@ -2119,6 +2119,14 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       .dj-sheet {position:absolute;z-index:9;bottom:calc(100% + 3px);inset-inline:calc(0px - var(--zero-controls-padding));box-sizing:border-box;
         max-height:min(74dvh,74cqh);overflow:auto;overscroll-behavior:contain;display:grid;gap:.45rem;padding:.7rem var(--zero-controls-padding);
         background:#151a26;border-block:1px solid #5c657b;box-shadow:0 -.3rem 1.1rem #06081177;}
+      .dj-controller-photo {display:block;width:100%;height:auto;border-radius:.35rem;}
+      .dj-library {display:grid;gap:.4rem;}
+      .dj-track-list {display:grid;gap:.2rem;list-style:none;padding:0;margin:0;}
+      .dj-track-list li {display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.22rem;}
+      .zero-controls .dj-track-list button {min-height:30px;padding:.18rem .43rem;font:inherit;}
+      .zero-controls .dj-track-list .dj-track-select {text-align:left;overflow-wrap:anywhere;min-width:0;}
+      .dj-track-list .dj-track-select[aria-pressed=true] {border-color:#95b7ea;background:#2c3951;}
+      .dj-track-list .dj-track-load[aria-pressed=true] {background:#344b4a;border-color:#83bfba;}
       .dj-sheet label,.dj-deck {display:grid;gap:.28rem;min-width:0;}
       .dj-sheet select,.dj-sheet input[type=file] {width:100%;max-width:100%;min-width:0;font:inherit;color:inherit;}
       .dj-sheet select {background:#202635;padding:.35rem;border:1px solid #4c566b;border-radius:.25rem;}

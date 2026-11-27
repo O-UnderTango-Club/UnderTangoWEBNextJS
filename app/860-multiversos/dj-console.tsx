@@ -216,9 +216,14 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
     selected.current=id;
     setChoice(id);
   }
-  function load(side:DeckSide){
-    const id=selected.current;
-    if (!id || pending.current.has(side) || busy.current.has(side)) return;
+  function load(side:DeckSide,id=selected.current){
+    if (!id) return;
+    if (pending.current.has(side) || busy.current.has(side)) {
+      setCueNotice("El deck "+side+" está en uso. Pausalo para cambiar de tema.");
+      return;
+    }
+    select(id);
+    setCueNotice("");
     setLaunches(current=>({...current,[side]:undefined}));
     setLoaded(current=>({...current,[side]:id}));
   }
@@ -279,6 +284,23 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
   const port=hercules.find(p=>p.status==="open") ?? hercules[0];
   return <details className="dj-drawer"><summary>Consola DJ · A / B</summary>
     <div className="dj-sheet">
+      <img className="dj-controller-photo" src="/multiversos/hercules-inpulse-200-mk3.jpg"
+        width={546} height={346} alt="Controladora Hercules DJControl Inpulse 200 MK3" loading="lazy" />
+      <div className="dj-library" role="group" aria-label="Temas guardados">
+        <strong>Temas guardados</strong>
+        <ul className="dj-track-list">
+          {library.map(track=><li key={track.id}>
+            <button type="button" className="dj-track-select" aria-pressed={choice===track.id}
+              onClick={()=>select(track.id)}>{track.name}</button>
+            {(["A","B"] as const).map(side=><button key={side} type="button" className="dj-track-load"
+              aria-label={"Cargar "+track.name+" en deck "+side} aria-pressed={loaded[side]===track.id}
+              onClick={()=>load(side,track.id)}>{side}</button>)}
+          </li>)}
+        </ul>
+        <label className="dj-files">Agregar temas <input type="file" multiple accept="audio/*,.mp3,.wav" aria-label="Agregar archivos de audio"
+          onChange={e=>{const files=Array.from(e.currentTarget.files ?? []);e.currentTarget.value="";void add(files);}}/></label>
+        {notice && <small role="status">{notice}</small>}
+      </div>
       <small role="status">{port?.status==="open"?"Inpulse 200 MK3 conectada":port?.status==="failed"?"Puerto Hercules ocupado · revisá DJUCED":"Consola A/B · control en pantalla"}</small>
       {!output && <small>Podés cargar pistas ahora. Para escucharlas, elegí una escena.</small>}
       {cueNotice && <small role="status">{cueNotice}</small>}
@@ -294,11 +316,6 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
         return <Deck key={side+(track?.id ?? "")} side={side} track={track} load={()=>load(side)} canLoad={!!choice}
           output={output} crossGain={crossGain} launch={output ? launches[side] : undefined} onBusy={onBusy} onLaunch={onLaunch}/>;
       })}
-      <label>Biblioteca <select value={choice} aria-label="Tema de la biblioteca" onChange={e=>select(e.target.value)}>
-        {library.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-      <label className="dj-files">Agregar audio <input type="file" multiple accept="audio/*,.mp3,.wav" aria-label="Agregar archivos de audio"
-        onChange={e=>{const files=Array.from(e.currentTarget.files ?? []);e.currentTarget.value="";void add(files);}}/></label>
-      {notice && <small role="status">{notice}</small>}
       <details className="dj-entries">
         <summary>Pauta musical</summary>
         <label className="dj-arm"><input type="checkbox" checked={automatic} onChange={event=>setAutomatic(event.target.checked)} />

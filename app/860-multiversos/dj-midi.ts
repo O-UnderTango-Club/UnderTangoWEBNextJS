@@ -1,5 +1,16 @@
 export type DeckSide = "A" | "B";
 export type DjCommand = { action: "scene"; step: -1 | 1 } | { action: "load" | "play" | "cue"; side: DeckSide };
+export const DJ_FADERS = {cross:"Crossfader A/B",volumeA:"Volumen deck A",volumeB:"Volumen deck B"} as const;
+export const DJ_PADS = ["pad1","pad2","pad3","pad4"] as const;
+export const DJ_MIDI_NAMES = {...DJ_FADERS, pad1:"Pad 1", pad2:"Pad 2", pad3:"Pad 3", pad4:"Pad 4"} as const;
+export type DjPad = typeof DJ_PADS[number];
+export type DjMidiTarget = keyof typeof DJ_MIDI_NAMES;
+export type DjBinding = {id:string;alias?:string;label:string};
+export type DjMidiMap = Partial<Record<DjMidiTarget,DjBinding>>;
+export type DjMidiMessage = DjBinding & {type:"cc"|"bend"|"note";value:number};
+export const isDjPad = (target:DjMidiTarget):target is DjPad => DJ_PADS.some(pad=>pad===target);
+export const DJ_MIDI = "860-dj-midi";
+
 export const DJ_CONTROL = "860-dj-control";
 export const isInpulse200 = (name?: string) => /inpulse[\s_-]*200[\s_-]*mk[\s_-]*3/i.test(name ?? "");
 

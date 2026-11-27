@@ -3,7 +3,7 @@ export const MIDI_REASSIGNMENT = "860-midi-reassignment";
 export type MidiReassignment = {
   id: string;
   alias?: string;
-  owner: "bank" | "transport" | "master";
+  owner: "bank" | "transport" | "master" | "dj";
 };
 
 export function reassignMidi(detail: MidiReassignment) {

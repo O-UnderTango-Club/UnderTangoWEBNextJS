@@ -148,6 +148,9 @@ let width = 1,
   lastRead = 0,
   nextRead = 0,
   nextLines = 0;
+// Start the game clock only after the live view has had a moment of its own.
+const cameraIntroMs = 500;
+let firstCameraFrameAt = null;
 let sceneStart = null,
   lastLineAt = 0,
   lastMark = 0,
@@ -357,10 +360,10 @@ function refreshTexture(source, crop, stamp) {
   textureTime = stamp;
 }
 function render(source, crop, now, dt) {
+  if (sceneStart === null) return;
   const elapsed = now - sceneStart,
     lost = now - lastLineAt;
   ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
-  if (sceneStart === null) return;
   updateRound(now);
   const withinTime = secondsLeft(sceneStart, now) > 0;
   if (motion && lost > 900 && stage.dataset.phase === 'ground') phase('search', hint);
@@ -457,7 +460,9 @@ function animate(now) {
     source = isDemo ? scene : feed;
   const sw = isDemo ? scene.width : feed.videoWidth,
     sh = isDemo ? scene.height : feed.videoHeight;
-  if (sw && sh && (isDemo || feed.readyState >= 2)) {
+  const hasFrame = sw > 0 && sh > 0 && (isDemo || feed.readyState >= 2);
+  if (hasFrame && !isDemo && firstCameraFrameAt === null) firstCameraFrameAt = now;
+  if (hasFrame && (isDemo || now - firstCameraFrameAt >= cameraIntroMs)) {
     const crop = visibleCrop(sw, sh, width, height);
     if (now >= nextRead) {
       nextRead = now + 40;
@@ -476,6 +481,7 @@ function animate(now) {
   frame = requestAnimationFrame(animate);
 }
 function startFrames() {
+  firstCameraFrameAt = null;
   frameAt = performance.now();
   tools.hidden = false;
   listenToTilt();

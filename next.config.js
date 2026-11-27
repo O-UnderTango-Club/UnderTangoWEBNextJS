@@ -15,7 +15,13 @@ const nextConfig = {
       destination: "/867-producciones-musicales",
       permanent: true,
     }));
-    return [...homeRedirects, ...bandRedirects];
+    const cameraEntry = {
+      source: "/847/primera-voluntad",
+      missing: [{ type: "query", key: "vista", value: "ficha" }],
+      destination: "/847/primera-voluntad/experiencia.html?v=camara",
+      permanent: false,
+    };
+    return [...homeRedirects, ...bandRedirects, cameraEntry];
   },
 };
 

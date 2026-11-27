@@ -7,7 +7,7 @@ const description = "Ø Primera voluntad. Performance audiovisual generativa de 
 export const metadata: Metadata = {
   title: "Ø Primera voluntad · Multiversos 2026 | UnderTango",
   description,
-  alternates: { canonical: "/847/primera-voluntad" },
+  alternates: { canonical: "/847/primera-voluntad?vista=ficha" },
   openGraph: { title: "Ø Primera voluntad · 2 de diciembre en Puerto Iguazú", description, url: "/847/primera-voluntad", type: "website" },
 };
 export default function PrimeraVoluntad() {
@@ -22,8 +22,8 @@ export default function PrimeraVoluntad() {
             <p className={styles.date}><time dateTime="2026-12-02">Miércoles 2 de diciembre de 2026</time><br />La Cabaña de los Muñecos · Puerto Iguazú</p>
             <p>Pablo Cieslik · Ø UnderTango Club</p>
             <p>Mové el teléfono para guiar el cuadro entre las rectas del encuadre. En la muestra sin cámara podés arrastrarlo. Tenés 14 segundos para esquivar al Ø y llegar a la bandeja. Después podés guardar o compartir el video de tu intento.</p>
-            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=ronda14">Vivir la experiencia «Un Ø aparece» con cámara →</a></p>
-            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=ronda14#sin-camara">Ver sin cámara →</a></p>
+            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=camara">Vivir la experiencia «Un Ø aparece» con cámara →</a></p>
+            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=camara#sin-camara">Ver sin cámara →</a></p>
             <a className={styles.button} href="https://www.instagram.com/multiversos.festival/">Consultar las novedades del festival →</a>
           </header>
           <Image className={styles.flyer} src={flyer} width={720} height={900} unoptimized priority alt="Afiche de Ø Primera voluntad, Pablo Cieslik y Ø UnderTango Club, 2 de diciembre en La Cabaña de los Muñecos." />

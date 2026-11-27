@@ -23,7 +23,7 @@ export default function WebUndertango() {
           <p className={styles.kicker}>84 / 847 · Mesa de trabajo</p>
           <h1>847 · Web UnderTango</h1>
           <p>Decidir qué queremos que le llegue a la gente y comprobar que la web lo transmita. De cada página tiene que quedar claro qué ofrece, para quién es y qué puede hacer después quien la visita.</p>
-          <Link className={styles.button} href="/847/primera-voluntad">Abrir la ficha pública de Primera voluntad →</Link>
+          <a className={styles.button} href="/847/primera-voluntad">Abrir Primera voluntad con cámara →</a>
         </header>
         <section aria-labelledby="campana">
           <p className={styles.kicker}>Campaña prioritaria</p><h2 id="campana">Ø Primera voluntad</h2>

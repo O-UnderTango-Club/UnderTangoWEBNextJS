@@ -145,7 +145,9 @@
         height: 15px;
         color: rgba(163, 163, 163, 0.46);
       }
-      .stage[data-phase='permission'] #prize-target { visibility: hidden; }
+      .stage[data-round='waiting'] :is(#surface, #prize-target, #game-dock, #tilt) {
+        visibility: hidden;
+      }
       .stage[data-round='caught'] #prize-target, .stage[data-round='won'] #prize-target { color: #acffdf; }
       .stage[data-round='caught'] .tray-arrow, .stage[data-round='won'] .tray-arrow { visibility: hidden; }
       #prize-slot {
@@ -301,7 +303,7 @@
   </head>
   <body>
     <main id="game">
-      <section id="stage" class="stage" data-phase="permission" aria-label="Escena de Un Ø aparece">
+      <section id="stage" class="stage" data-phase="permission" data-round="waiting" aria-label="Escena de Un Ø aparece">
         <video id="feed" class="visual" autoplay muted playsinline hidden></video>
         <canvas id="scene" class="visual" aria-hidden="true" hidden></canvas>
         <canvas id="surface" class="visual" aria-hidden="true"></canvas>
@@ -398,9 +400,9 @@
           compartirlo desde la esquina inferior izquierda. Al cerrar se descarta el clip local. La cámara
           funciona sin micrófono y la página no envía las imágenes.
         </p>
-        <a href="/847/primera-voluntad">← Volver a la ficha</a>
+        <a href="/847/primera-voluntad?vista=ficha">Ver la ficha de la función →</a>
       </section>
     </main>
-    <script type="module" src="./experience.mjs?v=ronda14"></script>
+    <script type="module" src="./experience.mjs?v=camara"></script>
   </body>
 </html>

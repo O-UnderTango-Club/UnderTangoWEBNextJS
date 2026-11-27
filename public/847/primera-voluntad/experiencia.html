@@ -145,7 +145,7 @@
         height: 15px;
         color: rgba(163, 163, 163, 0.46);
       }
-      .stage[data-round='waiting'] :is(#surface, #prize-target, #game-dock, #tilt) {
+      .stage[data-round='waiting'] :is(#surface, #prize-target, #game-dock) {
         visibility: hidden;
       }
       .stage[data-round='caught'] #prize-target, .stage[data-round='won'] #prize-target { color: #acffdf; }
@@ -221,18 +221,17 @@
         border-radius: 2rem;
         background: #101222eb;
       }
-      .stage[data-phase='review'] :is(#surface, #prize-target, #steer-pad, #tilt, #stage-tools) { display: none; }
-      #tilt {
+      .stage[data-phase='review'] :is(#surface, #prize-target, #steer-pad, #stage-tools) { display: none; }
+      #enable-sound {
         position: absolute;
-        right: var(--right);
-        top: var(--top);
-        width: 44px;
-        height: 44px;
-        padding: 8px;
-        border-radius: 50%;
-        background: #0e1321e8;
+        z-index: 2;
+        left: 50%;
+        bottom: calc(var(--bottom) + 58px);
+        transform: translateX(-50%);
+        border-radius: 2rem;
+        background: #101222eb;
+        color: white;
       }
-      #tilt svg { width: 22px; height: 22px; vertical-align: middle; }
       #steer-pad {
         position: absolute;
         top: 0; left: 0;
@@ -345,12 +344,7 @@
           <span id="cue-meta"></span> <span id="cue-title"></span>
         </div>
         <button id="steer-pad" type="button" hidden aria-label="Mover el cuadro. Arrastrá o usá las flechas del teclado."></button>
-        <button id="tilt" type="button" aria-label="Activar inclinación del teléfono" title="Activar inclinación del teléfono" hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
-            <rect x="7" y="3" width="10" height="17" rx="2" transform="rotate(22 12 12)"/>
-            <path d="M3 7C4 4 6 2 9 1M21 17c-1 3-3 5-6 6"/>
-          </svg>
-        </button>
+        <button id="enable-sound" type="button" hidden>Activar sonido</button>
         <div id="game-dock">
           <div id="clip-tools" hidden>
             <a id="save" aria-label="Guardar video" title="Guardar video" target="_blank" rel="noopener" hidden download>
@@ -422,7 +416,6 @@
         <p>
           Apuntá a una junta del piso o al borde de una mesa. El Ø rueda por esa recta y puede saltar a otra que entre en el encuadre.
           Incliná el teléfono para que baje el cartel. El Ø sale a tu encuentro. Amagá hacia un lado y cambiá de dirección cuando salte. Tenés 14 segundos para tocar la bandeja. Si llegás, el festejo y el regalo aparecen al tocar la bandeja. Si se acaba el tiempo, tocá la flecha para volver a intentar. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
-          Si aparece el botón de inclinación arriba a la derecha, podés tocarlo para usar el sensor.
         </p>
         <p>
           «trance psicomusical», de Ø UnderTango Club, suena completa. Si hace falta, tocá la imagen para escucharla. Podés silenciarla con el botón de sonido. El video incluye la música y los pasos. Cada ronda se graba durante 14 segundos en tu dispositivo. Podés guardarlo o
@@ -432,6 +425,6 @@
         <a href="/847/primera-voluntad?vista=ficha">Ver la ficha de la función →</a>
       </section>
     </main>
-    <script type="module" src="./experience.mjs?v=festejo"></script>
+    <script type="module" src="./experience.mjs?v=sonido"></script>
   </body>
 </html>

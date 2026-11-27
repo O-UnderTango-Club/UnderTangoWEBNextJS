@@ -97,11 +97,13 @@ export function soundscape(onChange) {
   const steps = [];
   const samples = new Uint8Array(128);
 
+  let live = false, blocked = false;
   function play() {
-    if (paused || !player || !player.paused || startingPlayer || started === null) return;
+    if (paused || !player || !player.paused || startingPlayer || !live) return;
     startingPlayer = true;
     const current = player;
     current.play().catch(error => {
+      if (current === player && error.name === 'NotAllowedError') blocked = true;
       if (current === player && error.name !== 'NotAllowedError' && error.name !== 'AbortError') failed = true;
     }).finally(() => {
       if (current === player) {
@@ -162,7 +164,7 @@ export function soundscape(onChange) {
         musicNode.connect(meter);
         meter.connect(volume);
         volume.connect(mix);
-        player.onplaying = () => { failed = false; onChange(); };
+        player.onplaying = () => { blocked = failed = false; onChange(); };
         player.onerror = () => { failed = true; onChange(); };
         noise = makeNoise(context);
         context.onstatechange = () => {
@@ -225,6 +227,7 @@ export function soundscape(onChange) {
   }
 
   function close() {
+    live = blocked = false;
     started = null;
     steps.length = 0;
     request?.abort();
@@ -249,6 +252,8 @@ export function soundscape(onChange) {
 
   return {
     prepare,
+    enableLive() { live = true; unlock(); },
+    needsGesture: () => Boolean(live && !muted && !paused && (blocked || context?.state === 'suspended')),
     unlock,
     toggle,
     step,

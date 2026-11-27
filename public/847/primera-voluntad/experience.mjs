@@ -11,7 +11,7 @@ import {
   drawImpacts,
 } from './scene.mjs';
 import { drawSign } from './solid-sign.mjs?v=toma14';
-import { soundscape } from './footsteps.mjs?v=festejo';
+import { soundscape } from './footsteps.mjs?v=sonido';
 
 import { RollingSign, ShowBoard, collide, constrainContact, tiltFromRest } from './stage-physics.mjs?v=festejo';
 import { invitation, layoutBoard, paintBoard } from './show-board.mjs?v=ronda14';
@@ -32,7 +32,7 @@ const camera = get('camera'),
   sound = get('sound'),
   stop = get('stop'),
   speaker = get('speaker'),
-  tiltButton = get('tilt');
+  enableSound = get('enable-sound');
 const caption = get('cue'),
   tools = get('stage-tools'),
   status = get('status'),
@@ -194,30 +194,13 @@ function measureTilt({ beta, gamma }) {
   if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
   attitude = { beta, gamma };
   applyTilt();
-  tiltButton.hidden = true;
 }
 function listenToTilt() {
   if (!window.DeviceOrientationEvent) return;
   window.addEventListener('deviceorientation', measureTilt);
   window.screen.orientation?.addEventListener?.('change', applyTilt);
   window.addEventListener('orientationchange', applyTilt);
-  tiltButton.disabled = false;
-  tiltButton.hidden = typeof window.DeviceOrientationEvent.requestPermission !== 'function';
 }
-tiltButton.addEventListener('click', async () => {
-  const session = generation;
-  tiltButton.disabled = true;
-  try {
-    const result = await window.DeviceOrientationEvent.requestPermission();
-    if (session === generation && result !== 'granted')
-      status.textContent = 'El cartel sigue el movimiento visible en la cámara.';
-  } catch {
-    if (session === generation)
-      status.textContent = 'El cartel sigue el movimiento visible en la cámara.';
-  } finally {
-    if (session === generation) tiltButton.hidden = true;
-  }
-});
 
 function updateSound() {
   const audible = audio.audible();
@@ -227,6 +210,7 @@ function updateSound() {
       ? 'Silenciar música y pasos'
       : 'Activar música y pasos';
   sound.hidden = speaker.hidden = !mode || mode === 'review' || !audio.supported;
+  enableSound.hidden = mode !== 'camera' || !stream || suspended || !audio.needsGesture();
   sound.textContent = label;
   speaker.setAttribute('aria-label', label);
   speaker.setAttribute('aria-pressed', String(audible));
@@ -282,7 +266,6 @@ function stopInput() {
   window.removeEventListener('deviceorientation', measureTilt);
   window.screen.orientation?.removeEventListener?.('change', applyTilt);
   window.removeEventListener('orientationchange', applyTilt);
-  tiltButton.hidden = true;
   attitude = baseline = pointer = null;
   pad.hidden = true;
   if (stream) stream.getTracks().forEach((track) => track.stop());
@@ -501,6 +484,7 @@ function openSecret(id, pushEntry = true) {
       ink.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
     }
   }
+  enableSound.hidden = true;
   mode = 'prize';
   stopInput();
   if (clip.state === 'preparing') frame = requestAnimationFrame(animate);
@@ -582,6 +566,7 @@ async function startInput(selected) {
   window.scrollTo(0, 0);
   if (selected === 'demo') {
     audio.unlock();
+    audio.enableLive();
     scene.hidden = false;
     startFrames();
     return;
@@ -599,6 +584,7 @@ async function startInput(selected) {
       return;
     }
     stream = acquired;
+    audio.enableLive();
     for (const track of stream.getVideoTracks())
       track.addEventListener(
         'ended',
@@ -736,10 +722,11 @@ camera.addEventListener('click', () => enter('camera'));
 demo.addEventListener('click', () => enter('demo'));
 stop.addEventListener('click', dismiss);
 get('dismiss').addEventListener('click', dismiss);
+enableSound.addEventListener('click', audio.unlock);
 sound.addEventListener('click', audio.toggle);
 speaker.addEventListener('click', audio.toggle);
 stage.addEventListener('click', (event) => {
-  if (mode && !event.target.closest('button,a')) audio.unlock();
+  if ((mode === 'demo' || (mode === 'camera' && stream)) && !event.target.closest('button,a')) audio.unlock();
 });
 let leavingDocument = false;
 addEventListener('pagehide', () => { leavingDocument = true; suspend(); });

@@ -21,9 +21,9 @@ export default function PrimeraVoluntad() {
             <p>Una performance audiovisual en la que el piano, la electrónica y la imagen se transforman en vivo. Cuando cambia una frecuencia, también cambia lo que ves.</p>
             <p className={styles.date}><time dateTime="2026-12-02">Miércoles 2 de diciembre de 2026</time><br />La Cabaña de los Muñecos · Puerto Iguazú</p>
             <p>Pablo Cieslik · Ø UnderTango Club</p>
-            <p>Mové el teléfono para guiar el cuadro entre las rectas del encuadre. En la muestra sin cámara podés arrastrarlo. A los 15 segundos podés guardar o compartir el video.</p>
-            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=cruce">Vivir la experiencia «Un Ø aparece» con cámara →</a></p>
-            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=cruce#sin-camara">Ver sin cámara →</a></p>
+            <p>Mové el teléfono para guiar el cuadro entre las rectas del encuadre. En la muestra sin cámara podés arrastrarlo. Tenés 14 segundos para esquivar al Ø y llegar a la bandeja. Después podés guardar o compartir el video de tu intento.</p>
+            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=ronda14">Vivir la experiencia «Un Ø aparece» con cámara →</a></p>
+            <p><a className={styles.button} href="/847/primera-voluntad/experiencia.html?v=ronda14#sin-camara">Ver sin cámara →</a></p>
             <a className={styles.button} href="https://www.instagram.com/multiversos.festival/">Consultar las novedades del festival →</a>
           </header>
           <Image className={styles.flyer} src={flyer} width={720} height={900} unoptimized priority alt="Afiche de Ø Primera voluntad, Pablo Cieslik y Ø UnderTango Club, 2 de diciembre en La Cabaña de los Muñecos." />

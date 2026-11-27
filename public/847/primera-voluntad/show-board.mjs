@@ -1,15 +1,7 @@
-import { introMs, invitationMs } from './timing.mjs?v=cruce';
-
-export const announcements = [
-  {
-    city: 'Puerto Iguazú',
-    text: 'El 2 de diciembre nos vemos en la Cabaña de los Muñecos, en Puerto Iguazú',
-  },
-  { city: 'Posadas', text: 'El 12 de diciembre nos vemos en Silicon Misiones, en Posadas' },
-];
-export function cueAt(ms) {
-  return ms < introMs ? -1 : Math.floor((ms - introMs) / invitationMs) % announcements.length;
-}
+export const invitation = {
+  city: 'Puerto Iguazú',
+  text: 'El 2 de diciembre nos vemos en la Cabaña de los Muñecos, en Puerto Iguazú',
+};
 
 function wrap(ctx, text, width) {
   const lines = [];
@@ -25,13 +17,12 @@ function wrap(ctx, text, width) {
   return lines;
 }
 
-// Letter both faces at the same size so the physical body stays continuous
-// when the city changes. The canvas is shared by the live view and the video.
+// The same lettered face appears on the live canvas and in the recorded video.
 export function layoutBoard(ctx, view) {
   const w = view.width,
     h = view.height;
   const available = w - view.left - view.right;
-  const width = Math.min(528, available * (w < h ? 0.88 : 0.66));
+  const width = Math.min(550, available * (w < h ? 0.915 : 0.69));
   const pad = Math.min(15, Math.max(9, width * 0.044));
   const artSize = Math.min(51, Math.max(28, width * 0.14));
   const column = Math.max(25, width - pad * 3 - artSize);
@@ -41,25 +32,24 @@ export function layoutBoard(ctx, view) {
   const metaFont = '650 ' + small + 'px system-ui, sans-serif';
   const lineH = size * 1.09;
   ctx.font = font;
-  const titles = announcements.map((a) => wrap(ctx, a.text, column));
+  const titles = wrap(ctx, invitation.text, column);
   ctx.font = metaFont;
-  const labels = announcements.map((a) => wrap(ctx, 'Show de arte generativo · ' + a.city, column));
+  const labels = wrap(ctx, 'Show de arte generativo · ' + invitation.city, column);
   const height = Math.ceil(
     pad * 2 +
-      Math.max(...labels.map((l) => l.length)) * small * 1.22 +
+      labels.length * small * 1.22 +
       7 +
-      Math.max(...titles.map((l) => l.length)) * lineH
+      titles.length * lineH
   );
   return { width, height, pad, artSize, font, small, metaFont, lineH, titles, labels };
 }
 
-export function paintBoard(ctx, board, layout, index, art, now) {
+export function paintBoard(ctx, board, layout, art, now) {
   const { width: w, height: h } = layout;
   const x = -w / 2,
     y = -h / 2;
   const artReady = art.complete && !!art.naturalWidth;
-  layout.faces ??= [];
-  if (!layout.faces[index] || layout.faces[index].artReady !== artReady) {
+  if (!layout.face || layout.face.artReady !== artReady) {
     const canvas = document.createElement('canvas');
     const scale = Math.min(1.5, window.devicePixelRatio || 1);
     canvas.width = Math.ceil((w + 12) * scale);
@@ -67,13 +57,13 @@ export function paintBoard(ctx, board, layout, index, art, now) {
     const ink = canvas.getContext('2d');
     ink.scale(scale, scale);
     ink.translate(4 + w / 2, 3 + h / 2);
-    letterFace(ink, layout, index, art);
-    layout.faces[index] = { canvas, artReady };
+    letterFace(ink, layout, art);
+    layout.face = { canvas, artReady };
   }
   ctx.save();
   ctx.translate(board.x, board.y);
   ctx.rotate(board.angle);
-  ctx.drawImage(layout.faces[index].canvas, x - 4, y - 3, w + 12, h + 12);
+  ctx.drawImage(layout.face.canvas, x - 4, y - 3, w + 12, h + 12);
   const hit = Math.max(0, 1 - (now - board.lastHit) / 850);
   if (hit > 0) {
     ctx.strokeStyle = 'rgba(235,255,249,' + hit * 0.9 + ')';
@@ -83,18 +73,18 @@ export function paintBoard(ctx, board, layout, index, art, now) {
   ctx.restore();
 }
 
-function letterFace(ctx, layout, index, art) {
+function letterFace(ctx, layout, art) {
   const { width: w, height: h, pad, artSize } = layout;
   const x = -w / 2,
     y = -h / 2;
-  const accent = index === 0 ? '#89f2dc' : '#fabe88';
+  const accent = '#89f2dc';
   ctx.save();
   ctx.fillStyle = '#343148';
   ctx.fillRect(x + 2, y + 4, w, h);
   ctx.shadowColor = 'transparent';
   const plate = ctx.createLinearGradient(x, y, x + w, y + h);
   plate.addColorStop(0, '#10101f');
-  plate.addColorStop(1, index === 0 ? '#27233d' : '#342637');
+  plate.addColorStop(1, '#27233d');
   ctx.fillStyle = plate;
   ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = '#736d80';
@@ -110,19 +100,19 @@ function letterFace(ctx, layout, index, art) {
   }
   const tx = x + pad * 2 + artSize;
   const block =
-    layout.labels[index].length * layout.small * 1.22 + 7 + layout.titles[index].length * layout.lineH;
+    layout.labels.length * layout.small * 1.22 + 7 + layout.titles.length * layout.lineH;
   let ty = -block / 2;
   ctx.textBaseline = 'top';
   ctx.fillStyle = accent;
   ctx.font = layout.metaFont;
-  for (const line of layout.labels[index]) {
+  for (const line of layout.labels) {
     ctx.fillText(line, tx, ty);
     ty += layout.small * 1.22;
   }
   ty += 7;
   ctx.fillStyle = '#fffaf6';
   ctx.font = layout.font;
-  for (const line of layout.titles[index]) {
+  for (const line of layout.titles) {
     ctx.fillText(line, tx, ty);
     ty += layout.lineH;
   }

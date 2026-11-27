@@ -73,7 +73,7 @@ export class RollingSign {
     const blend = 1 - Math.exp(-dt * 6);
     // The visible solid grows into the block, even at the far end of a rail.
     // Collision and artwork use this same radius.
-    const radius = Math.max(route.radius, size * (0.062 + guard * 0.079));
+    const radius = Math.max(route.radius, size * (0.062 + guard * 0.09));
     this.radius += (radius - this.radius) * (1 - Math.exp(-dt * (7 + 8 * guard)));
     const lift = (route.lift || 0) + arc * size * (this.gentle ? 0.07 : 0.155);
     const rise = (lift - this.lift) * (1 - Math.exp(-dt * 15));
@@ -295,10 +295,10 @@ export function collide(sign, board, now) {
     (sign.vy - (sign.liftSpeed || 0) - board.vy - board.panVy - board.spin * contactX) * wy;
   const underneath = wy > 0.45;
   const lateral = board.vx + board.panVx, descent = Math.max(0, board.vy + board.panVy);
-  const cutting = board.driveX * lateral > 0 && Math.abs(board.driveX) > 52 &&
-    Math.abs(lateral) > Math.max(56, descent * 0.57);
-  const committed = sign.sinceCounter > 0.15 && sign.sinceCounter < 1.05;
-  if (underneath && relative < -6 && !sign.slipTime && cutting && (committed || Math.abs(u) > hw * 0.66)) {
+  const cutting = board.driveX * lateral > 0 && Math.abs(board.driveX) > 63 &&
+    Math.abs(lateral) > Math.max(65, descent * 0.66);
+  const committed = sign.sinceCounter > 0.18 && sign.sinceCounter < 0.88;
+  if (underneath && relative < -6 && !sign.slipTime && cutting && (committed || Math.abs(u) > hw * 0.73)) {
     sign.slipTime = 1.32;
     sign.escapeSide = -Math.sign(lateral);
     sign.vx += sign.escapeSide * Math.min(230, board.width * 0.76);

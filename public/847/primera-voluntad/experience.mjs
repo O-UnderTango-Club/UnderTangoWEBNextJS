@@ -11,14 +11,14 @@ import {
   drawImpacts,
 } from './scene.mjs';
 import { drawSign } from './solid-sign.mjs';
-import { soundscape } from './footsteps.mjs?v=bandeja';
+import { soundscape } from './footsteps.mjs?v=ronda14';
 
-import { RollingSign, ShowBoard, collide, tiltFromRest } from './stage-physics.mjs?v=cruce';
-import { announcements, cueAt, layoutBoard, paintBoard } from './show-board.mjs?v=cruce';
-import { SceneClip } from './clip.mjs';
+import { RollingSign, ShowBoard, collide, tiltFromRest } from './stage-physics.mjs?v=ronda14';
+import { invitation, layoutBoard, paintBoard } from './show-board.mjs?v=ronda14';
+import { SceneClip } from './clip.mjs?v=ronda14';
 import { touchesTray, settlePrize } from './prize-goal.mjs?v=cruce';
 import { showPrize } from './prize.mjs?v=meta-visible';
-import { introMs } from './timing.mjs?v=cruce';
+import { roundPhase, secondsLeft } from './timing.mjs?v=ronda14';
 
 const get = (id) => document.getElementById(id);
 const stage = get('stage'),
@@ -60,7 +60,9 @@ let body = null,
 const hits = [];
 const pad = get('steer-pad'),
   target = get('prize-target'),
-  gift = get('open-secret');
+  gift = get('open-secret'),
+  countdown = get('countdown'),
+  restart = get('restart');
 let goal, seating = null, pointer = null, baseline = null;
 
 function positionPrize() {
@@ -86,27 +88,41 @@ function checkLanding() {
   };
   pad.hidden = true;
 }
-function advanceSeating(step) {
-  if (settlePrize(board, goal, seating, step) && gift.hidden) {
-    stage.dataset.prize = 'ready';
-    gift.hidden = false;
-    status.textContent = 'Encajó el cuadro. Tocá el regalo para abrirlo.';
-  }
+function updateRound(now) {
+  const seconds = sceneStart === null ? null : secondsLeft(sceneStart, now);
+  const state = seconds === null ? 'waiting' : roundPhase(seconds, Boolean(seating), clip.state);
+  if (seconds !== null && countdown.textContent !== String(seconds)) countdown.textContent = String(seconds);
+  if (state === stage.dataset.round) return;
+  stage.dataset.round = state;
+  const finished = state === 'won' || state === 'lost';
+  const ready = finished && clip.state === 'ready';
+  countdown.hidden = seconds === null || finished;
+  clipTools.hidden = save.hidden = share.hidden = !ready;
+  gift.hidden = state !== 'won';
+  restart.hidden = state !== 'lost';
+  if (state !== 'playing') pad.hidden = true;
+  if (state === 'caught') status.textContent = 'El cartel llegó a la bandeja.';
+  if (state === 'won') status.textContent = 'Tocá el regalo para abrirlo.';
+  if (state === 'lost') status.textContent = 'Se terminó el tiempo. Tocá la flecha para volver a jugar.';
 }
+
 function updateClip(current) {
-  const ready = current.state === 'ready';
-  clipTools.hidden = save.hidden = !ready;
-  share.hidden = !ready || !current.canShare();
   clipError.hidden = current.state !== 'unavailable';
-  if (ready) {
+  if (current.state === 'ready') {
     save.href = current.url;
     save.download = current.file.name;
   } else {
     save.removeAttribute('href');
   }
+  updateRound(performance.now());
 }
 share.addEventListener('click', async () => {
-  if (sharing || !clip.canShare()) return;
+  if (sharing || clip.state !== 'ready') return;
+  if (!clip.canShare()) {
+    save.click();
+    status.textContent = 'Guardá el video y compartilo desde tus archivos.';
+    return;
+  }
   sharing = true;
   try {
     await navigator.share({ files: [clip.file], title: 'Ø Primera voluntad' });
@@ -132,12 +148,11 @@ let width = 1,
   lastRead = 0,
   nextRead = 0,
   nextLines = 0;
-let sceneStart = 0,
+let sceneStart = null,
   lastLineAt = 0,
   lastMark = 0,
   lastStep = 0,
-  side = 1,
-  cueIndex = -1;
+  side = 1;
 const marks = [];
 let attitude = null;
 function applyTilt() {
@@ -253,23 +268,27 @@ function stopInput() {
   feed.pause();
   feed.srcObject = null;
 }
-function release() {
-  stopInput();
-  seating = null;
-  delete stage.dataset.prize;
-  gift.hidden = true;
-  cancelAnimationFrame(frame);
-  mode = motion = previous = body = null;
-  clip.reset();
+function resetRound() {
+  sceneStart = null;
+  seating = motion = previous = body = pointer = null;
+  nextRead = nextLines = 0;
+  textureTime = -1;
+  side = 1;
+  hits.length = marks.length = 0;
+  pad.hidden = caption.hidden = true;
   board = new ShowBoard();
   if (layout) board.fit(view, layout);
-  hits.length = 0;
-  feed.hidden = scene.hidden = true;
+  applyTilt();
+  clip.reset();
+}
+function release() {
+  stopInput();
+  cancelAnimationFrame(frame);
+  mode = null;
+  resetRound();
+  feed.hidden = scene.hidden = tools.hidden = true;
   sample.width = sample.height = texture.width = texture.height = 0;
   ctx?.clearRect(0, 0, width, height);
-  marks.length = 0;
-  caption.hidden = tools.hidden = true;
-  cueIndex = -1;
   audio.close();
 }
 function end(message, complete = false) {
@@ -277,14 +296,11 @@ function end(message, complete = false) {
   finish.hidden = !complete;
   phase('idle', message);
 }
-function showWords(elapsed) {
-  const next = cueAt(elapsed);
-  if (next === cueIndex || next < 0) return;
-  cueIndex = next;
-  const cue = announcements[next];
-  get('cue-meta').textContent = 'Show de arte generativo · ' + cue.city;
-  get('cue-title').textContent = cue.text;
-  caption.dataset.cue = String(next);
+function startRound(now) {
+  sceneStart = lastMark = lastStep = now;
+  audio.start(now);
+  get('cue-meta').textContent = 'Show de arte generativo · ' + invitation.city;
+  get('cue-title').textContent = invitation.text;
   caption.hidden = tools.hidden = false;
 }
 function analyze(source, crop, now) {
@@ -301,7 +317,7 @@ function analyze(source, crop, now) {
   if (previous && now - lastRead < 550) {
     const change = cameraMotion(previous, current);
     if (change) {
-      if (mode === 'camera' && motion && !seating) board.carry(change);
+      if (mode === 'camera' && stage.dataset.round === 'playing') board.carry(change);
       motion?.carry(change);
       carryMarks(marks, change, width, height);
     }
@@ -343,13 +359,16 @@ function refreshTexture(source, crop, stamp) {
 function render(source, crop, now, dt) {
   const elapsed = now - sceneStart,
     lost = now - lastLineAt;
-  showWords(elapsed);
+  ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
+  if (sceneStart === null) return;
+  updateRound(now);
+  const withinTime = secondsLeft(sceneStart, now) > 0;
   if (motion && lost > 900 && stage.dataset.phase === 'ground') phase('search', hint);
   let turned = false;
   while (dt > 0) {
     const step = Math.min(dt, 1 / 90);
     if (motion) {
-      const playing = cueIndex >= 0 && !seating;
+      const playing = withinTime && !seating;
       if (playing) board.advance(view, step, gentle.matches);
       if (lost < 500 && motion.advance(step)) turned = true;
       body.advance(motion, step, playing ? board : null);
@@ -366,10 +385,9 @@ function render(source, crop, now, dt) {
         turned = true;
       }
     }
-    if (seating) advanceSeating(step);
+    if (seating && seating.progress < 1) settlePrize(board, goal, seating, step);
     dt -= step;
   }
-  ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
   const beat = motion ? audio.pulse() : 0;
   if (motion) {
     if (lost < 900 && (turned || now - lastStep > 460 + 100 * motion.depth)) {
@@ -408,56 +426,29 @@ function render(source, crop, now, dt) {
     drawField(ctx, body, now, beat);
     ctx.restore();
   }
-  if (cueIndex >= 0) {
-    if (mode === 'demo' && !seating) {
-      pad.hidden = false;
-      pad.style.width = board.width + 'px';
-      pad.style.height = board.height + 'px';
-      pad.style.transform = 'translate(' + (board.x - board.width / 2) + 'px,' +
-        (board.y - board.height / 2) + 'px) rotate(' + board.angle + 'rad)';
-    }
-    ctx.save();
-    ctx.globalAlpha = Math.min(1, (elapsed - introMs) / 140);
-    paintBoard(ctx, board, layout, cueIndex, art, now);
-    ctx.restore();
+  if (mode === 'demo' && withinTime && !seating) {
+    pad.hidden = false;
+    pad.style.width = board.width + 'px';
+    pad.style.height = board.height + 'px';
+    pad.style.transform = 'translate(' + (board.x - board.width / 2) + 'px,' +
+      (board.y - board.height / 2) + 'px) rotate(' + board.angle + 'rad)';
   }
+  paintBoard(ctx, board, layout, art, now);
   // Keep the solid defender visible in front when the plate meets it.
   if (body) drawSign(ctx, body, beat, now, elapsed);
-  if (clip.state === 'idle') clip.begin(surface, audio, now);
+  if (clip.state === 'idle') clip.begin(surface, audio, sceneStart);
   else if (clip.state === 'preparing') clip.paint(surface, now);
 }
-// Keep a completed clip on the claim page. For an early win, finish its two
-// invitations on the last visible frame, releasing the physical camera immediately.
 function openSecret() {
   if (gift.hidden || (mode !== 'camera' && mode !== 'demo')) return;
   cancelAnimationFrame(frame);
-  const still = document.createElement('canvas');
-  if (clip.state === 'preparing') {
-    still.width = surface.width;
-    still.height = surface.height;
-    const live = mode === 'camera' && feed.videoWidth && feed.readyState >= 2;
-    const source = mode === 'demo' ? scene : live ? feed : surface;
-    const crop = visibleCrop(live ? feed.videoWidth : source.width, live ? feed.videoHeight : source.height, width, height);
-    still.getContext('2d').drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, still.width, still.height);
-  }
-  const round = crypto.randomUUID();
-  history.pushState(null, '', './premio.html#' + round);
+  const id = crypto.randomUUID();
+  history.pushState(null, '', './premio.html#' + id);
   mode = 'prize';
   stopInput();
   get('game').hidden = true;
-  showPrize(round, clipTools);
+  showPrize(id, clipTools);
   get('prize').querySelector('.prize-extras').append(sound);
-  const frozenCrop = { x: 0, y: 0, w: still.width, h: still.height };
-  function finishClip(now) {
-    if (mode !== 'prize') return;
-    if (clip.state !== 'preparing') return;
-    lastLineAt = now;
-    const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
-    frameAt = now;
-    render(still, frozenCrop, now, dt);
-    frame = requestAnimationFrame(finishClip);
-  }
-  frame = requestAnimationFrame(finishClip);
 }
 function animate(now) {
   const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
@@ -478,23 +469,16 @@ function animate(now) {
         return;
       }
     }
-    if (!sceneStart) {
-      now = performance.now();
-      sceneStart = lastMark = lastStep = now;
-      audio.start(now);
-    }
+    now = performance.now();
+    if (motion && sceneStart === null) startRound(now);
     render(source, crop, now, dt);
   }
   frame = requestAnimationFrame(animate);
 }
 function startFrames() {
   frameAt = performance.now();
-  sceneStart = 0;
-  textureTime = -1;
-  lastMark = lastStep = sceneStart;
-  nextRead = nextLines = 0;
+  tools.hidden = false;
   listenToTilt();
-  side = 1;
   phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
   frame = requestAnimationFrame(animate);
 }
@@ -552,9 +536,16 @@ async function enter(selected) {
   }
 }
 function dismiss() {
-  end('Experiencia cerrada. Podés volver a empezar.', cueIndex >= 0);
+  end('Experiencia cerrada. Podés volver a empezar.', sceneStart !== null);
 }
 gift.addEventListener('click', openSecret);
+restart.addEventListener('click', () => {
+  if (stage.dataset.round !== 'lost') return;
+  resetRound();
+  frameAt = performance.now();
+  audio.unlock();
+  phase('search', mode === 'demo' ? 'Escena de muestra, sin cámara.' : hint);
+});
 pad.addEventListener('pointerdown', (event) => {
   if (mode !== 'demo' || pointer || event.button !== 0) return;
   pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
@@ -573,7 +564,7 @@ pad.addEventListener('keydown', (event) => {
   const dx = Math.min(18, width * 0.04) / (width * 1.25);
   const dy = 0.055;
   const delta = { ArrowLeft: [-dx, 0], ArrowRight: [dx, 0], ArrowUp: [0, -dy], ArrowDown: [0, dy] }[event.key];
-  if (!delta || mode !== 'demo') return;
+  if (!delta || mode !== 'demo' || stage.dataset.round !== 'playing') return;
   event.preventDefault();
   board.steer(...delta);
 });

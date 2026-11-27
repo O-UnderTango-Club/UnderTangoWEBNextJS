@@ -5,7 +5,7 @@ import { longestLine, sameLine, visibleLines } from '../public/847/primera-volun
 import { readFloor, SignMotion } from '../public/847/primera-voluntad/motion.mjs';
 import { visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
 import { arrangeScore } from '../public/847/primera-voluntad/footsteps.mjs';
-import { clipLength, clipName } from '../public/847/primera-voluntad/timing.mjs';
+import { clipLength, clipName, roundPhase, secondsLeft } from '../public/847/primera-voluntad/timing.mjs';
 
 import { cameraMotion, carryPoint } from '../public/847/primera-voluntad/camera-motion.mjs';
 
@@ -17,7 +17,7 @@ import {
   tiltFromRest,
 } from '../public/847/primera-voluntad/stage-physics.mjs';
 import { touchesTray, settlePrize } from '../public/847/primera-voluntad/prize-goal.mjs';
-import { announcements, cueAt } from '../public/847/primera-voluntad/show-board.mjs';
+import { invitation, layoutBoard } from '../public/847/primera-voluntad/show-board.mjs';
 
 import { metalAt } from '../public/847/primera-voluntad/solid-sign.mjs';
 
@@ -478,18 +478,39 @@ test('the defender lunges from the rail into a descending plate and returns when
   assert.ok(sign.lift < 0.1 && Math.abs(sign.x - route.x) < 4);
 });
 
-test('the city on the solid changes every six seconds, including after the clip', () => {
-  assert.equal(clipLength, 15000);
-  for (const ms of [0, 999]) assert.equal(cueAt(ms), -1);
-  for (const ms of [1000, 6999, 13000, 14999, 15000, 18999, 25000])
-    assert.deepEqual(announcements[cueAt(ms)], { city: 'Puerto Iguazú',
-      text: 'El 2 de diciembre nos vemos en la Cabaña de los Muñecos, en Puerto Iguazú' });
-  for (const ms of [7000, 12999, 19000, 24999, 60000])
-    assert.deepEqual(announcements[cueAt(ms)], { city: 'Posadas',
-      text: 'El 12 de diciembre nos vemos en Silicon Misiones, en Posadas' });
+test('the wider sign fits the viewport and carries the Iguazú invitation throughout the round', () => {
+  assert.equal(invitation.city, 'Puerto Iguazú');
+  assert.equal(invitation.text, 'El 2 de diciembre nos vemos en la Cabaña de los Muñecos, en Puerto Iguazú');
+  const ctx = { measureText: (line) => ({ width: line.length * 8 }) };
+  for (const [w, h] of [[320, 568], [390, 844], [844, 390]]) {
+    const layout = layoutBoard(ctx, { width: w, height: h, left: 12, right: 15 });
+    assert.ok(layout.width > Math.min(528, (w - 27) * (w < h ? 0.88 : 0.66)));
+    assert.ok(layout.width < w - 27);
+    assert.equal(layout.titles.join(' '), invitation.text);
+    assert.equal(layout.labels.join(' '), 'Show de arte generativo · Puerto Iguazú');
+  }
 });
 
-test('the export plays the first 15 continuous seconds and fades at the end', () => {
+test('each round counts fourteen seconds from the detected line and closes at the deadline', () => {
+  const start = 5821;
+  assert.equal(clipLength, 14000);
+  for (let i = 0; i < 14; i++) assert.equal(secondsLeft(start, start + i * 1000), 14 - i);
+  assert.equal(secondsLeft(start, start + 13999.99), 1);
+  assert.equal(secondsLeft(start, start + 14000), 0);
+  assert.equal(secondsLeft(start, start + 22000), 0);
+  assert.equal(secondsLeft(start + 22000, start + 22000), 14);
+  for (const clip of ['preparing', 'ready', 'unavailable']) {
+    assert.equal(roundPhase(1, false, clip), 'playing');
+    assert.equal(roundPhase(1, true, clip), 'caught');
+  }
+  for (const landed of [false, true]) {
+    assert.equal(roundPhase(0, landed, 'preparing'), 'finishing');
+    assert.equal(roundPhase(0, landed, 'ready'), landed ? 'won' : 'lost');
+    assert.equal(roundPhase(0, landed, 'unavailable'), landed ? 'won' : 'lost');
+  }
+});
+
+test('the export plays the first 14 continuous seconds and fades at the end', () => {
   const ctx = {
     createBuffer(channels, length, sampleRate) {
       const data = Array.from({ length: channels }, () => new Float32Array(length));
@@ -502,12 +523,12 @@ test('the export plays the first 15 continuous seconds and fades at the end', ()
     source.getChannelData(1)[i] = -i / source.length;
   }
   const score = arrangeScore(ctx, source, clipLength);
-  assert.equal(score.length, 15000);
-  assert.equal(clipName(clipLength, 'webm'), 'primera-voluntad-15s.webm');
+  assert.equal(score.length, 14000);
+  assert.equal(clipName(clipLength, 'webm'), 'primera-voluntad-14s.webm');
   for (let ch = 0; ch < 2; ch++) {
     const pcm = score.getChannelData(ch);
-    for (const i of [0, 14999]) assert.ok(Math.abs(pcm[i]) < 1e-6);
-    for (const i of [200, 7999, 13184, 13185, 14000, 14800])
+    for (const i of [0, 13999]) assert.ok(Math.abs(pcm[i]) < 1e-6);
+    for (const i of [200, 7999, 13184, 13185, 13800])
       assert.equal(pcm[i], source.getChannelData(ch)[i]);
   }
 });
@@ -544,7 +565,7 @@ test('the first tray contact catches even a fast, tilted or off-centre plate wit
   for (const [width, height] of [[320, 568], [390, 664], [760, 360]]) {
     const view = { ...portrait, width, height, bottom: 86 };
     const board = new ShowBoard();
-    board.fit(view, { width: (width - 28) * (width < height ? 0.88 : 0.66), height: 100 });
+    board.fit(view, { width: (width - 28) * (width < height ? 0.915 : 0.69), height: 100 });
     const goal = { x: width / 2, width: board.width, lipHeight: 11, bottom: height - view.bottom };
     assert.equal(touchesTray(board, goal), false);
     board.gravity = { x: -0.6, y: 1 };
@@ -612,7 +633,7 @@ test('waiting for the small wheel or making a large downward swipe cannot force 
     const rail = { a: { x: 0.08, y: 0.86 }, b: { x: 0.89, y: 0.34 } };
     const route = new SignMotion(readFloor([rail], w, h), w, h);
     const wheel = new RollingSign(route), board = new ShowBoard();
-    board.fit(view, { width: (w - 27) * 0.88, height: 128 });
+    board.fit(view, { width: (w - 27) * 0.915, height: 128 });
     const goal = { x: (w + view.left - view.right) / 2, bottom: h - view.bottom, width: board.width, lipHeight: 11 };
     let hits = 0, largestBlock = 0;
     function step(frame) {

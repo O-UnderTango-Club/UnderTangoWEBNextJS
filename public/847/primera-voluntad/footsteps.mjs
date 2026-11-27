@@ -1,4 +1,4 @@
-import { clipLength } from './timing.mjs';
+import { clipLength } from './timing.mjs?v=ronda14';
 
 // Stream the full master for the speakers. Only its beginning is decoded in
 // memory for a portable video export on phones without a native audio recorder.
@@ -266,6 +266,9 @@ export function soundscape(onChange) {
     close,
     supported: Boolean(Audio),
     start(now) {
+      // Each replay begins a new take. Finishing the video never stops the master.
+      if (started !== null && player) player.currentTime = 0;
+      steps.length = 0;
       started = now;
       play();
     },

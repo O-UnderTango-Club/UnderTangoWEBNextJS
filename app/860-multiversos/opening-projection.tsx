@@ -155,7 +155,7 @@ export function CollisionReadout({cue, seconds, paused}: { cue: Cue; seconds: nu
   return <p className="opening-rate" ref={ref} aria-live="off">0 golpes por segundo</p>;
 }
 
-export function OpeningProjection({scene, cue, seconds, strikes}: { scene: 1 | 2; cue: Cue; seconds: number; strikes: StrikeLog }) {
+export function OpeningProjection({scene, showCollisions, cue, seconds, strikes}: { scene: 1 | 2; showCollisions: boolean; cue: Cue; seconds: number; strikes: StrikeLog }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useLayoutEffect(() => {
     const canvas = ref.current, ink = canvas?.getContext("2d");
@@ -170,14 +170,14 @@ export function OpeningProjection({scene, cue, seconds, strikes}: { scene: 1 | 2
     const draw = () => {
       const elapsed = Math.max(0, cue.context.currentTime - cue.beginsAt), size = Math.min(width, height);
       ink.setTransform(ratio, 0, 0, ratio, 0, 0); ink.clearRect(0, 0, width, height); ink.translate(width / 2, height / 2);
+      uncoverUniverse(ink, width, height, strikes.current, motion.matches);
       if (scene === 1) {
-        uncoverUniverse(ink, width, height, strikes.current, motion.matches);
         const age = elapsed - timing.gong;
         if (age >= 0 && age < timing.fade) {
           ink.fillStyle = "#101116"; ink.globalAlpha = 1 - ease((age / timing.fade - .5) * 2);
           dot(ink, 0, 0, Math.max(4.5, size * .013)); ink.globalAlpha = 1;
         }
-      } else {
+      } else if (showCollisions) {
         collisions(ink, width, height, elapsed, seconds, motion.matches);
         for (const hit of strikes.current.hits) {
           ink.save();
@@ -190,7 +190,7 @@ export function OpeningProjection({scene, cue, seconds, strikes}: { scene: 1 | 2
     };
     resize(); const observer = new ResizeObserver(resize); observer.observe(canvas); draw();
     return () => { observer.disconnect(); cancelAnimationFrame(frame); };
-  }, [scene, cue, seconds, strikes]);
+  }, [scene, showCollisions, cue, seconds, strikes]);
   return <canvas ref={ref} className="opening-field" role="img"
-    aria-label={scene === 1 ? "Cada golpe de bombo revela el universo en ondas desde el primer punto" : "Dos puntos y sus impactos hasta alcanzar 111 Hz"} />;
+    aria-label={scene === 1 ? "Cada golpe de bombo revela el universo en ondas desde el primer punto" : "Dos puntos y sus impactos hasta alcanzar 111 Hz. El bombo sigue revelando el universo."} />;
 }

@@ -64,6 +64,11 @@ const styles = `
 }
 .pcfolio *, .pcfolio *::before, .pcfolio *::after { box-sizing: border-box; }
 .pcfolio h1, .pcfolio h2, .pcfolio h3, .pcfolio p { margin: 0; }
+.pcfolio p, .pcfolio h3 { font-family: inherit; }
+/* This standalone route is visible without the home page’s reveal script. */
+.pcfolio section { padding: 0; opacity: 1; transform: none; transition: none; }
+.pcfolio section h2 { display: block; text-align: start; }
+.pcfolio section h2::after { content: none; }
 .pcfolio a { color: inherit; text-underline-offset: .26em; }
 .pcfolio a:focus-visible, .pcfolio summary:focus-visible {
   outline: 3px solid #007571; outline-offset: 5px; border-radius: 2px;
@@ -74,7 +79,7 @@ const styles = `
   gap: .35rem 1rem; padding: 1.15rem 0;
 }
 .pcfolio .pc-bar a { font-weight: 700; }
-.pcfolio .pc-hero {
+.pcfolio section.pc-hero {
   position: relative; overflow: hidden; isolation: isolate;
   border: 1px solid var(--pc-dark); border-radius: 1.1rem;
   padding: clamp(1.4rem, 5vw, 4.5rem);
@@ -97,7 +102,7 @@ const styles = `
 .pcfolio .pc-role { font-size: clamp(1.03rem, 2.2vw, 1.36rem); font-weight: 650; margin-top: 1.15rem; }
 .pcfolio .pc-lede { margin-top: .65rem; max-width: 47ch; color: #dee8e2; }
 .pcfolio .pc-meta { color: var(--pc-mint); margin-top: 1.4rem; font-size: .88rem; }
-.pcfolio .pc-section { padding-top: clamp(2rem, 5vw, 3.6rem); }
+.pcfolio section.pc-section { padding-top: clamp(2rem, 5vw, 3.6rem); }
 .pcfolio h2 {
   font: 400 clamp(1.5rem, 3vw, 2.4rem)/1.3 var(--font-undertango-editorial), Georgia, serif;
   letter-spacing: -.04em; color: var(--pc-ink);

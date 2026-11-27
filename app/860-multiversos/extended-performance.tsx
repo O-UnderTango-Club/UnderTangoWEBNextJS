@@ -7,7 +7,8 @@ import { cubeIndexForMidi, CUBE_FIRST_MIDI, CUBE_SIZE, CUBE_TRACK_NAMES, CUBE_TR
   type CubeTrack, type ExtendedScene, type TimbreScene } from "./extended-scenes";
 import { createPerformanceNotes, type NoteFrequency, type PerformanceInput } from "./performance-notes";
 import { createTimbreRack } from "./timbre-rack";
-import { createSceneInstrument, sceneDrumLabel, usesSceneKeyboard } from "./scene-instrument";
+import { createSceneInstrument, usesSceneKeyboard } from "./scene-instrument";
+import {createRitualInstrument} from "./ritual-percussion";
 import {ritualLayer} from "./ritual-patterns";
 import { TEMPERAMENT_SCENE } from "./show-score";
 import { useTempo } from "./tempo";
@@ -46,8 +47,21 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
 
   useEffect(() => {
     const bus=manualOutput;
-    if(!(usesSceneKeyboard(scene) || percussion) || !bus)return;
-    const synth=createSceneInstrument(percussion ? 34 : scene as Parameters<typeof createSceneInstrument>[0],bus,a4,()=>({
+    if(!bus || scene===null)return;
+    if(percussion){
+      const drum=createRitualInstrument(scene,bus,firstMidi,(frequency,velocity)=>{
+        attack.current={count:attack.current.count+1,frequency,velocity};
+      });
+      const touch={strike:(_id:string,track:CubeTrack,index:number,v:number)=>drum.strike(firstMidi+track*CUBE_SIZE+index,v),release:()=>{}};
+      routing.current=drum.routing;player.current=touch;
+      return ()=>{
+        if(routing.current===drum.routing)routing.current=null;
+        if(player.current===touch)player.current=null;
+        drum.close();
+      };
+    }
+    if(!usesSceneKeyboard(scene))return;
+    const synth=createSceneInstrument(scene,bus,a4,()=>({
       bpm:transport.current.bpm,origin:transport.current.beatOrigin(bus.context),
     }),(frequency,velocity)=>{attack.current={count:attack.current.count+1,frequency,velocity};});
     const prefix=(device:string)=>`midi:${JSON.stringify(device)}:`;
@@ -62,8 +76,8 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
         if(velocity<=0 && pedals.has(channelKey))sustained.add(key);
         else {
           sustained.delete(key);
-          const pitch = numeric && !percussion ? CUBE_FIRST_MIDI + note - firstMidi : note;
-          if (velocity <= 0 || !numeric || percussion || pitch >= CUBE_FIRST_MIDI) play(key,pitch,velocity);
+          const pitch = numeric ? CUBE_FIRST_MIDI + note - firstMidi : note;
+          if (velocity <= 0 || !numeric || pitch >= CUBE_FIRST_MIDI) play(key,pitch,velocity);
         }
       },
       sustainMidi:scene!==88 ? undefined : (device,channel,down)=>{
@@ -241,7 +255,7 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
                 {MATRIX_ORDER.map((index) => {
                   const key = keys[track][faceIndex][index];
                   const address = faceIndex * 9 + index;
-                  const drum=percussion ? sceneDrumLabel(48+track*12+address) : null;
+                  const drum=percussion ? percussion.name+" · tecla "+(track*CUBE_SIZE+address+1) : null;
                   return <button key={key.midi} type="button" className="zero-note-key" data-hz={drum ? undefined : key.frequency}
                     data-sounding={sounding.includes(key.frequency)} aria-label={drum ?? `${key.label}${scene === 15 ? " hercios" : `, ${hz.format(key.frequency)} hercios`}`}
                     onPointerDown={(event) => {
@@ -254,7 +268,7 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
                       const id = `button:${++pulseId.current}`;
                       press(id, track, address);
                       window.setTimeout(() => release(id), 220);
-                    }}><span className="zero-note-hz">{drum ?? key.label}</span></button>;
+                    }}><span className="zero-note-hz">{drum ? track*CUBE_SIZE+address+1 : key.label}</span></button>;
                 })}
               </div>)}
             </div>
@@ -281,7 +295,7 @@ export function ExtendedPerformanceControls({ performance, paused, scene }: { pe
   </>;
   const percussion=ritualLayer(scene);
   if(percussion)return <div className="extended-settings">
-    <p>{percussion.name} · La base entra después de la cuenta. Tocá el teclado para grabar tus propios acentos encima.</p>
+    <p>{percussion.name} · Tocá el teclado para variar la altura del mismo golpe y usá Grabar capa para capturarlo.</p>
   </div>;
   if (!three && !timbre) {
     if(scene===89)return null;

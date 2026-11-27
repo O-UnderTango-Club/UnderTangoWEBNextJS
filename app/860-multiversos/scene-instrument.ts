@@ -37,10 +37,6 @@ const downbeats: Rhythm = { divisions: 1, steps: [0], gate: .66 };
 function kit(note: number): Color {
   return (["kick", "hat", "snare", "metal", "snare", "tom", "hat", "tom", "metal", "tom", "hat", "hat"] as const)[note % 12];
 }
-export function sceneDrumLabel(note:number) {
-  const labels:Partial<Record<Color,string>>={kick:"Bombo",snare:"Caja",hat:"Hi-hat",metal:"Metal",tom:"Tom"};
-  return labels[kit(note)] ?? "Golpe";
-}
 function orchestration(scene: InstrumentScene, note: number): {color: Color; rhythm?: Rhythm} {
   switch (scene) {
     case 40: return {color:"pluck",rhythm:offbeat};

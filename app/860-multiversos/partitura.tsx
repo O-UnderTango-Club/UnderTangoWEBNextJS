@@ -26,6 +26,8 @@ import { AudienceProjection } from "./audience-projection";
 import { ScoreTrack, PrimeraVoluntad } from "./primera-voluntad";
 import { hasReferenceVisual, ReferenceVisual } from "./reference-visuals";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
+import { FilterControls } from "./filter-controls";
+import { createMasterFilters, type FilterValues } from "./master-filters";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { hasScoredTake } from "./layer-take";
 import { useTempo, TempoProvider } from "./tempo";
@@ -1253,46 +1255,33 @@ function NoteComet({attack}: {attack: {current: {count:number; frequency:number;
   return <canvas ref={canvas} aria-hidden="true" style={{position:"absolute",bottom:"8%",left:0,width:"100%",height:"25%",pointerEvents:"none",zIndex:4}} />;
 }
 
-function OpeningFilm({cue, output, controls, strikes, inside, paused, finish}: {
+function OpeningFilm({cue, output, controls, strikes, paused, finish}: {
   cue: SceneZeroCue; output: GainNode; controls: HTMLDivElement | null; strikes: StrikeLog;
-  inside: boolean; paused: boolean; finish: () => void;
+  paused: boolean; finish: () => void;
 }) {
   const layer = useRef<HTMLDivElement>(null);
-  const envelope = useRef({fraction: 0, closing: false, elapsed: 0, filmTime: 0});
-  const clock = cue.context;
-  const filmCue = useMemo(() => ({context: clock, beginsAt: clock.currentTime - envelope.current.filmTime}), [clock]);
   useLayoutEffect(() => {
     const node = layer.current;
     if (!node) return;
-    const state = envelope.current;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let last = performance.now(), frame = 0;
-    const draw = (now: number) => {
-      const dt = paused ? 0 : (now - last) / 1000;
-      last = now;
-      state.filmTime += dt;
-      if (!state.closing && inside) state.fraction = openingFraction(strikes.current, still);
-      if (!inside && !state.closing) {
-        state.fraction = Math.min(1, state.fraction + dt / 8);
-        node.style.clipPath = "circle(" + (Math.SQRT1_2 * 100 * state.fraction ** .78) + "% at center)";
-      }
-      if (state.fraction >= 1) state.closing = true;
-      if (state.closing) {
-        state.elapsed += dt;
-        const t = Math.min(1, state.elapsed / 4);
-        const scale = 1 - t * t;
-        node.style.transform = "scale(" + scale + ")";
+    let closingAt: number | undefined;
+    let frame = 0;
+    const draw = () => {
+      const now = cue.context.currentTime;
+      if (closingAt === undefined && openingFraction(strikes.current, still) >= 1) closingAt = now;
+      if (closingAt !== undefined) {
+        const t = Math.min(1, (now - closingAt) / 4);
+        if (t === 1) { finish(); return; }
+        node.style.transform = "scale(" + (1 - t * t) + ")";
         node.style.opacity = String(1 - t ** 4);
-        if (!inside) node.style.clipPath = "circle(" + (72 * state.fraction ** .78) + "% at center)";
-        if (t === 1 || state.fraction === 0) { finish(); return; }
       }
       frame = requestAnimationFrame(draw);
     };
-    draw(last);
+    draw();
     return () => cancelAnimationFrame(frame);
-  }, [inside, paused, strikes, finish]);
+  }, [cue, strikes, finish]);
   return <div ref={layer} style={{position:"absolute", inset:0, zIndex:-1, pointerEvents:"none"}}>
-    <SceneVideo film={sceneFilms.get(1)!} cue={filmCue} output={output} controls={controls} paused={paused} />
+    <SceneVideo film={sceneFilms.get(1)!} cue={cue} output={output} controls={controls} paused={paused} />
   </div>;
 }
 
@@ -1311,6 +1300,9 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
   const extendedScene = typeof stage === "number" ? stage : null;
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
+  const [filters, setFilters] = useSavedSetting<FilterValues>("masterFilters", {});
+  const filterValues = useRef(filters);
+  filterValues.current = filters;
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
   const [djAutomatic, setDjAutomatic] = useSavedSetting("djScoreEnabled", true);
   const [showStopwatch, setShowStopwatch] = useSavedSetting("showStopwatch", false);
@@ -1356,6 +1348,8 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const roomAnalyser=useRef<AnalyserNode|null>(null);
   const countingTake = useRef(false);
   const sceneMonitor=useRef<WaveShaperNode|null>(null);
+  const filterRack = useRef<ReturnType<typeof createMasterFilters> | null>(null);
+  const loopMix = useRef<GainNode | null>(null);
   const mixMaster = useRef<GainNode | null>(null);
   const outputRef = useRef<GainNode | null>(null);
   const masterVolumeRef = useRef(masterVolume);
@@ -1373,7 +1367,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
     return true;
   }, []);
   const scoreClock = cue?.context ?? null;
-  const audition = usePausedSceneOutput(paused ? scoreClock : null, masterVolume);
+  const audition = usePausedSceneOutput(paused ? scoreClock : null, masterVolume, filters);
   const manualOutput = activeScene && cue ? (paused ? audition : outputRef.current) : null;
   const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, manualOutput, firstMidi);
   const liveAttack = extended.attack;
@@ -1382,18 +1376,20 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   },[liveAttack]);
   const directionSeconds = extendedScene ? extendedSeconds[extendedScene] || (EXTENDED_DEFAULT_SECONDS[extendedScene] || 16) : 0;
   useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
-  const earlyScene = typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
+  const openingActive = activeScene === "beacon" || activeScene === "line" || activeScene === "harmonics";
+  const earlyScene = openingActive ? "beacon" : typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
   const hitPoint = useCallback((hit: PointStrike) => {
     const previous = strikes.current;
     strikes.current = {
-      hits: [...previous.hits.filter(p => p.clock === hit.clock && hit.time - p.time < WAVE_SECONDS).slice(-31), hit],
+      hits: [...previous.hits.filter(p => p.clock.currentTime - p.time < WAVE_SECONDS).slice(-31), hit],
       energy: previous.energy + universeStrikeWeight(hit.velocity),
     };
     liveAttack.current = {count: liveAttack.current.count + 1, frequency: hit.frequency, velocity: hit.velocity};
   }, [liveAttack]);
-  useLayoutEffect(() => { strikes.current = {hits: [], energy: 0}; }, [cue]);
-  useLayoutEffect(() => { strikes.current.hits = []; }, [paused]);
-  useEarlyInstrument(earlyScene, manualOutput, cue?.beginsAt ?? 0, activeDurationMs / 1000, playingNoisePair, scoreClock, pianoRouting, hitPoint);
+  useLayoutEffect(() => { strikes.current = {hits: [], energy: 0}; }, [scoreClock, openingActive]);
+  // The two scenes share the same playable drum and its sounding tails.
+  useEarlyInstrument(earlyScene, manualOutput, openingActive ? 0 : cue?.beginsAt ?? 0,
+    openingActive ? 0 : activeDurationMs / 1000, playingNoisePair, scoreClock, pianoRouting, hitPoint);
   const noteInput = usePerformanceInput({
     firstMidi, scene: noteScene, ownsInput: noteScene !== null || stage === "preparing", splitNote, learnSplit,
     output: manualOutput, routing: pianoRouting, onStrike: noteStrike,
@@ -1424,6 +1420,9 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
     const context = audioRef.current;
     audioRef.current = null;
     sceneMonitor.current = null;
+    filterRack.current?.dispose();
+    filterRack.current = null;
+    loopMix.current = null;
     mixMaster.current = null;
     outputRef.current = null;
     if (context && context.state !== "closed") void context.close();
@@ -1472,6 +1471,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   }, [cue, finishedTake, enterNumberedScene, extendedScene, nextAfterSeconds, nextTimedScene, paused, previewMode, reset]);
 
   useEffect(() => () => stop(), [stop]);
+  useEffect(() => { filterRack.current?.apply(filters); }, [filters]);
 
   useEffect(() => {
     const volume = masterVolume;
@@ -1536,14 +1536,19 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       const context = new AudioContext();
       audioRef.current = context;
       const masterOutput = context.createGain();
+      const combined = context.createGain();
       const sceneMaster = context.createGain();
       sceneMaster.gain.value = masterVolumeRef.current / 100;
-      masterOutput.connect(sceneMaster);
+      masterOutput.connect(combined);
+      const rack = createMasterFilters(combined, sceneMaster, filterValues.current);
       const monitor = protectPeaks(sceneMaster, SPEAKER_CEILING);
       monitor.connect(context.destination);
       if (startPaused) await context.suspend();
       else await resumeAudioOutput(context);
       if (run !== runRef.current || audioRef.current !== context) return;
+      rack.apply(filterValues.current);
+      filterRack.current = rack;
+      loopMix.current = combined;
       sceneMonitor.current = monitor;
       mixMaster.current = sceneMaster;
       outputRef.current = masterOutput;
@@ -1768,13 +1773,18 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
     };
   }, []);
   useLayoutEffect(() => { if (sceneNumber !== null) queuePanelFollow.current(); }, [sceneNumber]);
-  const [openingRun, setOpeningRun] = useState<{cue: SceneZeroCue; output: GainNode; generation: number} | null>(null);
-  const openingGeneration = useRef(0);
+  const [openingRun, setOpeningRun] = useState<{cue: SceneZeroCue; output: GainNode} | null>(null);
   const finishOpeningFilm = useCallback(() => setOpeningRun(null), []);
+  const openingOrigin = useRef<AudioContext | null>(null);
   useLayoutEffect(() => {
-    if (sceneNumber === 1 && cue && outputRef.current) setOpeningRun({cue, output: outputRef.current, generation: ++openingGeneration.current});
-    else if (stage === "ready") setOpeningRun(null);
-  }, [sceneNumber, cue, stage === "ready"]);
+    if (!openingActive || !cue || !outputRef.current) {
+      openingOrigin.current = null;
+      setOpeningRun(null);
+    } else if (openingOrigin.current !== cue.context) {
+      openingOrigin.current = cue.context;
+      setOpeningRun({cue, output: outputRef.current});
+    }
+  }, [openingActive, cue]);
   const film = sceneNumber === null ? undefined : sceneFilms.get(sceneNumber);
   const filmLayer = sceneNumber !== 1 && film && cue && outputRef.current
     ? <SceneVideo key={sceneNumber} film={film} cue={cue} paused={paused} output={outputRef.current} controls={filmControls} />
@@ -2089,6 +2099,19 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
         min-height: 0; overflow: hidden; padding: 0; border-left: 1px solid #30333d;
       }
+      .zero-settings-footer {display:grid;gap:.3rem;border-top:1px solid #414553;padding-top:.7rem;}
+      .master-filters {margin-top:.6rem;display:grid;gap:.35rem;color:#e5eaff;}
+      .master-filters strong {font-size:.82rem;}
+      .master-filter-row {display:grid;grid-template-columns:repeat(9,minmax(24px,1fr));gap:.18rem;overflow-x:auto;padding:.12rem .08rem;}
+      .master-filter {display:grid;justify-items:center;gap:.22rem;font-size:.54rem;color:#cdd7ed;line-height:1;white-space:nowrap;}
+      .master-filter-face {position:relative;display:block;width:min(100%,34px);aspect-ratio:1;border:1px solid #626c87;
+        border-radius:50%;background:radial-gradient(circle at 39% 29%,#4d5871,#252d3d 59%,#151924 100%);}
+      .master-filter-face[data-active=true] {border-color:#81d3d2;}
+      .master-filter-face::after {content:"";position:absolute;inset:12% 46% 51%;background:#dae6ff;border-radius:8px;
+        transform:rotate(var(--knob-angle));transform-origin:50% 107%;pointer-events:none;}
+      .master-filter-face:focus-within {outline:2px solid #b8d9ff;outline-offset:2px;}
+      .zero-controls .master-filter-face input[type=range] {position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;
+        cursor:ns-resize;touch-action:none;}
       .zero-control-bar { padding: .85rem var(--zero-controls-padding) .4rem; border-top: 1px solid #30333d; }
       .zero-controls {position:relative;container:operator / size;}
       .dj-drawer {position:relative;margin-top:.4rem;color:#e5e9f3;font:500 .81rem/1.35 system-ui,sans-serif;}
@@ -2228,15 +2251,16 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       <SceneMixer filmLayer={liveSet ? filmLayer : null} stageBackground={extendedDark ? "#130f20" : light ? "#fff" : "#000"} extendedDark={extendedDark}
         canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={reset} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
-        takeScene={extendedScene} onTakeComplete={setFinishedTake} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || coda || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused}>
-      {openingRun && <OpeningFilm key={openingRun.generation} cue={cue ?? openingRun.cue} output={outputRef.current ?? openingRun.output}
-        controls={filmControls} strikes={strikes} inside={sceneNumber === 1} paused={paused} finish={finishOpeningFilm} />}
+        takeScene={extendedScene} onTakeComplete={setFinishedTake} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || coda || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={loopMix.current} paused={paused}>
+      {openingRun && <OpeningFilm cue={openingRun.cue} output={openingRun.output}
+        controls={filmControls} strikes={strikes} paused={paused} finish={finishOpeningFilm} />}
       {!liveSet && !coda && filmLayer}
       {!liveSet && !coda && cue && hasReferenceVisual(sceneNumber) &&
         <ReferenceVisual scene={sceneNumber} clock={cue.context} beginsAt={cue.beginsAt} duration={durations[sceneNumber]} paused={paused}/>}
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} cue={cue} paused={paused} />}
-      {(sceneNumber === 1 || stage === "two") && cue && <OpeningProjection scene={stage === "two" ? 2 : 1} cue={cue} seconds={activeDurationMs / 1000} strikes={strikes} />}
+      {openingActive && cue && <OpeningProjection scene={sceneNumber === 1 ? 1 : 2} showCollisions={stage === "two"}
+        cue={cue} seconds={activeDurationMs / 1000} strikes={strikes} />}
       {sceneNumber === 2 && cue && <CollisionReadout cue={cue} seconds={activeDurationMs / 1000} paused={paused} />}
       {question && <p className="zero-question" style={{ animationPlayState: paused ? "paused" : "running" }}>{OPENING_QUESTION}</p>}
       {expression && <HarmonicDiagram stage={stage as HarmonicStage} cue={diagramCue} durationMs={activeDurationMs - harmonicPhase * 1000}
@@ -2310,6 +2334,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
               <p className="scene-film-caption">Fondo · {sceneFilm.clip.title}</p>
               {isActive && <div ref={setFilmControls} />}
             </>}
+            {isActive && mode === "line" && openingRun && <div ref={setFilmControls} />}
             {score.number === 70 && <p>Escenas 70–79 · trance psicomusical. Ajustá la entrada del deck en la pauta musical.</p>}
             {(mode === 31 || mode === 89) && <p><strong>Loop de voz.</strong> {VOICE_CUES[mode]}</p>}
             {!hasScoredTake(score.number) && <input id={id} type="range" min={min} max={max} step={1} value={seconds}
@@ -2327,7 +2352,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
             </>}
             {mode === "beacon" && <p className="opening-cue">Desde la pregunta, tocá el piano o las teclas A–K. Cada golpe de bombo abre una onda y revela el universo. En pausa también podés tocar.</p>}
             {mode === "beacon" && voiceUnavailable && <small role="status">La voz no se pudo cargar. La pregunta sigue en pantalla.</small>}
-            {mode === "line" && <p className="opening-cue">Cada golpe deja un punto. Seguí el contador y escuchá cómo se juntan hasta formar la nota de 111 Hz. Podés acentuar el recorrido con el teclado.</p>}
+            {mode === "line" && <p className="opening-cue">La animación de los dos puntos sigue su curso. Cada tecla conserva el bombo y abre un poco más el video.</p>}
             {mode === "time" && <>
               <div className="zero-sampling">
                 <label htmlFor="time-sampling">Intervalo de muestreo</label>
@@ -2388,6 +2413,10 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
             {mode === "breath" && breathing && <button type="button" className="zero-continue" onClick={() => moveScene(10)}>Ir a escena 10</button>}
           </div>;
         })}
+        <footer className="zero-settings-footer">
+          <a className={styles.organonLink} href="/860-multiversos/organon" target="_blank" rel="noopener">Órganon · Mapa de controles ↗</a>
+          <a className={styles.materialLink} href="/860-multiversos/materiales.html" target="_blank" rel="noopener">Descargar material necesario para usar este dispositivo</a>
+        </footer>
       </div>
       <div className="zero-control-bar" role="group" aria-label="Panel de control">
         <div id="zero-midi" className="zero-midi">
@@ -2469,8 +2498,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         <DjConsole output={cue ? outputRef.current : null} inputs={midiInputs}
           scene={sceneNumber} cue={cue} seconds={durations[sceneNumber ?? 0]} paused={paused}
           automatic={djAutomatic} setAutomatic={setDjAutomatic}/>
-        <a className={styles.organonLink} href="/860-multiversos/organon" target="_blank" rel="noopener">Órganon · Mapa de controles ↗</a>
-        <a className={styles.materialLink} href="/860-multiversos/materiales.html" target="_blank" rel="noopener">Descargar material necesario para usar este dispositivo</a>
+        <FilterControls values={filters} change={(id,value)=>setFilters(current=>({...current,[id]:value}))}/>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
     </aside>

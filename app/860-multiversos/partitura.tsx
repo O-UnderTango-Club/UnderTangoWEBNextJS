@@ -39,7 +39,7 @@ import { SceneMixer } from "./scene-mixer";
 import { SceneVideo, sceneFilms } from "./scene-video";
 import { usesSceneKeyboard } from "./scene-instrument";
 import { DjConsole } from "./dj-console";
-import { DJ_CONTROL, herculesCommand, isInpulse200, type DjCommand } from "./dj-midi";
+import { DJ_CONTROL, DJ_MIDI, herculesCommand, isInpulse200, type DjCommand, type DjMidiMessage } from "./dj-midi";
 import { VOICE_CUES } from "./voice-loop";
 import { ProjectionSignalContext, useProjectionSignals, useSceneSignals } from "./projection-signals";
 import { StimulusBar } from "./stimulus-bar";
@@ -2156,6 +2156,14 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       .dj-sheet select {background:#202635;padding:.35rem;border:1px solid #4c566b;border-radius:.25rem;}
       .dj-deck {border-top:2px solid #73cbbd;padding:.5rem 0 .2rem;}
       .dj-deck[data-side=B] {border-color:#bb9bee;}
+      .dj-mix-row {display:grid;gap:.3rem;grid-template-columns:minmax(0,1fr) auto;align-items:center;}
+      .dj-pads {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.35rem;}
+      .dj-pad-cell {min-width:0;display:grid;gap:.22rem;}
+      .zero-controls .dj-pad {min-height:44px;background:#b9d8f4;border-color:#bbdaf3;color:#142840;overflow-wrap:anywhere;}
+      .zero-controls .dj-pad[aria-pressed=true] {background:#a4ecdd;border-color:#bcffeb;color:#11392f;}
+      .zero-controls .dj-midi-learn {min-height:30px;padding:.16rem .45rem;font-size:.72rem;}
+      .zero-controls .dj-midi-learn[aria-pressed=true] {background:#664481;color:#fff;}
+      .dj-pad-settings {display:grid;gap:.35rem;margin-top:.35rem;}
       .dj-cross-labels {display:flex;justify-content:space-between;}
       .dj-sheet .dj-arm {display:flex;align-items:center;margin:.55rem 0;}
       .dj-entries fieldset {margin:.45rem 0;border:1px solid #414a5c;min-inline-size:0;}
@@ -2539,7 +2547,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         </button>
         <DjConsole output={cue ? outputRef.current : null} inputs={midiInputs}
           scene={sceneNumber} cue={cue} seconds={durations[sceneNumber ?? 0]} paused={paused}
-          automatic={djAutomatic} setAutomatic={setDjAutomatic}/>
+          automatic={djAutomatic} setAutomatic={setDjAutomatic} connectMidi={connectMidi}/>
         <FilterControls values={filters} change={setFilter} bindings={filterBindings}
           learning={filterLearning} learn={learnFilter}/>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
@@ -2667,8 +2675,10 @@ export default function Multiversos860Page() {
           const id = JSON.stringify([input.id,channel,controlType,controlType==="bend"?0:first]);
           const reserved = fader!==undefined;
           const value = controlType==="bend"?(first+128*second)/16383:kind===0x80?0:second/127;
-          if(!window.dispatchEvent(new CustomEvent("860-bank-midi",{cancelable:true,
-            detail:{id,alias,value,type:controlType,reserved,label:(input.name||"MIDI")+" · "+(controlType==="bend"?"Pitch Bend":(controlType==="cc"?"CC ":"Nota ")+first)+" · canal "+(channel+1)}})))return;
+          const signal:DjMidiMessage={id,alias,value,type:controlType,
+            label:(input.name||"MIDI")+" · "+(controlType==="bend"?"Pitch Bend":(controlType==="cc"?"CC ":"Nota ")+first)+" · canal "+(channel+1)};
+          if(!window.dispatchEvent(new CustomEvent(DJ_MIDI,{cancelable:true,detail:signal})))return;
+          if(!window.dispatchEvent(new CustomEvent("860-bank-midi",{cancelable:true,detail:{...signal,reserved}})))return;
         }
         if (midiLearnRef.current === null && (kind === 0x90 || kind === 0x80 || (kind === 0xb0 && first < 120))) {
           const id = JSON.stringify([input.id,channel,kind===0xb0?"cc":"note",first]);

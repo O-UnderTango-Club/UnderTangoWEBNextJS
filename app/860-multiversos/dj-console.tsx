@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { SETTINGS_PREFIX } from "./control-map";
 import { REPERTOIRE } from "./repertoire-cue";
-import { DJ_CONTROL, isInpulse200, type DeckSide, type DjCommand } from "./dj-midi";
+import {DJ_CONTROL, DJ_MIDI, DJ_MIDI_NAMES, DJ_PADS, isDjPad, isInpulse200,
+  type DeckSide, type DjCommand, type DjMidiMap, type DjMidiMessage, type DjMidiTarget, type DjPad} from "./dj-midi";
+import {MIDI_REASSIGNMENT, reassignMidi, sameMidiSignal, type MidiReassignment} from "./midi-reassignment";
 import { djFiles, type LibraryFile } from "./dj-library";
 import { ACTIVE_SCORE, activeCueId, displaySceneNumber, type ShowScene } from "./show-score";
 import { useSavedSetting } from "./saved-setting";
@@ -13,11 +15,18 @@ type AudioBus = GainNode | null;
 type ScoreCue = { context: AudioContext; beginsAt: number };
 type DjEntry = { trackId:string; scene:ShowScene; offset:number; side:DeckSide };
 type Launch = { trackId:string };
+type PadPreset = {trackId:string;side:DeckSide};
 const repertoire = Object.entries(REPERTOIRE).flatMap(([id, clip], index) => clip ? [{
   track: {id:"860-"+id, name:clip.title+" · fragmento", url:clip.file},
   entry: {trackId:"860-"+id, scene:Number(id) as ShowScene, offset:clip.entry, side:(index % 2 ? "B" : "A") as DeckSide},
 }] : []);
 const fragments = repertoire.map(({track}) => track);
+const defaultPads:Record<DjPad,PadPreset> = {
+  pad1:{trackId:fragments[0]?.id??"",side:"A"},
+  pad2:{trackId:fragments[1]?.id??"",side:"B"},
+  pad3:{trackId:fragments[2]?.id??"",side:"A"},
+  pad4:{trackId:fragments[3]?.id??"",side:"B"},
+};
 function initialEntries(): DjEntry[] {
   return repertoire.map(({entry}) => {
     // A fragment disabled on the old score stays disabled on first opening the DJ console.
@@ -31,10 +40,11 @@ function initialEntries(): DjEntry[] {
 }
 const time = (s:number) => Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
 
-function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch}: {
+function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,onPlayback,volume,setVolume,midi}: {
   side:DeckSide;track?:Track;load:()=>void;canLoad:boolean;output:AudioBus;
   crossGain:number;launch?:Launch;onBusy:(side:DeckSide,busy:boolean)=>void;
-  onLaunch:(side:DeckSide)=>void;
+  onLaunch:(side:DeckSide)=>void;onPlayback:(side:DeckSide,playing:boolean)=>void;
+  volume:number;setVolume:(value:number)=>void;midi:ReactNode;
 }) {
   const audio = useRef<HTMLAudioElement>(null);
   const node = useRef<MediaElementAudioSourceNode|null>(null);
@@ -48,7 +58,6 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch}:
   const consumedLaunch = useRef<Launch | undefined>(undefined);
   const [position,setPosition] = useState(0), [duration,setDuration] = useState(0);
   const [playing,setPlaying] = useState(false), [error,setError] = useState("");
-  const [volume,setVolume] = useSavedSetting("djDeckVolume"+side, 100);
   const level = crossGain * volume / 100;
   useEffect(() => {
     const control = gain.current;
@@ -76,7 +85,7 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch}:
     return () => {
       request.current++; starting.current=false;
       resumeOnScorePlay.current=false;
-      onBusy(side,false);
+      onBusy(side,false);onPlayback(side,false);
       if (el && el.readyState >= 1) resumeAt.current=el.currentTime;
       el?.pause();
       if (node.current) {
@@ -85,13 +94,13 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch}:
       }
       gain.current?.disconnect(); gain.current=null;
     };
-  },[contextState,onBusy,route.version,side]);
+  },[contextState,onBusy,onPlayback,route.version,side]);
   function pause() {
     request.current++; starting.current=false; resumeOnScorePlay.current=false;
     audio.current?.pause(); onBusy(side,false);
   }
   function reportStopped() {
-    setPlaying(false);
+    setPlaying(false);onPlayback(side,false);
     if (!resumeOnScorePlay.current && !starting.current) onBusy(side,false);
   }
   async function play(fromStart = false) {
@@ -149,7 +158,7 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch}:
       onLoadedMetadata={e=>{const n=e.currentTarget.duration;setDuration(Number.isFinite(n)?n:0);
         if(resumeAt.current>0 && Number.isFinite(n)) e.currentTarget.currentTime=Math.min(resumeAt.current,n);}}
       onTimeUpdate={e=>setPosition(e.currentTarget.currentTime)}
-      onPlay={()=>{setPlaying(true);onBusy(side,true);}} onPause={reportStopped} onEnded={reportStopped}
+      onPlay={()=>{setPlaying(true);onBusy(side,true);onPlayback(side,true);}} onPause={reportStopped} onEnded={reportStopped}
       onError={()=>{if(track)setError("Este archivo no se puede reproducir.");}} />
     <input aria-label={"Posición del deck "+side} type="range" min={0} max={duration || 1} step=".01" disabled={!duration}
       value={Math.min(position,duration)} aria-valuetext={time(position)+" de "+time(duration)}
@@ -158,17 +167,17 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch}:
       disabled={!track || !output || output.context.state!=="running"} title={output ? undefined : "Elegí una escena para reproducir"} onClick={toggle}>{playing?"Ⅱ Pausa":"▶ Play"}</button>
       <button type="button" title="Volver al punto elegido" aria-label={"Detener deck "+side} disabled={!track} onClick={stop}>■ Cue</button>
       <output>{time(position)} / {time(duration)}</output></div>
-    <label>Volumen {side} · {volume} %
+    <div className="dj-mix-row"><label>Volumen {side} · {volume} %
       <input type="range" min={0} max={100} value={volume} aria-label={"Volumen deck "+side}
         onChange={event=>setVolume(event.currentTarget.valueAsNumber)} />
-    </label>
+    </label>{midi}</div>
     {error && <small role="status">{error}</small>}
   </div>;
 }
 
-export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setAutomatic}: {
+export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setAutomatic,connectMidi}: {
   output:AudioBus;inputs:MidiDevice[];scene:ShowScene|null;cue:ScoreCue|null;seconds:number;
-  paused:boolean;automatic:boolean;setAutomatic:(enabled:boolean)=>void;
+  paused:boolean;automatic:boolean;setAutomatic:(enabled:boolean)=>void;connectMidi:(retry?:boolean)=>Promise<void>;
 }) {
   const [library,setLibrary]=useState<Track[]>(fragments);
   const [choice,setChoice]=useState(fragments[0]?.id ?? "");
@@ -176,6 +185,19 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
   const [loaded,setLoaded]=useSavedSetting("djDeckFiles",{A:fragments[0]?.id ?? "",B:fragments[1]?.id ?? ""});
   const [entries,setEntries]=useSavedSetting("djScoreEntries",initialEntries);
   const [cross,setCross]=useState(50);
+  const [volumeA,setVolumeA]=useSavedSetting("djDeckVolumeA",100);
+  const [volumeB,setVolumeB]=useSavedSetting("djDeckVolumeB",100);
+  const [presets,setPresets]=useSavedSetting("djPadPresets",defaultPads);
+  const [midiMap,setMidiMap]=useSavedSetting<DjMidiMap>("djMidi",{});
+  const mapRef=useRef(midiMap);
+  mapRef.current=midiMap;
+  const [learning,setLearning]=useState<DjMidiTarget|null>(null);
+  const learnRef=useRef<DjMidiTarget|null>(null);
+  const held=useRef(new Set<string>());
+  const [playing,setPlaying]=useState({A:false,B:false});
+  const onPlayback=useCallback((side:DeckSide,value:boolean)=>{
+    setPlaying(current=>current[side]===value?current:{...current,[side]:value});
+  },[]);
   const [launches,setLaunches]=useState<Partial<Record<DeckSide,Launch>>>({});
   const pending=useRef(new Set<DeckSide>());
   const onLaunch=useCallback((side:DeckSide)=>{pending.current.delete(side);},[]);
@@ -226,6 +248,104 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
     setCueNotice("");
     setLaunches(current=>({...current,[side]:undefined}));
     setLoaded(current=>({...current,[side]:id}));
+  }
+  const setLevel={cross:setCross,volumeA:setVolumeA,volumeB:setVolumeB};
+  function triggerPad(pad:DjPad){
+    const {side,trackId}=presets[pad];
+    const track=library.find(item=>item.id===trackId);
+    if(!track){setCueNotice("Cargá el archivo asignado al "+DJ_MIDI_NAMES[pad]+".");return;}
+    if(!output || output.context.state!=="running"){
+      setCueNotice("Para tocar los pads, iniciá o reanudá una escena.");return;
+    }
+    if(loaded[side]!==track.id || pending.current.has(side)){
+      flushSync(()=>{
+        pending.current.delete(side);
+        setLaunches(current=>({...current,[side]:undefined}));
+        setLoaded(current=>({...current,[side]:track.id}));
+      });
+    }
+    setCueNotice(DJ_MIDI_NAMES[pad]+" · "+track.name+" → "+side);
+    window.dispatchEvent(new CustomEvent<DjCommand>(DJ_CONTROL,{detail:{action:"play",side}}));
+  }
+  function toggleLearn(target:DjMidiTarget){
+    const next=learnRef.current===target?null:target;
+    if(next){
+      window.dispatchEvent(new CustomEvent("860-midi-learn",{detail:"dj"}));
+      void connectMidi(true);
+    }
+    learnRef.current=next;setLearning(next);
+  }
+  useLayoutEffect(()=>{
+    function changeMidi(next:DjMidiMap){
+      mapRef.current=next;
+      setMidiMap(next);
+    }
+    function receiveMidi(event:Event){
+      const e=event as CustomEvent<DjMidiMessage>;
+      const {id,alias,value,type,label}=e.detail;
+      const signal={id,alias,owner:"dj" as const};
+      const chosen=learnRef.current;
+      if(chosen){
+        e.preventDefault();
+        if(isDjPad(chosen)?type==="bend" || value===0:type==="note")return;
+        reassignMidi(signal);
+        const next={...mapRef.current};
+        for(const key of Object.keys(next) as DjMidiTarget[]){
+          const binding=next[key];
+          if(binding && sameMidiSignal(binding.id,binding.alias,signal))delete next[key];
+        }
+        next[chosen]={id,alias,label};
+        changeMidi(next);
+        learnRef.current=null;setLearning(null);
+        if(isDjPad(chosen)){held.current.add(id);return;}
+        setLevel[chosen](Math.round(value*100));
+        return;
+      }
+      const target=(Object.keys(mapRef.current) as DjMidiTarget[]).find(key=>{
+        const binding=mapRef.current[key];
+        return binding && sameMidiSignal(binding.id,binding.alias,signal);
+      });
+      if(!target)return;
+      e.preventDefault();
+      if(!isDjPad(target)){setLevel[target](Math.round(value*100));return;}
+      if(!value){held.current.delete(id);return;}
+      if(held.current.has(id))return;
+      held.current.add(id);
+      triggerPad(target);
+    }
+    function release(event:Event){
+      const signal=(event as CustomEvent<MidiReassignment>).detail;
+      if(signal.owner==="dj")return;
+      const next={...mapRef.current};
+      let changed=false;
+      for(const key of Object.keys(next) as DjMidiTarget[]){
+        const binding=next[key];
+        if(!binding || !sameMidiSignal(binding.id,binding.alias,signal))continue;
+        delete next[key];
+        changed=true;
+      }
+      if(changed)changeMidi(next);
+    }
+    function reset(event:Event){
+      if((event as CustomEvent).detail==="dj")return;
+      learnRef.current=null;setLearning(null);
+    }
+    function disconnect(){held.current.clear();}
+    window.addEventListener(DJ_MIDI,receiveMidi);
+    window.addEventListener(MIDI_REASSIGNMENT,release);
+    window.addEventListener("860-midi-learn",reset);
+    window.addEventListener("860-midi-disconnect",disconnect);
+    return ()=>{
+      window.removeEventListener(DJ_MIDI,receiveMidi);
+      window.removeEventListener(MIDI_REASSIGNMENT,release);
+      window.removeEventListener("860-midi-learn",reset);
+      window.removeEventListener("860-midi-disconnect",disconnect);
+    };
+  });
+  function midiButton(target:DjMidiTarget){
+    return <button type="button" className="dj-midi-learn" aria-label={"Asignar MIDI a "+DJ_MIDI_NAMES[target]}
+      title={midiMap[target]?.label??"Asignar un control físico"} aria-pressed={learning===target}
+      onClick={()=>toggleLearn(target)}>{learning===target?"Cancelar":midiMap[target]?"MIDI ✓":"MIDI"}</button>;
   }
   useEffect(()=>{
     const receive=(e:Event)=>{
@@ -304,17 +424,45 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
       <small role="status">{port?.status==="open"?"Inpulse 200 MK3 conectada":port?.status==="failed"?"Puerto Hercules ocupado · revisá DJUCED":"Consola A/B · control en pantalla"}</small>
       {!output && <small>Podés cargar pistas ahora. Para escucharlas, elegí una escena.</small>}
       {cueNotice && <small role="status">{cueNotice}</small>}
-      <label>Crossfader
+      <div className="dj-pads" role="group" aria-label="Pads de temas guardados">
+        {DJ_PADS.map(pad=>{
+          const preset=presets[pad], track=library.find(item=>item.id===preset.trackId);
+          const active=loaded[preset.side]===preset.trackId && playing[preset.side];
+          return <div key={pad} className="dj-pad-cell">
+            <button type="button" className="dj-pad" aria-label={DJ_MIDI_NAMES[pad]+" · "+(track?.name??"Sin tema")+" · Deck "+preset.side}
+              aria-pressed={active} onClick={()=>triggerPad(pad)}>{DJ_MIDI_NAMES[pad]} · {track?.name??"Sin tema"}</button>
+            {midiButton(pad)}
+          </div>;
+        })}
+      </div>
+      <details><summary>Temas de los pads</summary><div className="dj-pad-settings">
+        {DJ_PADS.map(pad=><div key={pad} className="dj-mix-row">
+          <label>{DJ_MIDI_NAMES[pad]}<select aria-label={"Tema de "+DJ_MIDI_NAMES[pad]} value={presets[pad].trackId}
+            onChange={event=>{const trackId=event.currentTarget.value;setPresets(current=>({...current,[pad]:{...current[pad],trackId}}));}}>
+            <option value="">Sin tema</option>
+            {presets[pad].trackId && !library.some(item=>item.id===presets[pad].trackId) && <option value={presets[pad].trackId}>Archivo pendiente</option>}
+            {library.map(track=><option key={track.id} value={track.id}>{track.name}</option>)}
+          </select></label>
+          <label>Deck<select aria-label={"Deck de "+DJ_MIDI_NAMES[pad]} value={presets[pad].side}
+            onChange={event=>{const side=event.currentTarget.value as DeckSide;setPresets(current=>({...current,[pad]:{...current[pad],side}}));}}>
+            <option>A</option><option>B</option>
+          </select></label>
+        </div>)}
+      </div></details>
+      {learning && <small role="status">{isDjPad(learning)?"Pulsá el pad físico":"Mové el fader físico"} para asignar {DJ_MIDI_NAMES[learning]}.</small>}
+      <div className="dj-mix-row"><label>Crossfader
         <input type="range" min={0} max={100} value={cross} aria-label="Crossfader A/B"
           aria-valuetext={cross===50 ? "Centro" : cross<50 ? (100-2*cross)+" % hacia A" : (2*cross-100)+" % hacia B"}
           onChange={event=>setCross(event.currentTarget.valueAsNumber)} />
         <span className="dj-cross-labels"><span>A</span><span>B</span></span>
-      </label>
+      </label>{midiButton("cross")}</div>
       {(["A","B"] as const).map(side=>{
         const track=library.find(t=>t.id===loaded[side]);
         const crossGain=side==="A" ? Math.cos(cross*Math.PI/200) : Math.sin(cross*Math.PI/200);
         return <Deck key={side+(track?.id ?? "")} side={side} track={track} load={()=>load(side)} canLoad={!!choice}
-          output={output} crossGain={crossGain} launch={output ? launches[side] : undefined} onBusy={onBusy} onLaunch={onLaunch}/>;
+          output={output} crossGain={crossGain} launch={output ? launches[side] : undefined} onBusy={onBusy} onLaunch={onLaunch}
+          onPlayback={onPlayback} volume={side==="A"?volumeA:volumeB} setVolume={side==="A"?setVolumeA:setVolumeB}
+          midi={midiButton(side==="A"?"volumeA":"volumeB")}/>;
       })}
       <details className="dj-entries">
         <summary>Pauta musical</summary>

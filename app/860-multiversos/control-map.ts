@@ -1,3 +1,4 @@
+import {DJ_MIDI_NAMES, isDjPad, type DjMidiMap, type DjMidiTarget} from "./dj-midi";
 import {filterForFader} from "./master-filters";
 
 export const CONTROL_FILE = "Controles-860.json";
@@ -35,6 +36,7 @@ export const FIXED_CONTROLS = {
 export type BankAssignment = {slot: number; action: keyof typeof BANK_ACTIONS; label: string; alias?: string};
 export type CcBinding = {inputId: string; inputName?: string; cc: number; ccChannel?: number; bendChannel?: number};
 type Settings = {
+  djMidi: DjMidiMap;
   sampleBankMidi: Record<string, BankAssignment>;
   ccMap: Record<string, CcBinding>;
   generalPlayButton: string;
@@ -51,7 +53,7 @@ type Settings = {
   splitNote: number;
 };
 const defaults: Settings = {
-  sampleBankMidi: {}, ccMap: {}, generalPlayButton: "", generalPauseButton: "", generalStopButton: "", mixerRecordButton: "", mixerLiveButton: "", mixerPlayAllButton: "", mixerStopButton: "", mixerClearButton: "",
+  djMidi: {}, sampleBankMidi: {}, ccMap: {}, generalPlayButton: "", generalPauseButton: "", generalStopButton: "", mixerRecordButton: "", mixerLiveButton: "", mixerPlayAllButton: "", mixerStopButton: "", mixerClearButton: "",
   mixerTransportAliases: {}, midiLayouts: {numeric: false, tempered: true}, cubeFirstMidi: 36, splitNote: 60,
 };
 type SettingName = keyof Settings;
@@ -77,6 +79,14 @@ function validSignal(id: unknown, optional = false): boolean {
 }
 function validSetting(name: SettingName, value: unknown): boolean {
   switch (name) {
+    case "djMidi":
+      return object(value) && Object.entries(value).every(([target,item])=>{
+        if(!Object.hasOwn(DJ_MIDI_NAMES,target) || !object(item) || typeof item.id!=="string" ||
+          !validSignal(item.id) || !short(item.label) || (item.alias!==undefined && !validSignal(item.alias,true)))return false;
+        const parts=signal(item.id);
+        const type=parts[0]==="name"?parts[3]:parts[2];
+        return type==="cc" || type===(isDjPad(target as DjMidiTarget)?"note":"bend");
+      });
     case "sampleBankMidi":
       return object(value) && Object.keys(value).length <= 9 * Object.keys(BANK_ACTIONS).length && Object.entries(value).every(([id, item]) =>
         validSignal(id) && object(item) && integer(item.slot, 0, 8) && short(item.action) && Object.hasOwn(BANK_ACTIONS, item.action) &&
@@ -148,6 +158,9 @@ function labelSignal(id: string) {
 const synth = ["NUBE", "VCO", "SUB", "CORTE", "Q", "PULSO", "DERIVA", "ECO", "ESPACIO"];
 export function describeControls(s: Settings): Rows {
   const rows: Rows = {};
+  for(const [target,binding] of Object.entries(s.djMidi)){
+    rows["Consola DJ · "+DJ_MIDI_NAMES[target as DjMidiTarget]]=binding.label;
+  }
   for (const item of Object.values(s.sampleBankMidi).sort((a, b) => a.slot - b.slot || a.action.localeCompare(b.action))) {
     rows["S" + (item.slot + 1) + " · " + BANK_ACTIONS[item.action]] = item.label;
   }

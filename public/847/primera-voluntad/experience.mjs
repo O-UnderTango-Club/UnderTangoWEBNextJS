@@ -116,6 +116,12 @@ function updateRound() {
 }
 
 function updateClip(current) {
+  if (current.state === 'encoding' && chapter === 'ending') {
+    cancelAnimationFrame(frame);
+    stopInput();
+    audio.pause();
+    status.textContent = 'Preparando tu video con la respuesta…';
+  }
   get('previous-take').hidden = !savedId() || current.state === 'ready';
   clipError.hidden = current.state !== 'unavailable';
   if (current.state === 'ready') {
@@ -474,8 +480,9 @@ function drawCelebration(t) {
 }
 function ask() {
   if (chapter !== 'game' || sceneStart === null || mode === 'review') return;
-  cutoff = Math.min(roundLength, Math.max(100, Math.round(elapsedMs / 100) * 100));
+  cutoff = Math.min(roundLength, Math.max(100, Math.ceil(elapsedMs / 100) * 100));
   chapter = 'writing';
+  audio.pause();
   lastPictureAt = null;
   updateRound();
   dialog.showModal();
@@ -491,6 +498,7 @@ questionForm.addEventListener('submit', event => {
   lastPictureAt = null;
   clip.setDuration(cutoff + endingLength);
   dialog.close();
+  audio.resumeAt(cutoff / 1000);
   window.scrollTo(0, 0);
 });
 

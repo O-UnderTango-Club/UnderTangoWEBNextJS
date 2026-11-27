@@ -252,6 +252,10 @@ export function soundscape(onChange) {
 
   return {
     prepare,
+    resumeAt(seconds) {
+      if (player && player.readyState >= 1) player.currentTime = seconds;
+      unlock();
+    },
     enableLive() { live = true; unlock(); },
     needsGesture: () => Boolean(live && !muted && !paused && (blocked || context?.state === 'suspended')),
     unlock,

@@ -171,7 +171,7 @@ export class SceneClip {
   paint(source, now) {
     const c = this.capture;
     if (!c || c.pending || this.state !== 'preparing') return;
-    const at = Math.min(c.duration, Math.max(0, now - c.start));
+    const at = Math.min(c.duration, Math.max(0, Math.round(now - c.start)));
     const final = at === c.duration;
     if (!final && at - c.last < 50) return;
     c.last = at;

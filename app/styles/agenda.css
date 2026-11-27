@@ -566,15 +566,22 @@ a.event-card:focus-visible {
 }
 
 
-.agenda-featured {
+.agenda-page .agenda-featured {
   margin: 18px auto 22px;
   max-width: 1180px;
+  padding: 0;
 }
 
-.agenda-featured h2 {
+.agenda-page .agenda-featured h2 {
+  display: block;
   margin: 0 0 10px;
+  color: #141414;
   font-size: 1.1rem;
   font-weight: 750;
+}
+
+.agenda-page .agenda-featured h2::after {
+  content: none;
 }
 
 .agenda-featured-grid {

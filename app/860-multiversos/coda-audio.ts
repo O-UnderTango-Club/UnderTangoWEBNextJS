@@ -1,11 +1,17 @@
 import {useEffect,useRef} from "react";
 import type {PerformanceInput} from "./performance-notes";
-import type {Timbre} from "./coda-ballot";
+import type {Atmosphere} from "./coda-ballot";
 
-export function useCodaInstrument(scene:number, sound:Timbre, output:GainNode|null, paused:boolean,
+const phrasing = {
+  movido:{steps:[57,57,64,57,69,64,62,64],gaps:[.32,.32,.64,.32,.32,.48,.32,.48],attack:.48,decay:.55,accent:[1,.55,.78,.55]},
+  tranquilo:{steps:[57,64,69,62,57,52,64,57],gaps:[2.2,1.8,2.6,2.1],attack:1.15,decay:1.12,accent:[.64,.5,.58,.48]},
+  romantico:{steps:[57,60,64,69,67,64,60,62],gaps:[.72,.92,1.3,.83,.77,1.55],attack:1.4,decay:1.45,accent:[.85,.57,.69,.5]},
+} as const;
+
+export function useCodaInstrument(scene:number, atmosphere:Atmosphere, output:GainNode|null, paused:boolean,
     routing:{current:PerformanceInput|null}) {
-  const current=useRef({scene,sound,paused});
-  current.current={scene,sound,paused};
+  const current=useRef({scene,atmosphere,paused});
+  current.current={scene,atmosphere,paused};
   useEffect(()=>{
     if(!output)return;
     const clock=output.context;
@@ -22,12 +28,13 @@ export function useCodaInstrument(scene:number, sound:Timbre, output:GainNode|nu
       active.get(id)?.();
       if(!velocity || clock.state!=="running")return;
       if(ringing.size>=24)ringing.values().next().value?.();
-      const {scene,sound}=current.current;
+      const {scene,atmosphere:{sound,groove}}=current.current;
+      const feel=phrasing[groove];
       const level=(.015+.28*((111-scene)/21)**1.5)*Math.max(.13,velocity);
       const hz=222*2**((midi-57)/12), now=clock.currentTime;
       const gain=clock.createGain(),filter=clock.createBiquadFilter();
       const source=sound==="aire"?clock.createBufferSource():clock.createOscillator();
-      const end=now+(sound==="campana"?2.75:sound==="agua"?1.5:2);
+      const end=now+feel.decay*(sound==="campana"?2.75:sound==="agua"?1.5:2);
       if(source instanceof AudioBufferSourceNode){
         source.buffer=air;source.loop=true;filter.type="bandpass";filter.Q.value=1.4;
         filter.frequency.setValueAtTime(Math.min(4600,Math.max(120,hz*2)),now);
@@ -38,7 +45,7 @@ export function useCodaInstrument(scene:number, sound:Timbre, output:GainNode|nu
         filter.type="lowpass";filter.frequency.value=sound==="campana"?2400:1100;
       }
       source.connect(filter).connect(gain).connect(bus);
-      const attack=sound==="aire"?.18:.015;
+      const attack=feel.attack*(sound==="aire"?.18:.015);
       gain.gain.setValueAtTime(.00001,now);
       gain.gain.exponentialRampToValueAtTime(Math.max(.0001,level),now+attack);
       gain.gain.exponentialRampToValueAtTime(.00001,end);
@@ -67,12 +74,14 @@ export function useCodaInstrument(scene:number, sound:Timbre, output:GainNode|nu
     };
     routing.current=dest;
     const timer=window.setInterval(()=>{
-      const {scene,paused}=current.current;
+      const {scene,paused,atmosphere:{groove}}=current.current;
       if(paused || scene<93 || scene>=110 || clock.state!=="running" || clock.currentTime<nextAt)return;
-      const pitches=[57,64,69,62,57,52,64,57];
-      note("room-tail/"+phrase,pitches[phrase++%pitches.length],.55);
-      nextAt=clock.currentTime+2.1+(scene-93)*.26;
-    },140);
+      const {steps,gaps,accent}=phrasing[groove];
+      note("room-tail/"+phrase,steps[phrase%steps.length],accent[phrase%accent.length]);
+      const fade=1+Math.max(0,scene-102)*.28;
+      nextAt=clock.currentTime+gaps[phrase%gaps.length]*fade;
+      phrase++;
+    },40);
     window.addEventListener("blur",allOff);
     return ()=>{
       window.removeEventListener("blur",allOff);window.clearInterval(timer);allOff();bus.disconnect();

@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from "react";
-import {ballotRequest, isRound, type Ballot, type Choice, type Host} from "./coda-ballot";
+import {applyWinner, ballotRequest, DEFAULT_ATMOSPHERE, isRound, type Ballot, type Host} from "./coda-ballot";
 
-type Cue = {scene:number; beginsAt:number; duration:number; clock:AudioContext};
+type Cue = {scene:number; beginsAt:number; duration:number; clock:AudioContext|null};
 
 /** One serial command stream per presentation, including seeks, retries and early advances. */
 export function useHostedBallot(cue:Cue) {
@@ -9,7 +9,7 @@ export function useHostedBallot(cue:Cue) {
   const wake=useRef(()=>{});
   const [host,setHost]=useState<Host|null>(null);
   const [state,setState]=useState<Ballot|null>(null);
-  const [colorSound,setColorSound]=useState<Choice|null>(null);
+  const [atmosphere,setAtmosphere]=useState(DEFAULT_ATMOSPHERE);
   const [issue,setIssue]=useState(false);
   const [clockOffset,setClockOffset]=useState(0);
   useEffect(()=>{
@@ -17,9 +17,12 @@ export function useHostedBallot(cue:Cue) {
     wake.current();
   },[cue.scene,cue.beginsAt,cue.duration,cue.clock]);
   useEffect(()=>{
+    setHost(null);setState(null);setAtmosphere(DEFAULT_ATMOSPHERE);setIssue(false);
+    const clock=cue.clock;
+    if(!clock)return;
     let disposed=false, busy=false, again=false, created=false;
     let credentials:Host|undefined, snapshot:Ballot|null=null;
-    let previous=desired.current.scene, timer=0;
+    let timer=0;
     const abort=new AbortController();
     const command=(action:string, extra:Record<string,unknown>={})=>
       ballotRequest<Ballot>(credentials!.session,{action,hostToken:credentials!.hostToken,...extra},abort.signal);
@@ -28,9 +31,12 @@ export function useHostedBallot(cue:Cue) {
       if(disposed)return;
       setState(next);
       setClockOffset(Date.parse(next.serverTime)-Date.now());
-      if(!next.open && next.winner && next.scene!==null && desired.current.scene>next.scene)setColorSound(next.winner);
+      if(!next.open && next.winner && next.scene!==null){
+        const {scene,winner}=next;
+        setAtmosphere(previous=>applyWinner(previous,scene,winner));
+      }
     }
-    async function sync(){
+    const sync=async()=>{
       window.clearTimeout(timer);
       if(disposed)return;
       if(busy){again=true;return;}
@@ -38,15 +44,9 @@ export function useHostedBallot(cue:Cue) {
       again=false;
       let delay=0;
       try {
-        const {scene,clock,beginsAt,duration}=desired.current;
+        const {scene,beginsAt,duration}=desired.current;
         if(!location.protocol.startsWith("http")){setIssue(true);return;}
-        if(scene<previous && snapshot?.scene && scene<=snapshot.scene){
-          if(snapshot.open)await command("close",{scene:snapshot.scene});
-          credentials=undefined;created=false;snapshot=null;
-          if(!disposed){setState(null);setHost(null);setColorSound(null);}
-        }
-        previous=scene;
-        if(!created && scene<=100){
+        if(!created && scene>=90 && scene<=100){
           credentials??={session:crypto.randomUUID(),hostToken:crypto.randomUUID()};
           const result=await ballotRequest<Host>(credentials.session,{action:"create",hostToken:credentials.hostToken},abort.signal);
           credentials=result;created=true;
@@ -57,13 +57,12 @@ export function useHostedBallot(cue:Cue) {
           receive(await command("close",{scene:snapshot.scene}));
         }
         if(scene!==desired.current.scene){again=true;return;}
-        if(isRound(scene) && snapshot?.scene!==scene){
+        if(isRound(scene) && scene>(snapshot?.scene??0)){
           const left=duration ? duration-Math.max(0,clock.currentTime-beginsAt) : 28;
           if(left>0)receive(await command("open",{scene,duration:Math.max(1,Math.min(22,Math.floor(left-(left>7?3:0))))}));
         }else if(snapshot?.open || !snapshot){
           receive(await ballotRequest<Ballot>(credentials.session,undefined,abort.signal));
         }
-        if(snapshot && !snapshot.open && snapshot.winner && snapshot.scene!==null && scene>snapshot.scene && !disposed)setColorSound(snapshot.winner);
         if(!disposed)setIssue(false);
         if(snapshot?.open)delay=1000;
       }catch{
@@ -82,6 +81,6 @@ export function useHostedBallot(cue:Cue) {
           body:JSON.stringify({action:"close",...credentials,scene:snapshot.scene})}).catch(()=>{});
       }
     };
-  },[]);
-  return {session:host?.session,state,colorSound,issue,clockOffset};
+  },[cue.clock]);
+  return {session:host?.session,state,atmosphere,issue,clockOffset};
 }

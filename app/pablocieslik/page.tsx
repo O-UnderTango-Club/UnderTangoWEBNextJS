@@ -122,9 +122,11 @@ const styles = `
 .pcfolio .pc-card p { color: var(--pc-muted); }
 .pcfolio .pc-card a { margin-top: auto; padding-top: .55rem; color: var(--pc-green); text-decoration: underline; font-weight: 700; }
 .pcfolio .pc-footer {
+  background: transparent;
   margin-top: 2.8rem; padding-top: 1rem; border-top: 1px solid var(--pc-line);
   color: var(--pc-muted); font-size: .89rem;
 }
+.pcfolio .pc-footer::before { content: none; }
 @media (max-width: 42rem) {
   .pcfolio .pc-grid { grid-template-columns: minmax(0, 1fr); }
   .pcfolio .pc-hero::after { right: -.11em; opacity: .72; }

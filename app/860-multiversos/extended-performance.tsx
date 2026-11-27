@@ -7,7 +7,8 @@ import { cubeIndexForMidi, CUBE_FIRST_MIDI, CUBE_SIZE, CUBE_TRACK_NAMES, CUBE_TR
   type CubeTrack, type ExtendedScene, type TimbreScene } from "./extended-scenes";
 import { createPerformanceNotes, type NoteFrequency, type PerformanceInput } from "./performance-notes";
 import { createTimbreRack } from "./timbre-rack";
-import { createSceneInstrument, usesSceneKeyboard } from "./scene-instrument";
+import { createSceneInstrument, sceneDrumLabel, usesSceneKeyboard } from "./scene-instrument";
+import {ritualLayer} from "./ritual-patterns";
 import { TEMPERAMENT_SCENE } from "./show-score";
 import { useTempo } from "./tempo";
 
@@ -32,11 +33,12 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const auditionRack = useRef<ReturnType<typeof createTimbreRack> | null>(null);
   const attack = useRef({ count: 0, frequency: 0, velocity: 0 });
   const {bpm,clock:beatOrigin}=useTempo();
+  const percussion=!!ritualLayer(scene);
   const transport=useRef({bpm,beatOrigin});
   transport.current={bpm,beatOrigin};
   const player = useRef<{ strike: (id: string, track: CubeTrack, index: number, velocity: number) => void; release: (id: string) => void } | null>(null);
   const timbre = isTimbreScene(scene) ? scene : null;
-  const loopScene = timbre ? 20 : scene === 15 || scene === 18 ? scene : null;
+  const loopScene = percussion ? null : timbre ? 20 : scene === 15 || scene === 18 ? scene : null;
   const loopCue = useMemo(() => clock && loopScene ? { context: clock, beginsAt: clock.currentTime } : null, [clock, loopScene]);
   const three = loopScene === 15 || loopScene === 18;
   const keys = useMemo(() => getCubeKeys(!numeric, a4, firstMidi), [a4, numeric, firstMidi]);
@@ -44,8 +46,8 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
 
   useEffect(() => {
     const bus=manualOutput;
-    if(!usesSceneKeyboard(scene) || !bus)return;
-    const synth=createSceneInstrument(scene,bus,a4,()=>({
+    if(!(usesSceneKeyboard(scene) || percussion) || !bus)return;
+    const synth=createSceneInstrument(percussion ? 34 : scene as Parameters<typeof createSceneInstrument>[0],bus,a4,()=>({
       bpm:transport.current.bpm,origin:transport.current.beatOrigin(bus.context),
     }),(frequency,velocity)=>{attack.current={count:attack.current.count+1,frequency,velocity};});
     const prefix=(device:string)=>`midi:${JSON.stringify(device)}:`;
@@ -60,8 +62,8 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
         if(velocity<=0 && pedals.has(channelKey))sustained.add(key);
         else {
           sustained.delete(key);
-          const pitch = numeric ? CUBE_FIRST_MIDI + note - firstMidi : note;
-          if (velocity <= 0 || !numeric || pitch >= CUBE_FIRST_MIDI) play(key,pitch,velocity);
+          const pitch = numeric && !percussion ? CUBE_FIRST_MIDI + note - firstMidi : note;
+          if (velocity <= 0 || !numeric || percussion || pitch >= CUBE_FIRST_MIDI) play(key,pitch,velocity);
         }
       },
       sustainMidi:scene!==88 ? undefined : (device,channel,down)=>{
@@ -92,7 +94,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       window.removeEventListener("blur",releaseAll);document.removeEventListener("visibilitychange",hidden);
       synth.close();
     };
-  },[scene,manualOutput,routing,a4,firstMidi,numeric]);
+  },[scene,manualOutput,routing,a4,firstMidi,numeric,percussion]);
 
 
   useEffect(() => {
@@ -224,9 +226,10 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
     }
   }, [selected]);
   const liveNotes = [...new Set(live.flat())].sort((a, b) => a - b);
+  const percussion=ritualLayer(scene);
   return <div className="extended-instrument" data-extended-scene={scene}>
     {(scene === 31 || scene === 45) && <SpiralProjection analyser={analyser} attack={performance.attack} scene={scene} clock={clock} notes={liveNotes} />}
-    <div className="extended-cubes" ref={strip} role="group" aria-label="Tres cubos de frecuencias">
+    <div className="extended-cubes" ref={strip} role="group" aria-label={percussion ? "Tres cubos de percusión" : "Tres cubos de frecuencias"}>
       {CUBE_TRACKS.map((track) => {
 
         const sounding = live[track];
@@ -238,8 +241,9 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
                 {MATRIX_ORDER.map((index) => {
                   const key = keys[track][faceIndex][index];
                   const address = faceIndex * 9 + index;
-                  return <button key={key.midi} type="button" className="zero-note-key" data-hz={key.frequency}
-                    data-sounding={sounding.includes(key.frequency)} aria-label={`${key.label}${scene === 15 ? " hercios" : `, ${hz.format(key.frequency)} hercios`}`}
+                  const drum=percussion ? sceneDrumLabel(48+track*12+address) : null;
+                  return <button key={key.midi} type="button" className="zero-note-key" data-hz={drum ? undefined : key.frequency}
+                    data-sounding={sounding.includes(key.frequency)} aria-label={drum ?? `${key.label}${scene === 15 ? " hercios" : `, ${hz.format(key.frequency)} hercios`}`}
                     onPointerDown={(event) => {
                       if (event.button !== 0) return;
                       event.currentTarget.setPointerCapture(event.pointerId);
@@ -250,7 +254,7 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
                       const id = `button:${++pulseId.current}`;
                       press(id, track, address);
                       window.setTimeout(() => release(id), 220);
-                    }}><span className="zero-note-hz">{key.label}</span></button>;
+                    }}><span className="zero-note-hz">{drum ?? key.label}</span></button>;
                 })}
               </div>)}
             </div>
@@ -261,9 +265,9 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
     </div>
     {performance.timbre && <>
       <div className="extended-manual-strip">
-        <LiveChordTimeline histories={histories} live={liveNotes} compact />
+        {!percussion && <LiveChordTimeline histories={histories} live={liveNotes} compact />}
       </div>
-      <p className="extended-effect-caption">{TIMBRE_NAMES[performance.timbre]}</p>
+      <p className="extended-effect-caption">{ritualLayer(scene)?.name ?? TIMBRE_NAMES[performance.timbre]}</p>
     </>}
   </div>;
 }
@@ -275,6 +279,10 @@ export function ExtendedPerformanceControls({ performance, paused, scene }: { pe
     <input id="extended-a4" type="range" min={400} max={480} step={1} value={a4} onChange={(event) => setA4(Number(event.currentTarget.value))} />
     <div className="zero-loop-presets">{[440, 444].map((value) => <button type="button" key={value} aria-pressed={a4 === value} onClick={() => setA4(value)}>{value} Hz</button>)}</div>
   </>;
+  const percussion=ritualLayer(scene);
+  if(percussion)return <div className="extended-settings">
+    <p>{percussion.name} · La base entra después de la cuenta. Tocá el teclado para grabar tus propios acentos encima.</p>
+  </div>;
   if (!three && !timbre) {
     if(scene===89)return null;
     return <div className="extended-settings">

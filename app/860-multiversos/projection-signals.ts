@@ -32,7 +32,7 @@ export function useSceneSignals(scene:number|null, context:AudioContext|null, be
   useEffect(()=>{transport.current={bpm,clock};},[bpm,clock]);
 
   useEffect(()=>{
-    if (scene===null || scene===19 || !context) return;
+    if (scene===null || !context) return;
     const frame=signals.current;
     let seen=strikes.current.count, lastAttack=-Infinity, velocity=0;
     let pending=0, lastSample=-Infinity;

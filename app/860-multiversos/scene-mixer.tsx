@@ -9,6 +9,8 @@ import { useTempo } from "./tempo";
 import { TransportMidiButton, type TransportMidi } from "./transport-midi";
 import { MIDI_REASSIGNMENT, reassignMidi, sameMidiSignal, type MidiReassignment } from "./midi-reassignment";
 import { LiveSetProjection } from "./live-set-projection";
+import {playRitualTake} from "./ritual-percussion";
+import {ritualLayer} from "./ritual-patterns";
 import { LAYERS, hasScoredTake, takeSlot, takeName, nextTakeBeat, countLayer, firstRepeat, type LayerPlan } from "./layer-take";
 import { SCENE_INSTRUMENT_NAMES } from "./scene-instrument";
 import type { LiveSetScene } from "./extended-scenes";
@@ -304,6 +306,7 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
       const protectedTake=protectPeaks(gate,RECORDING_CEILING);
       protectedTake.connect(node);
       const click=plan ? countLayer(ctx,master,plan) : null;
+      const stopPercussion=plan ? playRitualTake(input,plan) : undefined;
       const replaced=currentClips.current.find(c=>c.slot===slot);
       const volume=replaced?.volume ?? bankVolumes.current.get(slot) ?? 75;
       const weight=currentClips.current.reduce((sum,c)=>sum+(c.slot!==slot && !c.stopped && !c.muted?(c.volume/100)**2:0), (volume/100)**2);
@@ -312,6 +315,7 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
       const dispose=()=>{
         if(released)return;
         released=true;
+        stopPercussion?.();
         for(const source of sources)source.disconnect(gate);
         gate.disconnect();protectedTake.disconnect();capture.stop();gain.disconnect();
       };
@@ -322,7 +326,7 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
         if(plan){countingTake.current=false;setCountIn(null);if(cue)onTakeComplete(cue);}
         dispose();pending.current.delete(kind);
         const old=currentClips.current.find(c=>c.slot===slot);
-        if(plan && !old && !channels.some(ch=>ch.some(value=>Math.abs(value)>.0002))){
+        if(plan && !channels.some(ch=>ch.some(value=>Math.abs(value)>.0002))){
           reservedSlots.current.delete(slot);bridge?.stop();setLayerState("Sin señal");
           if(!pending.current.size)setState("idle");
           return;
@@ -651,6 +655,7 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
   const currentTake=layer.current?.scene===takeScene && armed.current===cue ? layer.current : null;
   const activeCount=currentTake && countingTake.current ? countIn : null;
   const recordedLayer=currentTake && clips.find(c=>c.slot===currentTake.slot && c.layer===takeScene);
+  const percussion=ritualLayer(takeScene);
   let takeStatus=armed.current===cue ? layerState : "";
   if(currentTake && countingTake.current)takeStatus=activeCount!==null ? "Cuenta de entrada" : waiting ? "Próximo compás" : "Grabando";
   else if(takeStatus==="En loop" && !recordedLayer)takeStatus="Sin sample";
@@ -666,7 +671,7 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
     {automatic && cycle>180 && <output role="status">Subí el tempo a 6 BPM o más para grabar cuatro compases.</output>}
     {automatic && !liveSet && currentTake && <output data-take-status={takeStatus} style={{position:"absolute",top:"9%",right:"3%",zIndex:6,pointerEvents:"none",background:"#211c36",color:"#fff",padding:".4em .7em",borderRadius:6,textAlign:"center"}}>
       {activeCount!==null && <strong style={{display:"block",fontSize:"clamp(36px,7vw,96px)"}}>{activeCount}</strong>}
-      S{currentTake.slot+1} · {takeStatus}
+      S{currentTake.slot+1} · {takeStatus}{percussion && <small style={{display:"block"}}>{percussion.name}</small>}
     </output>}
     {liveSet && analyser && <LiveSetProjection filmLayer={filmLayer} cue={cue} seconds={seconds} scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
       analyser={showRoomInput ? roomMeter : analyser} paused={paused} meter={meter} bars={bars} bpm={bpm}

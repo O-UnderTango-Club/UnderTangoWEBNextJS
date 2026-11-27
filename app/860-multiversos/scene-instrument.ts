@@ -4,7 +4,7 @@ import { harmonicFrequencyAt } from "./frequency-tuning";
 import { SHOW_INTERLUDES, TEMPERAMENT_SCENE } from "./show-score";
 export const SCENE_INSTRUMENT_NAMES = {
   ...SHOW_INTERLUDES,
-  16: "Armónicos de 111 Hz", 17: "Serie armónica", 19: "Timbre al tacto",
+  16: "Armónicos de 111 Hz", 19: "Timbre al tacto",
   32: "Bajo de pulso", 33: "Pads abiertos", 34: "Batería electrónica", 35: "Arpegio",
   36: "Acordes cortos", 37: "Bajo ácido", 38: "Melodía de sierra", 39: "Ensamble por registros",
   63: "Dub", 64: "House", 65: "Garage", 66: "Breakbeat", 67: "Electro", 68: "Techno", 69: "Trance",
@@ -37,6 +37,10 @@ const downbeats: Rhythm = { divisions: 1, steps: [0], gate: .66 };
 function kit(note: number): Color {
   return (["kick", "hat", "snare", "metal", "snare", "tom", "hat", "tom", "metal", "tom", "hat", "hat"] as const)[note % 12];
 }
+export function sceneDrumLabel(note:number) {
+  const labels:Partial<Record<Color,string>>={kick:"Bombo",snare:"Caja",hat:"Hi-hat",metal:"Metal",tom:"Tom"};
+  return labels[kit(note)] ?? "Golpe";
+}
 function orchestration(scene: InstrumentScene, note: number): {color: Color; rhythm?: Rhythm} {
   switch (scene) {
     case 40: return {color:"pluck",rhythm:offbeat};
@@ -58,7 +62,6 @@ function orchestration(scene: InstrumentScene, note: number): {color: Color; rhy
     case 58: return {color:"pluck",rhythm:arpeggio};
     case 59: return {color:note<52?"kick":"lead",rhythm:note<52?downbeats:goa};
     case 16: return {color:"hollow"};
-    case 17: return {color:"pluck"};
     case 19: case 77: return {color:"hollow"};
     case 32: return {color:"bass"};
     case 33: case 76: return {color:"pad"};
@@ -230,10 +233,10 @@ function makeSound(bus: GainNode, scene: InstrumentScene, color: Color, hz: numb
   return sound;
 }
 
-export type PercussionVoice = "kick" | "snare" | "clap" | "hat";
-export function schedulePercussionHit(output:GainNode,scene:InstrumentScene,voice:PercussionVoice,at:number) {
-  const pitch={kick:52,snare:175,clap:250,hat:6200}[voice];
-  const velocity={kick:.73,snare:.59,clap:.63,hat:.48}[voice];
+export type PercussionVoice = "kick" | "snare" | "clap" | "hat" | "tom" | "metal";
+export function schedulePercussionHit(output:GainNode,scene:InstrumentScene,voice:PercussionVoice,at:number,shape?:{pitch:number;velocity:number}) {
+  const pitch=shape?.pitch ?? {kick:52,snare:175,clap:250,hat:6200,tom:166.5,metal:444}[voice];
+  const velocity=shape?.velocity ?? {kick:.73,snare:.59,clap:.63,hat:.48,tom:.67,metal:.56}[voice];
   return makeSound(output,scene,voice,pitch,velocity,at,()=>{});
 }
 

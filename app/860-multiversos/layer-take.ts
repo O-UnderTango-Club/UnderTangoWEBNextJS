@@ -1,5 +1,6 @@
 import { TIMBRE_NAMES, type TimbreScene } from "./extended-scenes";
 
+import {ritualLayer} from "./ritual-patterns";
 import {TEMPERAMENT_SCENE} from "./show-score";
 
 export const LAYERS = [
@@ -13,9 +14,9 @@ export const LAYERS = [
   {name:"Ensamble por registros",gesture:"ensamble",color:"#7adddf",pitch:247,wave:"triangle"},
 ] as const;
 export function isLayer(scene:number|null): scene is number {return scene!==null && scene>=32 && scene<=39;}
-export function hasScoredTake(scene:number|null): scene is number { return scene!==null && scene>=19 && scene<=39; }
-export function takeSlot(scene:number) { return scene>=32 ? scene-32 : (scene-19)%9; }
-export function takeName(scene:number) { return scene>=32 ? LAYERS[scene-32].name : TIMBRE_NAMES[scene as TimbreScene] ?? "El timbre"; }
+export function hasScoredTake(scene:number|null): scene is number { return scene!==null && scene>=18 && scene<=39; }
+export function takeSlot(scene:number) { return scene>=32 ? scene-32 : (scene-19+9)%9; }
+export function takeName(scene:number) { return scene>=32 ? LAYERS[scene-32].name : ritualLayer(scene)?.name ?? (scene===18 ? "Cubos · 111 Hz" : TIMBRE_NAMES[scene as TimbreScene] ?? "El timbre"); }
 export function nextTakeBeat(elapsed:number) {
   // The complete count starts at beat 12 and the take at beat 16 (zero-based).
   return 16 * Math.max(1, Math.ceil((elapsed + 4) / 16));

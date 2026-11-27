@@ -186,8 +186,8 @@ export default async function Chloe() {
             </>}
           </div>
           <div className={css.card}>
-            <h3>Calendario de UnderTango Club</h3>
-            <p className={css.meta}>Google Calendar · próximos 30 días</p>
+            <h3>Agenda pública de UnderTango Club</h3>
+            <p className={css.meta}>Próximos 30 días</p>
             {club?.updatedAt ? <>
               <p className={css.meta}>{club.partial ? "Consulta parcial" : "Consultado"} · {dateTime(club.updatedAt)}</p>
               {club.events.length ? <ul className={css.rows}>{club.events.map(event => <li key={event.id}>

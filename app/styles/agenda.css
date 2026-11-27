@@ -117,36 +117,6 @@
   margin-left: auto;
 }
 
-.agenda-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  border-radius: 999px;
-  border: 1px solid #d5d0c7;
-  background: #f7f5f1;
-  color: #59544c;
-  font-size: 0.66rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.agenda-status::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #2d8a4b;
-}
-
-.agenda-status.loading::before {
-  background: #b59b52;
-}
-
-.agenda-status.error::before {
-  background: #b54a4a;
-}
-
 .share-button,
 .category-filters button,
 .month-navigation button {
@@ -460,8 +430,7 @@ a.event-card:focus-visible {
 }
 
 .share-mode .agenda-subtitle,
-.share-mode .category-filters,
-.share-mode .agenda-status {
+.share-mode .category-filters {
   display: none;
 }
 
@@ -566,10 +535,6 @@ a.event-card:focus-visible {
     width: 100%;
   }
 
-  .agenda-status {
-    justify-content: center;
-  }
-
   .agenda-public-footer {
     flex-direction: column;
     gap: 2px;
@@ -580,8 +545,7 @@ a.event-card:focus-visible {
   .agenda-shell > header,
   .agenda-shell > footer,
   .share-button,
-  .category-filters,
-  .agenda-status {
+  .category-filters {
     display: none !important;
   }
 
@@ -598,5 +562,95 @@ a.event-card:focus-visible {
 
   .day-cell {
     min-height: 100px;
+  }
+}
+
+
+.agenda-featured {
+  margin: 18px auto 22px;
+  max-width: 1180px;
+}
+
+.agenda-featured h2 {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+  font-weight: 750;
+}
+
+.agenda-featured-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.agenda-featured-card {
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) minmax(0, 1fr);
+  align-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #303148;
+  background: #11121a;
+  color: #f7f6ff;
+}
+
+.agenda-featured-flyer {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  background: #08090f;
+}
+
+.agenda-featured-flyer img {
+  object-fit: contain;
+}
+
+.agenda-featured-flyer:focus-visible {
+  z-index: 1;
+  outline: 3px solid #b9acff;
+  outline-offset: -3px;
+}
+
+.agenda-featured-details {
+  padding: clamp(9px, 2vw, 24px);
+}
+
+.agenda-featured-details time {
+  display: block;
+  margin-bottom: 9px;
+  color: #d5ceff;
+  font-size: clamp(0.86rem, 1.4vw, 1.12rem);
+  font-weight: 750;
+}
+
+.agenda-featured-details h3 {
+  margin: 5px 0 8px;
+  font-size: clamp(1.08rem, 2vw, 1.72rem);
+  line-height: 1.14;
+}
+
+.agenda-featured-details p {
+  margin: 0 0 7px;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.agenda-featured-details .agenda-featured-place {
+  font-weight: 700;
+}
+
+.agenda-featured-details .agenda-featured-festival,
+.agenda-featured-details .agenda-featured-time {
+  color: #c9c5d7;
+  font-size: 0.76rem;
+}
+
+@media (max-width: 700px) {
+  .agenda-featured-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-featured-card {
+    grid-template-columns: minmax(100px, 35%) minmax(0, 1fr);
   }
 }

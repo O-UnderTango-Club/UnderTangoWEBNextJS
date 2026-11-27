@@ -49,10 +49,8 @@ export default function HomeLanding(){
         <div className={styles.panelBody}>
           <p className={styles.eyebrow}>01 · UNDER TANGO</p>
           <button type="button" className={styles.panelToggle} onClick={()=>toggle("shows")} aria-expanded={open==="shows"} aria-controls="home-shows-options"><span>{t("Shows")}</span><span className={styles.plus} aria-hidden="true">{open==="shows"?"−":"+"}</span></button>
-          {open!=="shows" && <p className={styles.hint}>{t("Elegí un país")}</p>}
           {open==="shows" && <div id="home-shows-options" className={styles.options}>
-            <a href="/agenda" aria-label={t("Ver actividades en Argentina")}><span>🇦🇷 {t("Argentina · Puerto Iguazú")}<small>Restaurante A Piacere · {t("Sábados · 21:00")}</small></span><span aria-hidden="true">↗</span></a>
-            <a href="/agenda" aria-label={t("Ver actividades en Brasil")}><span>🇧🇷 {t("Brasil · Foz do Iguaçu")}<small>Hotel Wish · {t("Viernes · 21:00")}</small></span><span aria-hidden="true">↗</span></a>
+            <a href="/agenda"><span>{t("Calendario de actividades")}</span><span aria-hidden="true">↗</span></a>
             <a href="/shows"><span>{t("Más información")}</span><span aria-hidden="true">↗</span></a>
           </div>}
         </div>

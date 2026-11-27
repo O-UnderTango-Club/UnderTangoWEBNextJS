@@ -1,8 +1,8 @@
-import { clipLength } from './timing.mjs?v=ronda14';
+import { clipLength } from './timing.mjs?v=respuesta';
 
 // Stream the full master for the speakers. Decode its opening locally for the clip.
 const trackUrl = './trance-psicomusical.mp3';
-const clipMusicUrl = './musica-del-clip.mp3';
+
 const musicGain = 0.31;
 
 export function arrangeScore(ctx, music, duration) {
@@ -120,12 +120,12 @@ export function soundscape(onChange) {
     request = controller;
     pending = (async () => {
       try {
-        const response = await fetch(clipMusicUrl, { signal: controller.signal });
+        const response = await fetch('./musica-del-clip.mp3?v=respuesta', { signal: controller.signal });
         if (!response.ok || !Offline) throw Error('Música no disponible');
         const decoder = new Offline(1, 1, 48000);
         const decoded = await decoder.decodeAudioData(await response.arrayBuffer());
         if (controller.signal.aborted) return null;
-        score = arrangeScore(decoder, decoded, clipLength);
+        score = decoded;
         return score;
       } catch {
         if (!controller.signal.aborted) failed = true;
@@ -218,7 +218,7 @@ export function soundscape(onChange) {
     const phrase = await prepare();
     if (!phrase) throw Error('Música no disponible');
     const ctx = new Offline(1, Math.round(rate * duration / 1000), rate);
-    playScore(ctx, ctx.destination, phrase);
+    playScore(ctx, ctx.destination, arrangeScore(ctx, phrase, duration));
     const grain = noise || (noise = makeNoise(ctx));
     for (const event of recordedSteps) playStep(ctx, ctx.destination, grain, event.time, event);
     const buffer = await ctx.startRendering();

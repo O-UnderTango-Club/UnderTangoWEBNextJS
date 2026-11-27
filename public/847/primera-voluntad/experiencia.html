@@ -341,15 +341,25 @@
           flex: 1 1 8rem;
         }
       }
+      #answer-dialog { width: min(86vw, 24rem); padding: 1.25rem; border-radius: 1rem; border: 1px solid #98aaa9; background: #10161bec; color: white; }
+      #answer-dialog::backdrop { background: #09121a55; }
+      #answer-form { display: grid; gap: .9rem; }
+      #answer-form label { font: 600 1.35rem/1.25 system-ui; }
+      #answer { width: 100%; box-sizing: border-box; font: 1rem/1.4 system-ui; padding: .6rem; }
     </style>
   </head>
   <body>
+    <dialog id="answer-dialog" aria-labelledby="question"><form id="answer-form">
+      <label id="question" for="answer">¿Cuál fue tu primera voluntad antes de nacer?</label>
+      <textarea id="answer" rows="3" maxlength="160" required></textarea>
+      <button type="submit">Listo</button>
+    </form></dialog>
     <main id="game">
       <section id="stage" class="stage" data-phase="permission" data-round="waiting" aria-label="Escena de Un Ø aparece">
         <video id="feed" class="visual" autoplay muted playsinline hidden></video>
         <canvas id="scene" class="visual" aria-hidden="true" hidden></canvas>
         <canvas id="surface" class="visual" aria-hidden="true"></canvas>
-        <video id="recording" controls playsinline preload="auto" aria-label="Tu video de 14 segundos" hidden></video>
+        <video id="recording" controls playsinline preload="auto" aria-label="Tu video de Primera voluntad" hidden></video>
         <img id="replay-picture" alt="" hidden>
         <button id="watch" type="button" hidden>Ver mi video</button>
         <div id="prize-target" aria-hidden="true">
@@ -433,16 +443,16 @@
         </div>
         <p>
           Apuntá a una junta del piso o al borde de una mesa. El Ø rueda por esa recta y puede saltar a otra que entre en el encuadre.
-          Incliná el teléfono para que baje el cartel. El Ø sale a tu encuentro. Amagá hacia un lado y cambiá de dirección cuando salte. Tenés 14 segundos para tocar la bandeja. Si llegás, el festejo y el regalo aparecen al tocar la bandeja. Si se acaba el tiempo, tocá la flecha para volver a intentar. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
+          Incliná el teléfono para que baje el cartel. El Ø sale a tu encuentro. Amagá hacia un lado y cambiá de dirección cuando salte. Tenés 12 segundos para tocar la bandeja. Si llegás, el festejo y el regalo aparecen al tocar la bandeja. Tocá el regalo o esperá a que termine la cuenta para responder la pregunta. En la muestra sin cámara podés arrastrar el cuadro o usar las flechas del teclado.
         </p>
         <p>
-          «trance psicomusical», de Ø UnderTango Club, suena completa. Si hace falta, tocá la imagen para escucharla. Podés silenciarla con el botón de sonido. El video incluye la música y los pasos. Cada ronda se graba durante 14 segundos en tu dispositivo. Podés guardarlo o
+          «trance psicomusical», de Ø UnderTango Club, suena completa. Si hace falta, tocá la imagen para escucharla. Podés silenciarla con el botón de sonido. El video incluye la música y los pasos. El video suma cinco segundos de cámara con tu respuesta. Lo que tardás en escribir queda fuera de la toma. Podés guardarlo o
           compartirlo desde la esquina inferior izquierda. Al volver de otra app podés reproducirlo, guardarlo o compartirlo otra vez. Recargar inicia otra ronda. Desde esta pestaña también podés recuperar tu última grabación. La cámara
           funciona sin micrófono y la página no envía las imágenes.
         </p>
         <a href="/847/primera-voluntad?vista=ficha">Ver la ficha de la función →</a>
       </section>
     </main>
-    <script type="module" src="./experience.mjs?v=paso"></script>
+    <script type="module" src="./experience.mjs?v=respuesta"></script>
   </body>
 </html>

@@ -493,14 +493,14 @@ test('the wider sign fits the viewport and carries the Iguazú invitation throug
   }
 });
 
-test('each round counts fourteen seconds from the detected line and closes at the deadline', () => {
+test('each round counts twelve seconds from the detected line and closes at the deadline', () => {
   const start = 5821;
-  assert.equal(clipLength, 14000);
-  for (let i = 0; i < 14; i++) assert.equal(secondsLeft(start, start + i * 1000), 14 - i);
-  assert.equal(secondsLeft(start, start + 13999.99), 1);
-  assert.equal(secondsLeft(start, start + 14000), 0);
+  assert.equal(clipLength, 17000);
+  for (let i = 0; i < 12; i++) assert.equal(secondsLeft(start, start + i * 1000), 12 - i);
+  assert.equal(secondsLeft(start, start + 11999.99), 1);
+  assert.equal(secondsLeft(start, start + 12000), 0);
   assert.equal(secondsLeft(start, start + 22000), 0);
-  assert.equal(secondsLeft(start + 22000, start + 22000), 14);
+  assert.equal(secondsLeft(start + 22000, start + 22000), 12);
   for (const clip of ['preparing', 'ready', 'unavailable']) {
     assert.equal(roundPhase(1, false, clip), 'playing');
     assert.equal(roundPhase(1, true, clip), 'won');
@@ -512,24 +512,24 @@ test('each round counts fourteen seconds from the detected line and closes at th
   }
 });
 
-test('the export plays the first 14 continuous seconds and fades at the end', () => {
+test('the export plays the first 17 continuous seconds and fades at the end', () => {
   const ctx = {
     createBuffer(channels, length, sampleRate) {
       const data = Array.from({ length: channels }, () => new Float32Array(length));
       return { numberOfChannels: channels, length, sampleRate, getChannelData: (i) => data[i] };
     },
   };
-  const source = ctx.createBuffer(2, 15250, 1000);
+  const source = ctx.createBuffer(2, 18500, 1000);
   for (let i = 0; i < source.length; i++) {
     source.getChannelData(0)[i] = i / source.length;
     source.getChannelData(1)[i] = -i / source.length;
   }
   const score = arrangeScore(ctx, source, clipLength);
-  assert.equal(score.length, 14000);
-  assert.equal(clipName(clipLength, 'webm'), 'primera-voluntad-14s.webm');
+  assert.equal(score.length, 17000);
+  assert.equal(clipName(clipLength, 'webm'), 'primera-voluntad-17s.webm');
   for (let ch = 0; ch < 2; ch++) {
     const pcm = score.getChannelData(ch);
-    for (const i of [0, 13999]) assert.ok(Math.abs(pcm[i]) < 1e-6);
+    for (const i of [0, 16999]) assert.ok(Math.abs(pcm[i]) < 1e-6);
     for (const i of [200, 7999, 13184, 13185, 13800])
       assert.equal(pcm[i], source.getChannelData(ch)[i]);
   }
@@ -696,11 +696,14 @@ test('a new vertical edge entering a horizontally uniform scene cannot pull the 
   assert.ok(!flow || Math.abs(flow.dx) < 0.001);
 });
 
-test('a shared take contains all fourteen seconds, including the final picture', () => {
-  const pictures = Array.from({ length: 281 }, (_, i) => ({ at: i * 50, blob: i }));
+test('a shared take contains all seventeen seconds, including the final picture', () => {
+  const pictures = Array.from({ length: 341 }, (_, i) => ({ at: i * 50, blob: i }));
   const frames = pictureSequence(pictures);
-  assert.equal(frames.length, 420);
-  for (let second = 0; second < 14; second++) {
+  assert.equal(frames.length, 510);
+  const early = pictureSequence(pictures.filter(p => p.at <= 11300), 11300);
+  assert.equal(early.length, 339);
+  assert.equal(early.at(-1), 226);
+  for (let second = 0; second < 17; second++) {
     assert.equal(frames[second * 30], second * 20);
     assert.ok(frames[second * 30 + 29] > second * 20);
   }

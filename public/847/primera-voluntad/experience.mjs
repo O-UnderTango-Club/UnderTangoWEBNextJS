@@ -11,16 +11,16 @@ import {
   drawImpacts,
 } from './scene.mjs?v=estela';
 import { drawSign } from './solid-sign.mjs?v=toma14';
-import { soundscape } from './footsteps.mjs?v=sonido';
+import { soundscape } from './footsteps.mjs?v=respuesta';
 
 import { RollingSign, ShowBoard, collide, constrainContact, tiltFromRest } from './stage-physics.mjs?v=paso';
 import { invitation, layoutBoard, paintBoard } from './show-board.mjs?v=paso';
 import { photoReview } from './photo-review.mjs?v=toma14';
-import { SceneClip } from './clip.mjs?v=toma14';
+import { SceneClip } from './clip.mjs?v=respuesta';
 import { touchesTray, settlePrize } from './prize-goal.mjs?v=cruce';
-import { showPrize } from './prize.mjs?v=estela';
+import { paintAnswer } from './answer.mjs?v=respuesta';
 import { readTake, rememberTake, savedId, markReturn, returningFromApp } from './saved-take.mjs?v=toma14';
-import { clipLength, roundPhase, secondsLeft } from './timing.mjs?v=festejo';
+import { roundLength, endingLength, roundPhase, secondsLeft } from './timing.mjs?v=respuesta';
 
 const get = (id) => document.getElementById(id);
 const stage = get('stage'),
@@ -47,10 +47,7 @@ const gentle = matchMedia('(prefers-reduced-motion: reduce)');
 const audio = soundscape(updateSound);
 const hint =
   'Buscando un borde. Probá con dos juntas del piso o con los costados de un pasillo bien iluminado.';
-function newClip() {
-  return new SceneClip(updateClip, (file, offsets) => rememberTake(file, won, sourceMode, offsets));
-}
-let clip = newClip(), retryPending = false;
+const clip = new SceneClip(updateClip, (file, offsets) => rememberTake(file, won, sourceMode, offsets));
 const clipTools = get('clip-tools'),
   save = get('save'),
   share = get('share'),
@@ -98,27 +95,27 @@ function checkLanding() {
   };
   pad.hidden = true;
 }
+const questionForm = get('answer-form'), dialog = get('answer-dialog'), input = get('answer');
+let chapter = 'game', cutoff = 0, answer = '';
 function updateRound() {
   const seconds = sceneStart === null ? null : secondsLeft(0, elapsedMs);
   const state = seconds === null ? 'waiting' : roundPhase(seconds, won);
-  const finished = state === 'won' || state === 'lost';
+  const finished = state === 'won' || state === 'lost' || chapter === 'ending';
   const ready = finished && clip.state === 'ready';
   clipTools.hidden = save.hidden = share.hidden = !ready;
-  watch.hidden = !ready || mode === 'review' || mode === 'prize';
+  watch.hidden = !ready || mode === 'review';
   if (seconds !== null && countdown.textContent !== String(seconds)) countdown.textContent = String(seconds);
+  gift.hidden = state !== 'won' || (chapter !== 'game' && !ready);
+  restart.hidden = !ready && clip.state !== 'unavailable';
   if (state === stage.dataset.round) return;
   stage.dataset.round = state;
   countdown.hidden = seconds === null || finished;
-  gift.hidden = state !== 'won';
-  restart.hidden = state !== 'lost';
   if (state !== 'playing') pad.hidden = true;
   if (state === 'won') status.textContent = 'Tocá el regalo para abrirlo.';
-  if (state === 'lost') status.textContent = 'Se terminó el tiempo. Tocá la flecha para volver a jugar.';
+  if (state === 'lost') status.textContent = 'Terminó la ronda. Escribí tu respuesta para completar el video.';
 }
 
 function updateClip(current) {
-  if (retryPending && ['encoding', 'unavailable'].includes(current.state)) queueMicrotask(retry);
-  if (mode === 'prize' && ['encoding','ready','unavailable'].includes(current.state)) cancelAnimationFrame(frame);
   get('previous-take').hidden = !savedId() || current.state === 'ready';
   clipError.hidden = current.state !== 'unavailable';
   if (current.state === 'ready') {
@@ -128,16 +125,16 @@ function updateClip(current) {
     save.removeAttribute('href');
   }
   updateRound();
-  if (current.state === 'ready' && suspended && !document.hidden) showRecording();
+  if (current.state === 'ready' && !document.hidden && (suspended || chapter === 'ending')) showRecording();
 }
-save.addEventListener('click', () => { if (mode !== 'prize') showRecording(); });
+save.addEventListener('click', () => { showRecording(); });
 watch.addEventListener('click', () => {
   showRecording();
   player.play().catch(() => {});
 });
 share.addEventListener('click', async () => {
   if (sharing || clip.state !== 'ready') return;
-  if (mode !== 'prize') showRecording();
+  showRecording();
   if (!clip.canShare()) {
     save.click();
     status.textContent = 'Guardá el video y compartilo desde tus archivos.';
@@ -274,7 +271,9 @@ function stopInput() {
   feed.srcObject = null;
 }
 function resetRound() {
-  retryPending = false;
+  chapter = 'game';
+  answer = input.value = '';
+  dialog.close();
   sceneStart = lastPictureAt = null;
   elapsedMs = captureMs = 0;
   won = false;
@@ -376,7 +375,7 @@ function render(source, crop, now, dt) {
     lost = performance.now() - lastLineAt;
   ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
   updateRound();
-  const withinTime = elapsedMs < clipLength;
+  const withinTime = chapter === 'game' && elapsedMs < roundLength;
   if (motion && lost > 900 && stage.dataset.phase === 'ground') phase('search', hint);
   let turned = false;
   while (dt > 0) {
@@ -385,7 +384,7 @@ function render(source, crop, now, dt) {
       const playing = withinTime && !seating;
       if (playing) board.advance(view, step, gentle.matches);
       else if (seating && seating.progress < 1) settlePrize(board, goal, seating, step);
-      if ((lost < 500 || mode === 'prize') && motion.advance(step)) turned = true;
+      if ((lost < 500) && motion.advance(step)) turned = true;
       body.advance(motion, step, playing ? board : null);
       body.keepInPlay(view);
       const hit = collide(body, board, now, !playing);
@@ -449,6 +448,7 @@ function render(source, crop, now, dt) {
   paintBoard(ctx, board, layout, art, now);
   if (body) drawSign(ctx, body, beat, now, elapsed);
   if (seating) drawCelebration((elapsedMs - seating.landedAt) / 1000);
+  if (chapter === 'ending') paintAnswer(ctx, width, height, board, answer, captureMs - cutoff);
   if (clip.state === 'idle') clip.begin(surface, audio, sceneStart);
   else if (clip.state === 'preparing') clip.paint(surface, sceneStart + captureMs);
 }
@@ -472,40 +472,29 @@ function drawCelebration(t) {
   }
   ctx.restore();
 }
-function openSecret(id, pushEntry = true) {
-  if (gift.hidden || mode === 'prize') return;
-  player.pause();
-  cancelAnimationFrame(frame);
-  if (pushEntry) history.pushState(null, '', './premio.html#' + id);
-  if (clip.state === 'preparing') {
-    const source = mode === 'camera' ? feed : scene;
-    if (mode === 'camera' && feed.videoWidth) {
-      const crop = visibleCrop(feed.videoWidth, feed.videoHeight, width, height);
-      ink.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
-    }
-  }
-  enableSound.hidden = true;
-  mode = 'prize';
-  stopInput();
-  if (clip.state === 'preparing') frame = requestAnimationFrame(animate);
-  get('game').hidden = true;
-  showPrize(id);
+function ask() {
+  if (chapter !== 'game' || sceneStart === null || mode === 'review') return;
+  cutoff = Math.min(roundLength, Math.max(100, Math.round(elapsedMs / 100) * 100));
+  chapter = 'writing';
+  lastPictureAt = null;
+  updateRound();
+  dialog.showModal();
+  input.focus({ preventScroll: true });
 }
-// The round and its effects use foreground time. Only the recording waits for JPEG conversion.
-function advanceClocks(now) {
-  const delta = lastPictureAt === null ? 0 : Math.max(0, now - lastPictureAt);
-  lastPictureAt = now;
-  elapsedMs += delta;
-  captureMs = clip.limitAdvance(captureMs + Math.min(200, delta));
-  return delta;
-}
+dialog.addEventListener('cancel', event => event.preventDefault());
+questionForm.addEventListener('submit', event => {
+  event.preventDefault();
+  if (!input.value.trim()) { input.focus(); return; }
+  answer = input.value.trim();
+  chapter = 'ending';
+  elapsedMs = captureMs = cutoff;
+  lastPictureAt = null;
+  clip.setDuration(cutoff + endingLength);
+  dialog.close();
+  window.scrollTo(0, 0);
+});
+
 function animate(now) {
-  if (mode === 'prize' && !suspended && clip.state === 'preparing') {
-    const delta = advanceClocks(now);
-    render(scene, visibleCrop(scene.width, scene.height, width, height), sceneStart + elapsedMs, Math.min(delta / 1000, 0.05));
-    frame = requestAnimationFrame(animate);
-    return;
-  }
   if (suspended || (mode !== 'camera' && mode !== 'demo')) return;
   const dt = Math.min(0.05, Math.max(0, (now - frameAt) / 1000));
   frameAt = now;
@@ -530,8 +519,19 @@ function animate(now) {
     now = performance.now();
     if (motion && sceneStart === null) startRound(now);
     if (sceneStart !== null) {
-      advanceClocks(now);
+      if (chapter === 'writing') {
+        ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
+        lastPictureAt = null;
+        frame = requestAnimationFrame(animate);
+        return;
+      }
+      const delta = lastPictureAt === null ? 0 : Math.max(0, now - lastPictureAt);
+      lastPictureAt = now;
+      elapsedMs += delta;
+      captureMs = chapter === 'game' ? Math.min(elapsedMs, roundLength) :
+        Math.min(cutoff + endingLength, clip.limitAdvance(captureMs + Math.min(200, delta)));
       render(source, crop, sceneStart + elapsedMs, dt);
+      if (chapter === 'game' && elapsedMs >= roundLength) ask();
     }
   } else lastPictureAt = null;
   frame = requestAnimationFrame(animate);
@@ -611,7 +611,7 @@ function rememberReviewPage() {
     history.replaceState({ ...history.state, primeraTake: id }, '', '#mi-video');
 }
 function showRecording() {
-  if (clip.state !== 'ready' || mode === 'prize') return;
+  if (clip.state !== 'ready') return;
   cancelAnimationFrame(frame);
   stopInput();
   audio.pause();
@@ -635,22 +635,12 @@ function dismiss() {
   if (clip.state === 'ready') { showRecording(); return; }
   end('Experiencia cerrada. Podés volver a empezar.', sceneStart !== null);
 }
-gift.addEventListener('click', () => openSecret(crypto.randomUUID()));
+gift.addEventListener('click', () => {
+  if (clip.state === 'ready' && won) location.assign('./premio.html#' + crypto.randomUUID());
+  else ask();
+});
 function retry() {
-  if (stage.dataset.round !== 'lost') return;
-  if (clip.state === 'preparing') { retryPending = true; return; }
-  retryPending = false;
-  if (clip.state === 'encoding') {
-    const finishing = clip, source = sourceMode;
-    finishing.persist = (file, offsets) => rememberTake(file, false, source, offsets);
-    finishing.onChange = current => {
-      if (current.state === 'ready') {
-        URL.revokeObjectURL(current.url);
-        get('previous-take').hidden = clip.state === 'ready';
-      }
-    };
-    clip = newClip();
-  }
+  if (restart.hidden) return;
   if (mode === 'review') { enter(sourceMode || 'camera'); return; }
   resetRound();
   frameAt = performance.now();
@@ -680,25 +670,6 @@ pad.addEventListener('keydown', (event) => {
   event.preventDefault();
   board.steer(...delta);
 });
-addEventListener('popstate', () => {
-  if (get('prize') && !location.pathname.endsWith('/premio.html')) {
-    get('prize').remove();
-    get('game').hidden = false;
-    document.title = 'Un Ø aparece · Primera voluntad';
-    if (clip.state === 'ready') {
-      mode = 'review';
-      showRecording();
-    } else {
-      cancelAnimationFrame(frame);
-      mode = sourceMode;
-      lastPictureAt = null;
-      startInput(mode);
-    }
-  } else if (location.pathname.endsWith('/premio.html') && mode !== 'prize') {
-    // Forward navigation reuses the prize document and its existing round ID.
-    openSecret(location.hash.slice(1), false);
-  }
-});
 get('previous-take').addEventListener('click', async () => {
   const session = generation;
   const take = await readTake();
@@ -710,7 +681,7 @@ function restoreTake(take) {
   sourceMode = take.source;
   won = take.won;
   sceneStart = 0;
-  elapsedMs = clipLength;
+  elapsedMs = roundLength;
   mode = 'review';
   clip.restore(take.file, take.photoOffsets);
   showRecording();
@@ -745,7 +716,7 @@ let opened = false;
 function suspend() {
   if (!leavingDocument && clip.state === 'ready') {
     markReturn(true);
-    if (mode !== 'prize') rememberReviewPage();
+    rememberReviewPage();
   }
   if (!mode || suspended) return;
   suspended = true;
@@ -775,7 +746,6 @@ async function visibility() {
     enter(demoEntry ? 'demo' : 'camera');
   } else if (suspended) {
     markReturn(false);
-    if (mode === 'prize') { suspended = false; if (clip.state === 'preparing') frame = requestAnimationFrame(animate); return; }
     if (clip.state === 'ready') { showRecording(); return; }
     if (clip.state === 'encoding') return;
     suspended = false;

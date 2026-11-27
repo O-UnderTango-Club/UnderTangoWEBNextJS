@@ -1,13 +1,14 @@
-import { clipLength } from './timing.mjs?v=ronda14';
+import { clipLength } from './timing.mjs?v=respuesta';
 import { webmFile, opusHead } from './webm.mjs?v=toma14';
 import { movieFile } from './quicktime.mjs?v=toma14';
 
 const fps = 30, rate = 48000;
-const totalFrames = clipLength * fps / 1000;
+
 
 // Bind each of the 420 presentation times to a picture from the actual round.
-export function pictureSequence(pictures) {
-  if (pictures[0]?.at !== 0 || pictures.at(-1).at < clipLength - 100 ||
+export function pictureSequence(pictures, duration = clipLength) {
+  const totalFrames = Math.round(duration * fps / 1000);
+  if (pictures[0]?.at !== 0 || pictures.at(-1).at < duration - 100 ||
       pictures.some((p, i) => i && p.at - pictures[i - 1].at > 650))
     throw Error('La toma quedó incompleta');
   let index = 0;
@@ -56,7 +57,7 @@ async function encodeVideo(sequence, config, capture) {
     }
     await encoder.flush();
     // Baseline AVC has no reordered pictures. Reject truncated or dropped frames.
-    if (error || samples.length !== totalFrames || samples.some((s, i) => Math.abs(s.time - i * 1000 / fps) > 1))
+    if (error || samples.length !== sequence.length || samples.some((s, i) => Math.abs(s.time - i * 1000 / fps) > 1))
       throw error || Error('Secuencia de video incompleta');
     return { samples, description };
   } finally {
@@ -95,10 +96,11 @@ async function encodeAudio(pcm, codec) {
   } finally { if (encoder.state !== 'closed') encoder.close(); }
 }
 async function exportTake(capture, sound) {
-  const sequence = pictureSequence(capture.pictures);
+  const duration = capture.duration;
+  const sequence = pictureSequence(capture.pictures, duration);
   const { width, height } = capture.canvas;
-  const pcm = await sound.renderClip(rate, clipLength);
-  if (pcm.length !== rate * clipLength / 1000) throw Error('Pista incompleta');
+  const pcm = await sound.renderClip(rate, duration);
+  if (pcm.length !== rate * duration / 1000) throw Error('Pista incompleta');
   if (window.VideoEncoder && window.VideoFrame && window.createImageBitmap) {
     for (const codec of ['avc1.42001f', 'vp8']) {
       if (capture.cancelled) throw Error('Toma cerrada');
@@ -110,19 +112,19 @@ async function exportTake(capture, sound) {
         const audio = await encodeAudio(pcm, avc ? 'mp4a.40.2' : 'opus').catch(() => null);
         if (!avc && !audio) continue;
         const video = await encodeVideo(sequence, config, capture);
-        if (avc && video.description) return movieFile(video.samples, width, height, clipLength, fps,
+        if (avc && video.description) return movieFile(video.samples, width, height, duration, fps,
           video.description, audio?.config ? audio : { pcm }, rate);
         if (!avc) return webmFile([
           ...video.samples.map(s => ({ ...s, track: 1 })),
           ...audio.samples.map(s => ({ data: s.data, time: Math.round(s.sample * 1000 / rate), key: true, track: 2 })),
-        ], width, height, clipLength, audio.config?.length >= 19 ? audio.config : opusHead());
+        ], width, height, duration, audio.config?.length >= 19 ? audio.config : opusHead());
       } catch {
         // The original pictures are still available if the device rejects a codec.
       }
     }
   }
   if (capture.cancelled) throw Error('Toma cerrada');
-  const file = movieFile(sequence.map(data => ({ data })), width, height, clipLength, fps, null, { pcm }, rate);
+  const file = movieFile(sequence.map(data => ({ data })), width, height, duration, fps, null, { pcm }, rate);
   let offset = file.size - pcm.byteLength - sequence.reduce((bytes, image) => bytes + image.size, 0);
   capture.photoOffsets = [offset];
   for (const image of sequence) capture.photoOffsets.push(offset += image.size);
@@ -154,9 +156,12 @@ export class SceneClip {
     canvas.width = Math.max(2, Math.round(source.width * scale / 2) * 2);
     canvas.height = Math.max(2, Math.round(source.height * scale / 2) * 2);
     this.capture = { canvas, ink: canvas.getContext('2d', { alpha: false }), start, audio,
-      pictures: [], last: -Infinity, pending: null, cancelled: false };
+      duration: Infinity, pictures: [], last: -Infinity, pending: null, cancelled: false };
     this.setState('preparing');
     this.paint(source, start);
+  }
+  setDuration(duration) {
+    if (this.capture) this.capture.duration = duration;
   }
   // Slow JPEG conversion may delay the round, but never consume unfilmed seconds.
   limitAdvance(elapsed) {
@@ -166,8 +171,8 @@ export class SceneClip {
   paint(source, now) {
     const c = this.capture;
     if (!c || c.pending || this.state !== 'preparing') return;
-    const at = Math.min(clipLength, Math.max(0, now - c.start));
-    const final = at === clipLength;
+    const at = Math.min(c.duration, Math.max(0, now - c.start));
+    const final = at === c.duration;
     if (!final && at - c.last < 50) return;
     c.last = at;
     const w = c.canvas.width, h = c.canvas.height, scale = Math.min(w / source.width, h / source.height);

@@ -581,6 +581,11 @@ async function startInput(selected) {
       end('No se pudo abrir la cámara. Podés reintentar o elegir Ver sin cámara.');
   }
 }
+function rememberReviewPage() {
+  const id = savedId();
+  if (location.hash !== '#mi-video' || history.state?.primeraTake !== id)
+    history.replaceState({ ...history.state, primeraTake: id }, '', '#mi-video');
+}
 function showRecording() {
   if (clip.state !== 'ready' || mode === 'prize') return;
   cancelAnimationFrame(frame);
@@ -590,11 +595,17 @@ function showRecording() {
   mode = 'review';
   feed.hidden = scene.hidden = pad.hidden = watch.hidden = true;
   const replayUrl = photos.source(clip);
-  if (player.getAttribute('src') !== replayUrl) player.src = replayUrl;
   player.hidden = false;
+  if (player.getAttribute('src') !== replayUrl) {
+    player.src = replayUrl;
+    player.load();
+  } else if (!player.readyState) {
+    // A mobile share sheet can suspend the initial metadata request.
+    player.load();
+  }
   phase('review', 'Tu video está listo para volver a verlo, guardarlo o compartirlo.');
   stop.hidden = sound.hidden = true;
-  if (location.hash !== '#mi-video') history.replaceState(history.state, '', '#mi-video');
+  rememberReviewPage();
 }
 function dismiss() {
   if (clip.state === 'ready') { showRecording(); return; }
@@ -688,7 +699,10 @@ document.fonts
   .catch(() => {});
 let opened = false;
 function suspend() {
-  if (!leavingDocument && clip.state === 'ready') markReturn(true);
+  if (!leavingDocument && clip.state === 'ready') {
+    markReturn(true);
+    if (mode !== 'prize') rememberReviewPage();
+  }
   if (!mode || suspended) return;
   suspended = true;
   cancelAnimationFrame(frame);
@@ -705,7 +719,7 @@ async function visibility() {
     const navigation = performance.getEntriesByType('navigation')[0];
     const reload = navigation?.type === 'reload' && !document.wasDiscarded && !returningFromApp();
     const demoEntry = location.hash === '#sin-camara';
-    const existing = !reload && !demoEntry && savedId() ? await readTake() : null;
+    const existing = !reload && !demoEntry ? await readTake(location.hash === '#mi-video') : null;
     if (session !== generation) return;
     get('previous-take').hidden = !savedId();
     markReturn(false);

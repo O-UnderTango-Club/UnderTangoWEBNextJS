@@ -14,7 +14,8 @@ function db() {
   return connection;
 }
 export function savedId() {
-  try { return sessionStorage.getItem(key); } catch { return null; }
+  try { return sessionStorage.getItem(key) || history.state?.primeraTake || null; }
+  catch { return history.state?.primeraTake || null; }
 }
 async function change(write) {
   const tx = (await db()).transaction('takes', 'readwrite');
@@ -50,18 +51,22 @@ export async function rememberTake(file, won, source, photoOffsets) {
     return false;
   }
 }
-export async function readTake() {
+export async function readTake(recoverLatest = false) {
   const id = savedId();
-  if (!id) return null;
+  if (!id && !recoverLatest) return null;
   try {
     const tx = (await db()).transaction('takes');
     const record = await new Promise((resolve, reject) => {
-      const req = tx.objectStore('takes').get(id);
-      req.onsuccess = () => resolve(req.result);
+      const store = tx.objectStore('takes');
+      const req = id ? store.get(id) : store.index('saved').openCursor(null, 'prev');
+      req.onsuccess = () => resolve(id ? req.result : req.result?.value);
       req.onerror = () => reject(req.error);
     });
-    if (record?.bytes?.byteLength && savedId() === id)
-      return { won: record.won, source: record.source, photoOffsets: record.photoOffsets, file: new File([record.bytes], record.name, { type: record.type }) };
+    if (record?.bytes?.byteLength && savedId() === id) {
+      try { sessionStorage.setItem(key, record.id); } catch { /* The file is available in memory. */ }
+      return { won: record.won, source: record.source, photoOffsets: record.photoOffsets,
+        file: new File([record.bytes], record.name, { type: record.type }) };
+    }
   } catch { /* In-memory playback still works if device storage is unavailable. */ }
   return null;
 }

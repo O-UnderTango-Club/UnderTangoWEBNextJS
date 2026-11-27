@@ -24,6 +24,7 @@ import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableE
 import { TypeProjection } from "./type-projection";
 import { AudienceProjection } from "./audience-projection";
 import { ScoreTrack, PrimeraVoluntad } from "./primera-voluntad";
+import { hasReferenceVisual, ReferenceVisual } from "./reference-visuals";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { hasScoredTake } from "./layer-take";
@@ -1778,7 +1779,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const filmLayer = sceneNumber !== 1 && film && cue && outputRef.current
     ? <SceneVideo key={sceneNumber} film={film} cue={cue} paused={paused} output={outputRef.current} controls={filmControls} />
     : null;
-  const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack);
+  const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack,hasReferenceVisual(sceneNumber));
   const sceneTitle = breathing ? "Plano 9" : numberedControls[sceneIndex]?.title;
   const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
   const coda = extendedScene !== null && extendedScene >= 90 ? extendedScene as CodaScene : null;
@@ -1831,6 +1832,18 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       }
       .scene-mixer { min-width:0; min-height:0; overflow:auto; overscroll-behavior:contain; background:#15151d; color:white; font: .76rem system-ui; }
       .scene-film { position:absolute; inset:0; z-index:-1; width:100%; height:100%; pointer-events:none; }
+      .reference-visual {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+      .zero-stage > .reference-visual {z-index:-1;}
+      .zero-stage > .reference-visual[data-reference-scene="62"] {z-index:1;}
+      .zero-stage:has(>.reference-visual) .extended-instrument:is([data-extended-scene="31"],[data-extended-scene="45"]) .extended-generative {width:53%;}
+      .live-set:has(>.reference-visual) > .live-set-drawing {opacity:.24;}
+      .live-set:has(>.reference-visual[data-reference-scene="54"]) > canvas[data-resonant-scene] {opacity:.33;}
+      .zero-stage > .reference-visual[data-reference-scene="60"] {z-index:1;mix-blend-mode:screen;opacity:.81;}
+      .reference-visual[data-reference-scene="34"] {transform:translateX(23%);}
+      .coda-stage > .reference-visual[data-reference-scene="91"] {opacity:.56;}
+      .coda-stage:has(.coda-qr) > .reference-visual:is([data-reference-scene="92"],[data-reference-scene="96"],[data-reference-scene="100"]) {opacity:.78;}
+      .coda-stage[data-reference-ballot] .coda-qr {width:min(100%,48cqh,30vw);margin-top:min(24cqh,13rem);}
+      @container(max-width:430px){.coda-stage[data-reference-ballot] .coda-qr {width:min(100%,42cqh);}}
       .scene-film[hidden] { display:none; }
       .live-set:has(> .scene-film:not([hidden])) > canvas[data-resonant-scene] { mix-blend-mode:screen; }
       .scene-film-caption { margin:.65rem 0 .25rem; font-size:.82rem; }
@@ -2215,10 +2228,12 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       <SceneMixer filmLayer={liveSet ? filmLayer : null} stageBackground={extendedDark ? "#130f20" : light ? "#fff" : "#000"} extendedDark={extendedDark}
         canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={reset} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
-        takeScene={extendedScene} onTakeComplete={setFinishedTake} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused}>
+        takeScene={extendedScene} onTakeComplete={setFinishedTake} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || coda || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={mixMaster.current} paused={paused}>
       {openingRun && <OpeningFilm key={openingRun.generation} cue={cue ?? openingRun.cue} output={outputRef.current ?? openingRun.output}
         controls={filmControls} strikes={strikes} inside={sceneNumber === 1} paused={paused} finish={finishOpeningFilm} />}
       {!liveSet && !coda && filmLayer}
+      {!liveSet && !coda && cue && hasReferenceVisual(sceneNumber) &&
+        <ReferenceVisual scene={sceneNumber} clock={cue.context} beginsAt={cue.beginsAt} duration={durations[sceneNumber]} paused={paused}/>}
       {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} cue={cue} paused={paused} />}
       {(sceneNumber === 1 || stage === "two") && cue && <OpeningProjection scene={stage === "two" ? 2 : 1} cue={cue} seconds={activeDurationMs / 1000} strikes={strikes} />}

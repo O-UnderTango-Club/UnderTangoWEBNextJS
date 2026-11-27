@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import {hasReferenceVisual, ReferenceVisual} from "./reference-visuals";
 import { AudienceProjection } from "./audience-projection";
 import { useTempo } from "./tempo";
 import { ResonantVisuals } from "./resonant-visuals";
@@ -9,6 +10,8 @@ import { LAYERS } from "./layer-take";
 type MeterRef = {current: AnalyserNode | null};
 type LiveSetProps = {
   filmLayer: ReactNode;
+  cue: {context:AudioContext;beginsAt:number}|null;
+  seconds: number;
   scene: number;
   title: string;
   analyser: MeterRef;
@@ -187,6 +190,8 @@ export function LiveSetProjection(props: LiveSetProps) {
     {scene===68 ? <AudienceProjection analyser={analyser} paused={paused} treatment="ascii" />
       : resonant ? <ResonantVisuals scene={scene} signals={signals} paused={paused} />
       : <SoundDrawing scene={scene} analyser={analyser} paused={paused} bpm={bpm} />}
+    {props.cue && hasReferenceVisual(scene) &&
+      <ReferenceVisual scene={scene} clock={props.cue.context} beginsAt={props.cue.beginsAt} duration={props.seconds} paused={paused}/>}
     {scene!==68 && <StimulusBar scene={scene} paused={paused} room={scene===89 && props.room} />}
     <div className="live-set-heading">{scene===88 ? "El último café" : title}</div>
     {layers && <div className="live-set-center" data-take-status={props.takeStatus} data-slot={props.slot===null?undefined:props.slot+1}>

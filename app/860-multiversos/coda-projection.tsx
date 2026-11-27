@@ -2,6 +2,7 @@ import {useEffect,useState,type CSSProperties,type ReactNode} from "react";
 import {INKS, isRound, PALETTES, remainingSeconds, TIMBRES} from "./coda-ballot";
 import {useHostedBallot} from "./coda-host";
 import {StimulusBar} from "./stimulus-bar";
+import {hasReferenceVisual, ReferenceVisual} from "./reference-visuals";
 import {useCodaInstrument} from "./coda-audio";
 import {SHOW_SCORE} from "./show-score";
 import type {PerformanceInput} from "./performance-notes";
@@ -50,12 +51,16 @@ export function CodaProjection(props:Props) {
   const vote=state?.scene===scene && isRound(scene);
   const seconds=state && vote ? remainingSeconds(state,clockOffset) : 0;
   const currentResult=state && state.scene!==null && scene===state.scene+1 && !state.open;
+  const direction=currentResult && state.winner ? ({azul:-1, ambar:1, violeta:0} as const)[state.winner.color] : undefined;
   const credit=credits[scene];
   const join=session?"/860-multiversos/votar?s="+session:null;
-  return <div className="coda-stage" data-scene={scene} data-color={selection.color} data-sound={selection.sound}
+  return <div className="coda-stage" data-reference-ballot={isRound(scene) || undefined} data-scene={scene} data-color={selection.color} data-sound={selection.sound}
     style={{"--coda-color":INKS[selection.color],"--coda-light":.06+.68*((111-scene)/21)} as CSSProperties}>
     <style>{style}</style>
     {props.filmLayer}
+    {hasReferenceVisual(scene) &&
+      <ReferenceVisual scene={scene} clock={props.clock} beginsAt={props.beginsAt} duration={props.duration}
+        paused={paused} choice={{color:INKS[selection.color],direction}}/>}
     <StimulusBar scene={scene} paused={paused} ballot={state && (!isRound(scene) || vote) ? {
       open:vote && state.open, total:state.total,
       choice:colorSound ? PALETTES[colorSound.color]+" · "+TIMBRES[colorSound.sound] : null,

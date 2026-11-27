@@ -65,5 +65,25 @@
         "reason": "El giro acompaña la invitación al público a elegir. La consigna y el acceso a la votación quedan en primer plano."
       }
     ]
+  },
+  {
+    "title": "Del piano a la sala",
+    "source": "1000882197.mp4",
+    "sha256": "8e0f71825991deb5cadc0a517a0a81bfe884c7dfe57cd19ee6ae521c0cb7843e",
+    "src": "/multiversos/fondo-ruido-sala.mp4",
+    "width": 360,
+    "height": 644,
+    "seconds": 15.557,
+    "audio": "AAC estéreo, nivel reducido y fundidos",
+    "image": "Recorrido vertical del escenario, del piso al saxo, el teclado y la batería.",
+    "uses": [
+      {
+        "scene": 89,
+        "loop": false,
+        "opacity": 0.97,
+        "fit": "contain",
+        "reason": "Después del piano y la voz, aparece el escenario físico y el video se funde a negro antes de que respire la sala."
+      }
+    ]
   }
 ]

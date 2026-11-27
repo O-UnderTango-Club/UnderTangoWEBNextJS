@@ -2,7 +2,7 @@ import {createContext, useContext, useEffect, useRef} from "react";
 import {useTempo} from "./tempo";
 
 function emptyFrame() {
-  return {low:0, mid:0, high:0, rms:0, attack:0, frequency:0, time:0, beat:0, gesture:0,
+  return {low:0, mid:0, high:0, rms:0, attack:0, frequency:0, time:0, beat:0, beats:0, gesture:0,
     bpm:0, hasAudio:false, wave:new Uint8Array(1024).fill(128)};
 }
 export type ProjectionSignals = {current:ReturnType<typeof emptyFrame>};
@@ -23,7 +23,7 @@ function bandLevel(bins:Uint8Array, widthHz:number, fromHz:number, toHz:number) 
 }
 
 export function useSceneSignals(scene:number|null, context:AudioContext|null, beginsAt:number,
-    paused:boolean, mix:ProjectionMeter, room:ProjectionMeter, strikes:ProjectionAttack):ProjectionSignals {
+    paused:boolean, mix:ProjectionMeter, room:ProjectionMeter, strikes:ProjectionAttack, captureBands=false):ProjectionSignals {
   const state = useRef<ReturnType<typeof emptyFrame>|null>(null);
   if (state.current===null) state.current=emptyFrame();
   const signals=state as ProjectionSignals;
@@ -32,7 +32,7 @@ export function useSceneSignals(scene:number|null, context:AudioContext|null, be
   useEffect(()=>{transport.current={bpm,clock};},[bpm,clock]);
 
   useEffect(()=>{
-    if (scene===null || scene===19 || scene>=90 || !context) return;
+    if (scene===null || scene===19 || !context) return;
     const frame=signals.current;
     let seen=strikes.current.count, lastAttack=-Infinity, velocity=0;
     let pending=0, lastSample=-Infinity;
@@ -46,7 +46,8 @@ export function useSceneSignals(scene:number|null, context:AudioContext|null, be
       frame.time=Math.max(0,now-beginsAt);
       const {bpm,clock}=transport.current;
       frame.bpm=bpm;
-      frame.beat=(Math.max(0,now-clock(ctx))*bpm/60)%1;
+      frame.beats=Math.max(0,now-clock(ctx))*bpm/60;
+      frame.beat=frame.beats%1;
       if (paused) return;
       pending=requestAnimationFrame(sample);
       if (timestamp-lastSample<1000/40) return;
@@ -64,7 +65,7 @@ export function useSceneSignals(scene:number|null, context:AudioContext|null, be
         let power=0;
         for (const value of frame.wave) power+=((value-128)/128)**2;
         frame.rms=Math.sqrt(power/frame.wave.length);
-        if (scene===44 || scene===54 || scene===78) {
+        if (captureBands || scene===44 || scene===78) {
           if (bins.length!==node.frequencyBinCount) bins=new Uint8Array(node.frequencyBinCount);
           node.getByteFrequencyData(bins);
           const widthHz=ctx.sampleRate/node.fftSize;
@@ -79,6 +80,6 @@ export function useSceneSignals(scene:number|null, context:AudioContext|null, be
     }
     sample(performance.now());
     return ()=>cancelAnimationFrame(pending);
-  },[scene,context,beginsAt,paused,mix,room,strikes,signals]);
+  },[scene,context,beginsAt,paused,mix,room,strikes,signals,captureBands]);
   return signals;
 }

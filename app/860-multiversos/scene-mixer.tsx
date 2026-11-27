@@ -668,7 +668,7 @@ export function SceneMixer({children, filmLayer, stageBackground, extendedDark, 
       {activeCount!==null && <strong style={{display:"block",fontSize:"clamp(36px,7vw,96px)"}}>{activeCount}</strong>}
       S{currentTake.slot+1} · {takeStatus}
     </output>}
-    {liveSet && analyser && <LiveSetProjection filmLayer={filmLayer} scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
+    {liveSet && analyser && <LiveSetProjection filmLayer={filmLayer} cue={cue} seconds={seconds} scene={liveSet} title={SCENE_INSTRUMENT_NAMES[liveSet]}
       analyser={showRoomInput ? roomMeter : analyser} paused={paused} meter={meter} bars={bars} bpm={bpm}
       position={activeCount===null ? position : activeCount-1} recording={state==="recording" && !waiting} waiting={waiting} countIn={activeCount}
       slot={currentTake?.slot ?? null} takeStatus={takeStatus}

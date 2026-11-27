@@ -105,7 +105,7 @@ let sprite,
   lastYaw = Infinity,
   lastPitch = Infinity,
   lastPaint = -Infinity,
-  foot = 0;
+  foot = 0, extent = unit;
 
 // Perspective size and position are composited at the video frame rate. Only
 // the small opaque mesh needs to be repainted when its lighting or pose changes.
@@ -120,15 +120,15 @@ export function drawSign(stage, m, level, now, elapsed) {
   if (change > 0.12 || (now - lastPaint > 45 && change > 0.014) || now - lastPaint > 180) {
     updateMetal(elapsed);
     brush.clearRect(0, 0, spriteSize, spriteSize);
-    foot = paintMesh(brush, m.yaw, m.pitch, roll, level);
+    ({ foot, extent } = paintMesh(brush, m.yaw, m.pitch, roll, level));
     lastRoll = roll;
     lastYaw = m.yaw;
     lastPitch = m.pitch;
     lastPaint = now;
   }
-  const scale = m.radius / unit,
+  const scale = m.radius / extent,
     side = spriteSize * scale;
-  stage.drawImage(sprite, m.x - side / 2, m.y - m.lift - side / 2 - foot * scale, side, side);
+  stage.drawImage(sprite, m.x - side / 2, m.y - m.lift - m.radius - side / 2 - (foot - unit) * scale, side, side);
 }
 
 function paintMesh(ctx, yaw, pitch, roll, level) {
@@ -196,5 +196,8 @@ function paintMesh(ctx, yaw, pitch, roll, level) {
     ctx.stroke();
   }
   ctx.restore();
-  return bottom;
+  // Fit the painted slash and bevels inside the same disk used for contact.
+  let extent = unit;
+  for (const p of points) extent = Math.max(extent, Math.hypot(p.u, p.v - bottom + unit) + 0.6);
+  return { foot: bottom, extent };
 }

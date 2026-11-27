@@ -1,7 +1,6 @@
 import { clipName } from './timing.mjs';
 
-// QuickTime Photo-JPEG + mono PCM for browsers without a usable MediaRecorder.
-// Every JPEG is independently seekable. Sample times come from the live animation.
+// Shared ISO base media boxes for indexed AVC/AAC and QuickTime exports.
 const ascii = (text) => Uint8Array.from(text, (c) => c.charCodeAt(0));
 const zeros = (n) => new Uint8Array(n);
 function integers(bytes, values) {
@@ -46,127 +45,59 @@ function track(id, width, height, duration, entry, tables, scale, count) {
   return box('trak', tkhd, box('mdia', header, handler, box('minf', media, data, stbl)));
 }
 
-export function quickTimeFile(frames, width, height, duration, pcm, rate) {
-  const ftyp = box('ftyp', ascii('qt  '), u32(0), ascii('qt  '));
-  const times = [],
-    sizes = [],
-    offsets = [];
-  let offset = ftyp.length + 8;
-  for (let i = 0; i < frames.length; i++) {
-    const frame = frames[i];
-    const delta = (frames[i + 1]?.at ?? duration) - frame.at;
-    if (times.length && times[times.length - 1] === delta) times[times.length - 2]++;
-    else times.push(1, delta);
-    offsets.push(offset);
-    sizes.push(frame.blob.size);
-    offset += frame.blob.size;
+function sampleTables(sizes, offset, times, keys) {
+  const runs = [];
+  for (const delta of times) {
+    if (runs.length && runs[runs.length - 1] === delta) runs[runs.length - 2]++;
+    else runs.push(1, delta);
   }
-  const jpeg = box(
-    'jpeg',
-    zeros(6),
-    u16(1),
-    zeros(16),
-    u16(width, height),
-    u32(72 * 65536, 72 * 65536, 0),
-    u16(1),
-    zeros(32),
-    u16(24, 0xffff)
-  );
-  const video = track(
-    1,
-    width,
-    height,
-    duration,
-    jpeg,
-    [
-      full('stts', 0, u32(times.length / 2, ...times)),
-      full('stsc', 0, u32(1, 1, 1, 1)),
-      full('stsz', 0, u32(0, sizes.length, ...sizes)),
-      full('stco', 0, u32(offsets.length, ...offsets)),
-    ],
-    1000,
-    duration
-  );
-  const tracks = [video],
-    media = frames.map((f) => f.blob);
-  if (pcm) {
-    const sound = box('sowt', zeros(6), u16(1), zeros(8), u16(1, 16, 0, 0), u32(rate * 65536));
-    tracks.push(
-      track(
-        2,
-        0,
-        0,
-        duration,
-        sound,
-        [
-          full('stts', 0, u32(1, pcm.length, 1)),
-          full('stsc', 0, u32(1, 1, pcm.length, 1)),
-          full('stsz', 0, u32(2, pcm.length)),
-          full('stco', 0, u32(1, offset)),
-        ],
-        rate,
-        pcm.length
-      )
-    );
-    media.push(pcm);
-    offset += pcm.byteLength;
-  }
-  const movie = full(
-    'mvhd',
-    0,
-    u32(0, 0, 1000, duration, 65536),
-    u16(256),
-    zeros(10),
-    matrix,
-    zeros(24),
-    u32(3)
-  );
-  return new File(
-    [ftyp, u32(offset - ftyp.length), ascii('mdat'), ...media, box('moov', movie, ...tracks)],
-    clipName(duration, 'mov'),
-    { type: 'video/quicktime' }
-  );
+  return [
+    full('stts', 0, u32(runs.length / 2, ...runs)),
+    full('stsc', 0, u32(1, 1, sizes.length, 1)),
+    full('stsz', 0, u32(0, sizes.length, ...sizes)),
+    full('stco', 0, u32(1, offset)),
+    ...(keys ? [full('stss', 0, u32(keys.length, ...keys))] : []),
+  ];
 }
 
-export class PhotoClip {
-  constructor(canvas, audio, duration, startTime) {
-    this.canvas = canvas;
-    this.duration = duration;
-    this.frames = [];
-    this.rate = 24000;
-    this.startTime = startTime;
-    this.sound = audio;
+function descriptor(tag, ...parts) {
+  const data = join(...parts);
+  // The three AAC descriptors here contain only a short AudioSpecificConfig.
+  if (data.length > 127) throw Error('Configuración AAC demasiado larga');
+  return join(Uint8Array.of(tag, data.length), data);
+}
+
+export function movieFile(video, width, height, duration, fps, avc, sound, rate) {
+  const aac = sound.config;
+  const ftyp = aac ? box('ftyp', ascii('isom'), u32(512), ascii('isomiso2avc1mp41'))
+                   : box('ftyp', ascii('qt  '), u32(0), ascii('qt  '));
+  const videoEntry = box(avc ? 'avc1' : 'jpeg', zeros(6), u16(1), zeros(16), u16(width, height),
+    u32(72 * 65536, 72 * 65536, 0), u16(1), zeros(32), u16(24, 0xffff),
+    ...(avc ? [box('avcC', avc)] : []));
+  const sampleCount = Math.round(rate * duration / 1000);
+  const audioFormat = [zeros(6), u16(1), zeros(8), u16(1, 16, 0, 0), u32(rate * 65536)];
+  const audioEntry = aac ? box('mp4a', ...audioFormat, full('esds', 0,
+    descriptor(3, u16(2), zeros(1), descriptor(4, Uint8Array.of(0x40, 0x15), zeros(3),
+      u32(96000, 96000), descriptor(5, aac)), descriptor(6, Uint8Array.of(2)))))
+    : box('sowt', ...audioFormat);
+  const videoData = video.map(s => s.data), videoSizes = videoData.map(d => d.size ?? d.byteLength);
+  const audioData = aac ? sound.samples.map(s => s.data) : [sound.pcm];
+  const videoBytes = videoSizes.reduce((a, b) => a + b, 0);
+  const audioBytes = audioData.reduce((n, d) => n + d.byteLength, 0);
+  function moov(offset) {
+    const vt = track(1, width, height, duration, videoEntry,
+      sampleTables(videoSizes, offset, video.map(() => 1),
+        avc ? video.flatMap((s, i) => s.key ? [i + 1] : []) : null), fps, video.length);
+    const at = offset + videoBytes;
+    const audioTables = aac ? sampleTables(audioData.map(d => d.byteLength), at,
+      sound.samples.map((s, i) => (sound.samples[i + 1]?.sample ?? sampleCount) - s.sample))
+      : [full('stts', 0, u32(1, sampleCount, 1)), full('stsc', 0, u32(1, 1, sampleCount, 1)),
+         full('stsz', 0, u32(2, sampleCount)), full('stco', 0, u32(1, at))];
+    const hdr = full('mvhd', 0, u32(0, 0, 1000, duration, 65536), u16(256), zeros(10), matrix, zeros(24), u32(3));
+    return box('moov', hdr, vt, track(2, 0, 0, duration, audioEntry, audioTables, rate, sampleCount));
   }
-  frame(now) {
-    const at = this.frames.length ? Math.max(1, Math.round(now - this.startTime)) : 0;
-    if (
-      this.pending ||
-      at >= this.duration ||
-      (this.frames.length && at - this.frames[this.frames.length - 1].at < 66)
-    )
-      return;
-    this.pending = new Promise((resolve) => this.canvas.toBlob(resolve, 'image/jpeg', 0.75))
-      .then((blob) => {
-        if (this.frames && blob && blob.type === 'image/jpeg') this.frames.push({ at, blob });
-      })
-      .catch(() => {})
-      .finally(() => {
-        this.pending = null;
-      });
-  }
-  async finish() {
-    const [pcm] = await Promise.all([this.sound.renderClip(this.rate, this.duration), this.pending]);
-    if (!this.frames?.length) throw Error('Sin cuadros para guardar');
-    return quickTimeFile(
-      this.frames,
-      this.canvas.width,
-      this.canvas.height,
-      this.duration,
-      pcm,
-      this.rate
-    );
-  }
-  close() {
-    this.frames = this.canvas = null;
-  }
+  const header = moov(ftyp.length + moov(0).length + 8);
+  const ext = aac ? 'mp4' : 'mov';
+  return new File([ftyp, header, u32(8 + videoBytes + audioBytes), ascii('mdat'), ...videoData, ...audioData],
+    clipName(duration, ext), { type: aac ? 'video/mp4' : 'video/quicktime' });
 }

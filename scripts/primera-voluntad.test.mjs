@@ -4,6 +4,7 @@ import { longestLine, sameLine, visibleLines } from '../public/847/primera-volun
 
 import { readFloor, SignMotion } from '../public/847/primera-voluntad/motion.mjs';
 import { visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
+import { pictureSequence } from '../public/847/primera-voluntad/clip.mjs';
 import { arrangeScore } from '../public/847/primera-voluntad/footsteps.mjs';
 import { clipLength, clipName, roundPhase, secondsLeft } from '../public/847/primera-voluntad/timing.mjs';
 
@@ -13,6 +14,7 @@ import {
   RollingSign,
   ShowBoard,
   collide,
+  constrainContact,
   screenGravity,
   tiltFromRest,
 } from '../public/847/primera-voluntad/stage-physics.mjs';
@@ -692,4 +694,57 @@ test('a new vertical edge entering a horizontally uniform scene cannot pull the 
   const after = gray.map((v, i) => i % width > 29 && i % width < 36 ? 179 : v);
   const flow = cameraMotion({ width, height, gray }, { width, height, gray: after });
   assert.ok(!flow || Math.abs(flow.dx) < 0.001);
+});
+
+test('a shared take contains all fourteen seconds, including the final picture', () => {
+  const pictures = Array.from({ length: 281 }, (_, i) => ({ at: i * 50, blob: i }));
+  const frames = pictureSequence(pictures);
+  assert.equal(frames.length, 420);
+  for (let second = 0; second < 14; second++) {
+    assert.equal(frames[second * 30], second * 20);
+    assert.ok(frames[second * 30 + 29] > second * 20);
+  }
+  assert.equal(frames.at(-1), pictures.at(-1).blob);
+  assert.throws(() => pictureSequence(pictures.filter(p => p.at <= 5000)), /incompleta/);
+  assert.throws(() => pictureSequence(pictures.filter(p => p.at <= 5000 || p.at >= 12000)), /incompleta/);
+});
+
+test('the visible wheel stays outside the rectangle during play, on the tray and after timeout', () => {
+  const w = 412, h = 839, dt = 1 / 90;
+  const view = { width: w, height: h, left: 12, right: 15, top: 12, bottom: 87 };
+  for (const lateral of [false, true]) {
+    const rail = { a: { x: 0.08, y: 0.86 }, b: { x: 0.89, y: 0.34 } };
+    const motion = new SignMotion(readFloor([rail], w, h), w, h);
+    const wheel = new RollingSign(motion), board = new ShowBoard();
+    board.fit(view, { width: (w - 27) * 0.915, height: 150 });
+    const goal = { x: (w - 3) / 2, width: board.width, bottom: h - 87, lipHeight: 11 };
+    let seating, previous;
+    for (let frame = 0; frame < 20 / dt; frame++) {
+      const seconds = frame * dt, fixed = Boolean(seating) || seconds >= 14;
+      board.gravity = { x: lateral ? Math.sign(Math.sin(seconds * 3.7)) * 0.99 : 0, y: lateral ? 0.65 : 1 };
+      if (!fixed) board.advance(view, dt, false);
+      if (seating && seating.progress < 1) settlePrize(board, goal, seating, dt);
+      motion.advance(dt);
+      wheel.advance(motion, dt, fixed ? null : board);
+      wheel.keepInPlay(view);
+      const hit = collide(wheel, board, seconds * 1000, fixed);
+      wheel.keepInPlay(view);
+      if (!fixed) board.confine(view);
+      constrainContact(wheel, board, view, fixed);
+      if (hit) motion.rebound(hit);
+      if (!fixed && touchesTray(board, goal)) {
+        seating = { progress: 0, angle: board.angle, offsetX: board.x - goal.x,
+          offsetY: board.y - (goal.bottom - board.height / 2) };
+      }
+      const center = { x: wheel.x, y: wheel.y - wheel.lift - wheel.radius };
+      const dx = center.x - board.x, dy = center.y - board.y;
+      const c = Math.cos(board.angle), s = Math.sin(board.angle);
+      const u = Math.abs(dx * c + dy * s) - board.width / 2;
+      const v = Math.abs(dy * c - dx * s) - board.height / 2;
+      assert.ok(Math.hypot(Math.max(u, 0), Math.max(v, 0)) >= wheel.radius * 1.04 - 1e-6);
+      if (previous) assert.ok(Math.hypot(center.x - previous.x, center.y - previous.y) < 25);
+      previous = center;
+    }
+    assert.equal(Boolean(seating), lateral);
+  }
 });

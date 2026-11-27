@@ -197,6 +197,31 @@
         width: 19px;
         height: 19px;
       }
+      #recording {
+        position: absolute;
+        inset: 0 0 auto;
+        width: 100%;
+        height: calc(100% - var(--bottom) - 62px);
+        object-fit: contain;
+        background: #090b10;
+      }
+      #replay-picture {
+        position: absolute;
+        inset: 0 0 auto;
+        width: 100%;
+        height: calc(100% - var(--bottom) - 118px);
+        object-fit: contain;
+        pointer-events: none;
+        background: #090b10;
+      }
+      #watch {
+        position: absolute;
+        left: var(--left);
+        top: var(--top);
+        border-radius: 2rem;
+        background: #101222eb;
+      }
+      .stage[data-phase='review'] :is(#surface, #prize-target, #steer-pad, #tilt, #stage-tools) { display: none; }
       #tilt {
         position: absolute;
         right: var(--right);
@@ -307,6 +332,9 @@
         <video id="feed" class="visual" autoplay muted playsinline hidden></video>
         <canvas id="scene" class="visual" aria-hidden="true" hidden></canvas>
         <canvas id="surface" class="visual" aria-hidden="true"></canvas>
+        <video id="recording" controls playsinline preload="metadata" aria-label="Tu video de 14 segundos" hidden></video>
+        <img id="replay-picture" alt="" hidden>
+        <button id="watch" type="button" hidden>Ver mi video</button>
         <div id="prize-target" aria-hidden="true">
           <span class="tray-shape"></span>
           <svg class="tray-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
@@ -325,7 +353,7 @@
         </button>
         <div id="game-dock">
           <div id="clip-tools" hidden>
-            <a id="save" aria-label="Guardar video" title="Guardar video" hidden download>
+            <a id="save" aria-label="Guardar video" title="Guardar video" target="_blank" rel="noopener" hidden download>
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
@@ -385,6 +413,7 @@
         <p id="status" class="status" role="status">Esperando permiso para usar la cámara…</p>
         <p id="clip-error" class="status" role="status" hidden>No se pudo preparar el video con sonido. Podés volver a empezar.</p>
         <div class="controls">
+          <button type="button" id="previous-take" hidden>Ver mi última grabación</button>
           <button type="button" id="camera">Usar la cámara</button
           ><button type="button" id="demo">Ver sin cámara</button>
           <button type="button" id="sound">Activar música y pasos</button
@@ -397,12 +426,12 @@
         </p>
         <p>
           «trance psicomusical», de Ø UnderTango Club, suena completa. Si hace falta, tocá la imagen para escucharla. Podés silenciarla con el botón de sonido. El video incluye la música y los pasos. Cada ronda se graba durante 14 segundos en tu dispositivo. Podés guardarlo o
-          compartirlo desde la esquina inferior izquierda. Al cerrar se descarta el clip local. La cámara
+          compartirlo desde la esquina inferior izquierda. Al volver de otra app podés reproducirlo, guardarlo o compartirlo otra vez. Recargar inicia otra ronda. Desde esta pestaña también podés recuperar tu última grabación. La cámara
           funciona sin micrófono y la página no envía las imágenes.
         </p>
         <a href="/847/primera-voluntad?vista=ficha">Ver la ficha de la función →</a>
       </section>
     </main>
-    <script type="module" src="./experience.mjs?v=camara"></script>
+    <script type="module" src="./experience.mjs?v=toma14"></script>
   </body>
 </html>

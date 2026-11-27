@@ -1,7 +1,6 @@
 import { clipLength } from './timing.mjs?v=ronda14';
 
-// Stream the full master for the speakers. Only its beginning is decoded in
-// memory for a portable video export on phones without a native audio recorder.
+// Stream the full master for the speakers. Decode its opening locally for the clip.
 const trackUrl = './trance-psicomusical.mp3';
 const clipMusicUrl = './musica-del-clip.mp3';
 const musicGain = 0.31;
@@ -76,21 +75,21 @@ function playStep(context, output, noise, t, { x, y, strong, side }) {
   scrape.stop(t + 0.18);
 }
 
-function playScore(ctx, output, score, offset) {
+function playScore(ctx, output, score) {
   const source = ctx.createBufferSource();
   const gain = ctx.createGain();
   source.buffer = score;
   gain.gain.value = musicGain;
   source.connect(gain);
   gain.connect(output);
-  source.start(ctx.currentTime, offset);
+  source.start(ctx.currentTime);
 }
 
 export function soundscape(onChange) {
   const Audio = window.AudioContext || window.webkitAudioContext;
   const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  let context, mix, monitor, recording, player, musicNode, meter, noise;
-  let score, pending, request, startingPlayer = false;
+  let context, mix, monitor, player, musicNode, meter, noise;
+  let score, pending, request, startingPlayer = false, paused = false;
   let started = null,
     muted = false,
     failed = false,
@@ -99,7 +98,7 @@ export function soundscape(onChange) {
   const samples = new Uint8Array(128);
 
   function play() {
-    if (!player || !player.paused || startingPlayer || started === null) return;
+    if (paused || !player || !player.paused || startingPlayer || started === null) return;
     startingPlayer = true;
     const current = player;
     current.play().catch(error => {
@@ -141,6 +140,7 @@ export function soundscape(onChange) {
 
   function unlock() {
     if (!Audio) return;
+    paused = false;
     try {
       if (!context) {
         context = new Audio();
@@ -149,10 +149,6 @@ export function soundscape(onChange) {
         monitor.gain.value = muted ? 0 : 1;
         mix.connect(monitor);
         monitor.connect(context.destination);
-        if (context.createMediaStreamDestination) {
-          recording = context.createMediaStreamDestination();
-          mix.connect(recording);
-        }
         player = document.createElement('audio');
         player.preload = 'auto';
         player.loop = true;
@@ -208,27 +204,22 @@ export function soundscape(onChange) {
     return level;
   }
 
-  function step(x, y, strong, side) {
+  function step(x, y, strong, side, elapsed) {
     if (started === null) return;
-    const event = { time: Math.max(0, (performance.now() - started) / 1000), x, y, strong, side };
+    const event = { time: Math.max(0, elapsed / 1000), x, y, strong, side };
     if (event.time < clipLength / 1000) steps.push(event);
     if (context?.state === 'running') playStep(context, mix, noise, context.currentTime, event);
   }
 
-  // Include the decay of footsteps just before each encoded section.
-  async function renderClip(rate, duration, from = 0) {
-    const preroll = Math.min(from, 200);
-    const offset = (from - preroll) / 1000;
-    const end = (from + duration) / 1000;
-    const events = steps.filter((event) => event.time >= offset && event.time < end);
+  async function renderClip(rate, duration) {
     const phrase = await prepare();
     if (!phrase) throw Error('Música no disponible');
-    const ctx = new Offline(1, Math.round((rate * (preroll + duration)) / 1000), rate);
-    playScore(ctx, ctx.destination, phrase, offset);
+    const ctx = new Offline(1, Math.round(rate * duration / 1000), rate);
+    playScore(ctx, ctx.destination, phrase);
     const grain = noise || (noise = makeNoise(ctx));
-    for (const event of events) playStep(ctx, ctx.destination, grain, event.time - offset, event);
+    for (const event of steps) playStep(ctx, ctx.destination, grain, event.time, event);
     const buffer = await ctx.startRendering();
-    const samples = buffer.getChannelData(0).subarray(Math.round((rate * preroll) / 1000));
+    const samples = buffer.getChannelData(0);
     return Int16Array.from(samples, (value) => Math.round(32767 * Math.max(-1, Math.min(1, value))));
   }
 
@@ -245,12 +236,11 @@ export function soundscape(onChange) {
       musicNode?.disconnect();
     }
     startingPlayer = false;
-    recording?.stream.getTracks().forEach((track) => track.stop());
     if (context) {
       context.onstatechange = null;
       if (context.state !== 'closed') context.close().catch(() => {});
     }
-    context = mix = monitor = recording = player = musicNode = noise = meter = null;
+    context = mix = monitor = player = musicNode = noise = meter = null;
     level = 0;
     failed = false;
     onChange();
@@ -264,6 +254,11 @@ export function soundscape(onChange) {
     pulse,
     renderClip,
     close,
+    pause() {
+      paused = true;
+      player?.pause();
+      if (context?.state === 'running') context.suspend().catch(() => {});
+    },
     supported: Boolean(Audio),
     start(now) {
       // Each replay begins a new take. Finishing the video never stops the master.
@@ -272,8 +267,6 @@ export function soundscape(onChange) {
       started = now;
       play();
     },
-    recordingTrack: () =>
-      player && !player.paused && player.readyState >= 2 && context?.state === 'running' ? recording?.stream.getAudioTracks()[0] : null,
     audible: () => Boolean(player && !player.paused && context?.state === 'running' && !muted),
     failed: () => failed,
   };

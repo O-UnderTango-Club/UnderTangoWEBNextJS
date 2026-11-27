@@ -18,7 +18,7 @@ const nextConfig = {
     const cameraEntry = {
       source: "/847/primera-voluntad",
       missing: [{ type: "query", key: "vista", value: "ficha" }],
-      destination: "/847/primera-voluntad/experiencia.html?v=camara",
+      destination: "/847/primera-voluntad/experiencia.html?v=toma14",
       permanent: false,
     };
     return [...homeRedirects, ...bandRedirects, cameraEntry];

@@ -1,3 +1,5 @@
+import { savedId } from './saved-take.mjs?v=toma14';
+
 const validRound = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function showPrize(round, clipTools) {
@@ -9,6 +11,7 @@ export function showPrize(round, clipTools) {
     document.body.append(prize);
     return;
   }
+  const hasTake = Boolean(clipTools || savedId());
   document.title = '¿Descubriste el premio secreto? · Ø Primera voluntad';
   prize.innerHTML = `<section aria-labelledby="won-title">
     <h1 id="won-title" tabindex="-1">¿Descubriste el premio secreto?</h1>
@@ -20,7 +23,7 @@ export function showPrize(round, clipTools) {
       <p id="claim-status" role="status" aria-live="polite"></p>
       <button id="claim" type="submit">Mandar mensaje</button>
     </form>
-    <div class="prize-extras"><a href="/847/primera-voluntad">Volver a Primera voluntad</a></div>
+    <div class="prize-extras"><a data-return href="${hasTake ? './experiencia.html?v=toma14#mi-video' : '/847/primera-voluntad'}">${hasTake ? 'Volver a mi video' : 'Volver a Primera voluntad'}</a></div>
   </section>`;
   document.body.append(prize);
   if (clipTools) prize.querySelector('.prize-extras').prepend(clipTools);

@@ -29,7 +29,7 @@ function float(id, n) {
   view.setFloat64(0, n);
   return element(id, view);
 }
-function opusHead() {
+export function opusHead() {
   const head = new Uint8Array(19);
   head.set(text('OpusHead'));
   head[8] = 1;
@@ -65,6 +65,7 @@ export function webmFile(packets, width, height, duration, audioHead) {
     number(0x83, 1),
     number(0x9c, 0),
     string(0x86, 'V_VP8'),
+    number(0x23e383, 33333333),
     element(0xe0, number(0xb0, width), number(0xba, height))
   );
   const entries = [video];
@@ -122,131 +123,4 @@ export function webmFile(packets, width, height, duration, audioHead) {
     clipName(duration, 'webm'),
     { type: 'video/webm' }
   );
-}
-
-export class WebClip {
-  static async supports(width, height) {
-    if (!window.VideoEncoder || !window.AudioEncoder || !window.VideoFrame || !window.AudioData)
-      return false;
-    const [video, audio] = await Promise.all([
-      VideoEncoder.isConfigSupported(this.videoConfig(width, height)),
-      AudioEncoder.isConfigSupported(this.audioConfig()),
-    ]);
-    return video.supported && audio.supported;
-  }
-  static videoConfig(width, height) {
-    return { codec: 'vp8', width, height, bitrate: 1600000, framerate: 20, latencyMode: 'realtime' };
-  }
-  static audioConfig() {
-    return { codec: 'opus', sampleRate: 48000, numberOfChannels: 1, bitrate: 80000 };
-  }
-  constructor(canvas, audio, duration, start) {
-    this.canvas = canvas;
-    this.duration = duration;
-    this.start = start;
-    this.packets = [];
-    this.lastKey = -Infinity;
-    this.hasVideo = false;
-    this.sound = audio;
-    this.audioUntil = 0;
-    const failed = (error) => {
-      this.error = error;
-    };
-    try {
-      this.video = new VideoEncoder({ output: (chunk) => this.packet(1, chunk), error: failed });
-      this.video.configure(WebClip.videoConfig(canvas.width, canvas.height));
-      this.audioHead = opusHead();
-      this.audio = new AudioEncoder({
-        output: (chunk, meta) => {
-          const desc = meta?.decoderConfig?.description;
-          if (desc && desc.byteLength >= 19) this.audioHead = new Uint8Array(desc).slice();
-          this.packet(2, chunk);
-        },
-        error: failed,
-      });
-      this.audio.configure(WebClip.audioConfig());
-    } catch (error) {
-      this.close();
-      throw error;
-    }
-  }
-  packet(track, chunk) {
-    const time = Math.max(0, Math.round(chunk.timestamp / 1000));
-    if (time >= this.duration) return;
-    const data = new Uint8Array(chunk.byteLength);
-    chunk.copyTo(data);
-    this.packets.push({ track, time, key: chunk.type === 'key', data });
-    if (track === 1) this.hasVideo = true;
-  }
-  // Encode completed sections during the performance so only the tail remains at 15 s.
-  queueAudio(until) {
-    if (until <= this.audioUntil || this.audioPending) return;
-    const from = this.audioUntil;
-    this.audioPending = this.sound
-      .renderClip(48000, until - from, from)
-      .then((pcm) => {
-        if (this.audio.state === 'closed') return;
-        this.encodeSound(pcm, from);
-        this.audioUntil = until;
-      })
-      .catch((error) => {
-        this.error = error;
-      })
-      .finally(() => {
-        this.audioPending = null;
-      });
-  }
-  encodeSound(pcm, from) {
-    for (let start = 0; start < pcm.length; start += 960) {
-      const block = new AudioData({
-        format: 's16',
-        sampleRate: 48000,
-        numberOfFrames: Math.min(960, pcm.length - start),
-        numberOfChannels: 1,
-        timestamp: from * 1000 + Math.round((start * 1e6) / 48000),
-        data: pcm.subarray(start, start + 960),
-      });
-      try {
-        this.audio.encode(block);
-      } finally {
-        block.close();
-      }
-    }
-  }
-  frame(now) {
-    if (this.error) return;
-    const elapsed = Math.max(0, now - this.start);
-    try {
-      const complete = Math.min(this.duration, Math.floor(elapsed / 2000) * 2000);
-      this.queueAudio(complete);
-      if (elapsed >= this.duration || this.video.encodeQueueSize > 2) return;
-      const ms = this.lastKey === -Infinity ? 0 : elapsed;
-      const key = ms - this.lastKey >= 1200;
-      const frame = new VideoFrame(this.canvas, { timestamp: Math.round(ms * 1000) });
-      try {
-        this.video.encode(frame, { keyFrame: key });
-      } finally {
-        frame.close();
-      }
-      if (key) this.lastKey = ms;
-    } catch (error) {
-      this.error = error;
-    }
-  }
-  async finish() {
-    if (this.error) throw this.error;
-    await this.audioPending;
-    if (this.error) throw this.error;
-    this.queueAudio(this.duration);
-    await this.audioPending;
-    if (this.error) throw this.error;
-    await Promise.all([this.video.flush(), this.audio?.flush()]);
-    if (!this.hasVideo) throw Error('Sin cuadros para guardar');
-    return webmFile(this.packets, this.canvas.width, this.canvas.height, this.duration, this.audioHead);
-  }
-  close() {
-    if (this.video && this.video.state !== 'closed') this.video.close();
-    if (this.audio && this.audio.state !== 'closed') this.audio.close();
-    this.packets = [];
-  }
 }

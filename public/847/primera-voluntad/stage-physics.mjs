@@ -24,6 +24,9 @@ export class RollingSign {
   // to that point; an oblique shove can send it rolling back along the other side.
   advance(route, dt, board = null) {
     const size = Math.min(route.width, route.height);
+    this.beforeX = this.x;
+    this.beforeY = this.y - this.lift - this.radius;
+    this.stepLimit = size * 2.4 * dt;
     this.sinceCounter += dt;
     this.slipTime = Math.max(0, this.slipTime - dt);
     const gap = board ? this.y - this.lift - 2 * this.radius - board.y - board.height / 2 : Infinity;
@@ -57,7 +60,18 @@ export class RollingSign {
       targetX += (t - rail) * dx;
       targetY += (t - rail) * dy;
     }
-    const spring = this.slipTime ? 88 : this.free > 0 ? 9 : 55 + 42 * guard;
+    if (board && this.slipTime > 0) {
+      // A successful feint sends the wheel around the real end of the plate.
+      const c = Math.cos(board.angle), s = Math.sin(board.angle);
+      const r = this.radius * 1.04;
+      const u = (this.x - board.x) * c + (this.y - this.lift - this.radius - board.y) * s;
+      if (this.escapeSide * u >= board.width / 2 + r - 1) this.roundingEdge = true;
+      const goalU = this.escapeSide * (board.width / 2 + r + 5);
+      const goalV = (this.roundingEdge ? -1 : 1) * (board.height / 2 + r + 2);
+      targetX = board.x + c * goalU - s * goalV;
+      targetY = board.y + s * goalU + c * goalV + this.lift + this.radius;
+    }
+    const spring = this.slipTime ? 120 : this.free > 0 ? 9 : 55 + 42 * guard;
     const drag = this.free > 0 ? 2.7 : 14;
     this.free = Math.max(0, this.free - dt);
     const limit = size * ((this.gentle ? 0.46 : 0.65) + (this.slipTime ? 0.46 : 0.35 * guard));
@@ -73,7 +87,7 @@ export class RollingSign {
     const blend = 1 - Math.exp(-dt * 6);
     // The visible solid grows into the block, even at the far end of a rail.
     // Collision and artwork use this same radius.
-    const radius = Math.max(route.radius, size * (0.062 + guard * 0.09));
+    const radius = this.slipTime ? size * 0.042 : Math.max(route.radius, size * (0.062 + guard * 0.09));
     this.radius += (radius - this.radius) * (1 - Math.exp(-dt * (7 + 8 * guard)));
     const lift = (route.lift || 0) + arc * size * (this.gentle ? 0.07 : 0.155);
     const rise = (lift - this.lift) * (1 - Math.exp(-dt * 15));
@@ -85,15 +99,24 @@ export class RollingSign {
     this.floor.angle += (route.floor.angle - this.floor.angle) * blend;
     this.energy = route.energy;
     this.travel = route.travel;
-    this.x = clamp(this.x, this.radius * 1.18, route.width - this.radius * 1.18);
+    const margin = this.radius * (this.slipTime ? 0.90 : 1.18);
+    this.x = clamp(this.x, margin, route.width - margin);
     this.y = clamp(this.y, this.radius * 2.3, route.height - this.radius * 0.08);
   }
 
   keepInPlay(view) {
     const min = Math.min(view.width, view.height);
-    this.radius = Math.max(this.radius, min * 0.062);
-    this.x = clamp(this.x, this.radius * 1.18, view.width - this.radius * 1.18);
+    this.radius = Math.max(this.radius, min * (this.slipTime ? 0.042 : 0.062));
+    const margin = this.radius * (this.slipTime ? 0.90 : 1.18);
+    this.x = clamp(this.x, margin, view.width - margin);
     this.y = clamp(this.y, this.lift + this.radius * 2.2, view.height - view.bottom + this.radius * 0.55);
+    // A screen constraint must not snap a wheel from one face to another
+    // while it is easing back in from the margin.
+    if (this.stepLimit) {
+      this.x = clamp(this.x, this.beforeX - this.stepLimit, this.beforeX + this.stepLimit);
+      const center = this.y - this.lift - this.radius;
+      this.y = clamp(center, this.beforeY - this.stepLimit, this.beforeY + this.stepLimit) + this.lift + this.radius;
+    }
   }
 }
 
@@ -254,7 +277,7 @@ export class ShowBoard {
 }
 
 // Circle against the same oriented rectangle that is drawn on screen and in the clip.
-export function collide(sign, board, now) {
+function contact(sign, board) {
   const r = sign.radius * 1.04,
     c = Math.cos(board.angle),
     s = Math.sin(board.angle);
@@ -270,7 +293,6 @@ export function collide(sign, board, now) {
     ny = v - py;
   const dist = Math.hypot(nx, ny);
   if (dist >= r) return null;
-  board.lastContact = now;
   let depth = r - dist;
   if (dist > 0.0001) {
     nx /= dist;
@@ -290,6 +312,21 @@ export function collide(sign, board, now) {
     wy = nx * s + ny * c;
   const contactX = px * c - py * s,
     contactY = px * s + py * c;
+  return { wx, wy, depth, u, hw, contactX, contactY };
+}
+
+export function collide(sign, board, now, fixed = false) {
+  const touch = contact(sign, board);
+  if (!touch) return null;
+  board.lastContact = now;
+  const { wx, wy, depth, u, hw, contactX, contactY } = touch;
+  if (fixed) {
+    sign.x += wx * depth;
+    sign.y += wy * depth;
+    const into = sign.vx * wx + (sign.vy - (sign.liftSpeed || 0)) * wy;
+    if (into < 0) { sign.vx -= 1.5 * into * wx; sign.vy -= 1.5 * into * wy; }
+    return null;
+  }
   const relative =
     (sign.vx - board.vx - board.panVx + board.spin * contactY) * wx +
     (sign.vy - (sign.liftSpeed || 0) - board.vy - board.panVy - board.spin * contactX) * wy;
@@ -299,7 +336,8 @@ export function collide(sign, board, now) {
     Math.abs(lateral) > Math.max(65, descent * 0.66);
   const committed = sign.sinceCounter > 0.18 && sign.sinceCounter < 0.88;
   if (underneath && relative < -6 && !sign.slipTime && cutting && (committed || Math.abs(u) > hw * 0.73)) {
-    sign.slipTime = 1.32;
+    sign.slipTime = 1.85;
+    sign.roundingEdge = false;
     sign.escapeSide = -Math.sign(lateral);
     sign.vx += sign.escapeSide * Math.min(230, board.width * 0.76);
   }
@@ -336,4 +374,23 @@ export function collide(sign, board, now) {
     born: now,
     power: clamp(-relative / 180, 0.36, 1),
   };
+}
+
+// Resolve the part of a contact that the screen limits cancelled. Holding the
+// plate at the tray or at timeout never turns off its solid surface.
+export function constrainContact(sign, board, view, fixed) {
+  let hit = contact(sign, board);
+  if (!hit || hit.depth < 1e-7) return;
+  if (!fixed) {
+    board.x -= hit.wx * (hit.depth + 0.1);
+    if (hit.wy > 0) board.y -= hit.wy * (hit.depth + 0.1);
+    board.confine(view);
+    hit = contact(sign, board);
+  }
+  if (hit) {
+    // Use the side actually touched, even if that costs part of the screen
+    // margin. Choosing the nearest free face can jump right through the plate.
+    sign.x += hit.wx * (hit.depth + 0.05);
+    sign.y += hit.wy * (hit.depth + 0.05);
+  }
 }

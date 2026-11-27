@@ -1,7 +1,7 @@
 "use client";
 
 import { useSavedSetting } from "./saved-setting";
-import { PIANO_KEYS as computerPianoKeys, type CcBinding } from "./control-map";
+import { SETTINGS_PREFIX, PIANO_KEYS as computerPianoKeys, type CcBinding } from "./control-map";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
@@ -31,7 +31,7 @@ import { FilterControls } from "./filter-controls";
 import { createMasterFilters, filterForFader, type FilterFader, type FilterValues, type MasterFilter } from "./master-filters";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import {ritualLayer} from "./ritual-patterns";
-import { hasScoredTake } from "./layer-take";
+import { hasScoredTake, isManualLayer } from "./layer-take";
 import { useTempo, TempoProvider } from "./tempo";
 import { SceneMixer } from "./scene-mixer";
 import { SceneVideo, sceneFilms } from "./scene-video";
@@ -1317,7 +1317,16 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const strikes = useRef<StrikeLog["current"]>({hits: [], energy: 0});
   const [voiceUnavailable, setVoiceUnavailable] = useState(false);
 
-  const [savedSeconds, setSavedSeconds] = useSavedSetting<number[]>("sceneSeconds112", () => previousSceneDurations() ?? SHOW_SCORE.map(cue => cue.seconds));
+  const [savedSeconds, setSavedSeconds] = useSavedSetting<number[]>("sceneSecondsManualLayers", () => {
+    try {
+      const previous=JSON.parse(localStorage.getItem(SETTINGS_PREFIX+"sceneSeconds112") ?? "null");
+      if(Array.isArray(previous) && previous.length===SHOW_SCORE.length){
+        const formerDefaults=[20,6,8,8,8,8,8,8,8,8,8,8,12];
+        return previous.map((seconds,id)=>id>=18 && id<=30 && seconds===formerDefaults[id-18] ? 6 : seconds);
+      }
+    } catch { /* Use the score when storage is unavailable. */ }
+    return resolveShowDurations(previousSceneDurations());
+  });
   const {bpm: scoreBpm} = useTempo();
   const takeSeconds = 16 * 60 / scoreBpm;
   const durations = useMemo(() => resolveShowDurations(savedSeconds).map((seconds,scene) =>
@@ -2341,6 +2350,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
           const number=displaySceneNumber(score.number), percussion=ritualLayer(score.number);
           const sceneFilm = sceneFilms.get(score.number);
           const {min,max} = limits[score.number];
+          const layerType=isManualLayer(score.number) && score.number<TEMPERAMENT_SCENE ? (percussion ? "Percusión" : "Sonido") : null;
           return <div key={mode} className="zero-scene" role="region" data-scene={number} data-cue-id={score.number} aria-labelledby={`${id}-title`}
             aria-current={isActive ? "step" : undefined}>
             <div className="zero-title">
@@ -2354,7 +2364,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
                   } else field.value = String(seconds);
                 }} onKeyDown={event => {if(event.key === "Enter")event.currentTarget.blur();}} /> s</label>}
             </div>
-            <small>{scoreTime(cueStarts[score.number])} · {percussion?.name ?? score.title}</small>
+            <small>{scoreTime(cueStarts[score.number])} · {layerType && `${layerType} · `}{percussion?.name ?? score.title}</small>
             {sceneFilm && <>
               <p className="scene-film-caption">Fondo · {sceneFilm.clip.title}</p>
               {isActive && <div ref={setFilmControls} />}

@@ -27,7 +27,7 @@ import { ScoreTrack, PrimeraVoluntad } from "./primera-voluntad";
 import { hasReferenceVisual, ReferenceVisual } from "./reference-visuals";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { FilterControls } from "./filter-controls";
-import { createMasterFilters, type FilterValues } from "./master-filters";
+import { createMasterFilters, filterForFader, type FilterFader, type FilterValues, type MasterFilter } from "./master-filters";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import { hasScoredTake } from "./layer-take";
 import { useTempo, TempoProvider } from "./tempo";
@@ -46,7 +46,8 @@ import { EXTENDED_STYLE } from "./extended-style";
 
 import { monitorMidiInputs, type MidiInputLike, type MidiDevice } from "./midi-inputs";
 
-const MASTER_FADER = -1;
+const MASTER_FADER = "-1";
+type FaderTarget = typeof MASTER_FADER | FilterFader;
 
 type MidiAccessLike = {
   inputs: {
@@ -1285,12 +1286,17 @@ function OpeningFilm({cue, output, controls, strikes, paused, finish}: {
   </div>;
 }
 
-function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs }: {
+function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs, filters, setFilter, filterBindings, filterLearning, learnFilter }: {
   firstMidi: number; calibration: boolean; toggleCalibration: () => void; masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
   connectMidi: (rescan?: boolean) => Promise<void>;
   midiConnection: MidiConnection;
   midiInputs: MidiDevice[];
+  filters: FilterValues;
+  setFilter: (id:MasterFilter,value:number)=>void;
+  filterBindings:Record<string,CcBinding>;
+  filterLearning:FilterFader|null;
+  learnFilter:(target:FilterFader)=>void;
 }) {
   const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE | ExtendedScene>("ready");
   const [scanState, setScanState] = useState<"idle" | "busy" | "done">("idle");
@@ -1300,7 +1306,6 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
   const extendedScene = typeof stage === "number" ? stage : null;
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
-  const [filters, setFilters] = useSavedSetting<FilterValues>("masterFilters", {});
   const filterValues = useRef(filters);
   filterValues.current = filters;
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
@@ -2104,6 +2109,9 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       .master-filters strong {font-size:.82rem;}
       .master-filter-row {display:grid;grid-template-columns:repeat(9,minmax(24px,1fr));gap:.18rem;overflow-x:auto;padding:.12rem .08rem;}
       .master-filter {display:grid;justify-items:center;gap:.22rem;font-size:.54rem;color:#cdd7ed;line-height:1;white-space:nowrap;}
+      .zero-controls .master-filter-midi {min-height:20px;padding:.12rem .06rem;width:100%;font-size:.47rem;letter-spacing:0;}
+      .zero-controls .master-filter-midi[data-assigned=true] {border-color:#83bfba;color:#bcf3df;}
+      .zero-controls .master-filter-midi[aria-pressed=true] {background:#593f79;border-color:#d4b2ff;}
       .master-filter-face {position:relative;display:block;width:min(100%,34px);aspect-ratio:1;border:1px solid #626c87;
         border-radius:50%;background:radial-gradient(circle at 39% 29%,#4d5871,#252d3d 59%,#151924 100%);}
       .master-filter-face[data-active=true] {border-color:#81d3d2;}
@@ -2145,6 +2153,8 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       .zero-midi { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .65rem; }
       .zero-midi p { margin: 0; color: #dce6ff; font-size: .76rem; overflow-wrap: anywhere; }
       .zero-controls .zero-midi button { font-size: .75rem; padding: .25rem .55rem; }
+      .zero-transport-total {margin:.32rem 0;display:flex;justify-content:space-between;gap:.4rem;font-size:.8rem;}
+      .zero-transport-total output {font-weight:650;font-variant-numeric:tabular-nums;}
       .zero-transport { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.7fr) repeat(3,minmax(0,1fr)); gap: .25rem; }
       .zero-controls .zero-transport button { display: grid; place-items: center; min-width: 0; padding: 0; }
       .zero-general-play {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px;}
@@ -2311,8 +2321,8 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
     <aside className="zero-controls" aria-label="Controles de las escenas">
       <div className="zero-settings" ref={settingsRef}>
         <div className="zero-scene">
-          <h2>Duración de la obra</h2>
-          <p><strong data-show-total={totalSeconds}>{scoreTime(totalSeconds)}</strong> · {SHOW_SCENE_COUNT} escenas · margen de 20:00 a 40:00</p>
+          <h2>Ajustes de la obra</h2>
+          <p>{SHOW_SCENE_COUNT} escenas · margen de 20:00 a 40:00</p>
           <details><summary>Ajustes de duración</summary>
             {sceneNumber !== null && sceneNumber < 10 && <p>La apertura ya está en marcha. Los cambios de las escenas 0–9 entran al volver a reproducirlas.</p>}
             <button type="button" onClick={() => {setSavedSeconds(SHOW_SCORE.map(cue => cue.seconds)); setRestFraction(.4);}}>Restablecer 30:00</button>
@@ -2438,6 +2448,9 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
           }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5v6h-6M4 19v-6h6M5.3 8a7.5 7.5 0 0 1 12.4-2L20 9M4 15l2.3 3A7.5 7.5 0 0 0 19 16"/></svg></button>
           {scanState !== "idle" && <small role="status">{scanState === "busy" ? "Buscando…" : midiConnection === "blocked" ? "Permiso MIDI bloqueado" : midiConnection === "unavailable" ? "MIDI no disponible" : midiInputs.length + " entradas detectadas"}</small>}
         </div>
+        <div className="zero-transport-total">
+          <span>Duración total</span><output data-show-total={totalSeconds}>{scoreTime(totalSeconds)}</output>
+        </div>
         <div className="zero-transport" role="group" aria-label="Reproducción">
           <button type="button" aria-label="Escena anterior" title="Escena anterior"
             disabled={sceneIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(sceneIndex - 1)}>
@@ -2506,7 +2519,8 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         <DjConsole output={cue ? outputRef.current : null} inputs={midiInputs}
           scene={sceneNumber} cue={cue} seconds={durations[sceneNumber ?? 0]} paused={paused}
           automatic={djAutomatic} setAutomatic={setDjAutomatic}/>
-        <FilterControls values={filters} change={(id,value)=>setFilters(current=>({...current,[id]:value}))}/>
+        <FilterControls values={filters} change={setFilter} bindings={filterBindings}
+          learning={filterLearning} learn={learnFilter}/>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
     </aside>
@@ -2516,18 +2530,20 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
 export default function Multiversos860Page() {
   const [midiInputs, setMidiInputs] = useState<MidiDevice[]>([]);
   const [midiConnection, setMidiConnection] = useState<MidiConnection>("checking");
-  const [midiLearnFor, setMidiLearnFor] = useState<number | null>(null);
+  const [midiLearnFor, setMidiLearnFor] = useState<FaderTarget | null>(null);
   const [firstMidi, setFirstMidi] = useSavedSetting("cubeFirstMidi", 36);
   const [calibration, setCalibration] = useState(false);
   const [masterVolume, setMasterVolume] = useSavedSetting("masterVolume", 100);
   const [faderSignal, setFaderSignal] = useState("");
-  const [ccMap, setCcMap] = useSavedSetting<Record<number, CcBinding>>("ccMap", {});
+  const [ccMap, setCcMap] = useSavedSetting<Record<string, CcBinding>>("ccMap", {});
+  const [filters, setFilters] = useSavedSetting<FilterValues>("masterFilters", {});
+  const setFilter = (id:MasterFilter,value:number) => setFilters(current=>({...current,[id]:value}));
   const midiAccessRef = useRef<MidiAccessLike | null>(null);
   const midiRequestRef = useRef<Promise<void> | null>(null);
   const midiMountedRef = useRef(false);
 
   const pianoRouting = useRef<PerformanceInput | null>(null);
-  const midiLearnRef = useRef<number | null>(null);
+  const midiLearnRef = useRef<FaderTarget | null>(null);
   const ccMapRef = useRef(ccMap);
   ccMapRef.current = ccMap;
   midiLearnRef.current = midiLearnFor;
@@ -2621,12 +2637,14 @@ export default function Multiversos860Page() {
           return !!uniqueName && uniqueName === binding.inputName;
         };
         const alias = uniqueName ? JSON.stringify(["name",uniqueName,channel,controlType,controlType==="bend"?0:first]) : "";
+        const matchesControl = (binding:CcBinding) => fromPort(binding) &&
+          (controlType==="bend" ? binding.cc===-1 && binding.bendChannel===channel :
+            controlType==="cc" && binding.cc===first && (binding.ccChannel===undefined || binding.ccChannel===channel));
+        const fader = Object.keys(ccMapRef.current).find(key =>
+          (key===MASTER_FADER || filterForFader(key)) && matchesControl(ccMapRef.current[key]));
         if (controlType && midiLearnRef.current === null) {
           const id = JSON.stringify([input.id,channel,controlType,controlType==="bend"?0:first]);
-          const masterFader = ccMapRef.current[MASTER_FADER];
-          const reserved = !!masterFader && fromPort(masterFader) &&
-            (controlType==="bend" ? masterFader.bendChannel===channel : controlType==="cc" && masterFader.cc===first &&
-              (masterFader.ccChannel===undefined || masterFader.ccChannel===channel));
+          const reserved = fader!==undefined;
           const value = controlType==="bend"?(first+128*second)/16383:kind===0x80?0:second/127;
           if(!window.dispatchEvent(new CustomEvent("860-bank-midi",{cancelable:true,
             detail:{id,alias,value,type:controlType,reserved,label:(input.name||"MIDI")+" · "+(controlType==="bend"?"Pitch Bend":(controlType==="cc"?"CC ":"Nota ")+first)+" · canal "+(channel+1)}})))return;
@@ -2636,59 +2654,45 @@ export default function Multiversos860Page() {
           const event = new CustomEvent("860-record-midi",{cancelable:true,detail:{id,alias,on:kind!==0x80 && second>0}});
           if(!window.dispatchEvent(event)) return;
         }
-        if (isInpulse200(input.name)) {
-          if (midiLearnRef.current === null && herculesCommand(input.id,data,djHeld.current)) return;
-          if (kind === 0x90 || kind === 0x80) return;
-        }
-        if (kind === 0x90 && second > 0) {
-          if (midiLearnRef.current === MASTER_FADER) setFaderSignal((input.name || "MIDI") + " · Nota " + first + " recibida. Para volumen, mové un fader o Pitch Bend.");
-          piano?.midiNote(input.id, channel, first, second / 127);
-          return;
-        }
-        if (kind === 0x80 || (kind === 0x90 && second === 0)) {
-          piano?.midiNote(input.id, channel, first, 0);
-          return;
-        }
-        const master = ccMapRef.current[MASTER_FADER];
-        const learning = midiLearnRef.current === MASTER_FADER;
-        if (kind === 0xe0 && (learning || (fromPort(master) && master?.bendChannel === channel))) {
-          if (learning) {
-            reassignMidi({id:JSON.stringify([input.id,channel,"bend",0]),alias,owner:"master"});
-            setCcMap(current => ({ ...current, [MASTER_FADER]: {inputId: input.id, inputName: input.name, cc: -1, bendChannel: channel} }));
-            midiLearnRef.current = null;
-            setMidiLearnFor(null);
-          }
-          const percent = Math.round((first + 128 * second) * 100 / 16383);
-          setMasterVolume(percent);
-          setFaderSignal(input.name + " · Pitch Bend · " + percent + "%");
-          return;
-        }
-        if (kind === 0xb0) {
-          if (first === 120 || first === 123) piano?.releaseMidi(input.id, channel);
-          if (first >= 120) return;
-          const waitingFor = midiLearnRef.current;
-          const controlsMaster=fromPort(master) && master?.cc===first && (master.ccChannel===undefined || master.ccChannel===channel);
-          if (learning || controlsMaster) {
-            setMasterVolume(Math.round(second * 100 / 127));
-            setFaderSignal(input.name + " · CC " + first + " · " + second + "/127");
-          }
-          if (waitingFor !== null) {
-            reassignMidi({id:JSON.stringify([input.id,channel,"cc",first]),alias,owner:"master"});
-            setCcMap((current) => {
-              const next = { ...current };
-              Object.keys(next).forEach((key) => {
-                const binding = next[Number(key)];
-                if (binding && fromPort(binding) && binding.cc === first) delete next[Number(key)];
-              });
-              next[waitingFor] = { inputId: input.id, inputName: input.name, cc: first, ccChannel: channel };
-              ccMapRef.current = next;
+        const learning = midiLearnRef.current;
+        const target = learning ?? fader;
+        if (target!==undefined && (controlType==="cc" || controlType==="bend")) {
+          const bend=controlType==="bend";
+          if (learning!==null) {
+            reassignMidi({id:JSON.stringify([input.id,channel,controlType,bend?0:first]),alias,owner:"master"});
+            const binding:CcBinding={inputId:input.id,inputName:input.name,cc:bend?-1:first,
+              ...(bend ? {bendChannel:channel} : {ccChannel:channel})};
+            setCcMap(current=>{
+              const next={...current};
+              for (const key of Object.keys(next)) if ((key===MASTER_FADER || filterForFader(key)) && matchesControl(next[key])) delete next[key];
+              next[learning]=binding;
+              ccMapRef.current=next;
               return next;
             });
-            midiLearnRef.current = null;
+            midiLearnRef.current=null;
             setMidiLearnFor(null);
-            return;
           }
-          if (first === 64 && !controlsMaster) piano?.sustainMidi?.(input.id, channel, second >= 64);
+          const percent=Math.round((bend ? (first+128*second)/16383 : second/127)*100);
+          const effect=filterForFader(target);
+          if (effect) setFilter(effect.id,percent);
+          else setMasterVolume(percent);
+          if (learning!==null || !effect) {
+            setFaderSignal((effect?.label || "Máster")+" · "+(input.name || "MIDI")+" · "+(bend ? "Pitch Bend" : "CC "+first)+" · "+percent+"%");
+          }
+          return;
+        }
+        if (isInpulse200(input.name)) {
+          if (learning===null && herculesCommand(input.id,data,djHeld.current)) return;
+          if (kind===0x90 || kind===0x80) return;
+        }
+        if (kind===0x90 && second>0) {
+          if (learning!==null) setFaderSignal("Mové un fader MIDI o Pitch Bend para asignar el control.");
+          piano?.midiNote(input.id,channel,first,second/127);
+        } else if (kind===0x80 || kind===0x90) {
+          piano?.midiNote(input.id,channel,first,0);
+        } else if (kind===0xb0) {
+          if (first===120 || first===123) piano?.releaseMidi(input.id,channel);
+          if (first===64) piano?.sustainMidi?.(input.id,channel,second>=64);
         }
       };
 
@@ -2714,42 +2718,53 @@ export default function Multiversos860Page() {
 
   useEffect(() => {
     const reset = (event: Event) => { if ((event as CustomEvent).detail !== "synth") { midiLearnRef.current = null; setMidiLearnFor(null); } };
-    const releaseMaster = (event: Event) => {
+    const releaseFader = (event: Event) => {
       const {id,alias,owner}=(event as CustomEvent<MidiReassignment>).detail;
       if (owner==="master") return;
-      const binding=ccMapRef.current[MASTER_FADER];
-      if (!binding) return;
       const [inputId,channel,type,number]=JSON.parse(id);
+      if (type!=="cc" && type!=="bend") return;
       const deviceName=alias ? JSON.parse(alias)[1] : undefined;
-      const samePort=binding.inputName && deviceName ? binding.inputName===deviceName : binding.inputId===inputId;
-      const sameControl=type==="cc" ? binding.cc===number && (binding.ccChannel===undefined || binding.ccChannel===channel)
-        : type==="bend" && binding.cc===-1 && binding.bendChannel===channel;
-      if (!samePort || !sameControl) return;
+      const targets=Object.entries(ccMapRef.current).filter(([key,binding])=>{
+        if (key!==MASTER_FADER && !filterForFader(key)) return false;
+        const samePort=binding.inputName && deviceName ? binding.inputName===deviceName : binding.inputId===inputId;
+        const sameControl=type==="cc" ? binding.cc===number && (binding.ccChannel===undefined || binding.ccChannel===channel)
+          : binding.cc===-1 && binding.bendChannel===channel;
+        return samePort && sameControl;
+      });
+      if (!targets.length) return;
       setCcMap(current=>{
         const next={...current};
-        delete next[MASTER_FADER];
+        for (const [key] of targets) delete next[key];
         ccMapRef.current=next;
         return next;
       });
     };
     window.addEventListener("860-midi-learn", reset);
-    window.addEventListener(MIDI_REASSIGNMENT,releaseMaster);
+    window.addEventListener(MIDI_REASSIGNMENT,releaseFader);
     return () => {
       window.removeEventListener("860-midi-learn",reset);
-      window.removeEventListener(MIDI_REASSIGNMENT,releaseMaster);
+      window.removeEventListener(MIDI_REASSIGNMENT,releaseFader);
     };
   }, [setCcMap]);
-  const beginMidiLearn = (index: number) => {
+  const toggleMidiLearn = (target: FaderTarget) => {
+    if (midiLearnRef.current===target) {
+      midiLearnRef.current=null;
+      setMidiLearnFor(null);
+      setFaderSignal("");
+      return;
+    }
+    const effect=filterForFader(target);
+    setFaderSignal(effect ? "Mové el fader MIDI para asignar "+effect.label+"." : "");
     window.dispatchEvent(new CustomEvent("860-midi-learn",{detail:"synth"}));
     void connectMidi(true);
-    midiLearnRef.current = index;
-    setMidiLearnFor(index);
+    midiLearnRef.current = target;
+    setMidiLearnFor(target);
   };
 
   return (
     <main className={styles.console}>
       <h1 className={styles.scoreTitle}>860 Multiversos</h1>
-      <TempoProvider><ModuleZero firstMidi={firstMidi} calibration={calibration} toggleCalibration={() => setCalibration(value => !value)} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={() => { if (midiLearnFor === MASTER_FADER) { midiLearnRef.current = null; setMidiLearnFor(null); } else { setFaderSignal(""); beginMidiLearn(MASTER_FADER); } }} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
+      <TempoProvider><ModuleZero firstMidi={firstMidi} calibration={calibration} toggleCalibration={() => setCalibration(value => !value)} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={()=>toggleMidiLearn(MASTER_FADER)} filters={filters} setFilter={setFilter} filterBindings={ccMap} filterLearning={midiLearnFor===MASTER_FADER ? null : midiLearnFor} learnFilter={toggleMidiLearn} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
       <div className={styles.horizon}>
         <span>LA FRONTERA ENTRE ESCUCHAR Y VER</span>
         <i />

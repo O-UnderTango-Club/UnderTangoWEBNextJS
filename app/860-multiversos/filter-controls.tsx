@@ -1,14 +1,23 @@
 import {useRef,type CSSProperties} from "react";
-import {MASTER_FILTERS,type FilterValues,type MasterFilter} from "./master-filters";
+import type {CcBinding} from "./control-map";
+import {MASTER_FILTERS,filterFader,type FilterFader,type FilterValues,type MasterFilter} from "./master-filters";
 
-export function FilterControls({values,change}:{values:FilterValues;change:(id:MasterFilter,value:number)=>void}) {
+export function FilterControls({values,change,bindings,learning,learn}:{
+  values:FilterValues;change:(id:MasterFilter,value:number)=>void;
+  bindings:Record<string,CcBinding>;learning:FilterFader|null;learn:(target:FilterFader)=>void;
+}) {
   const drag=useRef<{pointer:number;id:MasterFilter;x:number;y:number;value:number}|null>(null);
   return <div className="master-filters" role="group" aria-label="Filtros del máster">
     <strong>Filtros</strong>
     <div className="master-filter-row">
       {MASTER_FILTERS.map(({id,label,short,description})=>{
         const value=values[id] ?? 0;
-        return <label key={id} className="master-filter" title={description+" · "+value+"%"}>
+        const target=filterFader(id), binding=bindings[target], active=learning===target;
+        const prompt=active ? "Cancelar asignación MIDI de "+label :
+          (binding ? "Reasignar MIDI de " : "Asignar MIDI a ")+label;
+        const assigned=binding ? (binding.inputName || binding.inputId)+" · "+
+          (binding.cc<0 ? "Pitch Bend" : "CC "+binding.cc)+" · canal "+((binding.bendChannel ?? binding.ccChannel ?? 0)+1) : "";
+        return <div key={id} className="master-filter" title={description+" · "+value+"%"}>
           <span className="master-filter-face" data-active={value>0} style={{"--knob-angle":(-135+value*2.7)+"deg"} as CSSProperties}>
             <input type="range" aria-label={label} aria-valuetext={value+" %"} min={0} max={100} step={1} value={value}
               onChange={event=>change(id,event.currentTarget.valueAsNumber)}
@@ -37,7 +46,10 @@ export function FilterControls({values,change}:{values:FilterValues;change:(id:M
             />
           </span>
           <span aria-hidden="true">{short}</span>
-        </label>;
+          <button type="button" className="master-filter-midi" aria-label={prompt}
+            title={assigned ? prompt+" · "+assigned : prompt} aria-pressed={active}
+            data-assigned={!!binding} onClick={()=>learn(target)}>MIDI</button>
+        </div>;
       })}
     </div>
   </div>;

@@ -34,7 +34,6 @@ import { usesSceneKeyboard } from "./scene-instrument";
 import { DjConsole } from "./dj-console";
 import { DJ_CONTROL, herculesCommand, isInpulse200, type DjCommand } from "./dj-midi";
 import { VOICE_CUES } from "./voice-loop";
-import { REPERTOIRE, RepertoireCue } from "./repertoire-cue";
 import { ProjectionSignalContext, useProjectionSignals, useSceneSignals } from "./projection-signals";
 import { StimulusBar } from "./stimulus-bar";
 import { warmRecorder } from "./measure-recorder";
@@ -1312,6 +1311,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const extendedScene = typeof stage === "number" ? stage : null;
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
+  const [djAutomatic, setDjAutomatic] = useSavedSetting("djScoreEnabled", true);
   const [showStopwatch, setShowStopwatch] = useSavedSetting("showStopwatch", false);
   const [filmControls, setFilmControls] = useState<HTMLDivElement | null>(null);
   const strikes = useRef<StrikeLog["current"]>({hits: [], energy: 0});
@@ -2081,13 +2081,18 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       .dj-drawer {position:relative;margin-top:.4rem;color:#e5e9f3;font:500 .81rem/1.35 system-ui,sans-serif;}
       .dj-drawer summary {cursor:pointer;background:#202635;border:1px solid #414a5c;border-radius:.3rem;padding:.48rem .6rem;}
       .dj-sheet {position:absolute;z-index:9;bottom:calc(100% + 3px);inset-inline:calc(0px - var(--zero-controls-padding));box-sizing:border-box;
-        max-height:min(68dvh,68cqh);overflow:auto;overscroll-behavior:contain;display:grid;gap:.45rem;padding:.7rem var(--zero-controls-padding);
+        max-height:min(74dvh,74cqh);overflow:auto;overscroll-behavior:contain;display:grid;gap:.45rem;padding:.7rem var(--zero-controls-padding);
         background:#151a26;border-block:1px solid #5c657b;box-shadow:0 -.3rem 1.1rem #06081177;}
       .dj-sheet label,.dj-deck {display:grid;gap:.28rem;min-width:0;}
       .dj-sheet select,.dj-sheet input[type=file] {width:100%;max-width:100%;min-width:0;font:inherit;color:inherit;}
       .dj-sheet select {background:#202635;padding:.35rem;border:1px solid #4c566b;border-radius:.25rem;}
       .dj-deck {border-top:2px solid #73cbbd;padding:.5rem 0 .2rem;}
       .dj-deck[data-side=B] {border-color:#bb9bee;}
+      .dj-cross-labels {display:flex;justify-content:space-between;}
+      .dj-sheet .dj-arm {display:flex;align-items:center;margin:.55rem 0;}
+      .dj-entries fieldset {margin:.45rem 0;border:1px solid #414a5c;min-inline-size:0;}
+      .dj-entry-fields {display:grid;grid-template-columns:minmax(0,1fr) 4.25rem 3rem;gap:.4rem;margin-top:.35rem;}
+      .dj-entry-fields input {width:100%;min-width:0;}
       .dj-track {margin:0;font-size:.85rem;overflow-wrap:anywhere;}
       .dj-deck-head,.dj-transport {display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;}
       .dj-deck-head strong {margin-right:auto;}.dj-transport output{font-size:.7rem;font-variant-numeric:tabular-nums;}
@@ -2270,7 +2275,6 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         {numberedControls.map(({mode, id}, index) => {
           const isActive = mode === numberedMode;
           const score = SHOW_SCORE[index], seconds = durations[index];
-          const excerpt = REPERTOIRE[score.number];
           const sceneFilm = sceneFilms.get(score.number);
           const {min,max} = limits[index];
           return <div key={mode} className="zero-scene" role="region" data-scene={score.number} aria-labelledby={`${id}-title`}
@@ -2291,9 +2295,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
               <p className="scene-film-caption">Fondo · {sceneFilm.clip.title}</p>
               {isActive && <div ref={setFilmControls} />}
             </>}
-            {score.number === 70 && <p>Escenas 70–79 · trance psicomusical. El fragmento entra en el ensamble de la 79.</p>}
-            {excerpt && <RepertoireCue scene={score.number} clip={excerpt} seconds={seconds}
-              cue={isActive ? cue : null} output={isActive ? outputRef.current : null} />}
+            {score.number === 70 && <p>Escenas 70–79 · trance psicomusical. Ajustá la entrada del deck en la pauta musical.</p>}
             {(mode === 31 || mode === 89) && <p><strong>Loop de voz.</strong> {VOICE_CUES[mode]}</p>}
             {!hasScoredTake(score.number) && <input id={id} type="range" min={min} max={max} step={1} value={seconds}
               aria-label={`Ajustar duración de la escena ${score.number}`} aria-valuetext={`${seconds} segundos`}
@@ -2449,7 +2451,9 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         <button type="button" aria-pressed={calibration} onClick={toggleCalibration}>
           {calibration ? "Tocá la tecla más grave · Cancelar" : "Tecla más grave de los cubos · MIDI " + firstMidi}
         </button>
-        <DjConsole output={manualOutput} inputs={midiInputs}/>
+        <DjConsole output={cue ? outputRef.current : null} inputs={midiInputs}
+          scene={sceneNumber} cue={cue} seconds={durations[sceneNumber ?? 0]} paused={paused}
+          automatic={djAutomatic} setAutomatic={setDjAutomatic}/>
         <a className={styles.organonLink} href="/860-multiversos/organon" target="_blank" rel="noopener">Órganon · Mapa de controles ↗</a>
         <a className={styles.materialLink} href="/860-multiversos/materiales.html" target="_blank" rel="noopener">Descargar material necesario para usar este dispositivo</a>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}

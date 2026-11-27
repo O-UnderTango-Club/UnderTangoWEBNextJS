@@ -35,7 +35,12 @@ export function addMark(marks, motion, now, step, side) {
     side,
     born: now,
   });
-  if (marks.length > 28) marks.shift();
+  // Keep fine detail near the wheel and one older point per half-second.
+  for (let i = marks.length - 2; i > 0; i--) {
+    if (now - marks[i].born > 1600 && marks[i].born - marks[i - 1].born < 500)
+      marks.splice(i, 1);
+  }
+  while (marks.length && now - marks[0].born > 22000) marks.shift();
 }
 
 function smoothPath(ctx, points, join = false) {
@@ -55,7 +60,7 @@ function smoothPath(ctx, points, join = false) {
 // The ribbons sample the floor underneath, then fine strands cross their folds.
 export function drawWake(ctx, source, crop, width, height, marks, now, body) {
   const gentle = body.gentle,
-    lifetime = gentle ? 1500 : 2100;
+    lifetime = 22000;
   while (marks.length && now - marks[0].born > lifetime) marks.shift();
   if (marks.length < 2) return;
   const last = marks.at(-1);
@@ -125,7 +130,7 @@ export function drawWake(ctx, source, crop, width, height, marks, now, body) {
   ctx.stroke();
   ctx.lineCap = ctx.lineJoin = 'round';
   ctx.globalCompositeOperation = 'screen';
-  const lanes = gentle ? [-1, 0, 1] : [-1, -0.84, -0.39, 0.05, 0.49, 0.86, 1];
+  const lanes = gentle ? [-1, 0, 1] : [-1, -0.55, 0.05, 0.62, 1];
   for (const lane of lanes) {
     const points = lane === -1 ? left : lane === 1 ? right : strand(lane);
     ctx.beginPath();

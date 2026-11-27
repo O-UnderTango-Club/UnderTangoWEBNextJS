@@ -3,7 +3,7 @@ import test from 'node:test';
 import { longestLine, sameLine, visibleLines } from '../public/847/primera-voluntad/line-detector.mjs';
 
 import { readFloor, SignMotion } from '../public/847/primera-voluntad/motion.mjs';
-import { visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
+import { addMark, carryMarks, visibleCrop } from '../public/847/primera-voluntad/scene.mjs';
 import { pictureSequence } from '../public/847/primera-voluntad/clip.mjs';
 import { arrangeScore } from '../public/847/primera-voluntad/footsteps.mjs';
 import { clipLength, clipName, roundPhase, secondsLeft } from '../public/847/primera-voluntad/timing.mjs';
@@ -567,7 +567,7 @@ test('the first tray contact catches even a fast, tilted or off-centre plate wit
   for (const [width, height] of [[320, 568], [390, 664], [760, 360]]) {
     const view = { ...portrait, width, height, bottom: 86 };
     const board = new ShowBoard();
-    board.fit(view, { width: (width - 28) * (width < height ? 0.915 : 0.69), height: 100 });
+    board.fit(view, { width: (width - 28) * (width < height ? 0.922 : 0.70), height: 100 });
     const goal = { x: width / 2, width: board.width, lipHeight: 11, bottom: height - view.bottom };
     assert.equal(touchesTray(board, goal), false);
     board.gravity = { x: -0.6, y: 1 };
@@ -635,7 +635,7 @@ test('waiting for the small wheel or making a large downward swipe cannot force 
     const rail = { a: { x: 0.08, y: 0.86 }, b: { x: 0.89, y: 0.34 } };
     const route = new SignMotion(readFloor([rail], w, h), w, h);
     const wheel = new RollingSign(route), board = new ShowBoard();
-    board.fit(view, { width: (w - 27) * 0.915, height: 128 });
+    board.fit(view, { width: (w - 27) * 0.922, height: 128 });
     const goal = { x: (w + view.left - view.right) / 2, bottom: h - view.bottom, width: board.width, lipHeight: 11 };
     let hits = 0, largestBlock = 0;
     function step(frame) {
@@ -716,12 +716,12 @@ test('the visible wheel stays outside the rectangle during play, on the tray and
     const rail = { a: { x: 0.08, y: 0.86 }, b: { x: 0.89, y: 0.34 } };
     const motion = new SignMotion(readFloor([rail], w, h), w, h);
     const wheel = new RollingSign(motion), board = new ShowBoard();
-    board.fit(view, { width: (w - 27) * 0.915, height: 150 });
+    board.fit(view, { width: (w - 27) * 0.922, height: 150 });
     const goal = { x: (w - 3) / 2, width: board.width, bottom: h - 87, lipHeight: 11 };
     let seating, previous;
     for (let frame = 0; frame < 20 / dt; frame++) {
       const seconds = frame * dt, fixed = Boolean(seating) || seconds >= 14;
-      board.gravity = { x: lateral ? Math.sign(Math.sin(seconds * 3.7)) * 0.99 : 0, y: lateral ? 0.65 : 1 };
+      board.gravity = { x: lateral ? Math.sign(Math.sin(seconds * 5.1)) * 0.99 : 0, y: lateral ? 0.65 : 1 };
       if (!fixed) board.advance(view, dt, false);
       if (seating && seating.progress < 1) settlePrize(board, goal, seating, dt);
       motion.advance(dt);
@@ -747,4 +747,17 @@ test('the visible wheel stays outside the rectangle during play, on the tray and
     }
     assert.equal(Boolean(seating), lateral);
   }
+});
+
+test('the wake follows a pan out and back and retains twenty seconds with bounded geometry', () => {
+  const marks = [];
+  const motion = { x: 100, y: 80, vx: 16, vy: 0, radius: 12, energy: 0.15, spin: 1 };
+  for (let t = 0; t <= 30000; t += 83) addMark(marks, motion, t, false, 1);
+  assert.ok(marks.length < 75);
+  assert.ok(marks.at(-1).born - marks[0].born >= 20000);
+  const initial = marks[0].x;
+  carryMarks(marks, { a: 1, b: 0, dx: 1, dy: 0 }, 390, 780);
+  assert.ok(marks[0].x > 390);
+  carryMarks(marks, { a: 1, b: 0, dx: -1, dy: 0 }, 390, 780);
+  assert.equal(marks[0].x, initial);
 });

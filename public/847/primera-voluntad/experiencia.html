@@ -6,7 +6,7 @@
     <meta name="robots" content="noindex,nofollow" />
     <meta name="theme-color" content="#090b10" />
     <meta name="referrer" content="no-referrer" />
-    <link rel="stylesheet" href="./premio.css" />
+    <link rel="stylesheet" href="./premio.css?v=estela" />
     <title>Un Ø aparece · Primera voluntad</title>
     <style>
       @font-face {
@@ -150,6 +150,24 @@
       }
       .stage[data-round='caught'] #prize-target, .stage[data-round='won'] #prize-target { color: #acffdf; }
       .stage[data-round='caught'] .tray-arrow, .stage[data-round='won'] .tray-arrow { visibility: hidden; }
+      .stage[data-round='won'] #prize-target::after {
+        content: '';
+        position: absolute;
+        inset: -0.8rem 12% 0;
+        border: 2px solid #c5ffe5;
+        border-radius: 50%;
+        box-shadow: 0 0 12px #76efdf, inset 0 0 8px #ffc9e7;
+        opacity: 0;
+        animation: landing-glow 1.4s ease-out 2;
+        pointer-events: none;
+      }
+      @keyframes landing-glow {
+        from { transform: translateY(0) scale(0.35); opacity: 0.9; }
+        to { transform: translateY(-3rem) scale(1.25); opacity: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .stage[data-round='won'] #prize-target::after { animation: none; }
+      }
       #prize-slot {
         grid-area: 1 / 2;
         display: grid;
@@ -425,6 +443,6 @@
         <a href="/847/primera-voluntad?vista=ficha">Ver la ficha de la función →</a>
       </section>
     </main>
-    <script type="module" src="./experience.mjs?v=sonido"></script>
+    <script type="module" src="./experience.mjs?v=estela"></script>
   </body>
 </html>

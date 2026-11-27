@@ -9,16 +9,16 @@ import {
   carryMarks,
   drawDemo,
   drawImpacts,
-} from './scene.mjs';
+} from './scene.mjs?v=estela';
 import { drawSign } from './solid-sign.mjs?v=toma14';
 import { soundscape } from './footsteps.mjs?v=sonido';
 
-import { RollingSign, ShowBoard, collide, constrainContact, tiltFromRest } from './stage-physics.mjs?v=festejo';
-import { invitation, layoutBoard, paintBoard } from './show-board.mjs?v=ronda14';
+import { RollingSign, ShowBoard, collide, constrainContact, tiltFromRest } from './stage-physics.mjs?v=estela';
+import { invitation, layoutBoard, paintBoard } from './show-board.mjs?v=estela';
 import { photoReview } from './photo-review.mjs?v=toma14';
 import { SceneClip } from './clip.mjs?v=toma14';
 import { touchesTray, settlePrize } from './prize-goal.mjs?v=cruce';
-import { showPrize } from './prize.mjs?v=toma14';
+import { showPrize } from './prize.mjs?v=estela';
 import { readTake, rememberTake, savedId, markReturn, returningFromApp } from './saved-take.mjs?v=toma14';
 import { clipLength, roundPhase, secondsLeft } from './timing.mjs?v=festejo';
 
@@ -71,7 +71,7 @@ const pad = get('steer-pad'),
   gift = get('open-secret'),
   countdown = get('countdown'),
   restart = get('restart');
-let sourceMode = null, won = false, suspended = false, elapsedMs = 0, lastPictureAt = null;
+let sourceMode = null, won = false, suspended = false, elapsedMs = 0, captureMs = 0, lastPictureAt = null;
 let goal, seating = null, pointer = null, baseline = null;
 
 function positionPrize() {
@@ -231,7 +231,7 @@ function resize() {
   const priorWidth = width, priorHeight = height;
   width = w;
   height = h;
-  const ratio = Math.min(devicePixelRatio || 1, 1.1, Math.sqrt(820000 / (w * h)));
+  const ratio = Math.min(devicePixelRatio || 1, 1.1, Math.sqrt(600000 / (w * h)));
   surface.width = Math.round(w * ratio);
   surface.height = Math.round(h * ratio);
   ctx?.setTransform(surface.width / w, 0, 0, surface.height / h, 0, 0);
@@ -276,7 +276,7 @@ function stopInput() {
 function resetRound() {
   retryPending = false;
   sceneStart = lastPictureAt = null;
-  elapsedMs = 0;
+  elapsedMs = captureMs = 0;
   won = false;
   player.pause();
   photos.clear();
@@ -450,7 +450,7 @@ function render(source, crop, now, dt) {
   if (body) drawSign(ctx, body, beat, now, elapsed);
   if (seating) drawCelebration((elapsedMs - seating.landedAt) / 1000);
   if (clip.state === 'idle') clip.begin(surface, audio, sceneStart);
-  else if (clip.state === 'preparing') clip.paint(surface, now);
+  else if (clip.state === 'preparing') clip.paint(surface, sceneStart + captureMs);
 }
 function drawCelebration(t) {
   if (t < 0 || t > 2.6) return;
@@ -489,18 +489,19 @@ function openSecret(id, pushEntry = true) {
   stopInput();
   if (clip.state === 'preparing') frame = requestAnimationFrame(animate);
   get('game').hidden = true;
-  showPrize(id, clipTools);
-  get('prize').querySelector('.prize-extras').append(sound);
-  get('prize').querySelector('[data-return]')?.addEventListener('click', event => {
-    event.preventDefault();
-    history.back();
-  });
+  showPrize(id);
+}
+// The round and its effects use foreground time. Only the recording waits for JPEG conversion.
+function advanceClocks(now) {
+  const delta = lastPictureAt === null ? 0 : Math.max(0, now - lastPictureAt);
+  lastPictureAt = now;
+  elapsedMs += delta;
+  captureMs = clip.limitAdvance(captureMs + Math.min(200, delta));
+  return delta;
 }
 function animate(now) {
   if (mode === 'prize' && !suspended && clip.state === 'preparing') {
-    const delta = lastPictureAt === null ? 0 : Math.min(200, Math.max(0, now - lastPictureAt));
-    elapsedMs = clip.limitAdvance(elapsedMs + delta);
-    lastPictureAt = now;
+    const delta = advanceClocks(now);
     render(scene, visibleCrop(scene.width, scene.height, width, height), sceneStart + elapsedMs, Math.min(delta / 1000, 0.05));
     frame = requestAnimationFrame(animate);
     return;
@@ -517,7 +518,7 @@ function animate(now) {
   if (hasFrame && (isDemo || now - firstCameraFrameAt >= cameraIntroMs)) {
     const crop = visibleCrop(sw, sh, width, height);
     if (now >= nextRead) {
-      nextRead = now + 40;
+      nextRead = now + (seating ? 110 : 50);
       if (isDemo) drawDemo(ink, width, height, sceneStart ? (now - sceneStart) / 1000 : 0, 1);
       try {
         analyze(source, crop, now);
@@ -529,9 +530,7 @@ function animate(now) {
     now = performance.now();
     if (motion && sceneStart === null) startRound(now);
     if (sceneStart !== null) {
-      const delta = lastPictureAt === null ? 0 : Math.max(0, Math.min(200, now - lastPictureAt));
-      elapsedMs = clip.limitAdvance(elapsedMs + delta);
-      lastPictureAt = now;
+      advanceClocks(now);
       render(source, crop, sceneStart + elapsedMs, dt);
     }
   } else lastPictureAt = null;
@@ -683,8 +682,6 @@ pad.addEventListener('keydown', (event) => {
 });
 addEventListener('popstate', () => {
   if (get('prize') && !location.pathname.endsWith('/premio.html')) {
-    get('game-dock').prepend(clipTools);
-    stop.before(sound);
     get('prize').remove();
     get('game').hidden = false;
     document.title = 'Un Ø aparece · Primera voluntad';

@@ -1,10 +1,10 @@
 /** The performance instruments feed the same scene bus as the score and sample recorder. */
 import { cubeIndexForMidi } from "./extended-scenes";
 import { harmonicFrequencyAt } from "./frequency-tuning";
-import { SHOW_INTERLUDES } from "./show-score";
+import { SHOW_INTERLUDES, TEMPERAMENT_SCENE } from "./show-score";
 export const SCENE_INSTRUMENT_NAMES = {
   ...SHOW_INTERLUDES,
-  16: "Armónicos de 111 Hz", 17: "Clavecín temperado", 19: "Timbre al tacto",
+  16: "Armónicos de 111 Hz", 17: "Serie armónica", 19: "Timbre al tacto",
   32: "Bajo de pulso", 33: "Pads abiertos", 34: "Batería electrónica", 35: "Arpegio",
   36: "Acordes cortos", 37: "Bajo ácido", 38: "Melodía de sierra", 39: "Ensamble por registros",
   63: "Dub", 64: "House", 65: "Garage", 66: "Breakbeat", 67: "Electro", 68: "Techno", 69: "Trance",
@@ -20,7 +20,7 @@ export function usesSceneKeyboard(scene: number | null): scene is InstrumentScen
 }
 
 type Color = "bass" | "pad" | "stab" | "acid" | "lead" | "hollow" | "piano" | "pluck" |
-  "reed" | "strings" | "doubleBass" | "drag" | "kick" | "snare" | "hat" | "metal" | "tom";
+  "reed" | "strings" | "doubleBass" | "drag" | "kick" | "snare" | "clap" | "hat" | "metal" | "tom";
 type Rhythm = { divisions: number; steps: readonly (number | null)[]; gate: number };
 // Steps are semitone offsets. Resting the first sixteenth leaves room for the kick.
 const roll: Rhythm = { divisions: 4, steps: [null, 0, 0, 0], gate: .73 };
@@ -118,7 +118,7 @@ function makeSound(bus: GainNode, scene: InstrumentScene, color: Color, hz: numb
   const nodes: AudioNode[]=[filter,envelope];
   const piano=color==="piano", pad=color==="pad" || color==="strings";
   const bass=color==="bass" || color==="doubleBass";
-  const drums=["kick","snare","hat","metal","tom"].includes(color);
+  const drums=["kick","snare","clap","hat","metal","tom"].includes(color);
   const struck=drums || ["pluck","stab","doubleBass"].includes(color);
   const attack=pad?(scene===76?.22:.11):color==="reed" || color==="drag"?.035:.003;
   const releaseTime=pad?.34:piano?.14:color==="reed"?.1:.045;
@@ -126,7 +126,7 @@ function makeSound(bus: GainNode, scene: InstrumentScene, color: Color, hz: numb
   const amp=envelope.gain;
   amp.setValueAtTime(.00001,time);
   amp.exponentialRampToValueAtTime(peak,time+attack);
-  const natural=color==="kick"?.36:color==="tom"?.26:color==="snare"?.2:color==="hat"?.075:color==="metal"?.3:
+  const natural=color==="kick"?.36:color==="tom"?.26:(color==="snare" || color==="clap")?.2:color==="hat"?.075:color==="metal"?.3:
     color==="doubleBass"?.9:color==="pluck"?1.1:color==="stab"?.28:0;
   if(natural) amp.exponentialRampToValueAtTime(.00001,time+natural);
   else if(piano) amp.setTargetAtTime(.00001,time+attack,1.1);
@@ -160,9 +160,10 @@ function makeSound(bus: GainNode, scene: InstrumentScene, color: Color, hz: numb
   } else if(piano || color==="pluck"){
     // Piano strings lose their upper partials faster than their fundamental.
     osc(piano?"triangle":"sawtooth",1,.73);
-    osc("sine",2.002,.28*velocity,0,.65);
-    osc("sine",3.006,.2*velocity**2,0,.28);
-    osc("sine",5.014,.12*velocity**2,0,.08);
+    const pure=scene < TEMPERAMENT_SCENE;
+    osc("sine",pure?2:2.002,.28*velocity,0,.65);
+    osc("sine",pure?3:3.006,.2*velocity**2,0,.28);
+    osc("sine",pure?5:5.014,.12*velocity**2,0,.08);
     sweep(hz*(4+velocity*12),hz*2.2,.42);
   } else if(color==="kick" || color==="tom") {
     const fundamental=osc("sine",1,1), end=color==="kick"?Math.min(85,Math.max(39,hz)):Math.min(440,Math.max(72,hz));
@@ -171,6 +172,14 @@ function makeSound(bus: GainNode, scene: InstrumentScene, color: Color, hz: numb
     osc("triangle",2,.16,0,.016);
   } else if(drums){
     if(color==="snare"){noise("highpass",950,.9);osc("triangle",1,.26,0,.052);}
+    else if(color==="clap"){
+      noise("bandpass",1220,1.05);
+      for (const offset of [.015,.030]) {
+        amp.setValueAtTime(.025*velocity,time+offset);
+        amp.linearRampToValueAtTime(peak*.82,time+offset+.003);
+      }
+      amp.exponentialRampToValueAtTime(.00001,time+.155);
+    }
     else if(color==="hat")noise("highpass",6400,1.15);
     else {osc("square",1,.32);osc("square",1.48,.23);osc("triangle",2.71,.23);noise("highpass",4700,.38);}
   } else if(pad || color==="reed" || color==="drag" || color==="lead" || color==="stab"){
@@ -221,6 +230,13 @@ function makeSound(bus: GainNode, scene: InstrumentScene, color: Color, hz: numb
   return sound;
 }
 
+export type PercussionVoice = "kick" | "snare" | "clap" | "hat";
+export function schedulePercussionHit(output:GainNode,scene:InstrumentScene,voice:PercussionVoice,at:number) {
+  const pitch={kick:52,snare:175,clap:250,hat:6200}[voice];
+  const velocity={kick:.73,snare:.59,clap:.63,hat:.48}[voice];
+  return makeSound(output,scene,voice,pitch,velocity,at,()=>{});
+}
+
 type Beat = {bpm:number; origin:number};
 export function createSceneInstrument(scene: InstrumentScene, output: GainNode, tuning:number, beat:()=>Beat,
   onAttack:(frequency:number,velocity:number)=>void) {
@@ -239,7 +255,7 @@ export function createSceneInstrument(scene: InstrumentScene, output: GainNode, 
   const keys=new Map<string,Held>();
   let timer:number|undefined;
   function frequency(note:number,color:Color) {
-    if (scene === 16) return harmonicFrequencyAt(cubeIndexForMidi(note));
+    if (scene < TEMPERAMENT_SCENE) return harmonicFrequencyAt(cubeIndexForMidi(note));
     let midi=note;
     if(color==="bass" || color==="doubleBass" || color==="kick" || (color==="acid" && scene!==74 && scene!==79)) {
       while(midi>51)midi-=12;

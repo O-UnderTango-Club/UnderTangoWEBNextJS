@@ -1,13 +1,8 @@
 import {useEffect, useRef} from "react";
 import {useProjectionSignals} from "./projection-signals";
 
-const rhythm = {
-  34: [[0,4,8,12],[4,12],[2,6,10,14]],
-  64: [[0,4,8,12],[4,12],[2,6,10,14]],
-  66: [[0,4,8,11,14],[4,12],[0,2,4,6,8,10,12,14]],
-  67: [[0,3,6,10],[4,12],[0,2,4,6,8,10,12,14]],
-  72: [[0,4,8,12],[3,6,11,14],[0,2,4,6,8,10,12,14]],
-} as const;
+import {PERCUSSION_PATTERNS,isPercussionScene,rhythmLayerVisible,type PercussionScene} from "./score-percussion";
+import {useTempo} from "./tempo";
 
 export const REFERENCE_VISUALS = {
   31:"Anillos ópticos y puntos concéntricos",
@@ -47,7 +42,7 @@ const grain=(i:number)=>{const n=Math.sin(i*91.71+27.13)*43758.5453;return n-Mat
 const ink=["#efba6c","#f684aa","#72d6e5"];
 type Drawing=CanvasRenderingContext2D;
 type Color="#78c4ef"|"#f7c378"|"#b29bed";
-type Frame={t:number;p:number;b:number;low:number;mid:number;high:number;hit:number;reduced:boolean};
+type Frame={t:number;p:number;b:number;elapsedBeats:number;low:number;mid:number;high:number;hit:number;reduced:boolean};
 type Choice={color:Color;direction?:-1|0|1};
 const circle=(g:Drawing,x:number,y:number,r:number)=>{g.beginPath();g.arc(x,y,r,0,turn);};
 function line(g:Drawing,points:readonly (readonly [number,number])[],closed=false) {
@@ -60,40 +55,38 @@ function label(g:Drawing,text:string,y:number,size:number,color:string,width:num
   g.fillStyle=color;g.textAlign="center";g.textBaseline="middle";g.fillText(text,0,y,width);
 }
 
-function drawRhythm(g:Drawing,scene:keyof typeof rhythm,f:Frame,r:number) {
+function drawRhythm(g:Drawing,scene:PercussionScene,f:Frame,r:number) {
   const step=(f.b%4)*4, angle=(n:number)=>n*turn/16-Math.PI/2;
   const point=(n:number,radius:number):[number,number]=>[Math.cos(angle(n))*radius,Math.sin(angle(n))*radius];
   const bands=[f.low,f.mid,f.high];
   const outer=r*.90;
   for(let i=0;i<16;i++){
-    const [x,y]=point(i,outer);
-    circle(g,x,y,i%4===0 ? 2.8 : 1.5);
-    g.fillStyle=i%4===0 ? "#afc7c9" : "#516467";g.fill();
+    line(g,[point(i,outer-r*(i%4===0 ? .035 : .016)),point(i,outer)]);
+    g.strokeStyle=i%4===0 ? "#afc7c9" : "#516467";g.lineWidth=1;g.stroke();
   }
   const radii=[r*.43,r*.64,r*.83];
-  const groups=rhythm[scene];
-  groups.forEach((steps,index)=>{
-    const shown=scene===34 ? rise((f.p-index*.18)*7) : 1;
-    if(!shown)return;
+  const groups=PERCUSSION_PATTERNS[scene];
+  groups.forEach(({steps},index)=>{
+    if(!rhythmLayerVisible(scene,index,f.elapsedBeats))return;
     const radius=radii[index], color=ink[index];
-    circle(g,0,0,radius);g.strokeStyle=color;g.globalAlpha=.17*shown;g.lineWidth=1;g.stroke();
+    circle(g,0,0,radius);g.strokeStyle=color;g.globalAlpha=.17;g.lineWidth=1;g.stroke();
     const vertices=steps.map(n=>point(n,radius));
-    g.globalAlpha=.14*shown;
+    g.globalAlpha=.14;
     line(g,vertices,steps.length>2);g.fillStyle=color;if(steps.length>2)g.fill();
-    g.globalAlpha=(.56+.36*bands[index])*shown;g.lineWidth=1.6;g.stroke();
+    g.globalAlpha=.56+.36*bands[index];g.lineWidth=1.6;g.stroke();
     steps.forEach((n,i)=>{
       const elapsed=(step-n+16)%16;
       const accent=Math.exp(-elapsed*4)*(.62+.38*bands[index]);
       const [x,y]=vertices[i];
       circle(g,x,y,3.1+accent*7);g.fill();
       if(accent>.02){
-        g.globalAlpha=accent*.35*shown;circle(g,x,y,9+accent*14);g.fill();
-        g.globalAlpha=(.56+.36*bands[index])*shown;
+        g.globalAlpha=accent*.35;circle(g,x,y,9+accent*14);g.fill();
+        g.globalAlpha=.56+.36*bands[index];
       }
     });
   });
   g.globalAlpha=.76;g.strokeStyle="#eefaf1";g.lineWidth=1;
-  line(g,[[0,0],point(f.reduced ? Math.floor(step/4)*4 : step,outer)]);g.stroke();
+  line(g,[[0,0],point(f.reduced ? Math.floor(step) : step,outer)]);g.stroke();
   circle(g,0,0,3.2);g.fillStyle="#ecfff9";g.fill();
 }
 
@@ -327,6 +320,7 @@ export function ReferenceVisual({scene,clock,beginsAt,duration,paused,choice}:{
 }) {
   const surface=useRef<HTMLCanvasElement>(null);
   const signals=useProjectionSignals();
+  const {bpm,clock:beatOrigin}=useTempo();
   const color=choice?.color ?? "#78c4ef", direction=choice?.direction;
   useEffect(()=>{
     const canvas=surface.current;
@@ -347,8 +341,9 @@ export function ReferenceVisual({scene,clock,beginsAt,duration,paused,choice}:{
       context.setTransform(width/w,0,0,height/h,0,0);context.clearRect(0,0,w,h);
       const t=Math.max(0,clock.currentTime-beginsAt);
       const p=clamp(t/Math.max(.1,duration));
-      const {low,mid,high,rms,attack,beats}=signals.current;
-      const f:Frame={t,p,b:beats,low,mid,high,hit:Math.max(attack,Math.min(.7,rms*2)),reduced};
+      const {low,mid,high,rms,attack}=signals.current;
+      const beats=isPercussionScene(scene) ? Math.max(0,(clock.currentTime-beatOrigin(clock))*bpm/60) : 0;
+      const f:Frame={t,p,b:beats,elapsedBeats:t*bpm/60,low,mid,high,hit:Math.max(attack,Math.min(.7,rms*2)),reduced};
       const vote=scene===92||scene===96||scene===100;
       const side=scene===31||scene===45;
       const r=side ? Math.min(w*.20,h*.34) : Math.min(w,h)*(scene===34 ? .36 : vote ? .18 : scene>=90 ? .32 : .40);
@@ -356,7 +351,7 @@ export function ReferenceVisual({scene,clock,beginsAt,duration,paused,choice}:{
       const x=side ? w*.76 : vote || scene===91 ? w*.72 : w*.5;
       const y=vote || scene===91 ? h*.27 : scene>=90 ? h*.44 : h*.5;
       context.translate(x,y);
-      if(scene===34||scene===64||scene===66||scene===67||scene===72)drawRhythm(context,scene,f,r);
+      if(isPercussionScene(scene))drawRhythm(context,scene,f,r);
       else if(scene===31||scene===45||scene===52||scene===54)drawOptics(context,scene,f,r);
       else if(scene===51||scene===58||scene===59||scene===60)drawFire(context,scene,f,w,h*.98);
       else if(scene===41)drawContraluz(context,f,r);
@@ -376,6 +371,6 @@ export function ReferenceVisual({scene,clock,beginsAt,duration,paused,choice}:{
     resize.observe(view);
     paint(performance.now());
     return ()=>{cancelAnimationFrame(pending);resize.disconnect();};
-  },[beginsAt,clock,color,direction,duration,paused,scene,signals]);
+  },[beatOrigin,beginsAt,bpm,clock,color,direction,duration,paused,scene,signals]);
   return <canvas className="reference-visual" data-reference-scene={scene} role="img" aria-label={REFERENCE_VISUALS[scene]} ref={surface}/>;
 }

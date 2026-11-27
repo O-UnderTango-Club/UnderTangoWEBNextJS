@@ -1,4 +1,6 @@
 // Original phase lengths are also used to recover older saved performances.
+export const TEMPERAMENT_SCENE = 31;
+
 export const SHOW_TRANSITIONS = { pointHold: 2.5, lineHold: 4, trailTurn: 3 } as const;
 export const SHOW_OPENING = { opening: 5, beacon: 12.5, line: 12, harmonics: 14, space: 9, time: 9, rest: 4 } as const;
 export const SHOW_CONTINUATION = { cross: 8, sphere: 10, noise: 12, return: 7, breath: 6 } as const;
@@ -37,13 +39,13 @@ const cues = [
   [14, "Visor de acordes", SHOW_NOTES.fourteen],
   [15, "Tres visores melódicos", 25],
   [16, "Vibración y condición inicial", 10],
-  [17, "De 111 Hz al temperamento igual", 10],
+  [17, "Serie armónica · 111 Hz", 10],
   [18, "Tres cubos · Semitonos", 20],
   [19, "El timbre", 6],
   [20, "Armónicos", 8], [21, "Filtro resonante", 8], [22, "Saturación", 8],
   [23, "Trémolo", 8], [24, "Modulación en anillo", 8], [25, "Chorus", 8],
   [26, "Flanger", 8], [27, "Phaser", 8], [28, "Eco", 8], [29, "Reverberación", 8],
-  [30, "Ecos en estéreo", 12], [31, "Ondas concéntricas", 18],
+  [30, "Ecos en estéreo", 12], [TEMPERAMENT_SCENE, "Bach · Temperamento igual y ondas concéntricas", 18],
   [32, "Bajo de pulso", 26], [33, "Pads abiertos", 23], [34, "Batería electrónica", 26],
   [35, "Arpegio", 18], [36, "Acordes cortos", 16], [37, "Bajo ácido", 20],
   [38, "Melodía de sierra", 20], [39, "Ensamble temperado · Entrada de Hardstyle", 27],

@@ -1,5 +1,7 @@
 import { TIMBRE_NAMES, type TimbreScene } from "./extended-scenes";
 
+import {TEMPERAMENT_SCENE} from "./show-score";
+
 export const LAYERS = [
   {name:"Bajo de pulso",gesture:"pulso",color:"#91dbc2",pitch:110,wave:"sine"},
   {name:"Pads abiertos",gesture:"halo",color:"#b4b1ff",pitch:220,wave:"sine"},
@@ -29,8 +31,11 @@ export function countLayer(ctx:AudioContext, speakers:AudioNode, plan:LayerPlan)
     const osc=ctx.createOscillator(), gain=ctx.createGain();
     osc.type=layer.wave;
     const interval=layer.gesture==="escalera" || layer.gesture==="ensamble" ? [1,1.25,1.5,2][i%4] : i===0 ? 1.5 : 1;
-    osc.frequency.setValueAtTime(layer.pitch*interval,at);
-    osc.frequency.exponentialRampToValueAtTime(layer.pitch*interval*(layer.gesture==="golpe"?.42:.94),end);
+    if (plan.scene<TEMPERAMENT_SCENE) osc.frequency.setValueAtTime(i===0?333:222,at);
+    else {
+      osc.frequency.setValueAtTime(layer.pitch*interval,at);
+      osc.frequency.exponentialRampToValueAtTime(layer.pitch*interval*(layer.gesture==="golpe"?.42:.94),end);
+    }
     gain.gain.setValueAtTime(.0001,at);
     gain.gain.exponentialRampToValueAtTime(i===0?.115:.075,at+.003);
     gain.gain.exponentialRampToValueAtTime(.0001,end);

@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { temperedFrequency, type ExtendedScene } from "./extended-scenes";
 
+import { TEMPERAMENT_SCENE } from "./show-score";
+
 const BACH_PORTRAIT = "/multiversos/bach-haussmann.jpg";
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const smooth = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t); };
@@ -111,10 +113,11 @@ export function ExtendedArt({ scene, clock, beginsAt, seconds, paused, a4 }: {
     let width = 0, height = 0;
     const paint = () => {
       const elapsed = Math.max(0, clock.currentTime - beginsAt);
-      const progress = clamp(elapsed / Math.max(1, seconds));
+      const progress = clamp(elapsed / Math.max(1, scene===TEMPERAMENT_SCENE ? Math.min(10,seconds) : seconds));
       if (draw) drawFractal(draw, width, height, reduced ? 1 : progress, reduced ? 0 : elapsed);
-      panel.style.setProperty("--extended-reveal", `${scene === 16 ? smooth((progress - 0.63) / 0.22) : smooth((progress - 0.15) / 0.56)}`);
-      if (scene === 17) {
+      panel.style.setProperty("--extended-reveal", `${scene === TEMPERAMENT_SCENE ? smooth((progress - 0.15) / 0.36) : smooth((progress - 0.46) / 0.25)}`);
+      if (scene === TEMPERAMENT_SCENE) {
+        panel.style.opacity = String(1 - smooth((progress - .74) / .25));
         const flash = smooth((progress - 0.31) / 0.065) * (1 - smooth((progress - 0.41) / 0.13));
         panel.style.setProperty("--bach-visibility", `${reduced ? 0.58 : 0.94 * flash}`);
       }
@@ -139,12 +142,12 @@ export function ExtendedArt({ scene, clock, beginsAt, seconds, paused, a4 }: {
   }, [beginsAt, clock, paused, scene, seconds]);
 
   if (scene === 19) return <div className="extended-timbre-cue"><p>Ahora trabajemos el timbre.</p></div>;
-  if (scene === 16) return <div className="extended-fractal" data-extended-scene={scene} ref={art}>
+  if (scene === 16 || scene === 17) return <div className="extended-fractal" data-extended-scene={scene} ref={art}>
     <canvas ref={canvas} role="img" aria-label="Cubos fractales que se alejan y se reúnen en la proyección de una esfera de seis dimensiones" />
     <div className="extended-condition">
-      <p>Vibración</p>
-      <h2>Condición inicial</h2>
-      <span>La sexta dimensión es las condiciones necesarias para que todas las dimensiones de abajo sucedan.</span>
+      <p>{scene===16 ? "Vibración" : "Afinación microtonal"}</p>
+      <h2>{scene===16 ? "Condición inicial" : "Serie armónica"}</h2>
+      <span>{scene===16 ? "La sexta dimensión es las condiciones necesarias para que todas las dimensiones de abajo sucedan." : "111 · 222 · 333 Hz"}</span>
     </div>
   </div>;
   return <div className="extended-tuning" data-extended-scene={scene} ref={art}>
@@ -166,12 +169,12 @@ export function useExtendedArtAudio(scene: ExtendedScene | null, clock: AudioCon
   outputRef: { current: GainNode | null }) {
   useEffect(() => {
     const output = outputRef.current;
-    if (!output || !clock || (scene !== 16 && scene !== 17)) return;
+    if (!output || !clock || (scene !== 16 && scene !== 17 && scene !== TEMPERAMENT_SCENE)) return;
     const bus = clock.createGain();
     bus.connect(output);
     const oscillators: OscillatorNode[] = [];
     const availableAt = clock.currentTime + 0.012;
-    const time = Math.max(seconds, 1);
+    const time = Math.max(scene===TEMPERAMENT_SCENE ? Math.min(10,seconds) : seconds, 1);
     const tone = (frequency: number, from: number, to: number, volume: number) => {
       const at = Math.max(beginsAt + time * from, availableAt), end = beginsAt + time * to;
       if (end - at < 0.012) return;
@@ -192,6 +195,8 @@ export function useExtendedArtAudio(scene: ExtendedScene | null, clock: AudioCon
     if (scene === 16) {
       tone(111, 0.06, 0.98, 0.075);
       tone(222, 0.32, 0.97, 0.035);
+    } else if(scene===17) {
+      [111,222,333,444].forEach((frequency,index)=>tone(frequency,.06+index*.11,.94,.064/(1+index*.55)));
     } else {
       [111, 222, 333].forEach((frequency, index) => tone(frequency, 0.05 + index * 0.082, 0.39, 0.062));
       tone(a4, 0.34, 0.94, 0.096);

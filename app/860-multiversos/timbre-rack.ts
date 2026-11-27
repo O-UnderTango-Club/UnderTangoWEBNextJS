@@ -69,7 +69,7 @@ export function createTimbreRack(output: GainNode) {
         const amplitude = use(clock.createGain());
         const ring = scene === 24;
         amplitude.gain.value = ring ? 0 : 0.55;
-        modulate(amplitude.gain, ring ? 84 : 4.2, ring ? 0.85 : 0.45);
+        modulate(amplitude.gain, ring ? 111 : 4.2, ring ? 0.85 : 0.45);
         source.connect(amplitude).connect(wet);
         break;
       }

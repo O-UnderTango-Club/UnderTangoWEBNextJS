@@ -8,6 +8,7 @@ import { cubeIndexForMidi, CUBE_FIRST_MIDI, CUBE_SIZE, CUBE_TRACK_NAMES, CUBE_TR
 import { createPerformanceNotes, type NoteFrequency, type PerformanceInput } from "./performance-notes";
 import { createTimbreRack } from "./timbre-rack";
 import { createSceneInstrument, usesSceneKeyboard } from "./scene-instrument";
+import { TEMPERAMENT_SCENE } from "./show-score";
 import { useTempo } from "./tempo";
 
 type OutputRef = { current: GainNode | null };
@@ -25,7 +26,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
   const [amounts, setAmounts] = useSavedSetting<Partial<Record<TimbreScene, number>>>("amounts", {});
   const [live, setLive] = useState<TrackNotes>(EMPTY_TRACKS);
   const selectedRef = useRef(selected);
-  const numeric = scene !== null && scene <= 16;
+  const numeric = scene !== null && scene < TEMPERAMENT_SCENE;
   const instrument = useRef<OutputRef["current"]>(null);
   const rack = useRef<ReturnType<typeof createTimbreRack> | null>(null);
   const auditionRack = useRef<ReturnType<typeof createTimbreRack> | null>(null);
@@ -59,8 +60,8 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
         if(velocity<=0 && pedals.has(channelKey))sustained.add(key);
         else {
           sustained.delete(key);
-          const pitch = scene >= 16 && scene <= 16 ? CUBE_FIRST_MIDI + note - firstMidi : note;
-          if (velocity <= 0 || scene > 16 || pitch >= CUBE_FIRST_MIDI) play(key,pitch,velocity);
+          const pitch = numeric ? CUBE_FIRST_MIDI + note - firstMidi : note;
+          if (velocity <= 0 || !numeric || pitch >= CUBE_FIRST_MIDI) play(key,pitch,velocity);
         }
       },
       sustainMidi:scene!==88 ? undefined : (device,channel,down)=>{
@@ -91,7 +92,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       window.removeEventListener("blur",releaseAll);document.removeEventListener("visibilitychange",hidden);
       synth.close();
     };
-  },[scene,manualOutput,routing,a4,firstMidi]);
+  },[scene,manualOutput,routing,a4,firstMidi,numeric]);
 
 
   useEffect(() => {
@@ -269,7 +270,7 @@ export function ExtendedPerformanceProjection({ analyser, performance, clock, pa
 
 export function ExtendedPerformanceControls({ performance, paused, scene }: { performance: Performance; paused: boolean; scene: ExtendedScene }) {
   const { a4, setA4, selected, select, three, firstMidi, timbre, strength, setStrength } = performance;
-  const tuning = scene >= 17 && scene !== 89 && <>
+  const tuning = scene >= TEMPERAMENT_SCENE && scene !== 89 && <>
     <label htmlFor="extended-a4">La4 de referencia <output>{a4} Hz</output></label>
     <input id="extended-a4" type="range" min={400} max={480} step={1} value={a4} onChange={(event) => setA4(Number(event.currentTarget.value))} />
     <div className="zero-loop-presets">{[440, 444].map((value) => <button type="button" key={value} aria-pressed={a4 === value} onClick={() => setA4(value)}>{value} Hz</button>)}</div>

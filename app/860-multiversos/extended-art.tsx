@@ -142,12 +142,12 @@ export function ExtendedArt({ scene, clock, beginsAt, seconds, paused, a4 }: {
   }, [beginsAt, clock, paused, scene, seconds]);
 
   if (scene === 19) return <div className="extended-timbre-cue"><p>Ahora trabajemos el timbre.</p></div>;
-  if (scene === 16 || scene === 17) return <div className="extended-fractal" data-extended-scene={scene} ref={art}>
+  if (scene === 16) return <div className="extended-fractal" data-extended-scene={scene} ref={art}>
     <canvas ref={canvas} role="img" aria-label="Cubos fractales que se alejan y se reúnen en la proyección de una esfera de seis dimensiones" />
     <div className="extended-condition">
-      <p>{scene===16 ? "Vibración" : "Afinación microtonal"}</p>
-      <h2>{scene===16 ? "Condición inicial" : "Serie armónica"}</h2>
-      <span>{scene===16 ? "La sexta dimensión es las condiciones necesarias para que todas las dimensiones de abajo sucedan." : "111 · 222 · 333 Hz"}</span>
+      <p>Vibración</p>
+      <h2>Condición inicial</h2>
+      <span>La sexta dimensión es las condiciones necesarias para que todas las dimensiones de abajo sucedan.</span>
     </div>
   </div>;
   return <div className="extended-tuning" data-extended-scene={scene} ref={art}>
@@ -169,7 +169,7 @@ export function useExtendedArtAudio(scene: ExtendedScene | null, clock: AudioCon
   outputRef: { current: GainNode | null }) {
   useEffect(() => {
     const output = outputRef.current;
-    if (!output || !clock || (scene !== 16 && scene !== 17 && scene !== TEMPERAMENT_SCENE)) return;
+    if (!output || !clock || (scene !== 16 && scene !== TEMPERAMENT_SCENE)) return;
     const bus = clock.createGain();
     bus.connect(output);
     const oscillators: OscillatorNode[] = [];
@@ -195,8 +195,6 @@ export function useExtendedArtAudio(scene: ExtendedScene | null, clock: AudioCon
     if (scene === 16) {
       tone(111, 0.06, 0.98, 0.075);
       tone(222, 0.32, 0.97, 0.035);
-    } else if(scene===17) {
-      [111,222,333,444].forEach((frequency,index)=>tone(frequency,.06+index*.11,.94,.064/(1+index*.55)));
     } else {
       [111, 222, 333].forEach((frequency, index) => tone(frequency, 0.05 + index * 0.082, 0.39, 0.062));
       tone(a4, 0.34, 0.94, 0.096);

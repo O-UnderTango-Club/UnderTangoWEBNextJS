@@ -1,4 +1,4 @@
-import { SHOW_SCORE } from "./show-score";
+import { RETIRED_SCENE, SHOW_SCORE } from "./show-score";
 
 const shortestShow = 20 * 60;
 const longestShow = 40 * 60;
@@ -30,6 +30,7 @@ export function resolveShowDurations(saved: unknown): number[] {
     values = [zero, one, total - zero - one, ...saved.slice(2)];
   }
   const durations = defaults.map((fallback, index) => {
+    if(index===RETIRED_SCENE)return 0;
     const value: unknown = values[index];
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return fallback;
     return Math.max(minimums[index], Math.min(longestShow, Math.round(value)));
@@ -59,7 +60,7 @@ function boundsForIndex(index: number, durations: number[]) {
 }
 
 function sceneIndex(scene: number) {
-  return Number.isInteger(scene) && scene >= 0 && scene < defaults.length ? scene : -1;
+  return Number.isInteger(scene) && scene >= 0 && scene < defaults.length && scene!==RETIRED_SCENE ? scene : -1;
 }
 
 export function durationBounds(scene: number, durations: number[]): { min: number; max: number } {

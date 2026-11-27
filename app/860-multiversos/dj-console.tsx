@@ -4,7 +4,7 @@ import { SETTINGS_PREFIX } from "./control-map";
 import { REPERTOIRE } from "./repertoire-cue";
 import { DJ_CONTROL, isInpulse200, type DeckSide, type DjCommand } from "./dj-midi";
 import { djFiles, type LibraryFile } from "./dj-library";
-import { SHOW_SCORE, type ShowScene } from "./show-score";
+import { ACTIVE_SCORE, activeCueId, displaySceneNumber, type ShowScene } from "./show-score";
 import { useSavedSetting } from "./saved-setting";
 import type { MidiDevice } from "./midi-inputs";
 
@@ -250,7 +250,7 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
     const {rows}=fired.current;
     const timers:number[]=[];
     entries.forEach((entry,index)=>{
-      if (!entry.trackId || entry.scene!==scene || entry.offset>=seconds || rows.has(index)) return;
+      if (!entry.trackId || activeCueId(entry.scene)!==scene || entry.offset>=seconds || rows.has(index)) return;
       const at=cue.beginsAt+entry.offset;
       const launch=()=>{
         const now=cue.context.currentTime;
@@ -273,7 +273,7 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
         setLoaded(current=>({...current,[entry.side]:track.id}));
         const next={trackId:track.id};
         setLaunches(current=>({...current,[entry.side]:next}));
-        setCueNotice("Escena "+scene+" · "+track.name+" → "+entry.side);
+        setCueNotice("Escena "+displaySceneNumber(scene)+" · "+track.name+" → "+entry.side);
       };
       launch();
     });
@@ -329,8 +329,8 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
             {library.map(track=><option key={track.id} value={track.id}>{track.name}</option>)}
           </select></label>
           <div className="dj-entry-fields">
-            <label>Escena <select value={entry.scene} onChange={event=>changeEntry(index,{scene:Number(event.target.value) as ShowScene})}>
-              {SHOW_SCORE.map(({number,title})=><option key={number} value={number}>{number} · {title}</option>)}
+            <label>Escena <select value={activeCueId(entry.scene)} onChange={event=>changeEntry(index,{scene:Number(event.target.value) as ShowScene})}>
+              {ACTIVE_SCORE.map(({number,title})=><option key={number} value={number}>{displaySceneNumber(number)} · {title}</option>)}
             </select></label>
             <label>Segundo <input type="number" min={0} step={.1} value={entry.offset} onChange={event=>{
               const offset=event.currentTarget.valueAsNumber;

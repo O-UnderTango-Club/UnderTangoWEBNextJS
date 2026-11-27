@@ -1,5 +1,6 @@
 // Original phase lengths are also used to recover older saved performances.
 export const TEMPERAMENT_SCENE = 31;
+export const RETIRED_SCENE = 17;
 
 export const SHOW_TRANSITIONS = { pointHold: 2.5, lineHold: 4, trailTurn: 3 } as const;
 export const SHOW_OPENING = { opening: 5, beacon: 12.5, line: 12, harmonics: 14, space: 9, time: 9, rest: 4 } as const;
@@ -39,7 +40,7 @@ const cues = [
   [14, "Visor de acordes", SHOW_NOTES.fourteen],
   [15, "Tres visores melódicos", 25],
   [16, "Vibración y condición inicial", 10],
-  [17, "Serie armónica · 111 Hz", 10],
+  [RETIRED_SCENE, "Serie armónica · 111 Hz", 0],
   [18, "Tres cubos · Semitonos", 20],
   [19, "El timbre", 6],
   [20, "Armónicos", 8], [21, "Filtro resonante", 8], [22, "Saturación", 8],
@@ -87,7 +88,11 @@ function buildScore(): ShowCue[] {
 }
 
 export const SHOW_SCORE = buildScore();
-export const SHOW_SCENE_COUNT = SHOW_SCORE.filter(cue => cue.number > 0).length;
+export const ACTIVE_SCORE = SHOW_SCORE.filter(cue=>cue.number!==RETIRED_SCENE);
+export const SHOW_SCENE_COUNT = ACTIVE_SCORE.length-1;
+// Cue IDs remain stable for saved timings, DJ assignments, media and voting.
+export const displaySceneNumber = (id:number) => id>RETIRED_SCENE ? id-1 : id;
+export const activeCueId = (id:ShowScene):ShowScene => id===RETIRED_SCENE ? 18 : id;
 export const SHOW_TOTAL_SECONDS = SHOW_SCORE[SHOW_SCORE.length - 1].end;
 export const SHOW_EXTENDED_SECONDS: Record<number, number> = Object.fromEntries(
   SHOW_SCORE.filter(cue => cue.number >= 15).map(cue => [cue.number, cue.seconds])

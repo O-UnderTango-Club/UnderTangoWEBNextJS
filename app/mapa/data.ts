@@ -5,7 +5,7 @@ export type Activity = {
   city: CityId;
   venue: string;
   title: string;
-  status: "En preparación" | "Actividad en el lugar" | "Con fecha" | "Proyecto abierto";
+  status: "En preparación" | "Actividad en el lugar" | "Con fecha" | "Proyecto abierto" | "Nueva fecha por confirmar";
   description: string;
   artists: string[];
   date?: string;
@@ -60,8 +60,8 @@ export const activities: Activity[] = [
   },
   {
     id: "boleros-tango", number: "06", city: "santa-terezinha", venue: "Santa Terezinha de Itaipu", title: "Boleros + Tango",
-    status: "Con fecha", description: "Preparación de la propuesta de boleros y tango para el 28 de noviembre. Plantel todavía por definir.",
-    artists: [], date: "2026-11-28", dateLabel: "Sábado 28 de noviembre", coordinates: [-25.4390809, -54.4019902],
+    status: "Nueva fecha por confirmar", description: "La presentación de boleros y tango se reprogramará. Anunciaremos la nueva fecha cuando esté confirmada.",
+    artists: [], coordinates: [-25.4390809, -54.4019902],
     location: "Santa Terezinha de Itaipu · referencia de ciudad", approximate: true,
   },
   {

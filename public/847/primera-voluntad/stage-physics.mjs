@@ -87,7 +87,7 @@ export class RollingSign {
     const blend = 1 - Math.exp(-dt * 6);
     // The visible solid grows into the block, even at the far end of a rail.
     // Collision and artwork use this same radius.
-    const radius = this.slipTime ? size * 0.046 : Math.max(route.radius, size * (0.066 + guard * 0.09));
+    const radius = this.slipTime ? size * 0.049 : Math.max(route.radius, size * (0.069 + guard * 0.09));
     this.radius += (radius - this.radius) * (1 - Math.exp(-dt * (7 + 8 * guard)));
     const lift = (route.lift || 0) + arc * size * (this.gentle ? 0.07 : 0.155);
     const rise = (lift - this.lift) * (1 - Math.exp(-dt * 15));
@@ -106,7 +106,7 @@ export class RollingSign {
 
   keepInPlay(view) {
     const min = Math.min(view.width, view.height);
-    this.radius = Math.max(this.radius, min * (this.slipTime ? 0.046 : 0.066));
+    this.radius = Math.max(this.radius, min * (this.slipTime ? 0.049 : 0.069));
     const margin = this.radius * (this.slipTime ? 0.90 : 1.18);
     this.x = clamp(this.x, margin, view.width - margin);
     this.y = clamp(this.y, this.lift + this.radius * 2.2, view.height - view.bottom + this.radius * 0.55);

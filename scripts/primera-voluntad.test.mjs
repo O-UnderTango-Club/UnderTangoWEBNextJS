@@ -567,7 +567,7 @@ test('the first tray contact catches even a fast, tilted or off-centre plate wit
   for (const [width, height] of [[320, 568], [390, 664], [760, 360]]) {
     const view = { ...portrait, width, height, bottom: 86 };
     const board = new ShowBoard();
-    board.fit(view, { width: (width - 28) * (width < height ? 0.922 : 0.70), height: 100 });
+    board.fit(view, { width: (width - 28) * (width < height ? 0.935 : 0.712), height: 100 });
     const goal = { x: width / 2, width: board.width, lipHeight: 11, bottom: height - view.bottom };
     assert.equal(touchesTray(board, goal), false);
     board.gravity = { x: -0.6, y: 1 };
@@ -577,7 +577,7 @@ test('the first tray contact catches even a fast, tilted or off-centre plate wit
       caught = touchesTray(board, goal);
     }
     assert.ok(caught && !board.rebounding);
-    assert.ok(Math.abs(board.x - goal.x) > 8 && Math.abs(board.angle) > 0.045);
+    assert.ok(Math.abs(board.x - goal.x) > (width - 28 - board.width) * 0.22 && Math.abs(board.angle) > 0.045);
     const entry = { angle: board.angle, offsetX: board.x - goal.x,
       offsetY: board.y - (goal.bottom - board.height / 2), progress: 0 };
     for (let n = 0; n < 22; n++) {
@@ -635,7 +635,7 @@ test('waiting for the small wheel or making a large downward swipe cannot force 
     const rail = { a: { x: 0.08, y: 0.86 }, b: { x: 0.89, y: 0.34 } };
     const route = new SignMotion(readFloor([rail], w, h), w, h);
     const wheel = new RollingSign(route), board = new ShowBoard();
-    board.fit(view, { width: (w - 27) * 0.922, height: 128 });
+    board.fit(view, { width: (w - 27) * 0.935, height: 128 });
     const goal = { x: (w + view.left - view.right) / 2, bottom: h - view.bottom, width: board.width, lipHeight: 11 };
     let hits = 0, largestBlock = 0;
     function step(frame) {
@@ -716,12 +716,12 @@ test('the visible wheel stays outside the rectangle during play, on the tray and
     const rail = { a: { x: 0.08, y: 0.86 }, b: { x: 0.89, y: 0.34 } };
     const motion = new SignMotion(readFloor([rail], w, h), w, h);
     const wheel = new RollingSign(motion), board = new ShowBoard();
-    board.fit(view, { width: (w - 27) * 0.922, height: 150 });
+    board.fit(view, { width: (w - 27) * 0.935, height: 150 });
     const goal = { x: (w - 3) / 2, width: board.width, bottom: h - 87, lipHeight: 11 };
     let seating, previous;
     for (let frame = 0; frame < 20 / dt; frame++) {
       const seconds = frame * dt, fixed = Boolean(seating) || seconds >= 14;
-      board.gravity = { x: lateral ? Math.sign(Math.sin(seconds * 5.1)) * 0.99 : 0, y: lateral ? 0.65 : 1 };
+      board.gravity = { x: lateral ? Math.sign(Math.sin(seconds * 5.9)) * 0.99 : 0, y: lateral ? 0.65 : 1 };
       if (!fixed) board.advance(view, dt, false);
       if (seating && seating.progress < 1) settlePrize(board, goal, seating, dt);
       motion.advance(dt);

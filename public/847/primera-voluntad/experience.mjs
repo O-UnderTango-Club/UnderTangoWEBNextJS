@@ -13,8 +13,8 @@ import {
 import { drawSign } from './solid-sign.mjs?v=toma14';
 import { soundscape } from './footsteps.mjs?v=sonido';
 
-import { RollingSign, ShowBoard, collide, constrainContact, tiltFromRest } from './stage-physics.mjs?v=estela';
-import { invitation, layoutBoard, paintBoard } from './show-board.mjs?v=estela';
+import { RollingSign, ShowBoard, collide, constrainContact, tiltFromRest } from './stage-physics.mjs?v=paso';
+import { invitation, layoutBoard, paintBoard } from './show-board.mjs?v=paso';
 import { photoReview } from './photo-review.mjs?v=toma14';
 import { SceneClip } from './clip.mjs?v=toma14';
 import { touchesTray, settlePrize } from './prize-goal.mjs?v=cruce';

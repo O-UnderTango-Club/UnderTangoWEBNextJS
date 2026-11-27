@@ -1,16 +1,10 @@
-export const ROUNDS = [92, 96, 100] as const;
-export const PALETTES = { azul: "Azul", ambar: "Ámbar", violeta: "Violeta" } as const;
-export const TIMBRES = { aire: "Aire", campana: "Campana", agua: "Agua" } as const;
-export const INKS = { azul: "#78c4ef", ambar: "#f7c378", violeta: "#b29bed" } as const;
-export type Color = keyof typeof PALETTES;
-export type Timbre = keyof typeof TIMBRES;
-export type Choice = { color: Color; sound: Timbre };
+import {encodeVote,isRound,type Choice} from "../../app/860-multiversos/coda-questions";
+export * from "../../app/860-multiversos/coda-questions";
 export type Ballot = {
   session:string; scene:number|null; closesAt:string|null; serverTime:string;
   open:boolean; total:number; winner:Choice|null; voted:boolean;
 };
 export type Host = {session:string;hostToken:string};
-export const isRound = (scene:number) => ROUNDS.some(value => value === scene);
 export function remainingSeconds(state:Ballot, offset:number) {
   return state.open && state.closesAt
     ? Math.max(0, Math.ceil((Date.parse(state.closesAt) - Date.now() - offset) / 1000)) : 0;
@@ -35,13 +29,14 @@ function rehearsalRequest(session:string, post?:Record<string,unknown>):Ballot|H
   if(action==="open"){
     const scene=Number(post?.scene);
     if(!isRound(scene))throw new BallotError(400);
+    if(round.scene!==null && scene<round.scene)throw new BallotError(409);
     if(round.scene!==scene){round.scene=scene;round.closes=now+Number(post?.duration)*1000;round.vote=null;}
   } else if(action==="close" && post?.scene===round.scene)round.closes=Math.min(round.closes,now);
   else if(action==="vote"){
     if(round.scene!==post?.scene || now>=round.closes)throw new BallotError(409);
-    const color=String(post?.color), sound=String(post?.sound);
-    if(!Object.hasOwn(PALETTES,color)||!Object.hasOwn(TIMBRES,sound))throw new BallotError(400);
-    round.vote??={color:color as Color,sound:sound as Timbre};
+    const vote=encodeVote(Number(post.scene),post.option);
+    if(!vote)throw new BallotError(400);
+    round.vote??=vote;
   }
   if(action!=="state")localStorage.setItem(key,JSON.stringify(round));
   const open=now<round.closes;

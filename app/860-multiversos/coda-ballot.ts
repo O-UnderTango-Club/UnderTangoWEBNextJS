@@ -1,16 +1,11 @@
-export const ROUNDS = [92, 96, 100] as const;
-export const PALETTES = { azul: "Azul", ambar: "Ámbar", violeta: "Violeta" } as const;
-export const TIMBRES = { aire: "Aire", campana: "Campana", agua: "Agua" } as const;
-export const INKS = { azul: "#78c4ef", ambar: "#f7c378", violeta: "#b29bed" } as const;
-export type Color = keyof typeof PALETTES;
-export type Timbre = keyof typeof TIMBRES;
-export type Choice = { color: Color; sound: Timbre };
+import type {Choice} from "./coda-questions";
+export * from "./coda-questions";
+
 export type Ballot = {
   session:string; scene:number|null; closesAt:string|null; serverTime:string;
   open:boolean; total:number; winner:Choice|null; voted:boolean;
 };
 export type Host = {session:string;hostToken:string};
-export const isRound = (scene:number) => ROUNDS.some(value => value === scene);
 export function remainingSeconds(state:Ballot, offset:number) {
   return state.open && state.closesAt
     ? Math.max(0, Math.ceil((Date.parse(state.closesAt) - Date.now() - offset) / 1000)) : 0;

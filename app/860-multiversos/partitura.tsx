@@ -20,6 +20,8 @@ import { ACTIVE_SCORE, displaySceneNumber, SHOW_OPENING, SHOW_SCENE_COUNT, SHOW_
 import { durationBounds, editShowDuration, resolveShowDurations } from "./show-durations";
 import { previousSceneDurations } from "./previous-durations";
 import { CodaProjection } from "./coda-projection";
+import { useHostedBallot } from "./coda-host";
+import { atmosphereLabel } from "./coda-ballot";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
 import { TypeProjection } from "./type-projection";
 import { AudienceProjection } from "./audience-projection";
@@ -1810,6 +1812,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const sceneTitle = breathing ? "Plano 9" : numberedControls[sceneIndex]?.title;
   const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
   const coda = extendedScene !== null && extendedScene >= 90 ? extendedScene as CodaScene : null;
+  const ballot=useHostedBallot({scene:coda??0,clock:cue?.context??null,beginsAt:cue?.beginsAt??0,duration:coda ? extendedSeconds[coda] : 0});
   const extendedDark = coda !== null || extendedScene === 16 || isTimbreScene(extendedScene) || liveSet !== null;
   const totalSeconds = durations.reduce((sum, seconds) => sum + seconds, 0);
   const cueStarts = useMemo(() => {
@@ -2311,7 +2314,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       {extendedScene===TEMPERAMENT_SCENE && cue &&
         <ExtendedArt scene={TEMPERAMENT_SCENE} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused}/>}
       {(sceneNumber === 14 || sceneNumber === 18) && <NoteComet key={sceneNumber} attack={liveAttack} />}
-      {coda && cue && <CodaProjection filmLayer={filmLayer} scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} paused={paused} routing={pianoRouting} />}
+      {coda && cue && <CodaProjection ballot={ballot} filmLayer={filmLayer} scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} paused={paused} routing={pianoRouting} />}
       {extendedScene && !liveSet && !coda && cue && (extendedScene === 42 || extendedScene === 62
         ? <TypeProjection scene={extendedScene} beginsAt={cue.beginsAt} clock={cue.context} paused={paused} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} />
         : extendedScene === 61
@@ -2338,6 +2341,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         <div className="zero-scene">
           <h2>Ajustes de la obra</h2>
           <p>{SHOW_SCENE_COUNT} escenas · margen de 20:00 a 40:00</p>
+          {coda && ballot.state && <p>Ambiente en vivo · {atmosphereLabel(ballot.atmosphere)}</p>}
           <details><summary>Ajustes de duración</summary>
             {sceneNumber !== null && sceneNumber < 10 && <p>La apertura ya está en marcha. Los cambios de las escenas 0–9 entran al volver a reproducirlas.</p>}
             <button type="button" onClick={() => {setSavedSeconds(SHOW_SCORE.map(cue => cue.seconds)); setRestFraction(.4);}}>Restablecer duraciones</button>

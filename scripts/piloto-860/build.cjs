@@ -32,7 +32,7 @@ function inlineAssets(source) {
 const modules = entries.map(name => {
   let source = read(path.join(route,name));
   // File previews have their own ballot on this computer and never open a public voting session.
-  if (name === "coda-ballot.ts") source = read(path.join(__dirname, "file-ballot.ts"));
+  if (name === "coda-ballot.ts") source = read(path.join(__dirname, "file-ballot.ts")).replaceAll("../../app/860-multiversos/coda-questions","./coda-questions");
   if (name === "coda-host.ts") {
     source = source.replace('if(!location.protocol.startsWith("http")){setIssue(true);return;}', "")
       .replace(/void fetch\("\/api\/860-votos",[\s\S]*?\}\)\.catch\(\(\)=>\{\}\);/, 'void ballotRequest(credentials.session,{action:"close",hostToken:credentials.hostToken,scene:snapshot.scene}).catch(()=>{});');

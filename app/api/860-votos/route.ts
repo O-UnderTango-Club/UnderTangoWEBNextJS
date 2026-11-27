@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import {encodeVote, isRound} from "../../860-multiversos/coda-ballot";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -7,9 +8,6 @@ export const runtime = "nodejs";
 const cookieName = "ut860_publico";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const validId = (value: unknown): value is string => typeof value === "string" && uuid.test(value);
-const scenes = [92, 96, 100];
-const colors = ["azul", "ambar", "violeta"];
-const sounds = ["aire", "campana", "agua"];
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 type Payload = Record<string, unknown>;
@@ -32,11 +30,12 @@ async function respond(request: NextRequest, body: Payload) {
   if (!validId(session)) return json({error:"Identificador de función inválido."},400);
   const hostToken = action === "create" && body.hostToken === undefined ? randomUUID() : body.hostToken;
   if (["create","open","close"].includes(action) && !validId(hostToken)) return json({error:"Falta el permiso de conducción."},403);
-  const {scene, duration, color, sound} = body;
-  if (["open","close","vote"].includes(action) && (typeof scene !== "number" || !scenes.includes(scene))) return json({error:"Ronda inválida."},400);
+  const {scene, duration, option} = body;
+  if (["open","close","vote"].includes(action) && (typeof scene !== "number" || !isRound(scene))) return json({error:"Ronda inválida."},400);
   if (action === "open" && (typeof duration !== "number" || !Number.isInteger(duration) || duration<1 || duration>120)) return json({error:"Duración inválida."},400);
+  const vote = action === "vote" && typeof scene === "number" ? encodeVote(scene, option) : null;
   if (action === "vote") {
-    if (typeof color !== "string" || !colors.includes(color) || typeof sound !== "string" || !sounds.includes(sound)) return json({error:"Elegí un color y un sonido."},400);
+    if (!vote) return json({error:"Elegí una opción para esta pregunta."},400);
     if (!validId(cookie)) return json({error:"Actualizá la votación para habilitar este navegador."},428);
   }
   const url = process.env.ANALYTICS_SUPABASE_URL;
@@ -49,7 +48,7 @@ async function respond(request: NextRequest, body: Payload) {
       method:"POST", cache:"no-store", signal:AbortSignal.timeout(6500), headers,
       body:JSON.stringify({p_action:action,p_session:session,
         p_voter:hash(session+":"+voter),p_host:validId(hostToken)?hash(hostToken):null,
-        p_scene:scene??null,p_duration:duration??null,p_color:color??null,p_sound:sound??null}),
+        p_scene:scene??null,p_duration:duration??null,p_color:vote?.color??null,p_sound:vote?.sound??null}),
     });
     if (!upstream.ok) {
       const {code} = await upstream.json();

@@ -30,6 +30,10 @@ El teclado, MIDI y el botón de sonido tocan el instrumento de la escena indicad
 
 El archivo se actualiza cuando cambian las asignaciones. Su historial conserva hasta 64 revisiones recientes por perfil. Los cambios de teclas incorporadas se registran al abrir la nueva versión de la partitura. Al modificar esos controles, actualizá la referencia en `control-map.ts` en el mismo cambio y verificá exportación, reapertura y recuperación.
 
+## Votación de la sala
+
+El QR abre una página por función. Al entrar a las escenas de votación visibles 91, 95 y 99, esa misma página presenta una pregunta de pulso, timbre o color. El resultado de cada ronda se suma a los anteriores y se aplica al instrumento, al fraseo y a la proyección de la coda. Después de la tercera ronda la página muestra el cierre. Probá las tres rondas en una sola pestaña del público, el voto único por ronda y el avance manual de la partitura.
+
 ## Videos del piloto local
 
 Cuando Pablo pida revisar material nuevo en `G:\00 - Inicio\860`, ejecutá `node scripts/piloto-860/revisar-clips.cjs` desde la raíz del piloto. Compara el contenido de los originales por SHA-256, incluso si se renombraron. Revisá la imagen y la pista de audio de cada incorporación y elegí la escena por su relación con lo que se proyecta y se toca.

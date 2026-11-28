@@ -8,7 +8,7 @@ const phrasing = {
   romantico:{steps:[57,60,64,69,67,64,60,62],gaps:[.72,.92,1.3,.83,.77,1.55],attack:1.4,decay:1.45,accent:[.85,.57,.69,.5]},
 } as const;
 
-export function useCodaInstrument(scene:number, atmosphere:Atmosphere, output:GainNode|null, paused:boolean,
+export function useCodaInstrument(scene:number, atmosphere:Atmosphere, output:GainNode|null, scoreOutput:GainNode|null, paused:boolean,
     routing:{current:PerformanceInput|null}) {
   const current=useRef({scene,atmosphere,paused});
   current.current={scene,atmosphere,paused};
@@ -18,13 +18,18 @@ export function useCodaInstrument(scene:number, atmosphere:Atmosphere, output:Ga
     const bus=clock.createGain();
     bus.gain.value=.28;
     bus.connect(output);
+    const backing = scoreOutput?.context === clock ? clock.createGain() : null;
+    if (backing && scoreOutput) {
+      backing.gain.value = bus.gain.value;
+      backing.connect(scoreOutput);
+    }
     const air=clock.createBuffer(1,Math.round(clock.sampleRate*1.25),clock.sampleRate);
     const data=air.getChannelData(0);
     for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
     const active=new Map<string,()=>void>();
     const ringing=new Set<()=>void>();
     let nextAt=clock.currentTime+1, phrase=0;
-    function note(id:string,midi:number,velocity:number){
+    function note(id:string,midi:number,velocity:number,destination=bus){
       active.get(id)?.();
       if(!velocity || clock.state!=="running")return;
       if(ringing.size>=24)ringing.values().next().value?.();
@@ -44,7 +49,7 @@ export function useCodaInstrument(scene:number, atmosphere:Atmosphere, output:Ga
         if(sound==="agua")source.frequency.exponentialRampToValueAtTime(Math.max(28,Math.min(3500,hz*.65)),now+.19);
         filter.type="lowpass";filter.frequency.value=sound==="campana"?2400:1100;
       }
-      source.connect(filter).connect(gain).connect(bus);
+      source.connect(filter).connect(gain).connect(destination);
       const attack=feel.attack*(sound==="aire"?.18:.015);
       gain.gain.setValueAtTime(.00001,now);
       gain.gain.exponentialRampToValueAtTime(Math.max(.0001,level),now+attack);
@@ -75,17 +80,17 @@ export function useCodaInstrument(scene:number, atmosphere:Atmosphere, output:Ga
     routing.current=dest;
     const timer=window.setInterval(()=>{
       const {scene,paused,atmosphere:{groove}}=current.current;
-      if(paused || scene<93 || scene>=110 || clock.state!=="running" || clock.currentTime<nextAt)return;
+      if(!backing || paused || scene<93 || scene>=110 || clock.state!=="running" || clock.currentTime<nextAt)return;
       const {steps,gaps,accent}=phrasing[groove];
-      note("room-tail/"+phrase,steps[phrase%steps.length],accent[phrase%accent.length]);
+      note("room-tail/"+phrase,steps[phrase%steps.length],accent[phrase%accent.length],backing);
       const fade=1+Math.max(0,scene-102)*.28;
       nextAt=clock.currentTime+gaps[phrase%gaps.length]*fade;
       phrase++;
     },40);
     window.addEventListener("blur",allOff);
     return ()=>{
-      window.removeEventListener("blur",allOff);window.clearInterval(timer);allOff();bus.disconnect();
+      window.removeEventListener("blur",allOff);window.clearInterval(timer);allOff();bus.disconnect();backing?.disconnect();
       if(routing.current===dest)routing.current=null;
     };
-  },[output,routing,scene]);
+  },[output,scoreOutput,routing,scene]);
 }

@@ -36,7 +36,7 @@ const style = `
 @container(max-width:430px){.coda-invite{inset:17% 5% 6%;gap:3%;grid-template-columns:1fr 1fr;}.coda-stage h2{font-size:clamp(1.4rem,7cqw,2.1rem)}.coda-qr{width:min(100%,48cqh);}}
 `;
 const motionSeconds={movido:5.2,tranquilo:13,romantico:9.3} as const;
-type Props={ballot:ReturnType<typeof useHostedBallot>;scene:number;clock:AudioContext;beginsAt:number;duration:number;output:GainNode|null;paused:boolean;routing:{current:PerformanceInput|null};filmLayer:ReactNode};
+type Props={ballot:ReturnType<typeof useHostedBallot>;scene:number;clock:AudioContext;beginsAt:number;duration:number;output:GainNode|null;scoreOutput:GainNode|null;paused:boolean;routing:{current:PerformanceInput|null};filmLayer:ReactNode};
 export function CodaProjection(props:Props) {
   const {scene,paused}=props;
   const {session,state,atmosphere,issue,clockOffset}=props.ballot;
@@ -46,7 +46,7 @@ export function CodaProjection(props:Props) {
     const timer=window.setInterval(()=>redraw(n=>n+1),300);
     return ()=>clearInterval(timer);
   },[state?.open]);
-  useCodaInstrument(scene,atmosphere,props.output,paused,props.routing);
+  useCodaInstrument(scene,atmosphere,props.output,props.scoreOutput,paused,props.routing);
   const period=motionSeconds[atmosphere.groove];
   const question=questionFor(scene);
   const title=SHOW_SCORE.find(cue=>cue.number===scene)?.title;

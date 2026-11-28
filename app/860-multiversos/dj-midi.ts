@@ -1,5 +1,8 @@
 export type DeckSide = "A" | "B";
-export type DjCommand = { action: "scene"; step: -1 | 1 } | { action: "load" | "play" | "cue"; side: DeckSide };
+export type DjCommand =
+  | { action: "scene"; step: -1 | 1 }
+  | { action: "load" | "play" | "cue"; side: DeckSide }
+  | { action: "pad"; pad: DjPad };
 export const DJ_FADERS = {cross:"Crossfader A/B",volumeA:"Volumen deck A",volumeB:"Volumen deck B"} as const;
 export const DJ_PADS = ["pad1","pad2","pad3","pad4"] as const;
 export const DJ_MIDI_NAMES = {...DJ_FADERS, pad1:"Pad 1", pad2:"Pad 2", pad3:"Pad 3", pad4:"Pad 4"} as const;
@@ -23,10 +26,13 @@ export function herculesCommand(inputId: string, data: ArrayLike<number>, held: 
     return true;
   }
   const channel = status & 15, kind = status & 0xf0;
-  const action = control === 7 ? "play" : control === 6 ? "cue" : control === 13 ? "load" : null;
-  if (!action || (channel !== 1 && channel !== 2) || (kind !== 0x90 && kind !== 0x80)) return false;
+  if (kind !== 0x90 && kind !== 0x80) return false;
+  const transport = control === 7 ? "play" : control === 6 ? "cue" : control === 13 ? "load" : null;
+  const command: DjCommand | null = channel === 6 && control === 0 ? {action:"pad", pad:"pad1"}
+    : transport && (channel === 1 || channel === 2) ? {action:transport, side:channel === 1 ? "A" : "B"} : null;
+  if (!command) return false;
   const key = JSON.stringify([inputId, channel, control]);
   if (kind === 0x80 || !value) held.delete(key);
-  else if (!held.has(key)) { held.add(key); send({action, side:channel === 1 ? "A" : "B"}); }
+  else if (!held.has(key)) { held.add(key); send(command); }
   return true;
 }

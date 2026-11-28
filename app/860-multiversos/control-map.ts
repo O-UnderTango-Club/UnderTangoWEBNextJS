@@ -46,7 +46,7 @@ export const FIXED_CONTROLS = {
   "Grabar con el botón enfocado": "Espacio o Intro",
   "Hercules · Play/Pausa A y B": "Nota 7 · canales 2 y 3",
   "Hercules · Cue A y B": "Nota 6 · canales 2 y 3",
-  "Hercules · Cargar A y B": "Nota 13 · canales 2 y 3",
+  "Hercules · Cargar A y B": "Nota 13 · canales 2 y 3 · Prepara el otro pad del deck",
   "Hercules · Pad 1 izquierdo": "Modo Hot Cue · Nota 0, canal 7 · Asignación de fábrica con prioridad del aprendizaje MIDI",
   "Hercules · Pads 2, 3 y 4": "Modo Hot Cue · Notas 1, 2 y 3 · Canales 7 y 8 · Las asignaciones aprendidas tienen prioridad",
   "Hercules · Rueda de escenas": "CC 1 relativo · canal 1 · Horario → siguiente · Antihorario → anterior",

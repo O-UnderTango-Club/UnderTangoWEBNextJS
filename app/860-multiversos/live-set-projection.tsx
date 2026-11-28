@@ -1,6 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import {hasReferenceVisual, ReferenceVisual} from "./reference-visuals";
-import { AudienceProjection } from "./audience-projection";
 import { useTempo } from "./tempo";
 import { ResonantVisuals } from "./resonant-visuals";
 import { useProjectionSignals } from "./projection-signals";
@@ -154,8 +153,7 @@ const style = `
 .live-set[data-family=psy] {background:radial-gradient(ellipse at 50% 52%,#1d1029 0,#0c101b 47%,#06070c 95%);}
 .live-set[data-family=tango] {color:#f0dfcb;background:radial-gradient(ellipse at 50% 53%,#2c1d1a,#0e0b0c 72%);}
 .live-set[data-family=cierre] {color:#e0d6c5;background:#0e0e10;}
-.live-set .live-set-drawing,.live-set>.audience-projection {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
-.live-set>.audience-projection button {pointer-events:auto;}
+.live-set .live-set-drawing {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
 .live-set-heading {position:absolute;left:clamp(1.5rem,7%,7rem);top:clamp(2.6rem,12%,6.5rem);max-width:85%;color:inherit;font-size:clamp(1.7rem,5.6cqw,5.4rem);line-height:1.02;letter-spacing:-.035em;}
 .live-set[data-scene="68"] .live-set-heading {top:auto;bottom:4%;font-size:clamp(1rem,2.4cqw,2rem);background:#070b10d9;padding:.18em .35em;}
 .live-set[data-resonant] .live-set-heading {top:auto;bottom:clamp(.7rem,3%,2rem);left:clamp(.7rem,3%,2rem);max-width:52%;font-size:clamp(.86rem,1.55cqw,1.45rem);text-shadow:0 1px 5px #000,0 1px 12px #000;pointer-events:none;}
@@ -187,8 +185,7 @@ export function LiveSetProjection(props: LiveSetProps) {
   return <div className="live-set" data-scene={scene} data-family={family} data-resonant={resonant || undefined} role="group" aria-label={title}>
     <style>{style}</style>
     {props.filmLayer}
-    {scene===68 ? <AudienceProjection analyser={analyser} paused={paused} treatment="ascii" />
-      : resonant ? <ResonantVisuals scene={scene} signals={signals} paused={paused} />
+    {resonant ? <ResonantVisuals scene={scene} signals={signals} paused={paused} />
       : <SoundDrawing scene={scene} analyser={analyser} paused={paused} bpm={bpm} />}
     {props.cue && hasReferenceVisual(scene) &&
       <ReferenceVisual scene={scene} clock={props.cue.context} beginsAt={props.cue.beginsAt} duration={props.seconds} paused={paused}/>}

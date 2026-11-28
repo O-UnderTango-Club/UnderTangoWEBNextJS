@@ -25,8 +25,7 @@ export function drawAsciiCamera(video: HTMLVideoElement, canvas: HTMLCanvasEleme
     analyser.current?.getByteFrequencyData(spectrum);
     const bass = (spectrum[2]+spectrum[3]+spectrum[4])/765;
     const air = (spectrum[24]+spectrum[40]+spectrum[70])/765;
-    ink.fillStyle = "#050910";
-    ink.fillRect(0, 0, width, height);
+    ink.clearRect(0, 0, width, height);
     ink.font = font + 'px "Courier New", monospace';
     ink.textBaseline = "top";
     for(let y=0; y<rows; y++){

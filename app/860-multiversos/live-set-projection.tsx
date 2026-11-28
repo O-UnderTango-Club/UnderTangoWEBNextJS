@@ -29,6 +29,7 @@ type LiveSetProps = {
 
 function SoundDrawing({scene, analyser, paused, bpm}: Pick<LiveSetProps,"scene"|"analyser"|"paused"|"bpm">) {
   const surface = useRef<HTMLCanvasElement>(null);
+  const signals = useProjectionSignals();
   useEffect(() => {
     const canvas = surface.current, ctx = canvas?.getContext("2d");
     if (!canvas || !ctx || paused) return;
@@ -50,7 +51,8 @@ function SoundDrawing({scene, analyser, paused, bpm}: Pick<LiveSetProps,"scene"|
       if (node) {node.getByteFrequencyData(bins);node.getByteTimeDomainData(wave);}
       else {bins.fill(0);wave.fill(128);}
       low += (((bins[1]+bins[2]+bins[3]+bins[4])/1020)-low)*.32;
-      const phase = node && !reduceMotion ? node.context.currentTime*bpm/60 : 0;
+      const phase = signals.percussion ? (signals.percussion.step ?? 0)/4
+        : node && !reduceMotion ? node.context.currentTime*bpm/60 : 0;
       ctx.clearRect(0,0,w,h);
       const cyan = scene < 40, tango = scene >= 80;
       const hue = cyan ? 151 + (scene-32)*7 : tango ? 30 : 177 + ((scene-63)*17)%110;
@@ -110,7 +112,7 @@ function SoundDrawing({scene, analyser, paused, bpm}: Pick<LiveSetProps,"scene"|
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  },[analyser,bpm,paused,scene]);
+  },[analyser,bpm,paused,scene,signals]);
   return <canvas ref={surface} className="live-set-drawing" aria-hidden="true" />;
 }
 

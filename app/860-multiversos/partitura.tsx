@@ -32,7 +32,7 @@ import { TypeProjection } from "./type-projection";
 import { AudienceProjection, type CameraStatus } from "./audience-projection";
 import { AudiovisualControls, AudiovisualLayers, useAudiovisuals } from "./audiovisuals";
 import { PrimeraVoluntad } from "./primera-voluntad";
-import { useScorePercussion } from "./score-percussion";
+import { isPlayedPercussionScene, useScorePercussion, type PercussionCursor } from "./score-percussion";
 import { hasReferenceVisual, ReferenceVisual } from "./reference-visuals";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { FilterControls } from "./filter-controls";
@@ -1510,14 +1510,16 @@ function ModuleZero({
   const scoreClock = cue?.context ?? null;
   const audition = usePausedSceneOutput(paused ? scoreClock : null, masterVolume, synthVolume, filters);
   const manualOutput = activeScene && cue ? (paused ? audition : synthOutputRef.current) : null;
-  const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, synthOutputRef, pianoRouting, manualOutput, firstMidi);
+  const percussionCue = isPlayedPercussionScene(extendedScene) ? cue : null;
+  const percussionCursor = useMemo<PercussionCursor|null>(()=>percussionCue ? {step:null} : null,[percussionCue]);
+  const extended = useExtendedPerformance(extendedScene, scoreClock, synthOutputRef, pianoRouting, manualOutput, firstMidi, percussionCursor);
   const liveAttack = extended.attack;
   const noteStrike = useCallback((frequency:number, time:number, velocity=.85) => {
     liveAttack.current={count:liveAttack.current.count+1,frequency,velocity};
   },[liveAttack]);
   const directionSeconds = extendedScene ? extendedSeconds[extendedScene] || (EXTENDED_DEFAULT_SECONDS[extendedScene] || 16) : 0;
   useExtendedArtAudio(extendedScene, cue?.context ?? null, cue?.beginsAt ?? 0, directionSeconds, extended.a4, outputRef);
-  useScorePercussion(extendedScene,cue,directionSeconds,paused,loopMix.current);
+  useScorePercussion(extendedScene,cue,paused,loopMix.current);
   const openingActive = activeScene === "beacon" || activeScene === "line" || activeScene === "harmonics";
   const earlyScene = openingActive ? "beacon" : typeof activeScene === "string" && !isNoteScene(activeScene) ? activeScene : null;
   const hitPoint = useCallback((hit: PointStrike) => {
@@ -1969,7 +1971,7 @@ function ModuleZero({
   const audiovisualActive = sceneNumber !== null && audiovisuals.enabled &&
     audiovisuals.films.some(film=>sceneNumber>=film.scene && film.opacity>0);
   const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack,
-    hasReferenceVisual(sceneNumber) || audiovisualActive);
+    percussionCursor, hasReferenceVisual(sceneNumber) || audiovisualActive);
   const sceneTitle = breathing ? "Plano 9" : NUMBERED_CONTROLS[sceneIndex]?.title;
   const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
   const coda = extendedScene !== null && extendedScene >= 90 ? extendedScene as CodaScene : null;
@@ -2570,6 +2572,7 @@ function ModuleZero({
               {isActive && <div ref={setFilmControls} />}
             </>}
             {isActive && mode === "line" && openingRun && <div ref={setFilmControls} />}
+            {isPlayedPercussionScene(score.number) && <p>Cada tecla toca el siguiente golpe del ciclo.</p>}
             {score.number === 70 && <p>Trance psicomusical. Ajustá la entrada del deck en la pauta musical.</p>}
             {(mode === 31 || mode === 89) && <p><strong>Loop de voz.</strong> {VOICE_CUES[mode]}</p>}
             {!hasScoredTake(score.number) && <input id={id} type="range" min={min} max={max} step={1} value={seconds}

@@ -1,7 +1,7 @@
 import {useEffect, useRef} from "react";
 import {useProjectionSignals} from "./projection-signals";
 
-import {PERCUSSION_PATTERNS,isPercussionScene,rhythmLayerVisible,type PercussionScene} from "./score-percussion";
+import {PERCUSSION_PATTERNS,isPercussionScene,isPlayedPercussionScene,rhythmLayerVisible,type PercussionScene} from "./score-percussion";
 import {useTempo} from "./tempo";
 
 export const REFERENCE_VISUALS = {
@@ -42,7 +42,7 @@ const grain=(i:number)=>{const n=Math.sin(i*91.71+27.13)*43758.5453;return n-Mat
 const ink=["#efba6c","#f684aa","#72d6e5"];
 type Drawing=CanvasRenderingContext2D;
 type Color="#78c4ef"|"#f7c378"|"#b29bed";
-type Frame={t:number;p:number;b:number;elapsedBeats:number;low:number;mid:number;high:number;hit:number;reduced:boolean};
+type Frame={t:number;p:number;rhythmStep:number|null;elapsedBeats:number;low:number;mid:number;high:number;hit:number;reduced:boolean};
 type Choice={color:Color;direction?:-1|0|1};
 const circle=(g:Drawing,x:number,y:number,r:number)=>{g.beginPath();g.arc(x,y,r,0,turn);};
 function line(g:Drawing,points:readonly (readonly [number,number])[],closed=false) {
@@ -56,7 +56,7 @@ function label(g:Drawing,text:string,y:number,size:number,color:string,width:num
 }
 
 function drawRhythm(g:Drawing,scene:PercussionScene,f:Frame,r:number) {
-  const step=(f.b%4)*4, angle=(n:number)=>n*turn/16-Math.PI/2;
+  const step=f.rhythmStep, angle=(n:number)=>n*turn/16-Math.PI/2;
   const point=(n:number,radius:number):[number,number]=>[Math.cos(angle(n))*radius,Math.sin(angle(n))*radius];
   const bands=[f.low,f.mid,f.high];
   const outer=r*.90;
@@ -75,7 +75,7 @@ function drawRhythm(g:Drawing,scene:PercussionScene,f:Frame,r:number) {
     line(g,vertices,steps.length>2);g.fillStyle=color;if(steps.length>2)g.fill();
     g.globalAlpha=.56+.36*bands[index];g.lineWidth=1.6;g.stroke();
     steps.forEach((n,i)=>{
-      const elapsed=(step-n+16)%16;
+      const elapsed=step===null ? Infinity : (step-n+16)%16;
       const accent=Math.exp(-elapsed*4)*(.62+.38*bands[index]);
       const [x,y]=vertices[i];
       circle(g,x,y,3.1+accent*7);g.fill();
@@ -86,7 +86,9 @@ function drawRhythm(g:Drawing,scene:PercussionScene,f:Frame,r:number) {
     });
   });
   g.globalAlpha=.76;g.strokeStyle="#eefaf1";g.lineWidth=1;
-  line(g,[[0,0],point(f.reduced ? Math.floor(step) : step,outer)]);g.stroke();
+  if(step!==null){
+    line(g,[[0,0],point(f.reduced ? Math.floor(step) : step,outer)]);g.stroke();
+  }
   circle(g,0,0,3.2);g.fillStyle="#ecfff9";g.fill();
 }
 
@@ -329,8 +331,9 @@ export function ReferenceVisual({scene,clock,beginsAt,duration,paused,choice}:{
     const view=canvas, context=g;
     const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let pending=0, previous=-Infinity;
+    const played=isPlayedPercussionScene(scene);
     function paint(timestamp:number) {
-      if(!paused)pending=requestAnimationFrame(paint);
+      if(!paused || played)pending=requestAnimationFrame(paint);
       if(timestamp-previous<(reduced ? 80 : 28))return;
       previous=timestamp;
       const w=view.clientWidth,h=view.clientHeight;
@@ -342,8 +345,9 @@ export function ReferenceVisual({scene,clock,beginsAt,duration,paused,choice}:{
       const t=Math.max(0,clock.currentTime-beginsAt);
       const p=clamp(t/Math.max(.1,duration));
       const {low,mid,high,rms,attack}=signals.current;
-      const beats=isPercussionScene(scene) ? Math.max(0,(clock.currentTime-beatOrigin(clock))*bpm/60) : 0;
-      const f:Frame={t,p,b:beats,elapsedBeats:t*bpm/60,low,mid,high,hit:Math.max(attack,Math.min(.7,rms*2)),reduced};
+      const rhythmStep=scene===34 ? (Math.max(0,clock.currentTime-beatOrigin(clock))*bpm/60%4)*4
+        : signals.percussion?.step ?? null;
+      const f:Frame={t,p,rhythmStep,elapsedBeats:t*bpm/60,low,mid,high,hit:Math.max(attack,Math.min(.7,rms*2)),reduced};
       const vote=scene===92||scene===96||scene===100;
       const side=scene===31||scene===45;
       const r=side ? Math.min(w*.20,h*.34) : Math.min(w,h)*(scene===34 ? .36 : vote ? .18 : scene>=90 ? .32 : .40);
@@ -367,7 +371,7 @@ export function ReferenceVisual({scene,clock,beginsAt,duration,paused,choice}:{
       else if(scene===104)drawTower(context,f,r,color);
       context.restore();
     }
-    const resize=new ResizeObserver(()=>{if(paused){previous=-Infinity;paint(performance.now());}});
+    const resize=new ResizeObserver(()=>{if(paused && !played){previous=-Infinity;paint(performance.now());}});
     resize.observe(view);
     paint(performance.now());
     return ()=>{cancelAnimationFrame(pending);resize.disconnect();};

@@ -30,6 +30,10 @@ El teclado, MIDI y el botón de sonido tocan el instrumento de la escena indicad
 
 El archivo se actualiza cuando cambian las asignaciones. Su historial conserva hasta 64 revisiones recientes por perfil. Los cambios de teclas incorporadas se registran al abrir la nueva versión de la partitura. Al modificar esos controles, actualizá la referencia en `control-map.ts` en el mismo cambio y verificá exportación, reapertura y recuperación.
 
+## Ciclos de percusión en vivo
+
+En las escenas visibles 63, 65, 66 y 71 cada pulsación del teclado MIDI o de las teclas musicales de la computadora dispara el siguiente punto sonoro del ciclo. El indicador circular se queda sobre el último punto hasta la próxima pulsación. Si coinciden varios timbres en un punto, suenan juntos. Probá la vuelta al primer golpe, una tecla sostenida y la continuidad del ciclo durante la pausa.
+
 ## Consola DJ
 
 Los pads 1 y 2 pertenecen al deck A y los pads 3 y 4 al B. En **Temas guardados**, **Cargar en pad** asigna el tema elegido a uno de los cuatro pads. Con una escena en marcha, un toque lo reproduce y el siguiente lo pausa en su posición. Si su deck contiene otro tema, el pad lo reemplaza y el otro canal sigue sonando. El botón físico de carga prepara el otro pad de ese deck mientras está en pausa. El selector **Esc.** junto a cada botón MIDI dispara el tema de ese pad al entrar en la escena elegida. **0** deja el pad en modo manual. Los temas musicales automáticos pasan por estos selectores. Los botones **MIDI** aprenden los pads, el crossfader y los faders de volumen A y B. Al cambiar de puerto se usa el nombre del dispositivo cuando es único. Verificá en el Órganon que los siete controles y las asignaciones previas aparezcan en la exportación.

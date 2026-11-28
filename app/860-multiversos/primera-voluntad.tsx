@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 type Props = {
   clock: AudioContext;
@@ -9,52 +9,6 @@ type Props = {
   press: (id: string, index: number) => void;
   release: (id: string) => void;
 };
-
-export function ScoreTrack({file, title, clock, output, trigger, fade}: {
-  file: string; title: string; clock: AudioContext | null; output: GainNode | null; trigger: boolean; fade: number;
-}) {
-  const [started, setStarted] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  const [failed, setFailed] = useState(false);
-  const position = useRef(0);
-  useEffect(() => { if (trigger) setStarted(true); }, [trigger]);
-  useEffect(() => {
-    if (!started || !clock || !output || output.context !== clock) return;
-    const context = clock;
-    const controller = new AbortController();
-    let source: AudioBufferSourceNode | undefined;
-    let at = 0;
-    const gain = clock.createGain();
-    gain.connect(output);
-    setFailed(false);
-    async function play() {
-      const response = await fetch(file, {signal: controller.signal});
-      if (!response.ok) throw Error(title);
-      const buffer = await context.decodeAudioData(await response.arrayBuffer());
-      if (controller.signal.aborted || position.current >= buffer.duration) return;
-      source = context.createBufferSource();
-      source.buffer = buffer;
-      source.connect(gain);
-      at = context.currentTime;
-      gain.gain.setValueAtTime(.48 * Math.min(1, position.current / fade), at);
-      gain.gain.linearRampToValueAtTime(.48, at + Math.max(0, fade - position.current));
-      source.start(at, position.current);
-      source.onended = () => { position.current = buffer.duration; source?.disconnect(); source = undefined; };
-    }
-    void play().catch(() => { if (!controller.signal.aborted) setFailed(true); });
-    return () => {
-      controller.abort();
-      if (source) {
-        position.current += Math.max(0, clock.currentTime - at);
-        source.onended = null;
-        source.stop();
-        source.disconnect();
-      }
-      gain.disconnect();
-    };
-  }, [started, output, clock, file, title, fade, attempt]);
-  return failed ? <button onClick={() => setAttempt(n => n + 1)}>Reintentar {title}</button> : null;
-}
 
 export function PrimeraVoluntad({ clock, analyser, attack, paused, press, release }: Props) {
   const frame = useRef<HTMLButtonElement>(null);

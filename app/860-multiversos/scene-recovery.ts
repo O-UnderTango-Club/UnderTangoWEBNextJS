@@ -41,3 +41,17 @@ export function saveLastPlayedScene(scene: ShowScene) {
     }
   }
 }
+
+export function clearLastPlayedScene() {
+  try {
+    const state = {...window.history.state};
+    delete state[LAST_PLAYED_SCENE];
+    window.history.replaceState(state, "");
+  } catch {
+    // Clear the other copies even when history cannot be edited.
+  }
+  for (const getStorage of sceneStores) {
+    try { getStorage().removeItem(LAST_PLAYED_SCENE); }
+    catch { /* Storage can be unavailable in a private profile. */ }
+  }
+}

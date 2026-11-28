@@ -22,7 +22,7 @@ import { LiveChordTimeline } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isLiveSetScene, isTimbreScene, type ExtendedScene } from "./extended-scenes";
 import { ACTIVE_SCORE, displaySceneNumber, SHOW_OPENING, SHOW_SCENE_COUNT, SHOW_SCORE, SHOW_TRANSITIONS, TEMPERAMENT_SCENE, type CodaScene } from "./show-score";
 import { durationBounds, editShowDuration, resolveShowDurations } from "./show-durations";
-import { readLastPlayedScene, saveLastPlayedScene } from "./scene-recovery";
+import { clearLastPlayedScene, readLastPlayedScene, saveLastPlayedScene } from "./scene-recovery";
 import { previousSceneDurations } from "./previous-durations";
 import { CodaProjection } from "./coda-projection";
 import { useHostedBallot } from "./coda-host";
@@ -30,7 +30,7 @@ import { atmosphereLabel } from "./coda-ballot";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
 import { TypeProjection } from "./type-projection";
 import { AudienceProjection } from "./audience-projection";
-import { ScoreTrack, PrimeraVoluntad } from "./primera-voluntad";
+import { PrimeraVoluntad } from "./primera-voluntad";
 import { useScorePercussion } from "./score-percussion";
 import { hasReferenceVisual, ReferenceVisual } from "./reference-visuals";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
@@ -1408,7 +1408,6 @@ function ModuleZero({
   const filterValues = useRef(filters);
   filterValues.current = filters;
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
-  const [djAutomatic, setDjAutomatic] = useSavedSetting("djScoreEnabled", true);
   const [showStopwatch, setShowStopwatch] = useSavedSetting("showStopwatch", false);
   const [filmControls, setFilmControls] = useState<HTMLDivElement | null>(null);
   const strikes = useRef<StrikeLog["current"]>({hits: [], energy: 0});
@@ -1471,6 +1470,7 @@ function ModuleZero({
   const timersRef = useRef(new Set<number>());
   const waitingCues = useRef(new Set<() => void>());
   const pausedRef = useRef(false);
+  const stopArmed = useRef(false);
   const runRef = useRef(0);
   const lastPlayed = useRef<number | null>(null);
   const checkpointScene = useCallback((next: ModuleStage) => {
@@ -1524,6 +1524,7 @@ function ModuleZero({
     output: manualOutput, routing: pianoRouting, onStrike: noteStrike,
   });
   const enterNumberedScene = useCallback((mode: NumberedScene, context: AudioContext, asPreview: boolean, beginsAt = context.currentTime) => {
+    stopArmed.current = false;
     setCue({ context, beginsAt });
     setPreviewMode(asPreview ? mode : null);
     enterStage(mode);
@@ -1560,6 +1561,7 @@ function ModuleZero({
 
   const reset = useCallback(() => {
     stop();
+    stopArmed.current = false;
     setCue(null);
     pausedRef.current = false;
     setPaused(false);
@@ -1616,6 +1618,7 @@ function ModuleZero({
     const context = audioRef.current;
     if (!context || pausedRef.current === next || transportBusy) return;
     const run = runRef.current;
+    if (!next) stopArmed.current = false;
     pausedRef.current = next;
     setTransportBusy(true);
     try {
@@ -1646,6 +1649,7 @@ function ModuleZero({
   const start = async (mode: ModuleZeroScene = "opening", previewOnly = false, startPaused = false) => {
     stop();
     const run = runRef.current;
+    stopArmed.current = false;
     pausedRef.current = startPaused;
     setPaused(startPaused);
     setTransportBusy(false);
@@ -1871,6 +1875,24 @@ function ModuleZero({
   }
   function playFromBeginning() {
     if (ready && !audioRef.current) void start();
+  }
+
+  function stopScene() {
+    if (ready) return;
+    if (preparing) {
+      reset();
+      return;
+    }
+    if (!stopArmed.current) {
+      stopArmed.current = true;
+      void changePaused(true);
+      return;
+    }
+    reset();
+    setRecoveryScene(null);
+    lastPlayed.current = null;
+    clearLastPlayedScene();
+    if (settingsRef.current) settingsRef.current.scrollTop = 0;
   }
 
   useLayoutEffect(() => {
@@ -2272,6 +2294,10 @@ function ModuleZero({
       .dj-mix-row {display:grid;gap:.3rem;grid-template-columns:minmax(0,1fr) auto;align-items:center;}
       .dj-pads {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.35rem;}
       .dj-pad-cell {min-width:0;display:grid;gap:.22rem;}
+      .dj-pad-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.22rem;}
+      .dj-pad-actions .dj-midi-learn {min-width:0;padding-inline:.16rem;overflow-wrap:anywhere;}
+      .dj-sheet .dj-pad-auto {display:flex;align-items:center;gap:.15rem;font-size:.67rem;}
+      .dj-pad-auto select {flex:1;min-width:0;height:100%;min-height:30px;padding:.15rem;cursor:pointer;}
       .zero-controls .dj-pad {min-height:44px;background:#b9d8f4;border-color:#bbdaf3;color:#142840;overflow-wrap:anywhere;}
       .zero-controls .dj-pad[aria-pressed=true] {background:#a4ecdd;border-color:#bcffeb;color:#11392f;}
       .zero-controls .dj-midi-learn {min-height:30px;padding:.16rem .45rem;font-size:.72rem;}
@@ -2287,10 +2313,6 @@ function ModuleZero({
       .dj-wave-status {font-size:.7rem;color:#c4c9dc;}
       .dj-pad-settings {display:grid;gap:.35rem;margin-top:.35rem;}
       .dj-cross-labels {display:flex;justify-content:space-between;}
-      .dj-sheet .dj-arm {display:flex;align-items:center;margin:.55rem 0;}
-      .dj-entries fieldset {margin:.45rem 0;border:1px solid #414a5c;min-inline-size:0;}
-      .dj-entry-fields {display:grid;grid-template-columns:minmax(0,1fr) 4.25rem 3rem;gap:.4rem;margin-top:.35rem;}
-      .dj-entry-fields input {width:100%;min-width:0;}
       .dj-track {margin:0;font-size:.85rem;overflow-wrap:anywhere;}
       .dj-deck-head,.dj-transport {display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;}
       .dj-deck-head strong {margin-right:auto;}.dj-transport output{font-size:.7rem;font-variant-numeric:tabular-nums;}
@@ -2362,9 +2384,6 @@ function ModuleZero({
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
       .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
       .zero-controls input[type=range] { display: block; width: 100%; margin: .75rem 0 .85rem; accent-color: #adc4ff; }
-      .repertoire-cue { margin-top:.45rem; }
-      .repertoire-cue label { display:flex; align-items:baseline; gap:.45rem; cursor:pointer; }
-      .repertoire-cue input { flex:none; accent-color:#adc4ff; }
       .zero-controls .zero-volume input { margin: .35rem 0 0; }
       .zero-scene-seconds {white-space:nowrap;font-size:.84rem;}
       .zero-scene-seconds input {width:4.5rem;padding:.35rem .25rem;color:inherit;background:#191d28;border:1px solid #4c5468;border-radius:4px;text-align:right;font:inherit;}
@@ -2422,7 +2441,7 @@ function ModuleZero({
     `}</style>
     <ProjectionSignalContext.Provider value={signals}><div className="zero-performance">
       <SceneMixer filmLayer={liveSet ? filmLayer : null} stageBackground={extendedDark ? "#130f20" : light ? "#fff" : "#000"} extendedDark={extendedDark}
-        canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={reset} codaScene={coda} liveSet={liveSet}
+        canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={stopScene} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
         takeScene={extendedScene} onTakeComplete={setFinishedTake} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || coda || ritualLayer(extendedScene) || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={loopMix.current} paused={paused}>
       {openingRun && <OpeningFilm cue={openingRun.cue} output={openingRun.output}
@@ -2447,8 +2466,6 @@ function ModuleZero({
         input={noteInput}
         beginsAt={cue?.beginsAt ?? 0} />}
       {noteScene === "fourteen" && <LiveChordTimeline histories={[noteInput.history]} live={noteInput.sounding} />}
-      {!ready && <ScoreTrack file={"/multiversos/electro.mp3"} title="Electro" clock={cue?.context ?? null} output={outputRef.current}
-        trigger={extendedScene === 67} fade={4} />}
       {extendedScene===TEMPERAMENT_SCENE && cue &&
         <ExtendedArt scene={TEMPERAMENT_SCENE} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused}/>}
       {(sceneNumber === 14 || sceneNumber === 18) && <NoteComet key={sceneNumber} attack={liveAttack} />}
@@ -2582,7 +2599,7 @@ function ModuleZero({
               </>}
             </div>}
             {previewMode !== null && isActive && !preparing
-              ? <button type="button" className="zero-play" onClick={reset}>Detener prueba</button>
+              ? <button type="button" className="zero-play" onClick={stopScene}>Detener prueba</button>
               : <button type="button" className="zero-play" disabled={!canStart} onClick={() => playMode(mode, true)}>Probar escena</button>}
             {mode === "time" && <button type="button" className="zero-continue" disabled={!canStart}
               onClick={() => void start("time")}>Reproducir desde 3 → 4</button>}
@@ -2637,7 +2654,7 @@ function ModuleZero({
             <TransportMidiButton action="pauseScene" midi={transportMidi} />
           </div>
           <div className="zero-general-play">
-            <button type="button" aria-label="Detener" title="Stop general de escena" disabled={ready} onClick={reset}>
+            <button type="button" aria-label="Detener" title="Stop · una vez pausa, dos veces vuelve al inicio" disabled={ready} onClick={stopScene}>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
             </button>
             <TransportMidiButton action="stopScene" midi={transportMidi} />
@@ -2667,11 +2684,10 @@ function ModuleZero({
           {calibration ? "Tocá la tecla más grave · Cancelar" : "Tecla más grave de los cubos · MIDI " + firstMidi}
         </button>
         <DjConsole output={cue ? outputRef.current : null} inputs={midiInputs}
-          scene={sceneNumber} cue={cue} seconds={durations[sceneNumber ?? 0]} paused={paused}
-          automatic={djAutomatic} setAutomatic={setDjAutomatic} connectMidi={connectMidi}/>
+          scene={sceneNumber} cue={cue} paused={paused} connectMidi={connectMidi}/>
         <FilterControls values={filters} change={setFilter} bindings={faderBindings}
           learning={learningFader && !isVolumeFader(learningFader) ? learningFader : null} learn={learnFader}/>
-        {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
+        {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : stopArmed.current ? "En pausa · Stop vuelve al inicio" : "En pausa"}</span>}
       </div>
     </aside>
   </div>;

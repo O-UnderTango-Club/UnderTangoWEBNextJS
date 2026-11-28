@@ -10,23 +10,51 @@ import { ACTIVE_SCORE, activeCueId, displaySceneNumber, type ShowScene } from ".
 import { useSavedSetting } from "./saved-setting";
 import type { MidiDevice } from "./midi-inputs";
 
-type Track = { id:string; name:string; url:string };
+type Track = { id:string; name:string; url:string; trim?:number; fadeIn?:number };
 type AudioBus = GainNode | null;
 type ScoreCue = { context: AudioContext; beginsAt: number };
 type DjEntry = { trackId:string; scene:ShowScene; offset:number; side:DeckSide };
 type Launch = { trackId:string };
 type PadPreset = {trackId:string;side:DeckSide};
+
+const unEstiloDificil: Track = {
+  id: "860-un-estilo-dificil",
+  name: "Un estilo difícil",
+  url: "/multiversos/hardstyle.mp3",
+  // Keep the score's existing level with the crossfader centred.
+  trim: .48 / Math.SQRT1_2,
+  fadeIn: .08,
+};
+// Cue 40 is the visible scene 39, where a recovered show can enter directly.
+const unEstiloDificilCues: readonly ShowScene[] = [39, 40, 60];
+
 const repertoire = Object.entries(REPERTOIRE).flatMap(([id, clip], index) => clip ? [{
   track: {id:"860-"+id, name:clip.title+" · fragmento", url:clip.file},
   entry: {trackId:"860-"+id, scene:Number(id) as ShowScene, offset:clip.entry, side:(index % 2 ? "B" : "A") as DeckSide},
 }] : []);
 const fragments = repertoire.map(({track}) => track);
+const defaultTracks = [unEstiloDificil, ...fragments];
 const defaultPads:Record<DjPad,PadPreset> = {
-  pad1:{trackId:fragments[0]?.id??"",side:"A"},
+  pad1:{trackId:unEstiloDificil.id,side:"A"},
   pad2:{trackId:fragments[1]?.id??"",side:"B"},
   pad3:{trackId:fragments[2]?.id??"",side:"A"},
   pad4:{trackId:fragments[3]?.id??"",side:"B"},
 };
+function initialPads(): Record<DjPad,PadPreset> {
+  const presets = { ...defaultPads };
+  try {
+    const saved: Partial<Record<DjPad,PadPreset>> | null = JSON.parse(localStorage.getItem(SETTINGS_PREFIX + "djPadPresets") ?? "null");
+    for (const pad of DJ_PADS) {
+      const previous = saved?.[pad];
+      if (previous && typeof previous.trackId === "string" && (previous.side === "A" || previous.side === "B")) {
+        presets[pad] = previous;
+      }
+    }
+  } catch { /* Use the defaults if the previous presets cannot be read. */ }
+  presets.pad1 = { ...presets.pad1, trackId: unEstiloDificil.id };
+  return presets;
+}
+
 function initialEntries(): DjEntry[] {
   return repertoire.map(({entry}) => {
     // A fragment disabled on the old score stays disabled on first opening the DJ console.
@@ -58,7 +86,7 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,o
   const consumedLaunch = useRef<Launch | undefined>(undefined);
   const [position,setPosition] = useState(0), [duration,setDuration] = useState(0);
   const [playing,setPlaying] = useState(false), [error,setError] = useState("");
-  const level = crossGain * volume / 100;
+  const level = crossGain * (track?.trim ?? 1) * volume / 100;
   useEffect(() => {
     const control = gain.current;
     if (control) control.gain.setTargetAtTime(level,control.context.currentTime,.015);
@@ -119,6 +147,12 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,o
       }
       if (fromStart) {cue.current=0;resumeAt.current=0;el.currentTime=0;}
       else if (el.ended) el.currentTime=cue.current;
+      if (track.fadeIn && el.currentTime === 0 && gain.current) {
+        const now = output.context.currentTime;
+        gain.current.gain.cancelScheduledValues(now);
+        gain.current.gain.setValueAtTime(0, now);
+        gain.current.gain.linearRampToValueAtTime(level, now + track.fadeIn);
+      }
       await el.play();
     } catch { if (token===request.current) setError("Revisá el archivo y pulsá Play en el deck."); }
     finally {
@@ -145,7 +179,7 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,o
   useLayoutEffect(()=>{
     function command(e:Event) {
       const c=(e as CustomEvent<DjCommand>).detail;
-      if (c.action==="scene" || c.side!==side) return;
+      if (!("side" in c) || c.side!==side) return;
       if(c.action==="play")void toggle();
       if(c.action==="cue")stop();
     }
@@ -179,15 +213,15 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
   output:AudioBus;inputs:MidiDevice[];scene:ShowScene|null;cue:ScoreCue|null;seconds:number;
   paused:boolean;automatic:boolean;setAutomatic:(enabled:boolean)=>void;connectMidi:(retry?:boolean)=>Promise<void>;
 }) {
-  const [library,setLibrary]=useState<Track[]>(fragments);
-  const [choice,setChoice]=useState(fragments[0]?.id ?? "");
+  const [library,setLibrary]=useState<Track[]>(defaultTracks);
+  const [choice,setChoice]=useState(unEstiloDificil.id);
   const selected=useRef(choice);
-  const [loaded,setLoaded]=useSavedSetting("djDeckFiles",{A:fragments[0]?.id ?? "",B:fragments[1]?.id ?? ""});
+  const [loaded,setLoaded]=useSavedSetting("djDeckFiles",{A:unEstiloDificil.id,B:fragments[1]?.id ?? ""});
   const [entries,setEntries]=useSavedSetting("djScoreEntries",initialEntries);
   const [cross,setCross]=useState(50);
   const [volumeA,setVolumeA]=useSavedSetting("djDeckVolumeA",100);
   const [volumeB,setVolumeB]=useSavedSetting("djDeckVolumeB",100);
-  const [presets,setPresets]=useSavedSetting("djPadPresets",defaultPads);
+  const [presets,setPresets]=useSavedSetting("djPadPresetsV2",initialPads);
   const [midiMap,setMidiMap]=useSavedSetting<DjMidiMap>("djMidi",{});
   const mapRef=useRef(midiMap);
   mapRef.current=midiMap;
@@ -207,6 +241,8 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
     else busy.current.delete(side);
   },[]);
   const fired=useRef<{cue:ScoreCue;rows:Set<number>} | undefined>(undefined);
+  const unEstiloDificilRun=useRef<AudioContext | null>(null);
+  const unEstiloDificilDeck = presets.pad1.trackId === unEstiloDificil.id ? presets.pad1.side : "A";
   const [cueNotice,setCueNotice]=useState("");
   const [notice,setNotice]=useState("");
   const urls=useRef(new Map<string,string>()), mounted=useRef(false);
@@ -352,6 +388,7 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
       const c=(e as CustomEvent<DjCommand>).detail;
       // A controller can send Load and Play before the next browser paint.
       if(c.action==="load")flushSync(()=>load(c.side));
+      if(c.action==="pad" && !mapRef.current[c.pad]) triggerPad(c.pad);
     };
     window.addEventListener(DJ_CONTROL,receive);return ()=>window.removeEventListener(DJ_CONTROL,receive);
   });
@@ -361,6 +398,20 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
     setLaunches({});
     setCueNotice("");
   },[output]);
+  useEffect(() => {
+    if (!cue || !output || paused || scene === null || !unEstiloDificilCues.includes(scene)) return;
+    const clock = cue.context;
+    if (clock.state !== "running" || unEstiloDificilRun.current === clock) return;
+    unEstiloDificilRun.current = clock;
+    const side = unEstiloDificilDeck;
+    const {id, name} = unEstiloDificil;
+    if (loaded[side] === id && (pending.current.has(side) || busy.current.has(side))) return;
+    pending.current.add(side);
+    setLoaded(current => ({...current, [side]: id}));
+    setLaunches(current => ({...current, [side]: {trackId: id}}));
+    setCueNotice("Escena " + displaySceneNumber(scene) + " · " + name + " → " + side);
+  }, [cue, loaded, output, paused, scene, setLoaded, unEstiloDificilDeck]);
+
   function changeEntry(index:number,change:Partial<DjEntry>) {
     setEntries(current=>current.map((entry,i)=>i===index ? {...entry,...change} : entry));
   }

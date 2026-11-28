@@ -1213,6 +1213,36 @@ const MODULE_ZERO_SCENE_BY_STAGE = {
   fourteen: "fourteen",
 } satisfies Record<string, ModuleZeroScene | null>;
 
+type ModuleStage = keyof typeof MODULE_ZERO_SCENE_BY_STAGE | ExtendedScene;
+
+const NUMBERED_CONTROLS = [
+  {mode: "opening", title: "El conjunto vacío", id: "zero-duration"},
+  {mode: "beacon", title: "La entidad mínima", id: "one-duration"},
+  {mode: "line", title: "Del golpe al armónico", id: "line-duration"},
+  {mode: "space", title: "Escena 2 → 3", id: "space-duration"},
+  {mode: "time", title: "Escena 3 → 4", id: "time-duration"},
+  ...CONTINUATION_SCENES.map(({mode, title}) => ({mode, title, id: `${mode}-duration`})),
+  ...NOTE_SCENE_IDS.map(mode => ({mode, title: `Escena ${NOTE_SCENES[mode].number}`, id: `scene-${mode}`})),
+  ...EXTENDED_SCENES.map(mode => ({mode, title: `Escena ${displaySceneNumber(mode)}`, id: `scene-${mode}`})),
+] as const;
+
+function sceneModeForStage(stage: ModuleStage): ModuleZeroScene | null {
+  return typeof stage === "number" ? stage : MODULE_ZERO_SCENE_BY_STAGE[stage];
+}
+
+function numberedSceneMode(mode: ModuleZeroScene | null): ModuleZeroScene | null {
+  return mode === "harmonics" ? "line" : mode;
+}
+
+function revealSceneCard(list: HTMLDivElement) {
+  const card = list.querySelector<HTMLElement>('[aria-current="step"]');
+  if (!card) return;
+  const top = list.getBoundingClientRect().top + list.clientTop + 10;
+  const row = card.getBoundingClientRect();
+  if (row.top < top - 1 || row.bottom > top + list.clientHeight - 20)
+    list.scrollTop += row.top - top;
+}
+
 const MIDI_PITCH_NAMES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "Sol", "La♭", "La", "Si♭", "Si"];
 
 async function resumeAudioOutput(context: AudioContext) {
@@ -1367,11 +1397,11 @@ function ModuleZero({
   filters: FilterValues;
   setFilter: (id: MasterFilter, value: number) => void;
 }) {
-  const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE | ExtendedScene>("ready");
+  const [stage, setStage] = useState<ModuleStage>("ready");
   const [recoveryScene, setRecoveryScene] = useState(readLastPlayedScene);
   const [scanState, setScanState] = useState<"idle" | "busy" | "done">("idle");
   const transportMidi = useTransportMidi(connectMidi);
-  const activeScene = typeof stage === "number" ? stage : MODULE_ZERO_SCENE_BY_STAGE[stage];
+  const activeScene = sceneModeForStage(stage);
   const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
   const extendedScene = typeof stage === "number" ? stage : null;
   const extendedPlaying = isPlayableExtendedScene(extendedScene);
@@ -1442,6 +1472,20 @@ function ModuleZero({
   const waitingCues = useRef(new Set<() => void>());
   const pausedRef = useRef(false);
   const runRef = useRef(0);
+  const lastPlayed = useRef<number | null>(null);
+  const checkpointScene = useCallback((next: ModuleStage) => {
+    const mode = numberedSceneMode(sceneModeForStage(next));
+    if (mode === null) return;
+    const index = NUMBERED_CONTROLS.findIndex(control => control.mode === mode);
+    const scene = ACTIVE_SCORE[index]?.number;
+    if (scene === undefined || scene === lastPlayed.current) return;
+    saveLastPlayedScene(scene);
+    lastPlayed.current = scene;
+  }, []);
+  const enterStage = useCallback((next: ModuleStage) => {
+    if (audioRef.current && !pausedRef.current) checkpointScene(next);
+    setStage(next);
+  }, [checkpointScene]);
   const learningSplitRef = useRef(false);
   const learnSplit = useCallback((note: number) => {
     if (!learningSplitRef.current || note < 1 || note > 127) return false;
@@ -1482,8 +1526,8 @@ function ModuleZero({
   const enterNumberedScene = useCallback((mode: NumberedScene, context: AudioContext, asPreview: boolean, beginsAt = context.currentTime) => {
     setCue({ context, beginsAt });
     setPreviewMode(asPreview ? mode : null);
-    setStage(mode);
-  }, []);
+    enterStage(mode);
+  }, [enterStage]);
   const nextTimedScene = extendedScene ? EXTENDED_SCENES[EXTENDED_SCENES.indexOf(extendedScene) + 1]
     : noteScene === "fourteen" ? 15 : noteScene ? NOTE_SCENES[noteScene].next
       : stage === "breath-hold" ? "ten" : null;
@@ -1522,8 +1566,8 @@ function ModuleZero({
     setTransportBusy(false);
     setSceneSteps([]);
     setPreviewMode(null);
-    setStage("ready");
-  }, [stop]);
+    enterStage("ready");
+  }, [enterStage, stop]);
 
   useEffect(() => {
     const receive = (event: Event) => {
@@ -1581,7 +1625,10 @@ function ModuleZero({
         await context.suspend();
       }
       else await resumeAudioOutput(context);
-      if (run === runRef.current) setPaused(next);
+      if (run === runRef.current) {
+        if (!next) checkpointScene(stage);
+        setPaused(next);
+      }
     } catch {
       if (run === runRef.current) pausedRef.current = !next;
     } finally {
@@ -1606,7 +1653,7 @@ function ModuleZero({
     setScheduledRest(restSeconds);
     setVoiceUnavailable(false);
     setPreviewMode(previewOnly ? mode : null);
-    setStage("preparing");
+    enterStage("preparing");
     try {
       const context = new AudioContext();
       audioRef.current = context;
@@ -1673,9 +1720,9 @@ function ModuleZero({
           showAt(scene, startsAt, () => {
             setCue({ context, beginsAt: startsAt });
             setActiveDurationMs(seconds * 1000);
-            setStage(scene);
+            enterStage(scene);
           });
-          if (scene === "breath") atTime(startsAt + seconds, () => setStage("breath-hold"));
+          if (scene === "breath") atTime(startsAt + seconds, () => enterStage("breath-hold"));
         }
       };
       const createChordBus = () => {
@@ -1697,7 +1744,7 @@ function ModuleZero({
       const enterDiagram = (stage: "harmonics" | "spatial" | "temporal", time: number, seconds: number) => {
         setCue({ context, beginsAt: time });
         setActiveDurationMs(seconds * 1000);
-        setStage(stage);
+        enterStage(stage);
       };
       const playTime = (bus: GainNode, time: number, voices: TunedVoice[]) => {
         voices.forEach((voice, index) => {
@@ -1708,7 +1755,7 @@ function ModuleZero({
           setActiveSamplingMs(timeSamplingMs);
           enterDiagram("temporal", time, timeSeconds);
         });
-        atTime(time + timeSeconds, () => setStage("time"));
+        atTime(time + timeSeconds, () => enterStage("time"));
         {
           const continuationAt = time + timeSeconds + FREQUENCY_TRAIL_TURN_SECONDS;
           const end = continuationAt + 0.10;
@@ -1727,7 +1774,7 @@ function ModuleZero({
         playModuleGong(context, masterOutput, time + harmonicSeconds * HARMONIC_CUE.secondGong, 444, 0.55);
         const second = addTone(bus, 222, time + harmonicSeconds * HARMONIC_CUE.trace222, harmonicSeconds * (HARMONIC_CUE.crossFormed - HARMONIC_CUE.trace222));
         const third = addTone(bus, 333, time + harmonicSeconds * HARMONIC_CUE.trace333, harmonicSeconds * (HARMONIC_CUE.result - HARMONIC_CUE.trace333));
-        atTime(time, () => setStage("harmonics"));
+        atTime(time, () => enterStage("harmonics"));
         playSpatial(bus, time + harmonicSeconds, [root, second, third]);
       };
 
@@ -1755,7 +1802,7 @@ function ModuleZero({
       const enterOpening = (stage: "opening" | "question" | "two", time: number, seconds: number) => {
         setActiveDurationMs(seconds * 1000);
         setCue({context, beginsAt: time});
-        setStage(stage);
+        enterStage(stage);
       };
       if (mode === "opening" || mode === "beacon") sceneNoiseBuffers(context);
       let time = context.currentTime + .08;
@@ -1769,7 +1816,7 @@ function ModuleZero({
         showAt("beacon", time, at => enterOpening("question", at, oneSeconds));
         const gongAt = time + pointTiming(oneSeconds).gong;
         const releaseRoom = playSceneOneGong(context, masterOutput, gongAt);
-        atTime(gongAt, () => setStage("one"));
+        atTime(gongAt, () => enterStage("one"));
         atTime(gongAt + 11.5, releaseRoom);
         time += oneSeconds;
       }
@@ -1799,29 +1846,19 @@ function ModuleZero({
   const continuation = activeScene && isContinuationScene(activeScene) ? activeScene : null;
   const splitLabel = MIDI_PITCH_NAMES[splitNote % 12] + (Math.floor(splitNote / 12) - 1);
   const restLabel = `${restSeconds} s`;
-  const numberedControls = [
-    {mode: "opening", title: "El conjunto vacío", id: "zero-duration"},
-    {mode: "beacon", title: "La entidad mínima", id: "one-duration"},
-    {mode: "line", title: "Del golpe al armónico", id: "line-duration"},
-    {mode: "space", title: "Escena 2 → 3", id: "space-duration"},
-    {mode: "time", title: "Escena 3 → 4", id: "time-duration"},
-    ...CONTINUATION_SCENES.map(({mode, title}) => ({mode, title, id: `${mode}-duration`})),
-    ...NOTE_SCENE_IDS.map(mode => ({mode, title: `Escena ${NOTE_SCENES[mode].number}`, id: `scene-${mode}`})),
-    ...EXTENDED_SCENES.map(mode => ({mode, title: `Escena ${displaySceneNumber(mode)}`, id: `scene-${mode}`})),
-  ] as const;
-  const numberedMode = activeScene === "harmonics" ? "line" : activeScene;
-  const sceneIndex = numberedControls.findIndex(control => control.mode === numberedMode);
+  const numberedMode = numberedSceneMode(activeScene);
+  const sceneIndex = NUMBERED_CONTROLS.findIndex(control => control.mode === numberedMode);
   const sceneNumber = sceneIndex >= 0 ? ACTIVE_SCORE[sceneIndex].number : null;
   const recoveryIndex = ready && recoveryScene !== null
     ? ACTIVE_SCORE.findIndex(({number}) => number === recoveryScene) : -1;
   const recoveryCue = recoveryIndex >= 0 ? ACTIVE_SCORE[recoveryIndex] : null;
   const recoveryNumber = recoveryCue ? displaySceneNumber(recoveryCue.number) : null;
 
+  const transportIndex = recoveryCue ? recoveryIndex : sceneIndex;
+
   useLayoutEffect(() => {
-    if (sceneNumber === null || paused || pausedRef.current || scoreClock?.state !== "running") return;
-    saveLastPlayedScene(sceneNumber);
-    setRecoveryScene(null);
-  }, [sceneNumber, paused, scoreClock]);
+    if (sceneNumber !== null && !paused) setRecoveryScene(null);
+  }, [sceneNumber, paused]);
 
   const recoveryLabel = recoveryNumber === null ? null : `Retomar escena ${recoveryNumber}`;
   const playLabel = playing ? "Pausar con Play" : paused ? "Reanudar" : recoveryLabel ?? "Reproducir";
@@ -1829,12 +1866,19 @@ function ModuleZero({
     if (!canPlayGeneral) return;
     if (waitingForAudio) void audioRef.current?.resume().catch(() => {});
     else if (ready) {
-      if (!audioRef.current) void start(numberedControls[recoveryIndex]?.mode);
+      if (!audioRef.current) void start(NUMBERED_CONTROLS[recoveryIndex]?.mode);
     } else void changePaused(!paused);
   }
   function playFromBeginning() {
     if (ready && !audioRef.current) void start();
   }
+
+  useLayoutEffect(() => {
+    const list = settingsRef.current;
+    if (!recoveryCue || !list) return;
+    const frame = requestAnimationFrame(() => revealSceneCard(list));
+    return () => cancelAnimationFrame(frame);
+  }, [recoveryCue]);
 
   const queuePanelFollow = useRef<(interaction?: boolean) => void>(() => {});
   useLayoutEffect(() => {
@@ -1844,12 +1888,7 @@ function ModuleZero({
     const follow = () => {
       timer = undefined;
       if (list.matches(":active")) return;
-      const card = list.querySelector<HTMLElement>('[aria-current="step"]');
-      if (!card) return;
-      const top = list.getBoundingClientRect().top + list.clientTop + 10;
-      const row = card.getBoundingClientRect();
-      if (row.top < top - 1 || row.bottom > top + list.clientHeight - 20)
-        list.scrollTop += row.top - top;
+      revealSceneCard(list);
     };
     const restart = () => {
       window.clearTimeout(timer);
@@ -1883,7 +1922,7 @@ function ModuleZero({
     ? <SceneVideo key={sceneNumber} film={film} cue={cue} paused={paused} output={outputRef.current} controls={filmControls} />
     : null;
   const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack,hasReferenceVisual(sceneNumber));
-  const sceneTitle = breathing ? "Plano 9" : numberedControls[sceneIndex]?.title;
+  const sceneTitle = breathing ? "Plano 9" : NUMBERED_CONTROLS[sceneIndex]?.title;
   const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
   const coda = extendedScene !== null && extendedScene >= 90 ? extendedScene as CodaScene : null;
   const ballot=useHostedBallot({scene:coda??0,clock:cue?.context??null,beginsAt:cue?.beginsAt??0,duration:coda ? extendedSeconds[coda] : 0});
@@ -1902,7 +1941,7 @@ function ModuleZero({
   };
   const moveScene = (index: number) => {
     queuePanelFollow.current(true);
-    const scene = numberedControls[index];
+    const scene = NUMBERED_CONTROLS[index];
     if (scene) playMode(scene.mode, previewMode !== null, paused);
   };
   useEffect(() => {
@@ -1910,8 +1949,8 @@ function ModuleZero({
     setSceneSteps(steps => steps.slice(sceneSteps.length));
     // Several MIDI detents can arrive before React has rendered the new scene.
     const index = sceneSteps.reduce((at, step) =>
-      Math.max(at < 0 ? -1 : 0, Math.min(numberedControls.length - 1, at + step)), sceneIndex);
-    if (index !== sceneIndex && (stage !== "breath" || index < sceneIndex)) moveScene(index);
+      Math.max(at < 0 ? -1 : 0, Math.min(NUMBERED_CONTROLS.length - 1, at + step)), transportIndex);
+    if (index !== transportIndex && (stage !== "breath" || index < transportIndex)) moveScene(index);
   });
   const harmonicPhase = stage === "harmonics" ? collisionTiming(activeDurationMs / 1000).harmonics : 0;
   const diagramCue = useMemo(() => cue && harmonicPhase ? {...cue, beginsAt: cue.beginsAt + harmonicPhase} : cue, [cue, harmonicPhase]);
@@ -2283,19 +2322,19 @@ function ModuleZero({
       }
       .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
       .zero-settings .zero-scene:first-child { padding-top: 0; border-top: 0; }
-      .zero-scene[aria-current=step], .zero-scene[data-recovered=true] {
+      .zero-scene[aria-current=step] {
         border-radius: .35rem; border-top-color: transparent; background: #25324c;
         box-shadow: 0 0 0 .42rem #25324c, 0 0 0 calc(.42rem + 1px) #819bd6,
           0 0 1rem rgba(142, 169, 233, .23);
       }
       .zero-recovery {
-        display: grid; gap: .5rem; margin: 0 0 1rem; padding: .65rem;
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+        gap: .35rem .55rem; margin: 0 0 .5rem; padding: .5rem .65rem;
         border: 1px solid #819bd6; border-radius: .35rem; background: #25324c;
       }
       .zero-recovery p { margin: 0; color: #dce6ff; font-size: .8rem; }
       .zero-recovery strong { display: block; margin-top: .18rem; color: #f2f3f7; font-size: .9rem; }
-      .zero-recovery-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
-      .zero-recovery-actions button { flex: 1 1 8rem; }
+      .zero-controls .zero-recovery button { min-height: 2rem; padding: .25rem .45rem; font-size: .78rem; }
       .zero-subtitle-toggle {
         display: flex; justify-content: space-between; align-items: center; gap: .5rem;
         min-height: 44px; font-size: .875rem; cursor: pointer;
@@ -2399,8 +2438,6 @@ function ModuleZero({
         input={noteInput}
         beginsAt={cue?.beginsAt ?? 0} />}
       {noteScene === "fourteen" && <LiveChordTimeline histories={[noteInput.history]} live={noteInput.sounding} />}
-      {!ready && <ScoreTrack file={"/multiversos/hardstyle.mp3"} title="Hardstyle" clock={cue?.context ?? null} output={outputRef.current}
-        trigger={extendedScene === 39 || extendedScene === 60} fade={.08} />}
       {!ready && <ScoreTrack file={"/multiversos/electro.mp3"} title="Electro" clock={cue?.context ?? null} output={outputRef.current}
         trigger={extendedScene === 67} fade={4} />}
       {extendedScene===TEMPERAMENT_SCENE && cue &&
@@ -2431,15 +2468,6 @@ function ModuleZero({
     <aside className="zero-controls" aria-label="Controles de las escenas">
       <div className="zero-settings" ref={settingsRef}>
         <div className="zero-scene">
-          {recoveryCue && <div className="zero-recovery">
-            <p role="status">Última escena reproducida
-              <strong>Escena {recoveryNumber} · {recoveryCue.title}</strong>
-            </p>
-            <div className="zero-recovery-actions">
-              <button type="button" className="zero-play" onClick={playGeneral}>{recoveryLabel}</button>
-              <button type="button" onClick={playFromBeginning}>Desde el inicio</button>
-            </div>
-          </div>}
           <h2>Ajustes de la obra</h2>
           <p>{SHOW_SCENE_COUNT} escenas · margen de 20:00 a 40:00</p>
           {coda && ballot.state && <p>Ambiente en vivo · {atmosphereLabel(ballot.atmosphere)}</p>}
@@ -2449,15 +2477,16 @@ function ModuleZero({
             {previousTimes && <button type="button" onClick={() => setSavedSeconds(previousTimes)}>Recuperar mis tiempos anteriores</button>}
           </details>
         </div>
-        {numberedControls.map(({mode, id}, index) => {
+        {NUMBERED_CONTROLS.map(({mode, id}, index) => {
           const isActive = mode === numberedMode;
           const score = ACTIVE_SCORE[index], seconds = durations[score.number];
+          const recovered = score.number === recoveryCue?.number;
           const number=displaySceneNumber(score.number), percussion=ritualLayer(score.number);
           const sceneFilm = sceneFilms.get(score.number);
           const {min,max} = limits[score.number];
           const layerType=isManualLayer(score.number) && score.number<TEMPERAMENT_SCENE ? (percussion ? "Percusión" : "Sonido") : null;
           return <div key={mode} className="zero-scene" role="region" data-scene={number} data-cue-id={score.number} aria-labelledby={`${id}-title`}
-            aria-current={isActive ? "step" : undefined} data-recovered={score.number === recoveryCue?.number ? true : undefined}>
+            aria-current={isActive || recovered ? "step" : undefined} data-recovered={recovered ? true : undefined}>
             <div className="zero-title">
               <h2 id={`${id}-title`}>Escena {number}</h2>
               {hasScoredTake(score.number) ? <span>{percussion ? "Percusión · " : score.number>=18 && score.number<31 ? "Sonido · " : ""}4 compases · {takeSeconds.toLocaleString("es-AR",{maximumFractionDigits:2})} s de toma</span> : <label className="zero-scene-seconds"><input key={seconds} type="number" min={min} max={max}
@@ -2573,9 +2602,15 @@ function ModuleZero({
         <div className="zero-transport-total">
           <span>Duración total</span><output data-show-total={totalSeconds}>{scoreTime(totalSeconds)}</output>
         </div>
+        {recoveryCue && <div className="zero-recovery">
+          <p role="status">Última escena reproducida
+            <strong>Escena {recoveryNumber} · {recoveryCue.title}</strong>
+          </p>
+          <button type="button" onClick={playFromBeginning}>Desde el inicio</button>
+        </div>}
         <div className="zero-transport" role="group" aria-label="Reproducción">
           <button type="button" aria-label="Escena anterior" title="Escena anterior"
-            disabled={sceneIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(sceneIndex - 1)}>
+            disabled={transportIndex <= 0 || preparing || transportBusy} onClick={() => moveScene(transportIndex - 1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h2v14H5zM19 5v14L8 12z" /></svg>
           </button>
           <div className="zero-general-play">
@@ -2599,7 +2634,7 @@ function ModuleZero({
             <TransportMidiButton action="stopScene" midi={transportMidi} />
           </div>
           <button type="button" aria-label="Escena siguiente" title="Escena siguiente"
-            disabled={sceneIndex === numberedControls.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(sceneIndex + 1)}>
+            disabled={transportIndex === NUMBERED_CONTROLS.length - 1 || stage === "breath" || preparing || transportBusy} onClick={() => moveScene(transportIndex + 1)}>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM5 5l11 7-11 7z" /></svg>
           </button>
         </div>

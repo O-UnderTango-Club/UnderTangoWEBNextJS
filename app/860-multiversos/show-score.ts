@@ -49,7 +49,7 @@ const cues = [
   [30, "Ecos en estéreo", 6], [TEMPERAMENT_SCENE, "Bach · Temperamento igual y ondas concéntricas", 18],
   [32, "Bajo de pulso", 26], [33, "Pads abiertos", 23], [34, "Batería electrónica", 26],
   [35, "Arpegio", 18], [36, "Acordes cortos", 16], [37, "Bajo ácido", 20],
-  [38, "Melodía de sierra", 20], [39, "Ensamble temperado · Entrada de Hardstyle", 27],
+  [38, "Melodía de sierra", 20], [39, "Ensamble temperado · Un estilo difícil", 27],
   [40, SHOW_INTERLUDES[40], 8], [41, SHOW_INTERLUDES[41], 8], [42, "El punto pensado", 18],
   [43, SHOW_INTERLUDES[43], 7], [44, SHOW_INTERLUDES[44], 8], [45, "Espiral expansiva", 18],
   [46, SHOW_INTERLUDES[46], 8], [47, SHOW_INTERLUDES[47], 8], [48, SHOW_INTERLUDES[48], 8],

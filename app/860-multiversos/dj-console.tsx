@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { SETTINGS_PREFIX } from "./control-map";
-import { REPERTOIRE } from "./repertoire-cue";
 import {DJ_CONTROL, DJ_MIDI, DJ_MIDI_NAMES, DJ_PADS, isDjPad, isInpulse200,
   type DeckSide, type DjCommand, type DjMidiMap, type DjMidiMessage, type DjMidiTarget, type DjPad} from "./dj-midi";
 import {MIDI_REASSIGNMENT, reassignMidi, sameMidiSignal, type MidiReassignment} from "./midi-reassignment";
 import { djFiles, type LibraryFile } from "./dj-library";
-import { ACTIVE_SCORE, activeCueId, displaySceneNumber, type ShowScene } from "./show-score";
+import { ACTIVE_SCORE, displaySceneNumber, type ShowScene } from "./show-score";
 import { useSavedSetting } from "./saved-setting";
 import type { MidiDevice } from "./midi-inputs";
 import { DjPadWaveform, djTime as time } from "./dj-pad-waveform";
@@ -14,9 +13,10 @@ import { DjPadWaveform, djTime as time } from "./dj-pad-waveform";
 type Track = { id:string; name:string; url:string; trim?:number; fadeIn?:number };
 type AudioBus = GainNode | null;
 type ScoreCue = { context: AudioContext; beginsAt: number };
-type DjEntry = { trackId:string; scene:ShowScene; offset:number; side:DeckSide };
 type Launch = { trackId: string; startAt: number };
-type PadPreset = { trackId: string; side: DeckSide; cueAt?: number };
+type PadPreset = { trackId: string; side: DeckSide; cueAt?: number; autoScene?: ShowScene };
+type ScheduledPad = { pad: DjPad; trackId: string; side: DeckSide };
+type SceneEntry = { cue: ScoreCue; scene: ShowScene; pads: ScheduledPad[]; started: Set<DeckSide> };
 
 const unEstiloDificil: Track = {
   id: "860-un-estilo-dificil",
@@ -26,14 +26,6 @@ const unEstiloDificil: Track = {
   trim: .48 / Math.SQRT1_2,
   fadeIn: .08,
 };
-// Cue 40 is the visible scene 39, where a recovered show can enter directly.
-const unEstiloDificilCues: readonly ShowScene[] = [39, 40, 60];
-
-const repertoire = Object.entries(REPERTOIRE).flatMap(([id, clip], index) => clip ? [{
-  track: {id:"860-"+id, name:clip.title+" · fragmento", url:clip.file},
-  entry: {trackId:"860-"+id, scene:Number(id) as ShowScene, offset:clip.entry, side:(index % 2 ? "B" : "A") as DeckSide},
-}] : []);
-const fragments = repertoire.map(({track}) => track);
 const trancePsicomusical: Track = {
   id: "860-trance-psicomusical",
   name: "trance psicomusical",
@@ -49,7 +41,20 @@ const quero: Track = {
   name: "Quero Ver Quem Sente de Verdade",
   url: "/multiversos/quero-ver-quem-sente-de-verdade.ogg",
 };
-const defaultTracks = [unEstiloDificil, trancePsicomusical, unCuerpo, quero, ...fragments];
+const defaultTracks: Track[] = [
+  unEstiloDificil, trancePsicomusical, unCuerpo, quero,
+  {id:"860-59", name:"een vriend van Hakken uit Nederland · fragmento", url:"/multiversos/repertorio-hakken.mp3"},
+  {id:"860-67", name:"Un Cuerpo Musical Electrónico · fragmento", url:"/multiversos/repertorio-cuerpo.mp3"},
+  {id:"860-79", name:"trance psicomusical · fragmento", url:"/multiversos/repertorio-trance.mp3"},
+  {id:"860-91", name:"Quero Ver Quem Sente de Verdade · fragmento", url:"/multiversos/repertorio-quero.mp3"},
+];
+const AUTO_SCENES = ACTIVE_SCORE.filter(({number}) => number !== 0);
+
+function padScene(pad: DjPad, preset: PadPreset): ShowScene {
+  if (!preset.trackId) return 0;
+  // Visible scene 39 has stable score ID 40.
+  return preset.autoScene ?? (pad === "pad1" && preset.trackId === unEstiloDificil.id ? 40 : 0);
+}
 const defaultPads: Record<DjPad, PadPreset> = {
   pad1: {trackId: unEstiloDificil.id, side: "A"},
   pad2: {trackId: trancePsicomusical.id, side: "B"},
@@ -90,17 +95,6 @@ function padStart(preset?: PadPreset) {
   return typeof at === "number" && Number.isFinite(at) && at >= 0 ? at : 0;
 }
 
-function initialEntries(): DjEntry[] {
-  return repertoire.map(({entry}) => {
-    // A fragment disabled on the old score stays disabled on first opening the DJ console.
-    try {
-      if (localStorage.getItem(SETTINGS_PREFIX + "repertoire-" + entry.scene) === "false") {
-        return {...entry, trackId:""};
-      }
-    } catch { /* Use the score defaults if storage is unavailable. */ }
-    return entry;
-  });
-}
 function Deck({side,track,load,canLoad,output,crossGain,launch,defaultStart,onBusy,onLaunch,onPlayback,volume,setVolume,midi}: {
   side:DeckSide;track?:Track;load:()=>void;canLoad:boolean;output:AudioBus;
   crossGain:number;launch?:Launch;defaultStart:number;onBusy:(side:DeckSide,busy:boolean)=>void;
@@ -252,15 +246,14 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,defaultStart,onBu
   </div>;
 }
 
-export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setAutomatic,connectMidi}: {
-  output:AudioBus;inputs:MidiDevice[];scene:ShowScene|null;cue:ScoreCue|null;seconds:number;
-  paused:boolean;automatic:boolean;setAutomatic:(enabled:boolean)=>void;connectMidi:(retry?:boolean)=>Promise<void>;
+export function DjConsole({output,inputs,scene,cue,paused,connectMidi}: {
+  output:AudioBus;inputs:MidiDevice[];scene:ShowScene|null;cue:ScoreCue|null;
+  paused:boolean;connectMidi:(retry?:boolean)=>Promise<void>;
 }) {
   const [library,setLibrary]=useState<Track[]>(defaultTracks);
   const [choice,setChoice]=useState(unEstiloDificil.id);
   const selected=useRef(choice);
   const [loaded,setLoaded]=useSavedSetting("djDeckFilesV2",initialDeckFiles);
-  const [entries,setEntries]=useSavedSetting("djScoreEntries",initialEntries);
   const [cross,setCross]=useState(50);
   const [volumeA,setVolumeA]=useSavedSetting("djDeckVolumeA",100);
   const [volumeB,setVolumeB]=useSavedSetting("djDeckVolumeB",100);
@@ -289,9 +282,7 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
     if (active) busy.current.add(side);
     else busy.current.delete(side);
   },[]);
-  const fired=useRef<{cue:ScoreCue;rows:Set<number>} | undefined>(undefined);
-  const unEstiloDificilRun=useRef<AudioContext | null>(null);
-  const unEstiloDificilDeck = presets.pad1.trackId === unEstiloDificil.id ? presets.pad1.side : "A";
+  const sceneEntry = useRef<SceneEntry | null>(null);
   const [cueNotice,setCueNotice]=useState("");
   const [notice,setNotice]=useState("");
   const urls=useRef(new Map<string,string>()), mounted=useRef(false);
@@ -453,60 +444,55 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
     if (output) return;
     pending.current.clear();
     padOnDeck.current = {};
+    sceneEntry.current = null;
     setLaunches({});
     setCueNotice("");
   },[output]);
   useEffect(() => {
-    if (!cue || !output || paused || scene === null || !unEstiloDificilCues.includes(scene)) return;
-    const clock = cue.context;
-    if (clock.state !== "running" || unEstiloDificilRun.current === clock) return;
-    unEstiloDificilRun.current = clock;
-    const side = unEstiloDificilDeck;
-    const {id, name} = unEstiloDificil;
-    const preset = presets.pad1.trackId === id ? presets.pad1 : undefined;
-    if (preset) padOnDeck.current[side] = "pad1";
-    else delete padOnDeck.current[side];
-    if (loaded[side] === id && (pending.current.has(side) || busy.current.has(side))) return;
-    launchTrack(side, id, padStart(preset));
-    setCueNotice("Escena " + displaySceneNumber(scene) + " · " + name + " → " + side);
-  }, [cue, launchTrack, loaded, output, paused, presets.pad1, scene, unEstiloDificilDeck]);
+    if (!cue || !output || scene === null || paused) return;
+    const {context,beginsAt} = cue;
+    if (sceneEntry.current?.cue !== cue || sceneEntry.current.scene !== scene) {
+      const pads = DJ_PADS.flatMap(pad => {
+        const preset=presets[pad];
+        return padScene(pad,preset) === scene && scene !== 0
+          ? [{pad, trackId:preset.trackId, side:preset.side}] : [];
+      });
+      sceneEntry.current = {cue, scene, pads, started:new Set()};
+    }
+    const entry = sceneEntry.current;
+    if (!entry.pads.length || entry.pads.every(({side}) => entry.started.has(side))) return;
 
-  function changeEntry(index:number,change:Partial<DjEntry>) {
-    setEntries(current=>current.map((entry,i)=>i===index ? {...entry,...change} : entry));
+    let timer: number | undefined;
+    function startPads() {
+      if (context.state !== "running") return;
+      const remaining = beginsAt - context.currentTime;
+      if (remaining > .005) {
+        timer = window.setTimeout(startPads, Math.max(8, remaining * 1000));
+        return;
+      }
+      for (const {pad,trackId,side} of entry.pads) {
+        if (entry.started.has(side)) continue;
+        const preset = presets[pad];
+        if (padScene(pad,preset) !== scene || preset.trackId !== trackId || preset.side !== side) continue;
+        const track = library.find(item => item.id === trackId);
+        if (!track) continue;
+        entry.started.add(side);
+        const owner = padOnDeck.current[side];
+        padOnDeck.current[side] = pad;
+        if (loaded[side] === trackId && (!owner || owner === pad) &&
+            (busy.current.has(side) || pending.current.has(side))) continue;
+        launchTrack(side, trackId, padStart(preset));
+        setCueNotice("Escena "+displaySceneNumber(scene)+" · "+DJ_MIDI_NAMES[pad]+" · "+track.name+" → "+side);
+      }
+    }
+    startPads();
+    return () => window.clearTimeout(timer);
+  }, [cue, launchTrack, library, loaded, output, paused, presets, scene]);
+
+  function sceneOnDeck(pad: DjPad, side: DeckSide, scene: ShowScene) {
+    if (scene === 0) return undefined;
+    return DJ_PADS.find(other => pad !== other && presets[other].side === side && padScene(other,presets[other]) === scene);
   }
-  useEffect(()=>{
-    if (!automatic || !cue || paused || !output || scene===null) return;
-    if (fired.current?.cue!==cue) fired.current={cue,rows:new Set()};
-    const {rows}=fired.current;
-    const timers:number[]=[];
-    entries.forEach((entry,index)=>{
-      if (!entry.trackId || activeCueId(entry.scene)!==scene || entry.offset>=seconds || rows.has(index)) return;
-      const at=cue.beginsAt+entry.offset;
-      const launch=()=>{
-        const now=cue.context.currentTime;
-        if (cue.context.state!=="running" || rows.has(index) || now>=cue.beginsAt+seconds) return;
-        if (at-now>.005) {
-          timers.push(window.setTimeout(launch,(at-now)*1000));
-          return;
-        }
-        const track=library.find(item=>item.id===entry.trackId);
-        if (!track) {
-          setCueNotice("Falta el archivo de la entrada "+(index+1)+".");
-          return;
-        }
-        rows.add(index);
-        if (pending.current.has(entry.side) || busy.current.has(entry.side)) {
-          setCueNotice("Entrada "+(index+1)+" omitida. Deck "+entry.side+" ocupado.");
-          return;
-        }
-        delete padOnDeck.current[entry.side];
-        launchTrack(entry.side, track.id, 0);
-        setCueNotice("Escena "+displaySceneNumber(scene)+" · "+track.name+" → "+entry.side);
-      };
-      launch();
-    });
-    return ()=>timers.forEach(timer=>window.clearTimeout(timer));
-  },[automatic,cue,entries,launchTrack,library,output,paused,scene,seconds]);
 
   const hercules=inputs.filter(p=>isInpulse200(p.name));
   const port=hercules.find(p=>p.status==="open") ?? hercules[0];
@@ -532,14 +518,35 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
       <small role="status">{port?.status==="open"?"Inpulse 200 MK3 conectada":port?.status==="failed"?"Puerto Hercules ocupado · revisá DJUCED":"Consola A/B · control en pantalla"}</small>
       {!output && <small>Podés cargar pistas ahora. Para escucharlas, elegí una escena.</small>}
       {cueNotice && <small role="status">{cueNotice}</small>}
+      <small>Esc. programa el arranque del pad. Con 0, el pad queda manual.</small>
       <div className="dj-pads" role="group" aria-label="Pads de temas guardados">
         {DJ_PADS.map(pad=>{
           const preset=presets[pad], track=library.find(item=>item.id===preset.trackId);
           const active=loaded[preset.side]===preset.trackId && playing[preset.side];
+          const startScene = padScene(pad,preset);
           return <div key={pad} className="dj-pad-cell">
             <button type="button" className="dj-pad" aria-label={DJ_MIDI_NAMES[pad]+" · "+(track?.name??"Sin tema")+" · Deck "+preset.side}
               aria-pressed={active} onClick={()=>triggerPad(pad)}>{DJ_MIDI_NAMES[pad]} · {track?.name??"Sin tema"}</button>
-            {midiButton(pad)}
+            <div className="dj-pad-actions">
+              {midiButton(pad)}
+              <label className="dj-pad-auto">
+                <span aria-hidden="true">Esc.</span>
+                <select aria-label={"Escena automática del "+DJ_MIDI_NAMES[pad]} value={startScene}
+                  disabled={!preset.trackId} title="Escena de arranque · 0 = manual"
+                  onChange={event=>{
+                    const autoScene=Number(event.currentTarget.value) as ShowScene;
+                    setPresets(current=>({...current,[pad]:{...current[pad],autoScene}}));
+                  }}>
+                  <option value={0}>0</option>
+                  {AUTO_SCENES.map(({number,title})=>{
+                    const occupied = sceneOnDeck(pad,preset.side,number);
+                    return <option key={number} value={number} disabled={!!occupied && number!==startScene}>
+                      {displaySceneNumber(number)} · {occupied ? DJ_MIDI_NAMES[occupied]+" en "+preset.side : title}
+                    </option>;
+                  })}
+                </select>
+              </label>
+            </div>
             {track && <DjPadWaveform key={track.id} track={track} label={DJ_MIDI_NAMES[pad]}
               cueAt={preset.cueAt} select={seconds => triggerPad(pad, seconds)}/>}
           </div>;
@@ -551,7 +558,9 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
             onChange={event=>{
               const trackId = event.currentTarget.value;
               setPresets(current => current[pad].trackId === trackId ? current
-                : {...current, [pad]: {side: current[pad].side, trackId}});
+                : {...current, [pad]: {
+                  side: current[pad].side, trackId, autoScene: trackId ? padScene(pad,current[pad]) : 0,
+                }});
             }}>
             <option value="">Sin tema</option>
             {presets[pad].trackId && !library.some(item=>item.id===presets[pad].trackId) && <option value={presets[pad].trackId}>Archivo pendiente</option>}
@@ -559,7 +568,12 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
           </select></label>
           <label>Deck<select aria-label={"Deck de "+DJ_MIDI_NAMES[pad]} value={presets[pad].side}
             onChange={event=>{const side=event.currentTarget.value as DeckSide;setPresets(current=>({...current,[pad]:{...current[pad],side}}));}}>
-            <option>A</option><option>B</option>
+            {(["A","B"] as const).map(side=>{
+              const occupied=sceneOnDeck(pad,side,padScene(pad,presets[pad]));
+              return <option key={side} value={side} disabled={!!occupied && side!==presets[pad].side}>
+                {side}{occupied ? " · escena asignada al "+DJ_MIDI_NAMES[occupied] : ""}
+              </option>;
+            })}
           </select></label>
         </div>)}
       </div></details>
@@ -581,36 +595,6 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
           defaultStart={padStart(pad ? presets[pad] : undefined)} onBusy={onBusy} onLaunch={onLaunch}
           onPlayback={onPlayback} volume={side==="A"?volumeA:volumeB} setVolume={side==="A"?setVolumeA:setVolumeB}
           midi={midiButton(side==="A"?"volumeA":"volumeB")}/>;
-      })}
-      <details className="dj-entries">
-        <summary>Pauta musical</summary>
-        <label className="dj-arm"><input type="checkbox" checked={automatic} onChange={event=>setAutomatic(event.target.checked)} />
-          Activar entradas por escena
-        </label>
-        {entries.map((entry,index)=><fieldset key={index}>
-          <legend>Entrada {index+1}</legend>
-          <label>Tema <select value={entry.trackId} onChange={event=>changeEntry(index,{trackId:event.target.value})}>
-            <option value="">Sin tema</option>
-            {entry.trackId && !library.some(item=>item.id===entry.trackId) && <option value={entry.trackId}>Archivo pendiente</option>}
-            {library.map(track=><option key={track.id} value={track.id}>{track.name}</option>)}
-          </select></label>
-          <div className="dj-entry-fields">
-            <label>Escena <select value={activeCueId(entry.scene)} onChange={event=>changeEntry(index,{scene:Number(event.target.value) as ShowScene})}>
-              {ACTIVE_SCORE.map(({number,title})=><option key={number} value={number}>{displaySceneNumber(number)} · {title}</option>)}
-            </select></label>
-            <label>Segundo <input type="number" min={0} step={.1} value={entry.offset} onChange={event=>{
-              const offset=event.currentTarget.valueAsNumber;
-              if (Number.isFinite(offset)) changeEntry(index,{offset:Math.max(0,offset)});
-            }}/></label>
-            <label>Deck <select value={entry.side} onChange={event=>changeEntry(index,{side:event.target.value as DeckSide})}>
-              <option>A</option><option>B</option>
-            </select></label>
-          </div>
-        </fieldset>)}
-      </details>
-      {[...new Set(entries.map(entry=>entry.trackId))].map(id=>{
-        const track=library.find(item=>item.id===id);
-        return track ? <audio key={id} hidden preload="auto" src={track.url} /> : null;
       })}
     </div>
   </details>;

@@ -24,7 +24,7 @@ Las luces, las ondas de la lupera y su reproducción comparten el origen del com
 
 El teclado, MIDI y el botón de sonido tocan el instrumento de la escena indicada. Al pausar se puede tocar ese mismo instrumento mientras el reloj y las grabaciones esperan. Sin escena activa, el teclado queda en silencio.
 
-**Stop general** tiene su propio botón MIDI junto al stop de la partitura. **Vaciar lupera** requiere dos pulsaciones del mismo botón dentro de tres segundos. Una pulsación muestra la confirmación. La segunda detiene el banco, cancela sus tomas en curso y libera S1 a S9, incluido el historial de deshacer de esas tomas. Verificá el stop y el vaciado con audio de prueba en un perfil descartable.
+**Stop general** tiene su propio botón MIDI junto al stop de la partitura. La primera pulsación pausa la escena en el punto actual. La segunda vuelve al inicio de la obra. Play entre ambas pulsaciones reanuda la escena y reinicia la secuencia de Stop. **Vaciar lupera** requiere dos pulsaciones del mismo botón dentro de tres segundos. Una pulsación muestra la confirmación. La segunda detiene el banco, cancela sus tomas en curso y libera S1 a S9, incluido el historial de deshacer de esas tomas. Verificá el stop y el vaciado con audio de prueba en un perfil descartable.
 
 **Play general** inicia, pausa y reanuda la partitura desde el mismo punto, tanto en pantalla como con su control MIDI. **Pausa general** conserva su asignación junto a Pausar y siempre lleva a pausa. Al aprender un control, la nueva función reemplaza la que tenía ese mismo dispositivo, canal y señal. Verificá el cambio en el Órganon y comprobá ambos destinos.
 
@@ -32,7 +32,7 @@ El archivo se actualiza cuando cambian las asignaciones. Su historial conserva h
 
 ## Consola DJ
 
-Cada uno de los cuatro pads enlaza un tema guardado con un deck. Con una escena en marcha, un toque lo reproduce y el siguiente lo pausa en su posición. Si el deck elegido contiene otro tema, el pad lo reemplaza sin detener el otro canal. Elegí los archivos y destinos en **Temas de los pads**. Los botones **MIDI** aprenden los pads, el crossfader y los faders de volumen A y B. Al cambiar de puerto se usa el nombre del dispositivo cuando es único. Verificá en el Órganon que los siete controles y las asignaciones previas aparezcan en la exportación.
+Cada uno de los cuatro pads enlaza un tema guardado con un deck. Con una escena en marcha, un toque lo reproduce y el siguiente lo pausa en su posición. Si el deck elegido contiene otro tema, el pad lo reemplaza sin detener el otro canal. Elegí los archivos y destinos en **Temas de los pads**. El selector **Esc.** junto a cada botón MIDI dispara el tema de ese pad al entrar en la escena elegida. **0** deja el pad en modo manual. Los temas musicales automáticos pasan por estos selectores. Los botones **MIDI** aprenden los pads, el crossfader y los faders de volumen A y B. Al cambiar de puerto se usa el nombre del dispositivo cuando es único. Verificá en el Órganon que los siete controles y las asignaciones previas aparezcan en la exportación.
 
 ## Votación de la sala
 

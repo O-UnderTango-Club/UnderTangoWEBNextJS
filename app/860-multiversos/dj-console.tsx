@@ -9,13 +9,14 @@ import { djFiles, type LibraryFile } from "./dj-library";
 import { ACTIVE_SCORE, activeCueId, displaySceneNumber, type ShowScene } from "./show-score";
 import { useSavedSetting } from "./saved-setting";
 import type { MidiDevice } from "./midi-inputs";
+import { DjPadWaveform, djTime as time } from "./dj-pad-waveform";
 
 type Track = { id:string; name:string; url:string; trim?:number; fadeIn?:number };
 type AudioBus = GainNode | null;
 type ScoreCue = { context: AudioContext; beginsAt: number };
 type DjEntry = { trackId:string; scene:ShowScene; offset:number; side:DeckSide };
-type Launch = { trackId:string };
-type PadPreset = {trackId:string;side:DeckSide};
+type Launch = { trackId: string; startAt: number };
+type PadPreset = { trackId: string; side: DeckSide; cueAt?: number };
 
 const unEstiloDificil: Track = {
   id: "860-un-estilo-dificil",
@@ -33,26 +34,60 @@ const repertoire = Object.entries(REPERTOIRE).flatMap(([id, clip], index) => cli
   entry: {trackId:"860-"+id, scene:Number(id) as ShowScene, offset:clip.entry, side:(index % 2 ? "B" : "A") as DeckSide},
 }] : []);
 const fragments = repertoire.map(({track}) => track);
-const defaultTracks = [unEstiloDificil, ...fragments];
-const defaultPads:Record<DjPad,PadPreset> = {
-  pad1:{trackId:unEstiloDificil.id,side:"A"},
-  pad2:{trackId:fragments[1]?.id??"",side:"B"},
-  pad3:{trackId:fragments[2]?.id??"",side:"A"},
-  pad4:{trackId:fragments[3]?.id??"",side:"B"},
+const trancePsicomusical: Track = {
+  id: "860-trance-psicomusical",
+  name: "trance psicomusical",
+  url: "/multiversos/electro.mp3",
 };
-function initialPads(): Record<DjPad,PadPreset> {
+const unCuerpo: Track = {
+  id: "860-un-cuerpo-musical-electronico",
+  name: "Un Cuerpo Musical Electrónico",
+  url: "/multiversos/un-cuerpo-musical-electronico.ogg",
+};
+const quero: Track = {
+  id: "860-quero-ver-quem-sente-de-verdade",
+  name: "Quero Ver Quem Sente de Verdade",
+  url: "/multiversos/quero-ver-quem-sente-de-verdade.ogg",
+};
+const defaultTracks = [unEstiloDificil, trancePsicomusical, unCuerpo, quero, ...fragments];
+const defaultPads: Record<DjPad, PadPreset> = {
+  pad1: {trackId: unEstiloDificil.id, side: "A"},
+  pad2: {trackId: trancePsicomusical.id, side: "B"},
+  pad3: {trackId: unCuerpo.id, side: "B"},
+  pad4: {trackId: quero.id, side: "B"},
+};
+
+function initialPads(): Record<DjPad, PadPreset> {
   const presets = { ...defaultPads };
   try {
-    const saved: Partial<Record<DjPad,PadPreset>> | null = JSON.parse(localStorage.getItem(SETTINGS_PREFIX + "djPadPresets") ?? "null");
+    const v2 = localStorage.getItem(SETTINGS_PREFIX + "djPadPresetsV2");
+    const saved: Partial<Record<DjPad, PadPreset>> | null = JSON.parse(v2 ?? localStorage.getItem(SETTINGS_PREFIX + "djPadPresets") ?? "null");
     for (const pad of DJ_PADS) {
       const previous = saved?.[pad];
-      if (previous && typeof previous.trackId === "string" && (previous.side === "A" || previous.side === "B")) {
-        presets[pad] = previous;
+      if (previous?.side === "A" || previous?.side === "B") {
+        presets[pad] = {...presets[pad], side: previous.side};
       }
     }
+    if (v2 !== null && typeof saved?.pad1?.trackId === "string") {
+      presets.pad1 = {...presets.pad1, trackId: saved.pad1.trackId};
+    }
   } catch { /* Use the defaults if the previous presets cannot be read. */ }
-  presets.pad1 = { ...presets.pad1, trackId: unEstiloDificil.id };
+  presets.pad3 = defaultPads.pad3;
   return presets;
+}
+
+function initialDeckFiles(): Record<DeckSide, string> {
+  let first = unEstiloDificil.id;
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_PREFIX + "djDeckFiles") ?? "null");
+    if (typeof saved?.A === "string" && saved.A) first = saved.A;
+  } catch { /* A new deck uses the first pad. */ }
+  return {A: first, B: unCuerpo.id};
+}
+
+function padStart(preset?: PadPreset) {
+  const at = preset?.cueAt;
+  return typeof at === "number" && Number.isFinite(at) && at >= 0 ? at : 0;
 }
 
 function initialEntries(): DjEntry[] {
@@ -66,11 +101,9 @@ function initialEntries(): DjEntry[] {
     return entry;
   });
 }
-const time = (s:number) => Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
-
-function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,onPlayback,volume,setVolume,midi}: {
+function Deck({side,track,load,canLoad,output,crossGain,launch,defaultStart,onBusy,onLaunch,onPlayback,volume,setVolume,midi}: {
   side:DeckSide;track?:Track;load:()=>void;canLoad:boolean;output:AudioBus;
-  crossGain:number;launch?:Launch;onBusy:(side:DeckSide,busy:boolean)=>void;
+  crossGain:number;launch?:Launch;defaultStart:number;onBusy:(side:DeckSide,busy:boolean)=>void;
   onLaunch:(side:DeckSide)=>void;onPlayback:(side:DeckSide,playing:boolean)=>void;
   volume:number;setVolume:(value:number)=>void;midi:ReactNode;
 }) {
@@ -82,7 +115,8 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,o
   // A media element can only be attached to one AudioContext.
   const [route,setRoute] = useState({output, version:0});
   if (route.output !== output) setRoute({output, version:route.version+1});
-  const request = useRef(0), starting = useRef(false), cue = useRef(0);
+  const request = useRef(0), starting = useRef(false), cue = useRef(defaultStart);
+  const hasPosition = useRef(false);
   const consumedLaunch = useRef<Launch | undefined>(undefined);
   const [position,setPosition] = useState(0), [duration,setDuration] = useState(0);
   const [playing,setPlaying] = useState(false), [error,setError] = useState("");
@@ -131,9 +165,19 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,o
     setPlaying(false);onPlayback(side,false);
     if (!resumeOnScorePlay.current && !starting.current) onBusy(side,false);
   }
-  async function play(fromStart = false) {
-    const el=audio.current;
-    if (!el || !track || !output || output.context.state !== "running" || starting.current || !el.paused) return;
+  async function play(startAt?: number) {
+    const el = audio.current;
+    if (!el || !track || !output || output.context.state !== "running") return;
+    const seconds = startAt ?? (hasPosition.current ? undefined : defaultStart);
+    if (seconds !== undefined) {
+      const end = Number.isFinite(el.duration) ? Math.max(0, el.duration - .05) : seconds;
+      cue.current = Math.min(seconds, end);
+      resumeAt.current = cue.current;
+      el.currentTime = cue.current;
+      setPosition(cue.current);
+      hasPosition.current = true;
+    }
+    if (starting.current || !el.paused) return;
     const token=++request.current;
     starting.current=true;onBusy(side,true);setError("");
     try {
@@ -145,8 +189,7 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,o
         node.current.connect(gain.current).connect(output);
         context.addEventListener("statechange",contextState);
       }
-      if (fromStart) {cue.current=0;resumeAt.current=0;el.currentTime=0;}
-      else if (el.ended) el.currentTime=cue.current;
+      if (el.ended) el.currentTime=cue.current;
       if (track.fadeIn && el.currentTime === 0 && gain.current) {
         const now = output.context.currentTime;
         gain.current.gain.cancelScheduledValues(now);
@@ -165,7 +208,7 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,o
   useEffect(() => {
     if (!launch || launch===consumedLaunch.current || launch.trackId!==track?.id) return;
     consumedLaunch.current=launch;
-    void play(true);
+    void play(launch.startAt);
     onLaunch(side);
   });
   function toggle() {
@@ -196,7 +239,7 @@ function Deck({side,track,load,canLoad,output,crossGain,launch,onBusy,onLaunch,o
       onError={()=>{if(track)setError("Este archivo no se puede reproducir.");}} />
     <input aria-label={"Posición del deck "+side} type="range" min={0} max={duration || 1} step=".01" disabled={!duration}
       value={Math.min(position,duration)} aria-valuetext={time(position)+" de "+time(duration)}
-      onChange={e=>{if(audio.current){cue.current=Number(e.target.value);audio.current.currentTime=cue.current;setPosition(cue.current);}}}/>
+      onChange={e=>{if(audio.current){hasPosition.current=true;cue.current=Number(e.target.value);audio.current.currentTime=cue.current;setPosition(cue.current);}}}/>
     <div className="dj-transport"><button type="button" aria-label={(playing?"Pausar":"Reproducir")+" deck "+side}
       disabled={!track || !output || output.context.state!=="running"} title={output ? undefined : "Elegí una escena para reproducir"} onClick={toggle}>{playing?"Ⅱ Pausa":"▶ Play"}</button>
       <button type="button" title="Volver al punto elegido" aria-label={"Detener deck "+side} disabled={!track} onClick={stop}>■ Cue</button>
@@ -216,12 +259,12 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
   const [library,setLibrary]=useState<Track[]>(defaultTracks);
   const [choice,setChoice]=useState(unEstiloDificil.id);
   const selected=useRef(choice);
-  const [loaded,setLoaded]=useSavedSetting("djDeckFiles",{A:unEstiloDificil.id,B:fragments[1]?.id ?? ""});
+  const [loaded,setLoaded]=useSavedSetting("djDeckFilesV2",initialDeckFiles);
   const [entries,setEntries]=useSavedSetting("djScoreEntries",initialEntries);
   const [cross,setCross]=useState(50);
   const [volumeA,setVolumeA]=useSavedSetting("djDeckVolumeA",100);
   const [volumeB,setVolumeB]=useSavedSetting("djDeckVolumeB",100);
-  const [presets,setPresets]=useSavedSetting("djPadPresetsV2",initialPads);
+  const [presets,setPresets]=useSavedSetting("djPadPresetsV3",initialPads);
   const [midiMap,setMidiMap]=useSavedSetting<DjMidiMap>("djMidi",{});
   const mapRef=useRef(midiMap);
   mapRef.current=midiMap;
@@ -234,6 +277,12 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
   },[]);
   const [launches,setLaunches]=useState<Partial<Record<DeckSide,Launch>>>({});
   const pending=useRef(new Set<DeckSide>());
+  const padOnDeck = useRef<Partial<Record<DeckSide, DjPad>>>({});
+  const launchTrack = useCallback((side: DeckSide, trackId: string, startAt: number) => {
+    pending.current.add(side);
+    setLoaded(current => current[side] === trackId ? current : {...current, [side]: trackId});
+    setLaunches(current => ({...current, [side]: {trackId, startAt}}));
+  }, [setLoaded]);
   const onLaunch=useCallback((side:DeckSide)=>{pending.current.delete(side);},[]);
   const busy=useRef(new Set<DeckSide>());
   const onBusy=useCallback((side:DeckSide,active:boolean)=>{
@@ -282,26 +331,34 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
     }
     select(id);
     setCueNotice("");
+    delete padOnDeck.current[side];
     setLaunches(current=>({...current,[side]:undefined}));
     setLoaded(current=>({...current,[side]:id}));
   }
   const setLevel={cross:setCross,volumeA:setVolumeA,volumeB:setVolumeB};
-  function triggerPad(pad:DjPad){
-    const {side,trackId}=presets[pad];
-    const track=library.find(item=>item.id===trackId);
-    if(!track){setCueNotice("Cargá el archivo asignado al "+DJ_MIDI_NAMES[pad]+".");return;}
-    if(!output || output.context.state!=="running"){
-      setCueNotice("Para tocar los pads, iniciá o reanudá una escena.");return;
+  function triggerPad(pad: DjPad, seekTo?: number) {
+    const preset = presets[pad];
+    const {side, trackId} = preset;
+    const track = library.find(item => item.id === trackId);
+    if (!track) {setCueNotice("Cargá el archivo asignado al " + DJ_MIDI_NAMES[pad] + ".");return;}
+    if (seekTo !== undefined) {
+      setPresets(current => current[pad].trackId === trackId
+        ? {...current, [pad]: {...current[pad], cueAt: seekTo}} : current);
+      if (padOnDeck.current[side] === pad) delete padOnDeck.current[side];
     }
-    if(loaded[side]!==track.id || pending.current.has(side)){
-      flushSync(()=>{
-        pending.current.delete(side);
-        setLaunches(current=>({...current,[side]:undefined}));
-        setLoaded(current=>({...current,[side]:track.id}));
-      });
+    if (!output || output.context.state !== "running") {
+      setCueNotice(seekTo === undefined ? "Para tocar los pads, iniciá o reanudá una escena."
+        : "Inicio guardado en " + time(seekTo) + ". Iniciá o reanudá una escena para escucharlo.");
+      return;
     }
-    setCueNotice(DJ_MIDI_NAMES[pad]+" · "+track.name+" → "+side);
-    window.dispatchEvent(new CustomEvent<DjCommand>(DJ_CONTROL,{detail:{action:"play",side}}));
+
+    const owner = padOnDeck.current[side];
+    const toggle = seekTo === undefined && loaded[side] === track.id && !pending.current.has(side) &&
+      (owner === pad || (owner === undefined && (preset.cueAt === undefined || playing[side])));
+    padOnDeck.current[side] = pad;
+    setCueNotice(DJ_MIDI_NAMES[pad] + " · " + track.name + " → " + side);
+    if (toggle) window.dispatchEvent(new CustomEvent<DjCommand>(DJ_CONTROL, {detail:{action:"play",side}}));
+    else flushSync(() => launchTrack(side, track.id, seekTo ?? padStart(preset)));
   }
   function toggleLearn(target:DjMidiTarget){
     const next=learnRef.current===target?null:target;
@@ -395,6 +452,7 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
   useLayoutEffect(()=>{
     if (output) return;
     pending.current.clear();
+    padOnDeck.current = {};
     setLaunches({});
     setCueNotice("");
   },[output]);
@@ -405,12 +463,13 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
     unEstiloDificilRun.current = clock;
     const side = unEstiloDificilDeck;
     const {id, name} = unEstiloDificil;
+    const preset = presets.pad1.trackId === id ? presets.pad1 : undefined;
+    if (preset) padOnDeck.current[side] = "pad1";
+    else delete padOnDeck.current[side];
     if (loaded[side] === id && (pending.current.has(side) || busy.current.has(side))) return;
-    pending.current.add(side);
-    setLoaded(current => ({...current, [side]: id}));
-    setLaunches(current => ({...current, [side]: {trackId: id}}));
+    launchTrack(side, id, padStart(preset));
     setCueNotice("Escena " + displaySceneNumber(scene) + " · " + name + " → " + side);
-  }, [cue, loaded, output, paused, scene, setLoaded, unEstiloDificilDeck]);
+  }, [cue, launchTrack, loaded, output, paused, presets.pad1, scene, unEstiloDificilDeck]);
 
   function changeEntry(index:number,change:Partial<DjEntry>) {
     setEntries(current=>current.map((entry,i)=>i===index ? {...entry,...change} : entry));
@@ -440,16 +499,14 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
           setCueNotice("Entrada "+(index+1)+" omitida. Deck "+entry.side+" ocupado.");
           return;
         }
-        pending.current.add(entry.side);
-        setLoaded(current=>({...current,[entry.side]:track.id}));
-        const next={trackId:track.id};
-        setLaunches(current=>({...current,[entry.side]:next}));
+        delete padOnDeck.current[entry.side];
+        launchTrack(entry.side, track.id, 0);
         setCueNotice("Escena "+displaySceneNumber(scene)+" · "+track.name+" → "+entry.side);
       };
       launch();
     });
     return ()=>timers.forEach(timer=>window.clearTimeout(timer));
-  },[automatic,cue,entries,library,output,paused,scene,seconds,setLoaded]);
+  },[automatic,cue,entries,launchTrack,library,output,paused,scene,seconds]);
 
   const hercules=inputs.filter(p=>isInpulse200(p.name));
   const port=hercules.find(p=>p.status==="open") ?? hercules[0];
@@ -483,13 +540,19 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
             <button type="button" className="dj-pad" aria-label={DJ_MIDI_NAMES[pad]+" · "+(track?.name??"Sin tema")+" · Deck "+preset.side}
               aria-pressed={active} onClick={()=>triggerPad(pad)}>{DJ_MIDI_NAMES[pad]} · {track?.name??"Sin tema"}</button>
             {midiButton(pad)}
+            {track && <DjPadWaveform key={track.id} track={track} label={DJ_MIDI_NAMES[pad]}
+              cueAt={preset.cueAt} select={seconds => triggerPad(pad, seconds)}/>}
           </div>;
         })}
       </div>
       <details><summary>Temas de los pads</summary><div className="dj-pad-settings">
         {DJ_PADS.map(pad=><div key={pad} className="dj-mix-row">
           <label>{DJ_MIDI_NAMES[pad]}<select aria-label={"Tema de "+DJ_MIDI_NAMES[pad]} value={presets[pad].trackId}
-            onChange={event=>{const trackId=event.currentTarget.value;setPresets(current=>({...current,[pad]:{...current[pad],trackId}}));}}>
+            onChange={event=>{
+              const trackId = event.currentTarget.value;
+              setPresets(current => current[pad].trackId === trackId ? current
+                : {...current, [pad]: {side: current[pad].side, trackId}});
+            }}>
             <option value="">Sin tema</option>
             {presets[pad].trackId && !library.some(item=>item.id===presets[pad].trackId) && <option value={presets[pad].trackId}>Archivo pendiente</option>}
             {library.map(track=><option key={track.id} value={track.id}>{track.name}</option>)}
@@ -509,9 +572,13 @@ export function DjConsole({output,inputs,scene,cue,seconds,paused,automatic,setA
       </label>{midiButton("cross")}</div>
       {(["A","B"] as const).map(side=>{
         const track=library.find(t=>t.id===loaded[side]);
+        const matchesDeck = (pad: DjPad) => presets[pad].side === side && presets[pad].trackId === track?.id;
+        const owner = padOnDeck.current[side];
+        const pad = owner && matchesDeck(owner) ? owner : DJ_PADS.find(matchesDeck);
         const crossGain=side==="A" ? Math.cos(cross*Math.PI/200) : Math.sin(cross*Math.PI/200);
         return <Deck key={side+(track?.id ?? "")} side={side} track={track} load={()=>load(side)} canLoad={!!choice}
-          output={output} crossGain={crossGain} launch={output ? launches[side] : undefined} onBusy={onBusy} onLaunch={onLaunch}
+          output={output} crossGain={crossGain} launch={output ? launches[side] : undefined}
+          defaultStart={padStart(pad ? presets[pad] : undefined)} onBusy={onBusy} onLaunch={onLaunch}
           onPlayback={onPlayback} volume={side==="A"?volumeA:volumeB} setVolume={side==="A"?setVolumeA:setVolumeB}
           midi={midiButton(side==="A"?"volumeA":"volumeB")}/>;
       })}

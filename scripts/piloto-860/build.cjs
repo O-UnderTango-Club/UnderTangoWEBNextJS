@@ -17,7 +17,7 @@ if (durationFile && (!Array.isArray(officialTimes) || officialTimes.length !== 1
 if (!portable && (controls.format !== "undertango-860/controles-v1" || !controls.settings)) throw Error("Falta el mapa del Órganon.");
 const entries = fs.readdirSync(route).filter(name => /\.tsx?$/.test(name) && !["page.tsx","layout.tsx"].includes(name));
 entries.push("organon/page.tsx", "votar/page.tsx");
-const mime = {".wav":"audio/wav",".mp3":"audio/mpeg",".mp4":"video/mp4",".png":"image/png",".jpg":"image/jpeg"};
+const mime = {".wav":"audio/wav",".mp3":"audio/mpeg",".ogg":"audio/ogg",".mp4":"video/mp4",".png":"image/png",".jpg":"image/jpeg"};
 const assets = new Map();
 function inlineAssets(source) {
   return source.replaceAll(/(["'])\/multiversos\/([\w.-]+)\1/g, (_, quote, asset) => {

@@ -2,7 +2,7 @@
 
 import { useSavedSetting } from "./saved-setting";
 import { SETTINGS_PREFIX, PIANO_KEYS as computerPianoKeys, type CcBinding } from "./control-map";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
 import { sceneNoiseBuffers, scheduleContinuationAudio } from "./scene-audio";
@@ -13,6 +13,7 @@ import { ContinuationProjection } from "./scene-visuals";
 import { FIRST_MIDI_NOTE, NOTE_SCENES, NOTE_SCENE_IDS, isNoteScene, type NoteScene, type PerformanceInput } from "./performance-notes";
 import { PerformanceProjection, usePerformanceInput } from "./performance-view";
 import { usePausedSceneOutput } from "./paused-scene-output";
+import { setOutputVolume } from "./output-volume";
 import { useEarlyInstrument } from "./early-instrument";
 import { LiveChordTimeline } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isLiveSetScene, isTimbreScene, type ExtendedScene } from "./extended-scenes";
@@ -1290,6 +1291,43 @@ function OpeningFilm({cue, output, controls, strikes, paused, finish}: {
   </div>;
 }
 
+function VolumeControl({ id, label, sound, volume, onChange, children }: {
+  id: string;
+  label: string;
+  sound: string;
+  volume: number;
+  onChange: (value: number) => void;
+  children?: ReactNode;
+}) {
+  const audibleVolume = useRef(volume || 100);
+  useEffect(() => {
+    if (volume > 0) audibleVolume.current = volume;
+  }, [volume]);
+
+  const muted = volume === 0;
+  const soundAction = muted ? "Restaurar " + sound : "Silenciar " + sound;
+  return <div className="zero-volume">
+    <button type="button" aria-label={soundAction} title={soundAction}
+      onClick={() => onChange(muted ? audibleVolume.current : 0)}>
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M3 9h4l5-4v14l-5-4H3z" />
+        <path fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"
+          d={muted ? "m16 9 5 6m0-6-5 6" : "M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12"} />
+      </svg>
+    </button>
+    <div>
+      <div className="zero-volume-label">
+        <label htmlFor={id}>{label}</label>
+        {children}
+        <output htmlFor={id}>{volume}%</output>
+      </div>
+      <input id={id} type="range" min={0} max={100} step={1}
+        value={volume} aria-valuetext={`${volume}%`}
+        onChange={(event) => onChange(Number(event.currentTarget.value))} />
+    </div>
+  </div>;
+}
+
 function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs, filters, setFilter, filterBindings, filterLearning, learnFilter }: {
   firstMidi: number; calibration: boolean; toggleCalibration: () => void; masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
@@ -1371,7 +1409,9 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const mixMaster = useRef<GainNode | null>(null);
   const outputRef = useRef<GainNode | null>(null);
   const masterVolumeRef = useRef(masterVolume);
-  const audibleVolumeRef = useRef(masterVolume);
+  const synthOutputRef = useRef<GainNode | null>(null);
+  const [synthVolume, setSynthVolume] = useSavedSetting("liveInstrumentVolume", 100);
+  const synthVolumeRef = useRef(synthVolume);
   const timersRef = useRef(new Set<number>());
   const waitingCues = useRef(new Set<() => void>());
   const pausedRef = useRef(false);
@@ -1385,9 +1425,9 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
     return true;
   }, []);
   const scoreClock = cue?.context ?? null;
-  const audition = usePausedSceneOutput(paused ? scoreClock : null, masterVolume, filters);
-  const manualOutput = activeScene && cue ? (paused ? audition : outputRef.current) : null;
-  const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, outputRef, pianoRouting, manualOutput, firstMidi);
+  const audition = usePausedSceneOutput(paused ? scoreClock : null, masterVolume, synthVolume, filters);
+  const manualOutput = activeScene && cue ? (paused ? audition : synthOutputRef.current) : null;
+  const extended = useExtendedPerformance(extendedScene, cue?.context ?? null, synthOutputRef, pianoRouting, manualOutput, firstMidi);
   const liveAttack = extended.attack;
   const noteStrike = useCallback((frequency:number, time:number, velocity=.85) => {
     liveAttack.current={count:liveAttack.current.count+1,frequency,velocity};
@@ -1444,6 +1484,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
     loopMix.current = null;
     mixMaster.current = null;
     outputRef.current = null;
+    synthOutputRef.current = null;
     if (context && context.state !== "closed") void context.close();
   }, []);
 
@@ -1493,24 +1534,13 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   useEffect(() => { filterRack.current?.apply(filters); }, [filters]);
 
   useEffect(() => {
-    const volume = masterVolume;
-    masterVolumeRef.current = volume;
-    if (volume > 0) audibleVolumeRef.current = volume;
-
-
-    const output = mixMaster.current;
-    if (!output) return;
-    const now = output.context.currentTime;
-    const gain = output.gain;
-    const previousGain = gain.value;
-    gain.cancelScheduledValues(now);
-    if (output.context.state === "running") {
-      gain.setValueAtTime(previousGain, now);
-      gain.linearRampToValueAtTime(volume / 100, now + 0.025);
-    } else {
-      gain.setValueAtTime(volume / 100, now);
-    }
+    masterVolumeRef.current = masterVolume;
+    if (mixMaster.current) setOutputVolume(mixMaster.current, masterVolume);
   }, [masterVolume]);
+  useEffect(() => {
+    synthVolumeRef.current = synthVolume;
+    if (synthOutputRef.current) setOutputVolume(synthOutputRef.current, synthVolume);
+  }, [synthVolume]);
 
   const changePaused = async (next: boolean) => {
     const context = audioRef.current;
@@ -1571,6 +1601,10 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       sceneMonitor.current = monitor;
       mixMaster.current = sceneMaster;
       outputRef.current = masterOutput;
+      const synthOutput = context.createGain();
+      synthOutput.gain.value = synthVolumeRef.current / 100;
+      synthOutput.connect(masterOutput);
+      synthOutputRef.current = synthOutput;
 
       if (typeof mode === "number" || isNoteScene(mode)) {
         enterNumberedScene(mode, context, previewOnly);
@@ -1725,8 +1759,6 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   };
 
   const showObject = stage === "opening";
-  const muted = masterVolume === 0;
-  const soundAction = muted ? "Restaurar sonido" : "Silenciar sonido";
   const preparing = stage === "preparing";
   const ready = stage === "ready";
   const waitingForAudio = (preparing || (paused && transportBusy)) && !pausedRef.current && audioRef.current?.state === "suspended";
@@ -2185,22 +2217,22 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       .zero-controls .zero-general-play .transport-midi-button {width:auto;padding:0 .3rem;font:600 .64rem/1 system-ui;}
       .zero-general-play .transport-midi-button[aria-pressed=true] {background:#664481;}
       .zero-transport svg { width: min(70%, 1.2rem); height: auto; fill: currentColor; }
-      .zero-master {
+      .zero-volume {
         display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
         gap: .6rem; margin-top: .65rem;
       }
-      .zero-controls .zero-master button { display: grid; place-items: center; width: 2.5rem; padding: 0; }
-      .zero-controls .zero-master button:hover { background: #3b4660; }
-      .zero-master button svg { width: 1.2rem; height: 1.2rem; }
-      .zero-master-label {
+      .zero-controls .zero-volume button { display: grid; place-items: center; width: 2.5rem; padding: 0; }
+      .zero-controls .zero-volume button:hover { background: #3b4660; }
+      .zero-volume button svg { width: 1.2rem; height: 1.2rem; }
+      .zero-volume-label {
         display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap;
         gap: .1rem .35rem; font-size: .8rem;
       }
       .zero-controls button.zero-midi-icon { display:inline-grid; place-items:center; width:28px; height:28px; min-height:28px; padding:3px; border-radius:50%; }
       .zero-controls .zero-midi-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
       .zero-midi-icon[aria-pressed=true] { background:#65518f; }
-      .zero-master-label output { margin-left:auto; }
-      .zero-master-label output { color: #dce6ff; font-variant-numeric: tabular-nums; }
+      .zero-volume-label output { margin-left:auto; }
+      .zero-volume-label output { color: #dce6ff; font-variant-numeric: tabular-nums; }
       .zero-settings {
         display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.15rem;
         min-height: 0; overflow: auto; overscroll-behavior: contain; overflow-anchor: none;
@@ -2234,7 +2266,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       .repertoire-cue { margin-top:.45rem; }
       .repertoire-cue label { display:flex; align-items:baseline; gap:.45rem; cursor:pointer; }
       .repertoire-cue input { flex:none; accent-color:#adc4ff; }
-      .zero-controls .zero-master input { margin: .35rem 0 0; }
+      .zero-controls .zero-volume input { margin: .35rem 0 0; }
       .zero-scene-seconds {white-space:nowrap;font-size:.84rem;}
       .zero-scene-seconds input {width:4.5rem;padding:.35rem .25rem;color:inherit;background:#191d28;border:1px solid #4c5468;border-radius:4px;text-align:right;font:inherit;}
       .zero-sampling { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; font-size: .75rem; }
@@ -2322,7 +2354,7 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       {extendedScene===TEMPERAMENT_SCENE && cue &&
         <ExtendedArt scene={TEMPERAMENT_SCENE} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused}/>}
       {(sceneNumber === 14 || sceneNumber === 18) && <NoteComet key={sceneNumber} attack={liveAttack} />}
-      {coda && cue && <CodaProjection ballot={ballot} filmLayer={filmLayer} scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} paused={paused} routing={pianoRouting} />}
+      {coda && cue && <CodaProjection ballot={ballot} filmLayer={filmLayer} scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} scoreOutput={outputRef.current} paused={paused} routing={pianoRouting} />}
       {extendedScene && !liveSet && !coda && cue && (extendedScene === 42 || extendedScene === 62
         ? <TypeProjection scene={extendedScene} beginsAt={cue.beginsAt} clock={cue.context} paused={paused} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} />
         : extendedScene === 61
@@ -2511,27 +2543,12 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
           </button>
         </div>
         {transportMidi.learning && ["play","pauseScene","stopScene"].includes(transportMidi.learning) && <small role="status">{transportMidi.hint}</small>}
-        <div className="zero-master">
-          <button type="button" aria-label={soundAction} title={soundAction}
-            onClick={() => setMasterVolume(muted ? audibleVolumeRef.current : 0)}>
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M3 9h4l5-4v14l-5-4H3z" />
-              <path fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"
-                d={muted ? "m16 9 5 6m0-6-5 6" : "M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12"} />
-            </svg>
-          </button>
-          <div>
-            <div className="zero-master-label">
-              <label htmlFor="zero-master-volume">Volumen master</label>
-              <button type="button" className="zero-midi-icon" title={faderLabel} aria-label={faderLabel} aria-pressed={learningFader} onClick={learnFader}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7"/><path d="m12 13 3-5M3 9l1 .5M7 3.5l.7 1.3M17 3.5l-.7 1.3M21 9l-1 .5"/></svg></button>
-              <output htmlFor="zero-master-volume">{masterVolume}%</output>
-            </div>
-            <input id="zero-master-volume" type="range" min={0} max={100} step={1}
-              value={masterVolume} aria-valuetext={`${masterVolume}%`}
-              onChange={(event) => setMasterVolume(Number(event.currentTarget.value))} />
-          </div>
-        </div>
+        <VolumeControl id="zero-master-volume" label="Volumen master" sound="sonido" volume={masterVolume} onChange={setMasterVolume}>
+          <button type="button" className="zero-midi-icon" title={faderLabel} aria-label={faderLabel} aria-pressed={learningFader} onClick={learnFader}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7"/><path d="m12 13 3-5M3 9l1 .5M7 3.5l.7 1.3M17 3.5l-.7 1.3M21 9l-1 .5"/></svg></button>
+        </VolumeControl>
         {(learningFader || faderSignal) && <small role="status" style={{display:"block"}}>{faderSignal || "Esperando un movimiento MIDI del fader…"}</small>}
+        <VolumeControl id="zero-synth-volume" label="Volumen del sintetizador" sound="sintetizador"
+          volume={synthVolume} onChange={setSynthVolume} />
         <label className="zero-subtitle-toggle">
           Activar subtítulos
           <input type="checkbox" role="switch" checked={showSubtitles}

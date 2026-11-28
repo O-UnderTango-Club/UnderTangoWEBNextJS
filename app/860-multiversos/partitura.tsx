@@ -29,7 +29,8 @@ import { useHostedBallot } from "./coda-host";
 import { atmosphereLabel } from "./coda-ballot";
 import { ExtendedPerformanceControls, ExtendedPerformanceProjection, isPlayableExtendedScene, useExtendedPerformance } from "./extended-performance";
 import { TypeProjection } from "./type-projection";
-import { AudienceProjection } from "./audience-projection";
+import { AudienceProjection, type CameraStatus } from "./audience-projection";
+import { AudiovisualControls, AudiovisualLayers, useAudiovisuals } from "./audiovisuals";
 import { PrimeraVoluntad } from "./primera-voluntad";
 import { useScorePercussion } from "./score-percussion";
 import { hasReferenceVisual, ReferenceVisual } from "./reference-visuals";
@@ -1374,6 +1375,14 @@ function VolumeControl({ id, label, sound, volume, onChange, target, binding, le
   </div>;
 }
 
+const CAMERA_FIRST_SCENE = 60;
+const CAMERA_MESSAGES: Record<CameraStatus,string> = {
+  off:"", live:"", opening:"Activando cámara…",
+  permission:"Habilitá el permiso de cámara y volvé a activarla.",
+  unavailable:"No se pudo abrir la cámara.",
+  disconnected:"Se desconectó la cámara.",
+};
+
 function ModuleZero({
   firstMidi, calibration, toggleCalibration, masterVolume, setMasterVolume, synthVolume, setSynthVolume,
   learnFader, learningFader, faderBindings, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs,
@@ -1408,6 +1417,10 @@ function ModuleZero({
   const filterValues = useRef(filters);
   filterValues.current = filters;
   const [showSubtitles, setShowSubtitles] = useSavedSetting("showSubtitles", false);
+  const [cameraStatus,setCameraStatus] = useState<CameraStatus>("off");
+  const autoCameraStarted = useRef(false);
+  const showCamera = cameraStatus === "opening" || cameraStatus === "live";
+  const audiovisuals = useAudiovisuals();
   const [showStopwatch, setShowStopwatch] = useSavedSetting("showStopwatch", false);
   const [filmControls, setFilmControls] = useState<HTMLDivElement | null>(null);
   const strikes = useRef<StrikeLog["current"]>({hits: [], energy: 0});
@@ -1562,6 +1575,8 @@ function ModuleZero({
   const reset = useCallback(() => {
     stop();
     stopArmed.current = false;
+    autoCameraStarted.current = false;
+    setCameraStatus("off");
     setCue(null);
     pausedRef.current = false;
     setPaused(false);
@@ -1853,6 +1868,14 @@ function ModuleZero({
   const numberedMode = numberedSceneMode(activeScene);
   const sceneIndex = NUMBERED_CONTROLS.findIndex(control => control.mode === numberedMode);
   const sceneNumber = sceneIndex >= 0 ? ACTIVE_SCORE[sceneIndex].number : null;
+  const audienceScene = sceneNumber !== null && displaySceneNumber(sceneNumber) === CAMERA_FIRST_SCENE;
+  useEffect(() => {
+    if (!cue || paused || autoCameraStarted.current || sceneNumber === null ||
+        displaySceneNumber(sceneNumber) < CAMERA_FIRST_SCENE) return;
+    autoCameraStarted.current = true;
+    setCameraStatus(current => current === "live" ? current : "opening");
+  }, [cue, paused, sceneNumber]);
+  const cameraSignal = cameraStatus === "opening" ? "waiting" : cameraStatus === "live" ? "live" : "off";
   const recoveryIndex = ready && recoveryScene !== null
     ? ACTIVE_SCORE.findIndex(({number}) => number === recoveryScene) : -1;
   const recoveryCue = recoveryIndex >= 0 ? ACTIVE_SCORE[recoveryIndex] : null;
@@ -1943,7 +1966,10 @@ function ModuleZero({
   const filmLayer = sceneNumber !== 1 && film && cue && outputRef.current
     ? <SceneVideo key={sceneNumber} film={film} cue={cue} paused={paused} output={outputRef.current} controls={filmControls} />
     : null;
-  const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack,hasReferenceVisual(sceneNumber));
+  const audiovisualActive = sceneNumber !== null && audiovisuals.enabled &&
+    audiovisuals.films.some(film=>sceneNumber>=film.scene && film.opacity>0);
+  const signals = useSceneSignals(sceneNumber,cue?.context ?? null,cue?.beginsAt ?? 0,paused,spiralAnalyser,roomAnalyser,liveAttack,
+    hasReferenceVisual(sceneNumber) || audiovisualActive);
   const sceneTitle = breathing ? "Plano 9" : NUMBERED_CONTROLS[sceneIndex]?.title;
   const liveSet = isLiveSetScene(extendedScene) ? extendedScene : null;
   const coda = extendedScene !== null && extendedScene >= 90 ? extendedScene as CodaScene : null;
@@ -2252,8 +2278,8 @@ function ModuleZero({
       .zero-time-caption small:last-child { color: #46516b; }
       .zero-controls {
         --zero-controls-padding: clamp(.75rem, 2.2vw, 2.5rem);
-        display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
-        min-height: 0; overflow: hidden; padding: 0; border-left: 1px solid #30333d;
+        display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(7rem, 1fr) auto;
+        min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0; border-left: 1px solid #30333d;
       }
       .zero-settings-footer {display:grid;gap:.3rem;border-top:1px solid #414553;padding-top:.7rem;}
       .master-filters {margin-top:.6rem;display:grid;gap:.35rem;color:#e5eaff;}
@@ -2279,21 +2305,23 @@ function ModuleZero({
         max-height:min(74dvh,74cqh);overflow:auto;overscroll-behavior:contain;display:grid;gap:.45rem;padding:.7rem var(--zero-controls-padding);
         background:#151a26;border-block:1px solid #5c657b;box-shadow:0 -.3rem 1.1rem #06081177;}
       .dj-controller-photo {display:block;width:100%;height:auto;border-radius:.35rem;}
-      .dj-library {display:grid;gap:.4rem;}
-      .dj-track-list {display:grid;gap:.2rem;list-style:none;padding:0;margin:0;}
-      .dj-track-list li {display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.22rem;}
-      .zero-controls .dj-track-list button {min-height:30px;padding:.18rem .43rem;font:inherit;}
-      .zero-controls .dj-track-list .dj-track-select {text-align:left;overflow-wrap:anywhere;min-width:0;}
-      .dj-track-list .dj-track-select[aria-pressed=true] {border-color:#95b7ea;background:#2c3951;}
-      .dj-track-list .dj-track-load[aria-pressed=true] {background:#344b4a;border-color:#83bfba;}
+      .dj-library[open] {display:grid;gap:.4rem;}
+      .dj-track-list {display:grid;gap:.35rem;list-style:none;padding:0;margin:.35rem 0;}
+      .dj-track-list li {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,8.5rem);align-items:center;gap:.45rem;}
+      .dj-track-title {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .dj-track-list select {cursor:pointer;}
       .dj-sheet label,.dj-deck {display:grid;gap:.28rem;min-width:0;}
       .dj-sheet select,.dj-sheet input[type=file] {width:100%;max-width:100%;min-width:0;font:inherit;color:inherit;}
       .dj-sheet select {background:#202635;padding:.35rem;border:1px solid #4c566b;border-radius:.25rem;}
       .dj-deck {border-top:2px solid #73cbbd;padding:.5rem 0 .2rem;}
       .dj-deck[data-side=B] {border-color:#bb9bee;}
       .dj-mix-row {display:grid;gap:.3rem;grid-template-columns:minmax(0,1fr) auto;align-items:center;}
+      .dj-pad-bank {display:grid;gap:.3rem;border-inline-start:2px solid #73cbbd;padding-inline-start:.4rem;}
+      .dj-pad-bank + .dj-pad-bank {border-color:#bb9bee;}
       .dj-pads {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.35rem;}
       .dj-pad-cell {min-width:0;display:grid;gap:.22rem;}
+      .zero-controls .dj-pad {display:grid;gap:.1rem;min-width:0;text-align:left;}
+      .dj-pad span {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.72rem;}
       .dj-pad-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.22rem;}
       .dj-pad-actions .dj-midi-learn {min-width:0;padding-inline:.16rem;overflow-wrap:anywhere;}
       .dj-sheet .dj-pad-auto {display:flex;align-items:center;gap:.15rem;font-size:.67rem;}
@@ -2311,7 +2339,6 @@ function ModuleZero({
         opacity:0;cursor:crosshair;touch-action:pan-y;}
       .dj-pad-wave:focus-within {outline:2px solid #a8c3ff;outline-offset:1px;}
       .dj-wave-status {font-size:.7rem;color:#c4c9dc;}
-      .dj-pad-settings {display:grid;gap:.35rem;margin-top:.35rem;}
       .dj-cross-labels {display:flex;justify-content:space-between;}
       .dj-track {margin:0;font-size:.85rem;overflow-wrap:anywhere;}
       .dj-deck-head,.dj-transport {display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;}
@@ -2380,6 +2407,18 @@ function ModuleZero({
         background: radial-gradient(circle at calc(100% - .5625rem) 50%, #131b2b .35rem, transparent .4rem), #adc4ff;
       }
       .zero-layout .zero-subtitle-toggle input:focus-visible { outline-offset: 3px; }
+      .av-layer {position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;z-index:2;
+        mask-image:radial-gradient(ellipse 76% 66% at center,#000 53%,transparent 100%);}
+      .zero-stage:is([data-extended-dark],:has(.type-projection)) > .av-layer {mix-blend-mode:screen;}
+      .av-settings {margin:0 0 .55rem;font-size:.8rem;}
+      .av-settings summary {cursor:pointer;color:#dce6ff;}
+      .av-options {max-height:min(22cqh,12rem);overflow:auto;overscroll-behavior:contain;scrollbar-color:#5d6476 #11131a;}
+      .av-setting {display:grid;gap:.38rem;margin:.5rem 0;padding:.5rem;border:1px solid #414a5c;border-radius:.25rem;}
+      .av-setting strong {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .av-setting label,.av-files {display:grid;gap:.2rem;min-width:0;}
+      .av-setting select,.av-files input {width:100%;min-width:0;color:inherit;font:inherit;}
+      .av-setting select {background:#202635;border:1px solid #4c566b;border-radius:.25rem;padding:.32rem;}
+      .zero-controls .av-setting input[type=range] {margin:.15rem 0;}
       .zero-title { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }
       .zero-title h2 { margin: 0; font: 400 clamp(1rem, 1.7vw, 1.7rem)/1.15 Georgia, serif; white-space: nowrap; }
       .zero-title output { color: #e5e9f9; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -2440,10 +2479,10 @@ function ModuleZero({
       ${EXTENDED_STYLE}
     `}</style>
     <ProjectionSignalContext.Provider value={signals}><div className="zero-performance">
-      <SceneMixer filmLayer={liveSet ? filmLayer : null} stageBackground={extendedDark ? "#130f20" : light ? "#fff" : "#000"} extendedDark={extendedDark}
+      <SceneMixer filmLayer={liveSet ? filmLayer : null} stageBackground={audienceScene ? "#080810" : extendedDark ? "#130f20" : light ? "#fff" : "#000"} extendedDark={extendedDark}
         canPlayNote={!!manualOutput && (!!earlyScene || !!noteScene || extendedPlaying || usesSceneKeyboard(extendedScene) || !!coda)} connectMidi={connectMidi} transportMidi={transportMidi} playGeneral={playGeneral} pauseScene={()=>{if(!ready && !preparing)void changePaused(true);}} stopScene={stopScene} codaScene={coda} liveSet={liveSet}
         voiceScene={extendedScene === 31 || extendedScene === 89 ? extendedScene : null} cue={cue} seconds={directionSeconds}
-        takeScene={extendedScene} onTakeComplete={setFinishedTake} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={liveSet || coda || ritualLayer(extendedScene) || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={loopMix.current} paused={paused}>
+        takeScene={extendedScene} onTakeComplete={setFinishedTake} countingTake={countingTake} roomAnalyser={roomAnalyser} analyser={showCamera || audiovisualActive || liveSet || coda || ritualLayer(extendedScene) || extendedScene === 31 || extendedScene === 42 || extendedScene === 45 || extendedScene === 60 || extendedScene === 61 || extendedScene === 62 ? spiralAnalyser : undefined} monitor={sceneMonitor.current} ready={ready} startScene={()=>void start()} scene={activeScene ? sceneTitle : undefined} routing={pianoRouting} input={outputRef.current} master={loopMix.current} paused={paused}>
       {openingRun && <OpeningFilm cue={openingRun.cue} output={openingRun.output}
         controls={filmControls} strikes={strikes} paused={paused} finish={finishOpeningFilm} />}
       {!liveSet && !coda && filmLayer}
@@ -2470,19 +2509,20 @@ function ModuleZero({
         <ExtendedArt scene={TEMPERAMENT_SCENE} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused}/>}
       {(sceneNumber === 14 || sceneNumber === 18) && <NoteComet key={sceneNumber} attack={liveAttack} />}
       {coda && cue && <CodaProjection ballot={ballot} filmLayer={filmLayer} scene={coda} clock={cue.context} beginsAt={cue.beginsAt} duration={extendedSeconds[coda]} output={manualOutput} scoreOutput={outputRef.current} paused={paused} routing={pianoRouting} />}
-      {extendedScene && !liveSet && !coda && cue && (extendedScene === 42 || extendedScene === 62
+      {extendedScene && !liveSet && !coda && cue && !audienceScene && (extendedScene === 42 || extendedScene === 62
         ? <TypeProjection scene={extendedScene} beginsAt={cue.beginsAt} clock={cue.context} paused={paused} output={outputRef.current} analyser={spiralAnalyser} attack={extended.attack} />
-        : extendedScene === 61
-        ? <AudienceProjection analyser={spiralAnalyser} attack={extended.attack} paused={paused} />
         : extendedScene === 60
         ? <PrimeraVoluntad key={cue.beginsAt} clock={cue.context} analyser={spiralAnalyser} attack={extended.attack} paused={paused}
             press={(id, index) => extended.press(id, extended.selected, index)} release={extended.release} />
         : extendedPlaying
         ? <ExtendedPerformanceProjection analyser={spiralAnalyser} performance={extended} scene={extendedScene} clock={cue.context} paused={paused} />
         : <ExtendedArt scene={extendedScene} clock={cue.context} beginsAt={cue.beginsAt} seconds={directionSeconds} a4={extended.a4} paused={paused} />)}
-      {sceneNumber !== null && sceneNumber > 0 && !liveSet && !coda && sceneNumber !== 61 && <StimulusBar scene={sceneNumber} paused={paused}
+      <AudiovisualLayers audiovisuals={audiovisuals} scene={cue ? sceneNumber : null} paused={paused} />
+      {showCamera && <AudienceProjection analyser={spiralAnalyser} attack={extended.attack} live={cameraStatus === "live"}
+        treatment={sceneNumber===68 ? "ascii" : "contour"} onStatus={setCameraStatus} />}
+      {sceneNumber !== null && sceneNumber > 0 && (!liveSet && !coda || sceneNumber===68) && <StimulusBar scene={sceneNumber} paused={paused}
         notes={noteScene ? noteInput.sounding : undefined} tuning={extended.a4}
-        resting={breathing} interactiveObject={showObject} />}
+        resting={breathing} interactiveObject={showObject} camera={cameraSignal} />}
       {(sceneNumber !== null || showStopwatch) && <div className="zero-scene-heading">
         {sceneNumber !== null && <div className="zero-scene-number" role="status" aria-label={`Escena ${displaySceneNumber(sceneNumber)}`}>{displaySceneNumber(sceneNumber)}</div>}
         {showStopwatch && <ScoreStopwatch clock={sceneNumber === null ? null : audioRef.current}
@@ -2680,6 +2720,12 @@ function ModuleZero({
           <input type="checkbox" role="switch" checked={showStopwatch}
             onChange={(event) => setShowStopwatch(event.currentTarget.checked)} />
         </label>
+        <label className="zero-subtitle-toggle">Mostrar cámara
+          <input type="checkbox" role="switch" checked={showCamera}
+            onChange={event=>setCameraStatus(event.currentTarget.checked ? "opening" : "off")} />
+        </label>
+        {CAMERA_MESSAGES[cameraStatus] && <small role="status">{CAMERA_MESSAGES[cameraStatus]}</small>}
+        <AudiovisualControls audiovisuals={audiovisuals} />
         <button type="button" aria-pressed={calibration} onClick={toggleCalibration}>
           {calibration ? "Tocá la tecla más grave · Cancelar" : "Tecla más grave de los cubos · MIDI " + firstMidi}
         </button>

@@ -32,7 +32,13 @@ El archivo se actualiza cuando cambian las asignaciones. Su historial conserva h
 
 ## Consola DJ
 
-Cada uno de los cuatro pads enlaza un tema guardado con un deck. Con una escena en marcha, un toque lo reproduce y el siguiente lo pausa en su posición. Si el deck elegido contiene otro tema, el pad lo reemplaza sin detener el otro canal. Elegí los archivos y destinos en **Temas de los pads**. El selector **Esc.** junto a cada botón MIDI dispara el tema de ese pad al entrar en la escena elegida. **0** deja el pad en modo manual. Los temas musicales automáticos pasan por estos selectores. Los botones **MIDI** aprenden los pads, el crossfader y los faders de volumen A y B. Al cambiar de puerto se usa el nombre del dispositivo cuando es único. Verificá en el Órganon que los siete controles y las asignaciones previas aparezcan en la exportación.
+Los pads 1 y 2 pertenecen al deck A y los pads 3 y 4 al B. En **Temas guardados**, **Cargar en pad** asigna el tema elegido a uno de los cuatro pads. Con una escena en marcha, un toque lo reproduce y el siguiente lo pausa en su posición. Si su deck contiene otro tema, el pad lo reemplaza y el otro canal sigue sonando. El botón físico de carga prepara el otro pad de ese deck mientras está en pausa. El selector **Esc.** junto a cada botón MIDI dispara el tema de ese pad al entrar en la escena elegida. **0** deja el pad en modo manual. Los temas musicales automáticos pasan por estos selectores. Los botones **MIDI** aprenden los pads, el crossfader y los faders de volumen A y B. Al cambiar de puerto se usa el nombre del dispositivo cuando es único. Verificá en el Órganon que los siete controles y las asignaciones previas aparezcan en la exportación.
+
+## Cámara y audiovisuales
+
+La cámara empieza apagada al abrir 860 y se activa al entrar en la escena visible 60. **Mostrar cámara** controla la señal durante toda la función. Probá que siga al avanzar de escena y que apagarla libere la webcam.
+
+**Activar audiovisuales** muestra clips mudos como capas sobre la proyección. Cada clip guarda su escena visible de inicio y su opacidad. La pieza de Ø Tango Rave entra después de la escena 60 y reacciona al sonido de la sala. Las grabaciones musicales siguen entrando por los pads de la consola DJ.
 
 ## Votación de la sala
 

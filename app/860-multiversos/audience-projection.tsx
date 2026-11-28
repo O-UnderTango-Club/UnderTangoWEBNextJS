@@ -1,39 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { drawAsciiCamera } from "./ascii-camera";
-import { StimulusBar } from "./stimulus-bar";
+
+export type CameraStatus = "off" | "opening" | "live" | "permission" | "unavailable" | "disconnected";
 
 type Props = {
   analyser: { current: AnalyserNode | null };
   attack?: { current: { count: number; velocity: number; frequency: number } };
   treatment?: "contour" | "ascii";
-  paused: boolean;
+  live: boolean;
+  onStatus: (status: CameraStatus) => void;
 };
 
 const columns = 112;
 const rows = 64;
 
-export function AudienceProjection({ analyser, attack, paused, treatment = "contour" }: Props) {
+export function AudienceProjection({ analyser, attack, live, onStatus, treatment = "contour" }: Props) {
   const camera = useRef<HTMLVideoElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
-  const [attempt, setAttempt] = useState(0);
-  const [status, setStatus] = useState("Activando cámara…");
-  const [live, setLive] = useState(false);
-  const [retry, setRetry] = useState(false);
 
   useEffect(() => {
-    const video = camera.current;
-    if (!video) return;
+    const video = camera.current!;
     let active = true;
     let stream: MediaStream | undefined;
-    setLive(false);
-    setRetry(false);
-    setStatus("Activando cámara…");
-    const interrupted = () => {
-      if (!active) return;
-      setStatus("Se desconectó la cámara.");
-      setLive(false);
-      setRetry(true);
-    };
+    const interrupted = () => { if (active) onStatus("disconnected"); };
+
     async function openCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -43,16 +33,15 @@ export function AudienceProjection({ analyser, attack, paused, treatment = "cont
           stream.getTracks().forEach(track => track.stop());
           return;
         }
-        stream.getVideoTracks()[0].addEventListener("ended", interrupted);
-        video!.srcObject = stream;
-        await video!.play();
-        if (active) { setLive(true); setStatus(""); }
+        const track=stream.getVideoTracks()[0];
+        if (!track || track.readyState !== "live") throw new Error("Cámara sin imagen");
+        track.addEventListener("ended", interrupted);
+        video.srcObject = stream;
+        await video.play();
+        if (active) onStatus("live");
       } catch (error) {
         if (!active) return;
-        stream?.getTracks().forEach(track => track.stop());
-        setStatus(error instanceof DOMException && error.name === "NotAllowedError"
-          ? "Habilitá la cámara en los permisos del navegador." : "No se pudo abrir la cámara del público.");
-        setRetry(true);
+        onStatus(error instanceof DOMException && error.name === "NotAllowedError" ? "permission" : "unavailable");
       }
     }
     void openCamera();
@@ -62,19 +51,13 @@ export function AudienceProjection({ analyser, attack, paused, treatment = "cont
       stream?.getTracks().forEach(track => track.stop());
       video.srcObject = null;
     };
-  }, [attempt]);
-
-  useEffect(() => {
-    const video = camera.current;
-    if (!video || !live) return;
-    if (paused) video.pause();
-    else void video.play().catch(() => { setLive(false); setStatus("No se pudo reanudar la cámara."); setRetry(true); });
-  }, [live, paused]);
+  }, [onStatus]);
 
   useEffect(() => {
     const video = camera.current, surface = overlay.current;
     const ink = surface?.getContext("2d");
-    if (!video || !surface || !ink || paused || !live) return;
+    if (!video || !surface || !ink || !live) return;
+    ink.clearRect(0, 0, surface.width, surface.height);
     if (treatment === "ascii") return drawAsciiCamera(video, surface, analyser);
     const sampler = document.createElement("canvas");
     sampler.width = columns; sampler.height = rows;
@@ -106,7 +89,7 @@ export function AudienceProjection({ analyser, attack, paused, treatment = "cont
       if (attack && attack.current.count !== seen) { seen = attack.current.count; impulse = attack.current.velocity; }
       impulse *= Math.exp(-dt * 3);
       const force = Math.min(1, bass + treble + impulse);
-      video.style.filter = `saturate(${1 + force * .85}) contrast(${1 + bass * .12})`;
+      video.style.filter = `saturate(${.8 + force * .78}) contrast(${1 + bass * .12})`;
       const dx = width / columns, dy = height / rows;
       ink.clearRect(0, 0, width, height);
       ink.lineWidth = Math.max(1, dx * .25);
@@ -134,14 +117,10 @@ export function AudienceProjection({ analyser, attack, paused, treatment = "cont
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [analyser, attack, live, paused, treatment]);
+  }, [analyser, attack, live, treatment]);
 
-  return <div className="audience-projection" aria-label="Proyección del público">
-    <video ref={camera} muted playsInline aria-label="Cámara del público" style={treatment === "ascii" ? {opacity:0} : undefined}/>
-    <canvas ref={overlay} aria-hidden="true" />
-    <StimulusBar scene={treatment==="ascii" ? 68 : 61} paused={paused} camera={live ? "live" : retry ? "off" : "waiting"} />
-    {status && <div className="audience-camera-status" role="status">{status}
-      {retry && <button type="button" onClick={() => setAttempt(value => value + 1)}>Reintentar cámara</button>}
-    </div>}
+  return <div className="audience-projection" data-live={live} data-treatment={treatment} aria-hidden="true">
+    <video ref={camera} muted playsInline />
+    <canvas ref={overlay} />
   </div>;
 }

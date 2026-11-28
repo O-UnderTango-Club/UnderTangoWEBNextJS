@@ -1,9 +1,9 @@
 export type LibraryFile = {id:string; file:File};
 
-// Keep the operator's MP3s on this browser. One store is shared by both decks.
-export async function djFiles(files?: LibraryFile[]): Promise<LibraryFile[]> {
+// Files stay on this browser, in a separate database for each library.
+export async function localMediaFiles(database: string, files?: LibraryFile[]): Promise<LibraryFile[]> {
   const db = await new Promise<IDBDatabase>((resolve,reject) => {
-    const request = indexedDB.open("860-multiversos-dj",1);
+    const request = indexedDB.open(database,1);
     request.onupgradeneeded = () => request.result.createObjectStore("tracks",{keyPath:"id"});
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);

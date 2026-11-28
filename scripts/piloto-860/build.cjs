@@ -8,6 +8,7 @@ const portable = controlFile === "--publico";
 const storageName = portable ? "860-portatil" : "860-piloto-apertura";
 const root = path.resolve(__dirname, "../..");
 const route = path.join(root, "app/860-multiversos");
+require("./reunir-tango-rave.cjs")(root);
 const read = file => fs.readFileSync(file, "utf8");
 const controls = portable ? null : JSON.parse(read(controlFile));
 const officialTimes = durationFile ? JSON.parse(read(durationFile)) : null;
@@ -22,8 +23,13 @@ const assets = new Map();
 function inlineAssets(source) {
   return source.replaceAll(/(["'])\/multiversos\/([\w.-]+)\1/g, (_, quote, asset) => {
     if (!assets.has(asset)) {
-      const bytes=fs.readFileSync(path.join(root,"public/multiversos",asset));
-      assets.set(asset,"data:"+mime[path.extname(asset)]+";base64,"+bytes.toString("base64"));
+      if (mediaListFile && asset==="tango-rave-overlay.mp4") {
+        // The ZIP already contains this large video. Keep its native file streaming.
+        assets.set(asset,"./Audiovisuales/"+asset);
+      } else {
+        const bytes=fs.readFileSync(path.join(root,"public/multiversos",asset));
+        assets.set(asset,"data:"+mime[path.extname(asset)]+";base64,"+bytes.toString("base64"));
+      }
     }
     return "__assets["+JSON.stringify(asset)+"]";
   });

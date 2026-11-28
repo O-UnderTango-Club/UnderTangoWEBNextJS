@@ -7,7 +7,11 @@ import { ACTIVE_SCORE, displaySceneNumber, type ShowScene } from "./show-score";
 type Film = { id:string; title:string; url:string; scene:ShowScene; opacity:number };
 type FilmSettings = Pick<Film, "scene" | "opacity">;
 const filmLibrary = "860-multiversos-audiovisuales";
-const initialFilm: FilmSettings = {scene:62,opacity:24};
+const tangoRave: Film = {
+  id:"tango-rave", title:"Ø Tango Rave",
+  url:"/multiversos/tango-rave-overlay.mp4",
+  scene:62, opacity:24, // Score ID 62 is the visible scene after 60.
+};
 
 export function useAudiovisuals() {
   const [enabled,setEnabled] = useSavedSetting("showAudiovisuals",true);
@@ -33,7 +37,7 @@ export function useAudiovisuals() {
     const added=records.map(({id,file}):Film=>{
       let url=urls.current.get(id);
       if (!url) {url=URL.createObjectURL(file);urls.current.set(id,url);}
-      return {id, title:file.name, url, scene:initialFilm.scene, opacity:initialFilm.opacity};
+      return {id, title:file.name, url, scene:tangoRave.scene, opacity:tangoRave.opacity};
     });
     setLocal(current=>[...new Map([...current,...added].map(film=>[film.id,film])).values()]);
   }
@@ -48,7 +52,7 @@ export function useAudiovisuals() {
     catch {setNotice("El video queda disponible durante esta sesión. El navegador no pudo guardarlo.");}
   }
 
-  const films=local.map(film=>({...film,...settings[film.id]}));
+  const films=[tangoRave,...local].map(film=>({...film,...settings[film.id]}));
   function change(film:Film, update:Partial<FilmSettings>) {
     setSettings(current=>({
       ...current,

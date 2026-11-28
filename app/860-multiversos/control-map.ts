@@ -37,7 +37,7 @@ export const FIXED_CONTROLS = {
   "Teclas del instrumento de la escena · MIDI 60 a 72": Object.keys(PIANO_KEYS).join(" ").toUpperCase(),
   "Escena 0 · Ruidos blanco, gris, rosa y marrón": "A S D F · Do Re Mi Fa (MIDI 60, 62, 64, 65)",
   "Escena 1 · Ataque del punto": "Desde la pregunta, piano MIDI o teclas A–K para tocar el bombo y revelar el universo",
-  "Play general · Pantalla o MIDI asignado": "Desde el inicio, reproduce. Durante la marcha, pausa. En pausa, reanuda en el mismo punto.",
+  "Play general · Pantalla o MIDI asignado": "Inicia la obra o retoma la última escena tras recargar. Durante la marcha, pausa. En pausa, reanuda en el mismo punto.",
   "Banco de notas · cara frontal": "1 a 9",
   "Cubo · cara derecha": "Mayús + 1 a 9",
   "Cubo extendido · cara superior": TOP_KEYS.map(key => key.replace("Key", "").replace("Comma", ",").replace("Period", ".")).join(" "),

@@ -22,6 +22,7 @@ import { LiveChordTimeline } from "./chord-loop-view";
 import { EXTENDED_DEFAULT_SECONDS, EXTENDED_SCENES, isLiveSetScene, isTimbreScene, type ExtendedScene } from "./extended-scenes";
 import { ACTIVE_SCORE, displaySceneNumber, SHOW_OPENING, SHOW_SCENE_COUNT, SHOW_SCORE, SHOW_TRANSITIONS, TEMPERAMENT_SCENE, type CodaScene } from "./show-score";
 import { durationBounds, editShowDuration, resolveShowDurations } from "./show-durations";
+import { readLastPlayedScene, saveLastPlayedScene } from "./scene-recovery";
 import { previousSceneDurations } from "./previous-durations";
 import { CodaProjection } from "./coda-projection";
 import { useHostedBallot } from "./coda-host";
@@ -1367,6 +1368,7 @@ function ModuleZero({
   setFilter: (id: MasterFilter, value: number) => void;
 }) {
   const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE | ExtendedScene>("ready");
+  const [recoveryScene, setRecoveryScene] = useState(readLastPlayedScene);
   const [scanState, setScanState] = useState<"idle" | "busy" | "done">("idle");
   const transportMidi = useTransportMidi(connectMidi);
   const activeScene = typeof stage === "number" ? stage : MODULE_ZERO_SCENE_BY_STAGE[stage];
@@ -1788,14 +1790,6 @@ function ModuleZero({
   const waitingForAudio = (preparing || (paused && transportBusy)) && !pausedRef.current && audioRef.current?.state === "suspended";
   const canPlayGeneral = waitingForAudio || (!preparing && !transportBusy);
   const playing = !ready && !preparing && !paused;
-  const playLabel = playing ? "Pausar con Play" : paused ? "Reanudar" : "Reproducir";
-  function playGeneral() {
-    if (!canPlayGeneral) return;
-    if (waitingForAudio) void audioRef.current?.resume().catch(() => {});
-    else if (ready) {
-      if (!audioRef.current) void start();
-    } else void changePaused(!paused);
-  }
   const breathing = stage === "breath-hold";
   const canStart = ready || breathing || noteScene !== null || extendedScene !== null || (previewMode !== null && !preparing);
   const light = !showObject && stage !== "ready" && !preparing;
@@ -1818,6 +1812,30 @@ function ModuleZero({
   const numberedMode = activeScene === "harmonics" ? "line" : activeScene;
   const sceneIndex = numberedControls.findIndex(control => control.mode === numberedMode);
   const sceneNumber = sceneIndex >= 0 ? ACTIVE_SCORE[sceneIndex].number : null;
+  const recoveryIndex = ready && recoveryScene !== null
+    ? ACTIVE_SCORE.findIndex(({number}) => number === recoveryScene) : -1;
+  const recoveryCue = recoveryIndex >= 0 ? ACTIVE_SCORE[recoveryIndex] : null;
+  const recoveryNumber = recoveryCue ? displaySceneNumber(recoveryCue.number) : null;
+
+  useLayoutEffect(() => {
+    if (sceneNumber === null || paused || pausedRef.current || scoreClock?.state !== "running") return;
+    saveLastPlayedScene(sceneNumber);
+    setRecoveryScene(null);
+  }, [sceneNumber, paused, scoreClock]);
+
+  const recoveryLabel = recoveryNumber === null ? null : `Retomar escena ${recoveryNumber}`;
+  const playLabel = playing ? "Pausar con Play" : paused ? "Reanudar" : recoveryLabel ?? "Reproducir";
+  function playGeneral() {
+    if (!canPlayGeneral) return;
+    if (waitingForAudio) void audioRef.current?.resume().catch(() => {});
+    else if (ready) {
+      if (!audioRef.current) void start(numberedControls[recoveryIndex]?.mode);
+    } else void changePaused(!paused);
+  }
+  function playFromBeginning() {
+    if (ready && !audioRef.current) void start();
+  }
+
   const queuePanelFollow = useRef<(interaction?: boolean) => void>(() => {});
   useLayoutEffect(() => {
     const list = settingsRef.current;
@@ -2265,11 +2283,19 @@ function ModuleZero({
       }
       .zero-scene { padding-top: 1.4rem; border-top: 1px solid #30333d; }
       .zero-settings .zero-scene:first-child { padding-top: 0; border-top: 0; }
-      .zero-scene[aria-current=step] {
+      .zero-scene[aria-current=step], .zero-scene[data-recovered=true] {
         border-radius: .35rem; border-top-color: transparent; background: #25324c;
         box-shadow: 0 0 0 .42rem #25324c, 0 0 0 calc(.42rem + 1px) #819bd6,
           0 0 1rem rgba(142, 169, 233, .23);
       }
+      .zero-recovery {
+        display: grid; gap: .5rem; margin: 0 0 1rem; padding: .65rem;
+        border: 1px solid #819bd6; border-radius: .35rem; background: #25324c;
+      }
+      .zero-recovery p { margin: 0; color: #dce6ff; font-size: .8rem; }
+      .zero-recovery strong { display: block; margin-top: .18rem; color: #f2f3f7; font-size: .9rem; }
+      .zero-recovery-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+      .zero-recovery-actions button { flex: 1 1 8rem; }
       .zero-subtitle-toggle {
         display: flex; justify-content: space-between; align-items: center; gap: .5rem;
         min-height: 44px; font-size: .875rem; cursor: pointer;
@@ -2356,7 +2382,8 @@ function ModuleZero({
       {!liveSet && !coda && filmLayer}
       {!liveSet && !coda && cue && hasReferenceVisual(sceneNumber) &&
         <ReferenceVisual scene={sceneNumber} clock={cue.context} beginsAt={cue.beginsAt} duration={durations[sceneNumber]} paused={paused}/>}
-      {stage === "ready" && <button type="button" className="zero-start" onClick={() => void start()} aria-label="Iniciar la secuencia desde el módulo cero" />}
+      {ready && <button type="button" className="zero-start" onClick={playGeneral}
+         aria-label={recoveryLabel ?? "Iniciar la secuencia desde el módulo cero"} />}
       {showObject && cue && <EmptySetScene durationMs={activeDurationMs} cue={cue} paused={paused} />}
       {openingActive && cue && <OpeningProjection scene={sceneNumber === 1 ? 1 : 2} showCollisions={stage === "two"}
         cue={cue} seconds={activeDurationMs / 1000} strikes={strikes} />}
@@ -2404,6 +2431,15 @@ function ModuleZero({
     <aside className="zero-controls" aria-label="Controles de las escenas">
       <div className="zero-settings" ref={settingsRef}>
         <div className="zero-scene">
+          {recoveryCue && <div className="zero-recovery">
+            <p role="status">Última escena reproducida
+              <strong>Escena {recoveryNumber} · {recoveryCue.title}</strong>
+            </p>
+            <div className="zero-recovery-actions">
+              <button type="button" className="zero-play" onClick={playGeneral}>{recoveryLabel}</button>
+              <button type="button" onClick={playFromBeginning}>Desde el inicio</button>
+            </div>
+          </div>}
           <h2>Ajustes de la obra</h2>
           <p>{SHOW_SCENE_COUNT} escenas · margen de 20:00 a 40:00</p>
           {coda && ballot.state && <p>Ambiente en vivo · {atmosphereLabel(ballot.atmosphere)}</p>}
@@ -2421,7 +2457,7 @@ function ModuleZero({
           const {min,max} = limits[score.number];
           const layerType=isManualLayer(score.number) && score.number<TEMPERAMENT_SCENE ? (percussion ? "Percusión" : "Sonido") : null;
           return <div key={mode} className="zero-scene" role="region" data-scene={number} data-cue-id={score.number} aria-labelledby={`${id}-title`}
-            aria-current={isActive ? "step" : undefined}>
+            aria-current={isActive ? "step" : undefined} data-recovered={score.number === recoveryCue?.number ? true : undefined}>
             <div className="zero-title">
               <h2 id={`${id}-title`}>Escena {number}</h2>
               {hasScoredTake(score.number) ? <span>{percussion ? "Percusión · " : score.number>=18 && score.number<31 ? "Sonido · " : ""}4 compases · {takeSeconds.toLocaleString("es-AR",{maximumFractionDigits:2})} s de toma</span> : <label className="zero-scene-seconds"><input key={seconds} type="number" min={min} max={max}

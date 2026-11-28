@@ -1,8 +1,11 @@
 "use client";
 
 import { useSavedSetting } from "./saved-setting";
-import { SETTINGS_PREFIX, PIANO_KEYS as computerPianoKeys, type CcBinding } from "./control-map";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  isFaderTarget, isVolumeFader, MASTER_FADER, PIANO_KEYS as computerPianoKeys, SETTINGS_PREFIX,
+  SYNTH_FADER, VOLUME_FADER_LABELS, type CcBinding, type FaderTarget, type VolumeFader,
+} from "./control-map";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { frequencyPoint, OCTAVE_NOTES, ORIGINAL_NOTES, tuningAt, type FrequencyVector } from "./frequency-tuning";
 import { sceneNoiseBuffers, scheduleContinuationAudio } from "./scene-audio";
@@ -31,7 +34,7 @@ import { useScorePercussion } from "./score-percussion";
 import { hasReferenceVisual, ReferenceVisual } from "./reference-visuals";
 import { ExtendedArt, useExtendedArtAudio } from "./extended-art";
 import { FilterControls } from "./filter-controls";
-import { createMasterFilters, filterForFader, type FilterFader, type FilterValues, type MasterFilter } from "./master-filters";
+import { createMasterFilters, filterForFader, type FilterValues, type MasterFilter } from "./master-filters";
 import { protectPeaks, SPEAKER_CEILING } from "./peak-protection";
 import {ritualLayer} from "./ritual-patterns";
 import { hasScoredTake, isManualLayer } from "./layer-take";
@@ -50,9 +53,6 @@ import { MIDI_REASSIGNMENT, reassignMidi, type MidiReassignment } from "./midi-r
 import { EXTENDED_STYLE } from "./extended-style";
 
 import { monitorMidiInputs, type MidiInputLike, type MidiDevice } from "./midi-inputs";
-
-const MASTER_FADER = "-1";
-type FaderTarget = typeof MASTER_FADER | FilterFader;
 
 type MidiAccessLike = {
   inputs: {
@@ -1291,13 +1291,16 @@ function OpeningFilm({cue, output, controls, strikes, paused, finish}: {
   </div>;
 }
 
-function VolumeControl({ id, label, sound, volume, onChange, children }: {
+function VolumeControl({ id, label, sound, volume, onChange, target, binding, learning, learn }: {
   id: string;
   label: string;
   sound: string;
   volume: number;
   onChange: (value: number) => void;
-  children?: ReactNode;
+  target: VolumeFader;
+  binding?: CcBinding;
+  learning: boolean;
+  learn: (target: FaderTarget) => void;
 }) {
   const audibleVolume = useRef(volume || 100);
   useEffect(() => {
@@ -1306,6 +1309,12 @@ function VolumeControl({ id, label, sound, volume, onChange, children }: {
 
   const muted = volume === 0;
   const soundAction = muted ? "Restaurar " + sound : "Silenciar " + sound;
+  const midiTarget = target === MASTER_FADER ? "volumen" : "volumen del sintetizador";
+  const midiAction = learning ? "Cancelar asignación del fader" :
+    (binding ? "Reasignar fader al " : "Asignar fader al ") + midiTarget;
+  const assignment = binding ? (binding.inputName || binding.inputId) + " · " +
+    (binding.cc < 0 ? "Pitch Bend" : "CC " + binding.cc) +
+    " · canal " + ((binding.bendChannel ?? binding.ccChannel ?? 0) + 1) : "";
   return <div className="zero-volume">
     <button type="button" aria-label={soundAction} title={soundAction}
       onClick={() => onChange(muted ? audibleVolume.current : 0)}>
@@ -1318,7 +1327,13 @@ function VolumeControl({ id, label, sound, volume, onChange, children }: {
     <div>
       <div className="zero-volume-label">
         <label htmlFor={id}>{label}</label>
-        {children}
+        <button type="button" className="zero-midi-icon" title={assignment ? midiAction + " · " + assignment : midiAction}
+          aria-label={midiAction} aria-pressed={learning} data-assigned={!!binding} onClick={() => learn(target)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="13" r="7" />
+            <path d="m12 13 3-5M3 9l1 .5M7 3.5l.7 1.3M17 3.5l-.7 1.3M21 9l-1 .5" />
+          </svg>
+        </button>
         <output htmlFor={id}>{volume}%</output>
       </div>
       <input id={id} type="range" min={0} max={100} step={1}
@@ -1328,22 +1343,32 @@ function VolumeControl({ id, label, sound, volume, onChange, children }: {
   </div>;
 }
 
-function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, setMasterVolume, learnFader, learningFader, faderBinding, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs, filters, setFilter, filterBindings, filterLearning, learnFilter }: {
-  firstMidi: number; calibration: boolean; toggleCalibration: () => void; masterVolume: number; setMasterVolume: (value: number) => void; learnFader: () => void; learningFader: boolean; faderBinding?: CcBinding; faderSignal: string;
+function ModuleZero({
+  firstMidi, calibration, toggleCalibration, masterVolume, setMasterVolume, synthVolume, setSynthVolume,
+  learnFader, learningFader, faderBindings, faderSignal, pianoRouting, connectMidi, midiConnection, midiInputs,
+  filters, setFilter,
+}: {
+  firstMidi: number;
+  calibration: boolean;
+  toggleCalibration: () => void;
+  masterVolume: number;
+  setMasterVolume: (value: number) => void;
+  synthVolume: number;
+  setSynthVolume: (value: number) => void;
+  learnFader: (target: FaderTarget) => void;
+  learningFader: FaderTarget | null;
+  faderBindings: Record<string, CcBinding>;
+  faderSignal: string;
   pianoRouting: { current: PerformanceInput | null };
   connectMidi: (rescan?: boolean) => Promise<void>;
   midiConnection: MidiConnection;
   midiInputs: MidiDevice[];
   filters: FilterValues;
-  setFilter: (id:MasterFilter,value:number)=>void;
-  filterBindings:Record<string,CcBinding>;
-  filterLearning:FilterFader|null;
-  learnFilter:(target:FilterFader)=>void;
+  setFilter: (id: MasterFilter, value: number) => void;
 }) {
   const [stage, setStage] = useState<keyof typeof MODULE_ZERO_SCENE_BY_STAGE | ExtendedScene>("ready");
   const [scanState, setScanState] = useState<"idle" | "busy" | "done">("idle");
   const transportMidi = useTransportMidi(connectMidi);
-  const faderLabel = learningFader ? "Cancelar asignación del fader" : faderBinding ? "Reasignar fader al volumen" : "Asignar fader al volumen";
   const activeScene = typeof stage === "number" ? stage : MODULE_ZERO_SCENE_BY_STAGE[stage];
   const noteScene = typeof activeScene === "string" && isNoteScene(activeScene) ? activeScene : null;
   const extendedScene = typeof stage === "number" ? stage : null;
@@ -1410,7 +1435,6 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
   const outputRef = useRef<GainNode | null>(null);
   const masterVolumeRef = useRef(masterVolume);
   const synthOutputRef = useRef<GainNode | null>(null);
-  const [synthVolume, setSynthVolume] = useSavedSetting("liveInstrumentVolume", 100);
   const synthVolumeRef = useRef(synthVolume);
   const timersRef = useRef(new Set<number>());
   const waitingCues = useRef(new Set<() => void>());
@@ -2230,7 +2254,8 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
       }
       .zero-controls button.zero-midi-icon { display:inline-grid; place-items:center; width:28px; height:28px; min-height:28px; padding:3px; border-radius:50%; }
       .zero-controls .zero-midi-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-      .zero-midi-icon[aria-pressed=true] { background:#65518f; }
+      .zero-midi-icon[data-assigned=true] { border-color:#83bfba; color:#bcf3df; }
+       .zero-midi-icon[aria-pressed=true] { background:#65518f; }
       .zero-volume-label output { margin-left:auto; }
       .zero-volume-label output { color: #dce6ff; font-variant-numeric: tabular-nums; }
       .zero-settings {
@@ -2543,12 +2568,11 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
           </button>
         </div>
         {transportMidi.learning && ["play","pauseScene","stopScene"].includes(transportMidi.learning) && <small role="status">{transportMidi.hint}</small>}
-        <VolumeControl id="zero-master-volume" label="Volumen master" sound="sonido" volume={masterVolume} onChange={setMasterVolume}>
-          <button type="button" className="zero-midi-icon" title={faderLabel} aria-label={faderLabel} aria-pressed={learningFader} onClick={learnFader}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7"/><path d="m12 13 3-5M3 9l1 .5M7 3.5l.7 1.3M17 3.5l-.7 1.3M21 9l-1 .5"/></svg></button>
-        </VolumeControl>
-        {(learningFader || faderSignal) && <small role="status" style={{display:"block"}}>{faderSignal || "Esperando un movimiento MIDI del fader…"}</small>}
-        <VolumeControl id="zero-synth-volume" label="Volumen del sintetizador" sound="sintetizador"
-          volume={synthVolume} onChange={setSynthVolume} />
+        <VolumeControl id="zero-master-volume" label="Volumen master" sound="sonido" volume={masterVolume} onChange={setMasterVolume}
+          target={MASTER_FADER} binding={faderBindings[MASTER_FADER]} learning={learningFader === MASTER_FADER} learn={learnFader} />
+        <VolumeControl id="zero-synth-volume" label="Volumen del sintetizador" sound="sintetizador" volume={synthVolume} onChange={setSynthVolume}
+          target={SYNTH_FADER} binding={faderBindings[SYNTH_FADER]} learning={learningFader === SYNTH_FADER} learn={learnFader} />
+        {faderSignal && <small role="status" style={{display:"block"}}>{faderSignal}</small>}
         <label className="zero-subtitle-toggle">
           Activar subtítulos
           <input type="checkbox" role="switch" checked={showSubtitles}
@@ -2565,8 +2589,8 @@ function ModuleZero({ firstMidi, calibration, toggleCalibration, masterVolume, s
         <DjConsole output={cue ? outputRef.current : null} inputs={midiInputs}
           scene={sceneNumber} cue={cue} seconds={durations[sceneNumber ?? 0]} paused={paused}
           automatic={djAutomatic} setAutomatic={setDjAutomatic} connectMidi={connectMidi}/>
-        <FilterControls values={filters} change={setFilter} bindings={filterBindings}
-          learning={filterLearning} learn={learnFilter}/>
+        <FilterControls values={filters} change={setFilter} bindings={faderBindings}
+          learning={learningFader && !isVolumeFader(learningFader) ? learningFader : null} learn={learnFader}/>
         {(preparing || paused) && <span className="zero-playback-status" role="status">{waitingForAudio ? "Tocá ▶ para habilitar el audio." : preparing ? "Preparando audio…" : "En pausa"}</span>}
       </div>
     </aside>
@@ -2580,6 +2604,7 @@ export default function Multiversos860Page() {
   const [firstMidi, setFirstMidi] = useSavedSetting("cubeFirstMidi", 36);
   const [calibration, setCalibration] = useState(false);
   const [masterVolume, setMasterVolume] = useSavedSetting("masterVolume", 100);
+  const [synthVolume, setSynthVolume] = useSavedSetting("liveInstrumentVolume", 100);
   const [faderSignal, setFaderSignal] = useState("");
   const [ccMap, setCcMap] = useSavedSetting<Record<string, CcBinding>>("ccMap", {});
   const [filters, setFilters] = useSavedSetting<FilterValues>("masterFilters", {});
@@ -2687,7 +2712,7 @@ export default function Multiversos860Page() {
           (controlType==="bend" ? binding.cc===-1 && binding.bendChannel===channel :
             controlType==="cc" && binding.cc===first && (binding.ccChannel===undefined || binding.ccChannel===channel));
         const fader = Object.keys(ccMapRef.current).find(key =>
-          (key===MASTER_FADER || filterForFader(key)) && matchesControl(ccMapRef.current[key]));
+          isFaderTarget(key) && matchesControl(ccMapRef.current[key]));
         if (controlType && midiLearnRef.current === null) {
           const id = JSON.stringify([input.id,channel,controlType,controlType==="bend"?0:first]);
           const reserved = fader!==undefined;
@@ -2712,7 +2737,7 @@ export default function Multiversos860Page() {
               ...(bend ? {bendChannel:channel} : {ccChannel:channel})};
             setCcMap(current=>{
               const next={...current};
-              for (const key of Object.keys(next)) if ((key===MASTER_FADER || filterForFader(key)) && matchesControl(next[key])) delete next[key];
+              for (const key of Object.keys(next)) if (isFaderTarget(key) && matchesControl(next[key])) delete next[key];
               next[learning]=binding;
               ccMapRef.current=next;
               return next;
@@ -2722,10 +2747,12 @@ export default function Multiversos860Page() {
           }
           const percent=Math.round((bend ? (first+128*second)/16383 : second/127)*100);
           const effect=filterForFader(target);
-          if (effect) setFilter(effect.id,percent);
-          else setMasterVolume(percent);
-          if (learning!==null || !effect) {
-            setFaderSignal((effect?.label || "Máster")+" · "+(input.name || "MIDI")+" · "+(bend ? "Pitch Bend" : "CC "+first)+" · "+percent+"%");
+          if (target === SYNTH_FADER) setSynthVolume(percent);
+          else if (target === MASTER_FADER) setMasterVolume(percent);
+          else if (effect) setFilter(effect.id,percent);
+          if (learning !== null || isVolumeFader(target)) {
+            const name = isVolumeFader(target) ? VOLUME_FADER_LABELS[target] : effect?.label;
+            setFaderSignal(name+" · "+(input.name || "MIDI")+" · "+(bend ? "Pitch Bend" : "CC "+first)+" · "+percent+"%");
           }
           return;
         }
@@ -2765,7 +2792,12 @@ export default function Multiversos860Page() {
   }, []);
 
   useEffect(() => {
-    const reset = (event: Event) => { if ((event as CustomEvent).detail !== "synth") { midiLearnRef.current = null; setMidiLearnFor(null); } };
+    const reset = (event: Event) => {
+      if ((event as CustomEvent).detail === "synth" || midiLearnRef.current === null) return;
+      midiLearnRef.current = null;
+      setMidiLearnFor(null);
+      setFaderSignal("");
+    };
     const releaseFader = (event: Event) => {
       const {id,alias,owner}=(event as CustomEvent<MidiReassignment>).detail;
       if (owner==="master") return;
@@ -2773,7 +2805,7 @@ export default function Multiversos860Page() {
       if (type!=="cc" && type!=="bend") return;
       const deviceName=alias ? JSON.parse(alias)[1] : undefined;
       const targets=Object.entries(ccMapRef.current).filter(([key,binding])=>{
-        if (key!==MASTER_FADER && !filterForFader(key)) return false;
+        if (!isFaderTarget(key)) return false;
         const samePort=binding.inputName && deviceName ? binding.inputName===deviceName : binding.inputId===inputId;
         const sameControl=type==="cc" ? binding.cc===number && (binding.ccChannel===undefined || binding.ccChannel===channel)
           : binding.cc===-1 && binding.bendChannel===channel;
@@ -2801,8 +2833,8 @@ export default function Multiversos860Page() {
       setFaderSignal("");
       return;
     }
-    const effect=filterForFader(target);
-    setFaderSignal(effect ? "Mové el fader MIDI para asignar "+effect.label+"." : "");
+    const name = isVolumeFader(target) ? VOLUME_FADER_LABELS[target] : filterForFader(target)?.label;
+    setFaderSignal("Mové un fader MIDI para asignar " + name + ".");
     window.dispatchEvent(new CustomEvent("860-midi-learn",{detail:"synth"}));
     void connectMidi(true);
     midiLearnRef.current = target;
@@ -2812,7 +2844,13 @@ export default function Multiversos860Page() {
   return (
     <main className={styles.console}>
       <h1 className={styles.scoreTitle}>860 Multiversos</h1>
-      <TempoProvider><ModuleZero firstMidi={firstMidi} calibration={calibration} toggleCalibration={() => setCalibration(value => !value)} faderSignal={faderSignal} masterVolume={masterVolume} setMasterVolume={setMasterVolume} faderBinding={ccMap[MASTER_FADER]} learningFader={midiLearnFor === MASTER_FADER} learnFader={()=>toggleMidiLearn(MASTER_FADER)} filters={filters} setFilter={setFilter} filterBindings={ccMap} filterLearning={midiLearnFor===MASTER_FADER ? null : midiLearnFor} learnFilter={toggleMidiLearn} pianoRouting={pianoRouting} connectMidi={connectMidi} midiConnection={midiConnection} midiInputs={midiInputs} /></TempoProvider>
+      <TempoProvider>
+        <ModuleZero firstMidi={firstMidi} calibration={calibration} toggleCalibration={() => setCalibration(value => !value)}
+          masterVolume={masterVolume} setMasterVolume={setMasterVolume} synthVolume={synthVolume} setSynthVolume={setSynthVolume}
+          faderSignal={faderSignal} faderBindings={ccMap} learningFader={midiLearnFor} learnFader={toggleMidiLearn}
+          filters={filters} setFilter={setFilter} pianoRouting={pianoRouting} connectMidi={connectMidi}
+          midiConnection={midiConnection} midiInputs={midiInputs} />
+      </TempoProvider>
       <div className={styles.horizon}>
         <span>LA FRONTERA ENTRE ESCUCHAR Y VER</span>
         <i />

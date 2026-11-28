@@ -1,11 +1,28 @@
 import {DJ_MIDI_NAMES, isDjPad, type DjMidiMap, type DjMidiTarget} from "./dj-midi";
-import {filterForFader} from "./master-filters";
+import {filterForFader, type FilterFader} from "./master-filters";
 
 export const CONTROL_FILE = "Controles-860.json";
 export const CONTROL_FORMAT = "undertango-860/controles-v1";
 export const SETTINGS_PREFIX = "860-multiversos:settings:v1:";
 export const JOURNAL_KEY = "860-multiversos:organon:v1";
 export const RECOVERED_CONTROLS = "860-controles-recuperados";
+export const MASTER_FADER = "-1";
+export const SYNTH_FADER = "synth-volume";
+export const VOLUME_FADER_LABELS = {
+  [MASTER_FADER]: "Máster",
+  [SYNTH_FADER]: "Volumen del sintetizador",
+} as const;
+export type VolumeFader = keyof typeof VOLUME_FADER_LABELS;
+export type FaderTarget = VolumeFader | FilterFader;
+
+export function isVolumeFader(key: string): key is VolumeFader {
+  return Object.hasOwn(VOLUME_FADER_LABELS, key);
+}
+
+export function isFaderTarget(key: string): key is FaderTarget {
+  return isVolumeFader(key) || !!filterForFader(key);
+}
+
 export const BANK_ACTIONS = { volume: "Volumen", stop: "Stop", play: "Play inmediato", once: "Una vuelta", next: "Play en el 1", toggle: "Play / stop", select: "Elegir destino" } as const;
 export const TRANSPORT_NAMES = {
   play: "Play general", pauseScene: "Pausa general", stopScene: "Stop general", record: "Grabar",
@@ -92,7 +109,7 @@ function validSetting(name: SettingName, value: unknown): boolean {
         validSignal(id) && object(item) && integer(item.slot, 0, 8) && short(item.action) && Object.hasOwn(BANK_ACTIONS, item.action) &&
         short(item.label) && (item.alias === undefined || validSignal(item.alias, true)));
     case "ccMap":
-      return object(value) && Object.entries(value).every(([slot, b]) => (/^(-1|[0-8])$/.test(slot) || filterForFader(slot)) && object(b) &&
+      return object(value) && Object.entries(value).every(([slot, b]) => (isFaderTarget(slot) || /^[0-8]$/.test(slot)) && object(b) &&
         short(b.inputId) && (b.inputName === undefined || short(b.inputName)) && integer(b.cc, -1, 127) &&
         (b.ccChannel === undefined || integer(b.ccChannel, 0, 15)) &&
         (b.bendChannel === undefined || integer(b.bendChannel, 0, 15)));
@@ -166,7 +183,7 @@ export function describeControls(s: Settings): Rows {
   }
   for (const [slot, b] of Object.entries(s.ccMap)) {
     const filter=filterForFader(slot);
-    rows[slot === "-1" ? "Máster" : filter ? "Filtros · " + filter.label : "Síntesis histórica · " + synth[Number(slot)]] =
+    rows[isVolumeFader(slot) ? VOLUME_FADER_LABELS[slot] : filter ? "Filtros · " + filter.label : "Síntesis histórica · " + synth[Number(slot)]] =
       (b.inputName || b.inputId) + " · " + (b.cc < 0 ? "Pitch Bend · canal " + (Number(b.bendChannel) + 1) : "CC " + b.cc + (b.ccChannel === undefined ? "" : " · canal " + (b.ccChannel + 1)));
   }
   const buttons = transportBindings(s);
@@ -193,12 +210,14 @@ function sharedFaders(settings: Settings): string[] {
     if (key[2] !== "cc" && key[2] !== "bend") continue;
     for (const [slot, b] of Object.entries(settings.ccMap)) {
       const filter=filterForFader(slot);
-      if (slot !== "-1" && !filter) continue;
+      const destination = filter ? "el filtro " + filter.label :
+        isVolumeFader(slot) ? "el " + VOLUME_FADER_LABELS[slot].toLowerCase() : null;
+      if (!destination) continue;
       const device = a.alias ? signal(a.alias)[1] : undefined;
       const sameDevice = device && b.inputName ? device===b.inputName : key[0]===b.inputId;
       const sameSignal = key[2] === "cc" ? b.cc === key[3] && (b.ccChannel===undefined || b.ccChannel===key[1]) : b.cc < 0 && b.bendChannel === key[1];
       if (sameDevice && sameSignal) found.push("S" + (a.slot + 1) + " · " + BANK_ACTIONS[a.action] + " comparte " + a.label +
-        (filter ? " con el filtro " + filter.label : " con el máster") + ". El banco cede ese control.");
+        " con " + destination + ". El banco cede ese control.");
     }
   }
   return found;

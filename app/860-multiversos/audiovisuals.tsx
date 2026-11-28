@@ -11,7 +11,7 @@ const initialFilm: FilmSettings = {scene:62,opacity:24};
 
 export function useAudiovisuals() {
   const [enabled,setEnabled] = useSavedSetting("showAudiovisuals",true);
-  const [settings,setSettings] = useSavedSetting<Record<string,FilmSettings>>("audiovisualSettings",{});
+  const [settings,setSettings] = useSavedSetting<Partial<Record<string,FilmSettings>>>("audiovisualSettings",{});
   const [local,setLocal] = useState<Film[]>([]);
   const [notice,setNotice] = useState("");
   const urls=useRef(new Map<string,string>());
@@ -50,7 +50,10 @@ export function useAudiovisuals() {
 
   const films=local.map(film=>({...film,...settings[film.id]}));
   function change(film:Film, update:Partial<FilmSettings>) {
-    setSettings(current=>({...current,[film.id]:{scene:film.scene,opacity:film.opacity,...current[film.id],...update}}));
+    setSettings(current=>({
+      ...current,
+      [film.id]: {...(current[film.id] ?? {scene:film.scene,opacity:film.opacity}),...update},
+    }));
   }
   return {enabled,setEnabled,films,change,notice,addVideos,setNotice};
 }

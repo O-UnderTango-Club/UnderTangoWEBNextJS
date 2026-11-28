@@ -28,7 +28,8 @@ export function herculesCommand(inputId: string, data: ArrayLike<number>, held: 
   const channel = status & 15, kind = status & 0xf0;
   if (kind !== 0x90 && kind !== 0x80) return false;
   const transport = control === 7 ? "play" : control === 6 ? "cue" : control === 13 ? "load" : null;
-  const command: DjCommand | null = channel === 6 && control === 0 ? {action:"pad", pad:"pad1"}
+  const pad = channel === 6 || (channel === 7 && control > 0) ? DJ_PADS[control] : undefined;
+  const command: DjCommand | null = pad ? {action:"pad", pad}
     : transport && (channel === 1 || channel === 2) ? {action:transport, side:channel === 1 ? "A" : "B"} : null;
   if (!command) return false;
   const key = JSON.stringify([inputId, channel, control]);

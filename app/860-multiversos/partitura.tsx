@@ -2276,6 +2276,15 @@ function ModuleZero({
       .zero-controls .dj-pad[aria-pressed=true] {background:#a4ecdd;border-color:#bcffeb;color:#11392f;}
       .zero-controls .dj-midi-learn {min-height:30px;padding:.16rem .45rem;font-size:.72rem;}
       .zero-controls .dj-midi-learn[aria-pressed=true] {background:#664481;color:#fff;}
+      .dj-pad-wave {position:relative;width:100%;height:1.55rem;overflow:hidden;background:#151b28;
+        border:1px solid #4d6179;border-radius:.25rem;color:#adc8e8;}
+      .dj-pad-wave svg {display:block;width:100%;height:100%;pointer-events:none;}
+      .dj-pad-wave path {fill:none;stroke:currentColor;stroke-width:.8;}
+      .dj-wave-cue {position:absolute;inset-block:0;width:2px;background:#ffda86;pointer-events:none;}
+      .zero-controls .dj-pad-wave input[type=range] {position:absolute;inset:0;width:100%;height:100%;margin:0;
+        opacity:0;cursor:crosshair;touch-action:pan-y;}
+      .dj-pad-wave:focus-within {outline:2px solid #a8c3ff;outline-offset:1px;}
+      .dj-wave-status {font-size:.7rem;color:#c4c9dc;}
       .dj-pad-settings {display:grid;gap:.35rem;margin-top:.35rem;}
       .dj-cross-labels {display:flex;justify-content:space-between;}
       .dj-sheet .dj-arm {display:flex;align-items:center;margin:.55rem 0;}

@@ -10,6 +10,7 @@ import { createTimbreRack } from "./timbre-rack";
 import { createSceneInstrument, usesSceneKeyboard } from "./scene-instrument";
 import {createRitualInstrument} from "./ritual-percussion";
 import {ritualLayer} from "./ritual-patterns";
+import {createPlayedPercussion,isPlayedPercussionScene,type PercussionCursor} from "./score-percussion";
 import { TEMPERAMENT_SCENE } from "./show-score";
 import { useTempo } from "./tempo";
 
@@ -22,7 +23,8 @@ export function isPlayableExtendedScene(scene: ExtendedScene | null) {
 }
 
 export function useExtendedPerformance(scene: ExtendedScene | null, clock: AudioContext | null, output: OutputRef,
-  routing: { current: PerformanceInput | null }, manualOutput: GainNode | null, firstMidi: number) {
+  routing: { current: PerformanceInput | null }, manualOutput: GainNode | null, firstMidi: number,
+  percussionCursor: PercussionCursor | null) {
   const [selected, setSelected] = useSavedSetting<CubeTrack>("selected", 0);
   const [a4, setA4] = useSavedSetting("a4", DEFAULT_A4);
   const [amounts, setAmounts] = useSavedSetting<Partial<Record<TimbreScene, number>>>("amounts", {});
@@ -61,9 +63,14 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       };
     }
     if(!usesSceneKeyboard(scene))return;
-    const synth=createSceneInstrument(scene,bus,a4,()=>({
-      bpm:transport.current.bpm,origin:transport.current.beatOrigin(bus.context),
-    }),(frequency,velocity)=>{attack.current={count:attack.current.count+1,frequency,velocity};});
+    const onAttack=(frequency:number,velocity:number)=>{
+      attack.current={count:attack.current.count+1,frequency,velocity};
+    };
+    const synth=percussionCursor && isPlayedPercussionScene(scene)
+      ? createPlayedPercussion(scene,bus,percussionCursor,onAttack)
+      : createSceneInstrument(scene,bus,a4,()=>({
+        bpm:transport.current.bpm,origin:transport.current.beatOrigin(bus.context),
+      }),onAttack);
     const prefix=(device:string)=>`midi:${JSON.stringify(device)}:`;
     const pedals=new Set<string>(), sustained=new Set<string>();
     const play=(key:string,note:number,velocity:number)=>{
@@ -108,7 +115,7 @@ export function useExtendedPerformance(scene: ExtendedScene | null, clock: Audio
       window.removeEventListener("blur",releaseAll);document.removeEventListener("visibilitychange",hidden);
       synth.close();
     };
-  },[scene,manualOutput,routing,a4,firstMidi,numeric,percussion]);
+  },[scene,manualOutput,routing,a4,firstMidi,numeric,percussion,percussionCursor]);
 
 
   useEffect(() => {

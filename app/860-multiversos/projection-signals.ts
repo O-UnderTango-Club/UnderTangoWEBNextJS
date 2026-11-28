@@ -1,11 +1,12 @@
-import {createContext, useContext, useEffect, useRef} from "react";
+import {createContext, useContext, useEffect, useMemo, useRef} from "react";
 import {useTempo} from "./tempo";
+import type {PercussionCursor} from "./score-percussion";
 
 function emptyFrame() {
   return {low:0, mid:0, high:0, rms:0, attack:0, frequency:0, time:0, beat:0, beats:0, gesture:0,
     bpm:0, hasAudio:false, wave:new Uint8Array(1024).fill(128)};
 }
-export type ProjectionSignals = {current:ReturnType<typeof emptyFrame>};
+export type ProjectionSignals = {current:ReturnType<typeof emptyFrame>;percussion:PercussionCursor|null};
 export type ProjectionMeter = {current:AnalyserNode|null};
 export type ProjectionAttack = {current:{count:number; frequency:number; velocity:number}};
 export const ProjectionSignalContext = createContext<ProjectionSignals|null>(null);
@@ -23,10 +24,11 @@ function bandLevel(bins:Uint8Array, widthHz:number, fromHz:number, toHz:number) 
 }
 
 export function useSceneSignals(scene:number|null, context:AudioContext|null, beginsAt:number,
-    paused:boolean, mix:ProjectionMeter, room:ProjectionMeter, strikes:ProjectionAttack, captureBands=false):ProjectionSignals {
+    paused:boolean, mix:ProjectionMeter, room:ProjectionMeter, strikes:ProjectionAttack,
+    percussion:PercussionCursor|null, captureBands=false):ProjectionSignals {
   const state = useRef<ReturnType<typeof emptyFrame>|null>(null);
-  if (state.current===null) state.current=emptyFrame();
-  const signals=state as ProjectionSignals;
+  const frame=state.current ?? (state.current=emptyFrame());
+  const signals=useMemo(()=>({current:frame,percussion}),[frame,percussion]);
   const {bpm,clock}=useTempo();
   const transport=useRef({bpm,clock});
   useEffect(()=>{transport.current={bpm,clock};},[bpm,clock]);

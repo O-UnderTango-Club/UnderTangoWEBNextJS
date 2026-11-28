@@ -28,8 +28,6 @@ const offbeat: Rhythm = { divisions: 2, steps: [null, 0], gate: .8 };
 const arpeggio: Rhythm = { divisions: 2, steps: [0, 7, 12, 7], gate: .8 };
 const goa: Rhythm = { divisions: 4, steps: [0, 1, 7, 12, 0, 10, 7, 1], gate: .76 };
 const garage: Rhythm = { divisions: 4, steps: [0, null, null, 7, null, null, 0, null], gate: 1.15 };
-const breakKick: Rhythm = { divisions: 4, steps: [0,null,null,null,null,null,0,null,null,null,0,null,null,null,null,0], gate: .8 };
-const breakSnare: Rhythm = { divisions: 4, steps: [null,null,null,null,0,null,null,null,null,null,null,0,0,null,null,null], gate: .75 };
 const breakHat: Rhythm = { divisions: 4, steps: [0,null,0,0,0,null,0,null], gate: .57 };
 const milonga: Rhythm = { divisions: 2, steps: [0, null, null, 7, null, null, 0, null], gate: 1.35 };
 const downbeats: Rhythm = { divisions: 1, steps: [0], gate: .66 };
@@ -62,20 +60,17 @@ function orchestration(scene: InstrumentScene, note: number): {color: Color; rhy
     case 32: return {color:"bass"};
     case 33: case 76: return {color:"pad"};
     case 34: return {color:kit(note)};
-    case 66: {const color=kit(note);return {color,rhythm:color==="kick"?breakKick:color==="snare"?breakSnare:breakHat};}
     case 35: return {color:"pluck",rhythm:arpeggio};
-    case 36: case 64: return {color:"stab"};
+    case 36: return {color:"stab"};
     case 37: case 73: return {color:"acid"};
     case 38: case 78: return {color:"lead"};
     case 39: return {color:note<48?"bass":note<68?"stab":"lead"};
     case 63: return {color:"pluck"};
     case 65: return {color:"bass",rhythm:garage};
-    case 67: return {color:"hollow",rhythm:arpeggio};
     case 68: return {color:note<52?"kick":"acid",rhythm:note<52?downbeats:roll};
     case 69: return {color:"lead",rhythm:arpeggio};
     case 70: return {color:"kick",rhythm:downbeats};
     case 71: return {color:"bass",rhythm:roll};
-    case 72: return {color:"stab",rhythm:offbeat};
     case 74: return {color:"acid",rhythm:goa};
     case 75: return {color:note%2?"hat":"metal"};
     case 79: return note<42?{color:"kick",rhythm:downbeats}:note<60?{color:"bass",rhythm:roll}:{color:"acid",rhythm:goa};
@@ -230,9 +225,9 @@ function makeSound(bus: GainNode, scene: InstrumentScene, color: Color, hz: numb
 }
 
 export type PercussionVoice = "kick" | "snare" | "clap" | "hat" | "tom" | "metal";
-export function schedulePercussionHit(output:GainNode,scene:InstrumentScene,voice:PercussionVoice,at:number,shape?:{pitch:number;velocity:number}) {
-  const pitch=shape?.pitch ?? {kick:52,snare:175,clap:250,hat:6200,tom:166.5,metal:444}[voice];
-  const velocity=shape?.velocity ?? {kick:.73,snare:.59,clap:.63,hat:.48,tom:.67,metal:.56}[voice];
+export function schedulePercussionHit(output:GainNode,scene:InstrumentScene,voice:PercussionVoice,at:number,velocityScale=1) {
+  const pitch={kick:52,snare:175,clap:250,hat:6200,tom:166.5,metal:444}[voice];
+  const velocity={kick:.73,snare:.59,clap:.63,hat:.48,tom:.67,metal:.56}[voice]*velocityScale;
   return makeSound(output,scene,voice,pitch,velocity,at,()=>{});
 }
 
